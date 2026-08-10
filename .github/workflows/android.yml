@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - umk3-hd-fan-remake
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -14,8 +17,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Smoke-test fighting loop
-        run: node tests/smoke.cjs
+      - name: Verify JavaScript and fighting loop
+        run: |
+          node --check web/umk3-data.js
+          node --check web/game.js
+          node tests/smoke.cjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -28,8 +34,11 @@ jobs:
           gradle-version: '8.7'
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
+      - name: Verify APK exists
+        run: test -s app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: umk3-hd-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
