@@ -138,8 +138,8 @@ jobs:
             echo "TOUCH_SCREEN=${W}x${H}" | tee emulator-touch.txt
 
             adb shell input tap $((W*50/100)) $((H*55/100)); sleep 1
-            # Select Scorpion (top row, last portrait) to verify the ninja art path.
-            adb shell input tap $((W*75/100)) $((H*25/100)); sleep 1
+            # Select Scorpion: seventh portrait in the first row.
+            adb shell input tap $((W*82/100)) $((H*25/100)); sleep 1
             adb shell input tap $((W*50/100)) $((H*55/100)); sleep 4
             adb shell input tap $((W*82/100)) $((H*48/100)); sleep 1
             adb shell input swipe $((W*12/100)) $((H*69/100)) $((W*18/100)) $((H*69/100)) 450; sleep 1
