@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - racing-native-3d
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
