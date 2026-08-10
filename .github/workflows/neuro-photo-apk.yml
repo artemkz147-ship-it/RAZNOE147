@@ -4,11 +4,14 @@ on:
   push:
     branches:
       - neuro-photo-editor
+    paths:
+      - 'neuro-photo/tools/customize_upstream.py'
+      - '.github/workflows/neuro-photo-apk.yml'
   pull_request:
     branches:
       - main
     paths:
-      - 'neuro-photo/**'
+      - 'neuro-photo/tools/customize_upstream.py'
       - '.github/workflows/neuro-photo-apk.yml'
   workflow_dispatch:
 
@@ -16,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: neuro-photo-${{ github.ref }}
+  group: neuro-photo-lite-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
