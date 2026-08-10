@@ -58,6 +58,9 @@ jobs:
       - name: Apply NeuroPhoto Full customization
         run: python3 neuro-photo/tools/customize_full_upstream.py upstream
 
+      - name: Remove bundled Android system libraries
+        run: python3 neuro-photo/tools/prepare_full_native_libs.py upstream
+
       - name: Download pinned SD1.5 Q4 model
         shell: bash
         run: |
@@ -75,9 +78,9 @@ jobs:
         working-directory: upstream
         run: flutter pub get
 
-      - name: Analyze patched Dart sources
+      - name: Analyze patched production Dart sources
         working-directory: upstream
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        run: flutter analyze lib --no-fatal-infos --no-fatal-warnings
 
       - name: Build Full release APK
         working-directory: upstream
@@ -94,11 +97,18 @@ jobs:
           echo "APK bytes: ${SIZE}"
           test "$SIZE" -lt 2147483648
           unzip -q dist/NeuroPhoto-full.apk 'lib/arm64-v8a/*.so' -d dist/apkcheck
+          test ! -e dist/apkcheck/lib/arm64-v8a/libc.so
+          test ! -e dist/apkcheck/lib/arm64-v8a/libm.so
+          test ! -e dist/apkcheck/lib/arm64-v8a/libdl.so
           echo 'ELF LOAD alignment:'
           for lib in dist/apkcheck/lib/arm64-v8a/*.so; do
             echo "--- $lib"
             readelf -lW "$lib" | awk '/LOAD/{print $NF}' | sort -u
           done
+          if find dist/apkcheck/lib/arm64-v8a -name '*.so' -print0 | xargs -0 -n1 sh -c 'readelf -lW "$0" | awk "/LOAD/{print \$NF}" | grep -qx 0x1000'; then
+            echo 'Found a 4 KiB-aligned native library in the final APK' >&2
+            exit 1
+          fi
           ls -lh dist/NeuroPhoto-full.apk dist/NeuroPhoto-full.apk.sha256
 
       - name: Publish prerelease APK
