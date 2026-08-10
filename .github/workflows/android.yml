@@ -12,6 +12,7 @@ on:
 jobs:
   build-and-launch-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -118,6 +119,7 @@ jobs:
           ls -l /dev/kvm || true
 
       - name: Boot official emulator, install APK and verify full touch fight
+        timeout-minutes: 8
         run: bash tools/android_emulator_test.sh app/build/outputs/apk/debug/app-debug.apk
 
       - uses: actions/upload-artifact@v4
@@ -135,6 +137,7 @@ jobs:
             avd-create.log
             emulator-accel.txt
             emulator-process.log
+            emulator-process-tail.log
             emulator-props.txt
             emulator-webview.txt
             emulator-devices.txt
