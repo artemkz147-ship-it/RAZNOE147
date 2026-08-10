@@ -22,6 +22,7 @@ concurrency:
 
 env:
   UPSTREAM_REF: '2.6.5.9'
+  ANDROID_BUILD_TOOLS: '37.0.0'
 
 jobs:
   android:
@@ -79,14 +80,24 @@ jobs:
         with:
           cmdline-tools-version: 15859902
 
-      - name: Install Android build dependencies
+      - name: Install Android 17 build dependencies
         shell: bash
         run: |
+          # Android 17 / API 37 is still exposed by sdkmanager as android-37.0
+          # on current preview repositories even though Gradle's compileSdk is 37.
           sdkmanager --channel=3 \
-            "platforms;android-37" \
-            "build-tools;36.0.0" \
+            "platforms;android-37.0" \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
             "ndk;28.2.13676358" \
             "cmake;3.31.6"
+
+          # Some tooling looks for $ANDROID_HOME/platforms/android-37 when compileSdk=37.
+          # Normalize the preview directory name without copying the platform contents.
+          if [ -d "$ANDROID_HOME/platforms/android-37.0" ] && [ ! -e "$ANDROID_HOME/platforms/android-37" ]; then
+            ln -s android-37.0 "$ANDROID_HOME/platforms/android-37"
+          fi
+          test -f "$ANDROID_HOME/platforms/android-37/android.jar"
+          test -x "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
 
       - name: Create installable debug signing key
         shell: bash
@@ -115,8 +126,8 @@ jobs:
         shell: bash
         run: |
           test -s dist/PS2-AutoTune-Android-universal.apk
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose dist/PS2-AutoTune-Android-universal.apk
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging dist/PS2-AutoTune-Android-universal.apk | head -n 5
+          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner" verify --verbose dist/PS2-AutoTune-Android-universal.apk
+          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/aapt" dump badging dist/PS2-AutoTune-Android-universal.apk | head -n 5
           sha256sum dist/PS2-AutoTune-Android-universal.apk > dist/SHA256SUMS.txt
           ls -lh dist
 
