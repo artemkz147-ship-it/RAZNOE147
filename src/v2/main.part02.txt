@@ -1,0 +1,130 @@
+      new THREE.BoxGeometry(this.roadWidth - 1.2, 0.028, 1.8),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x37d6ff, emissiveIntensity: 0.85 })
+    );
+    startLine.position.set(start.x, 0.085, start.z);
+    startLine.rotation.y = yaw;
+    this.scene.add(startLine);
+  }
+
+  buildScenery() {
+    const count = 190;
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x1c2940, roughness: 0.58, metalness: 0.34, emissive: 0x0b1b31, emissiveIntensity: 0.92 });
+    const buildings = new THREE.InstancedMesh(geo, mat, count);
+    const dummy = new THREE.Object3D();
+    const c = new THREE.Color();
+    for (let i = 0; i < count; i++) {
+      const t = (i / count + Math.sin(i * 91.7) * 0.03 + 1) % 1;
+      const p = this.track.getPointAt(t); const tan = this.track.getTangentAt(t).normalize(); const n = new THREE.Vector3(-tan.z, 0, tan.x);
+      const side = i % 2 ? 1 : -1;
+      const dist = 23 + ((i * 37) % 52);
+      const w = 5 + ((i * 11) % 11); const d = 5 + ((i * 17) % 12); const h = 10 + ((i * 29) % 58);
+      dummy.position.copy(p).addScaledVector(n, side * dist);
+      dummy.position.y = h * 0.5 - 0.05;
+      dummy.rotation.y = Math.sin(i * 2.11) * 1.2;
+      dummy.scale.set(w, h, d); dummy.updateMatrix();
+      buildings.setMatrixAt(i, dummy.matrix);
+      c.setHSL(0.53 + (i % 12) * 0.013, 0.36, 0.14 + (i % 5) * 0.024);
+      buildings.setColorAt(i, c);
+    }
+    buildings.castShadow = false; buildings.receiveShadow = true;
+    this.scene.add(buildings);
+
+    const windowGeo = new THREE.BoxGeometry(.58, .75, .05);
+    const windowMats = [0x46eaff, 0xff3a94, 0xffc24a, 0x9d69ff, 0x61ffb1].map(color => new THREE.MeshBasicMaterial({ color }));
+    for (let batch = 0; batch < windowMats.length; batch++) {
+      const windows = new THREE.InstancedMesh(windowGeo, windowMats[batch], 115);
+      let wi = 0;
+      for (let i = batch; i < 575 && wi < 115; i += 5) {
+        const t = mod(i * .0197 + batch * .031, 1); const p = this.track.getPointAt(t); const tan = this.track.getTangentAt(t).normalize(); const n = new THREE.Vector3(-tan.z, 0, tan.x);
+        const side = i % 2 ? 1 : -1; const dist = 18 + ((i * 13) % 39); const yaw = Math.atan2(-tan.x, -tan.z);
+        const wp = p.clone().addScaledVector(n, side * dist);
+        dummy.position.set(wp.x, 3 + ((i * 7) % 34), wp.z); dummy.rotation.set(0, yaw + (side > 0 ? 0 : Math.PI), 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); windows.setMatrixAt(wi++, dummy.matrix);
+      }
+      this.scene.add(windows);
+    }
+
+    const glowGeo = new THREE.BoxGeometry(0.3, 5.4, 0.3);
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0x69ecff });
+    const poles = new THREE.InstancedMesh(glowGeo, glowMat, 72);
+    for (let i = 0; i < 72; i++) {
+      const t = i / 72; const p = this.track.getPointAt(t); const tan = this.track.getTangentAt(t).normalize(); const n = new THREE.Vector3(-tan.z, 0, tan.x);
+      const pp = p.clone().addScaledVector(n, (i % 2 ? 1 : -1) * (this.roadWidth * .5 + 3.2));
+      dummy.position.set(pp.x, 2.7, pp.z); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); poles.setMatrixAt(i, dummy.matrix);
+    }
+    this.scene.add(poles);
+
+    for (let i = 0; i < 34; i++) {
+      const color = [0xff357c, 0x39ddff, 0xffb437, 0x8f63ff][i % 4];
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(4.8 + (i % 3) * 1.5, 1.2 + (i % 2) * .5, 0.13), new THREE.MeshBasicMaterial({ color }));
+      const t = (i * 0.047 + 0.025) % 1; const p = this.track.getPointAt(t); const tan = this.track.getTangentAt(t).normalize(); const n = new THREE.Vector3(-tan.z, 0, tan.x);
+      sign.position.copy(p).addScaledVector(n, (i % 2 ? 1 : -1) * (this.roadWidth * .5 + 7.5)); sign.position.y = 4.8 + (i % 5);
+      sign.rotation.y = Math.atan2(-tan.x, -tan.z);
+      this.scene.add(sign);
+    }
+
+    for (let i = 0; i < 10; i++) {
+      const t = (i + .5) / 10; const p = this.track.getPointAt(t); const tan = this.track.getTangentAt(t).normalize(); const n = new THREE.Vector3(-tan.z, 0, tan.x); const yaw = Math.atan2(-tan.x, -tan.z);
+      const gate = new THREE.Group();
+      const color = i % 2 ? 0xff3f9a : 0x45e8ff;
+      const gm = new THREE.MeshBasicMaterial({ color });
+      const top = new THREE.Mesh(new THREE.BoxGeometry(this.roadWidth + 2.3, .25, .25), gm); top.position.y = 5.4; gate.add(top);
+      for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(.25, 5.4, .25), gm); post.position.set(side * (this.roadWidth * .5 + 1), 2.7, 0); gate.add(post); }
+      gate.position.copy(p); gate.rotation.y = yaw; this.scene.add(gate);
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(this.roadWidth - 1.4, .025, 1.2), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .45 }));
+      pad.position.copy(p); pad.position.y = .085; pad.rotation.y = yaw; this.scene.add(pad);
+      void n;
+    }
+  }
+
+  buildPhysics() {
+    const groundBody = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.3, 0));
+    this.world.createCollider(RAPIER.ColliderDesc.cuboid(210, 0.25, 210).setFriction(1.0), groundBody);
+    for (let i = 0; i < this.trackSamples.length; i += 5) {
+      const p = this.trackSamples[i], t = this.trackTangents[i];
+      const n = new THREE.Vector3(-t.z, 0, t.x); const yaw = Math.atan2(-t.x, -t.z);
+      const rot = { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) };
+      for (const side of [-1, 1]) {
+        const bp = p.clone().addScaledVector(n, side * (this.roadWidth * 0.5 + 0.75));
+        const rb = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(bp.x, 0.62, bp.z).setRotation(rot));
+        this.world.createCollider(RAPIER.ColliderDesc.cuboid(2.9, 0.7, 0.2).setFriction(0.45).setRestitution(0.08), rb);
+      }
+    }
+  }
+
+  spawnDestructibles() {
+    const barrierMat = new THREE.MeshStandardMaterial({ color: 0xff7138, emissive: 0x5a1907, emissiveIntensity: .55, metalness: .15, roughness: .62 });
+    const crateMat = new THREE.MeshStandardMaterial({ color: 0xc28b45, roughness: .82, metalness: .04 });
+    const bollardMat = new THREE.MeshStandardMaterial({ color: 0x44eaff, emissive: 0x087691, emissiveIntensity: .9, metalness: .4, roughness: .36 });
+
+    for (let i = 0; i < 48; i++) {
+      const kind: DestructibleKind = i % 3 === 0 ? 'barrier' : i % 3 === 1 ? 'crate' : 'bollard';
+      const t = mod(.018 + i * .0199, 1); const p = this.track.getPointAt(t); const tan = this.track.getTangentAt(t).normalize(); const n = new THREE.Vector3(-tan.z, 0, tan.x);
+      const side = i % 2 ? 1 : -1; const offset = this.roadWidth * .5 + (kind === 'barrier' ? 2.1 : 3.5 + (i % 4));
+      const pos = p.clone().addScaledVector(n, side * offset);
+      const yaw = Math.atan2(-tan.x, -tan.z) + (kind === 'crate' ? i * .37 : 0);
+      let mesh: THREE.Mesh; let half = new THREE.Vector3();
+      if (kind === 'barrier') { mesh = new THREE.Mesh(new THREE.BoxGeometry(2.3, .78, .55), barrierMat.clone()); half.set(1.15, .39, .275); pos.y = .43; }
+      else if (kind === 'crate') { mesh = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.05, 1.05), crateMat.clone()); half.set(.525, .525, .525); pos.y = .56; }
+      else { mesh = new THREE.Mesh(new THREE.CylinderGeometry(.16, .22, 2.5, 10), bollardMat.clone()); half.set(.22, 1.25, .22); pos.y = 1.27; }
+      mesh.castShadow = true; mesh.receiveShadow = true; mesh.position.copy(pos); mesh.rotation.y = yaw; this.scene.add(mesh);
+      const rot = new THREE.Quaternion().setFromAxisAngle(Y_AXIS, yaw);
+      const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z).setRotation({ x: rot.x, y: rot.y, z: rot.z, w: rot.w }).setLinearDamping(.3).setAngularDamping(.35).setCanSleep(true));
+      this.world.createCollider(RAPIER.ColliderDesc.cuboid(half.x, half.y, half.z).setDensity(kind === 'bollard' ? 14 : 45).setFriction(.72).setRestitution(.24), body);
+      this.destructibles.push({ mesh, body, initialPosition: pos.clone(), initialRotation: rot.clone(), kind });
+    }
+  }
+
+  makeCar(color: number, accent: number) {
+    const g = new THREE.Group();
+    const paint = new THREE.MeshStandardMaterial({ color, metalness: 0.82, roughness: 0.24 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x07090d, metalness: 0.7, roughness: 0.22 });
+    const glass = new THREE.MeshStandardMaterial({ color: 0x143756, metalness: 0.42, roughness: 0.08, transparent: true, opacity: 0.88 });
+    const neon = new THREE.MeshBasicMaterial({ color: accent });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.12, 0.48, 4.2), paint); body.position.y = 0.64; body.castShadow = true; g.add(body);
+    const hood = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.25, 1.38), paint); hood.position.set(0, 0.93, -1.22); hood.rotation.x = -0.07; g.add(hood);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.68, 1.72), glass); cabin.position.set(0, 1.16, 0.18); cabin.rotation.x = -0.03; g.add(cabin);
+    const splitter = new THREE.Mesh(new THREE.BoxGeometry(2.28, 0.12, 0.35), dark); splitter.position.set(0, 0.42, -2.06); g.add(splitter);
+    const spoiler = new THREE.Mesh(new THREE.BoxGeometry(2.12, 0.12, 0.38), dark); spoiler.position.set(0, 1.22, 1.75); g.add(spoiler);
+    const wingL = new THREE.Mesh(new THREE.BoxGeometry(.12, .48, .12), dark); wingL.position.set(-.72, 1.02, 1.7); g.add(wingL);
+    const wingR = wingL.clone(); wingR.position.x = .72; g.add(wingR);

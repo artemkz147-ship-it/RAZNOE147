@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#071426" />
+    <title>Neon Apex Racing</title>
+  </head>
+  <body>
+    <div id="game"></div>
+
+    <div id="boot" class="screen active">
+      <div class="logo">NEON <span>APEX</span></div>
+      <div class="subtitle">MOBILE STREET RACING</div>
+      <div id="bootStatus" class="boot-status">Инициализация физики…</div>
+    </div>
+
+    <div id="menu" class="screen">
+      <div class="menu-card">
+        <div class="eyebrow">THREE CIRCUITS / DESTRUCTIBLE WORLD</div>
+        <h1>NEON APEX</h1>
+        <p>Три детализированные трассы, гараж с разными машинами, физические разрушения, повреждения кузова, дрифт, нитро и AI-соперники.</p>
+        <button id="startBtn" class="primary">НАЧАТЬ ГОНКУ</button>
+        <button id="qualityBtn" class="secondary">КАЧЕСТВО: АВТО</button>
+        <div class="tiny">WASD / стрелки / Shift или экранные кнопки • выбор трассы и машины сохраняется</div>
+      </div>
+    </div>
+
+    <div id="hud" class="hidden">
+      <div class="hud-top-left glass">
+        <div class="position"><span id="position">1</span><small>/6</small></div>
+        <div><span id="lap">1</span><small>/3 КРУГ</small></div>
+      </div>
+      <div class="hud-top-right glass">
+        <div id="raceTime">00:00.000</div>
+        <small>ВРЕМЯ</small>
+      </div>
+      <div class="speed-wrap">
+        <div class="speed"><span id="speed">0</span><small>КМ/Ч</small></div>
+        <div class="nitro-label"><span>NITRO</span><span id="nitroText">100%</span></div>
+        <div class="nitro-bar"><i id="nitroBar"></i></div>
+      </div>
+      <button id="pauseBtn" class="pause">Ⅱ</button>
+    </div>
+
+    <div id="countdown" class="countdown hidden">3</div>
+
+    <div id="touchControls" class="touch hidden">
+      <div class="steer-zone">
+        <button data-key="left" aria-label="Влево">◀</button>
+        <button data-key="right" aria-label="Вправо">▶</button>
+      </div>
+      <div class="pedal-zone">
+        <button data-key="brake" class="brake" aria-label="Тормоз">▾</button>
+        <button data-key="nitro" class="nitro" aria-label="Нитро">N₂O</button>
+        <button data-key="gas" class="gas" aria-label="Газ">▲</button>
+      </div>
+    </div>
+
+    <div id="pauseScreen" class="screen">
+      <div class="menu-card small-card">
+        <h2>ПАУЗА</h2>
+        <button id="resumeBtn" class="primary">ПРОДОЛЖИТЬ</button>
+        <button id="restartBtn" class="secondary">РЕСТАРТ</button>
+        <button id="menuBtn" class="secondary">В МЕНЮ</button>
+      </div>
+    </div>
+
+    <div id="finishScreen" class="screen">
+      <div class="menu-card small-card">
+        <div class="eyebrow">ФИНИШ</div>
+        <h2 id="finishTitle">1 МЕСТО</h2>
+        <div id="finishTime" class="finish-time">00:00.000</div>
+        <button id="againBtn" class="primary">ЕЩЁ РАЗ</button>
+        <button id="finishMenuBtn" class="secondary">В МЕНЮ</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main-v3.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,130 @@
+import * as THREE from 'three';
+import RAPIER from '@dimforge/rapier3d-compat';
+import './style-v2.css';
+
+type RaceState = 'menu' | 'countdown' | 'race' | 'paused' | 'finish';
+type Quality = 'auto' | 'high' | 'low';
+type DestructibleKind = 'barrier' | 'crate' | 'bollard';
+
+type AIState = {
+  mesh: THREE.Group;
+  body: RAPIER.RigidBody;
+  distance: number;
+  speed: number;
+  lane: number;
+  finished: boolean;
+  damage: number;
+};
+
+type Destructible = {
+  mesh: THREE.Object3D;
+  body: RAPIER.RigidBody;
+  initialPosition: THREE.Vector3;
+  initialRotation: THREE.Quaternion;
+  kind: DestructibleKind;
+};
+
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const clamp = THREE.MathUtils.clamp;
+const mod = (n: number, m: number) => ((n % m) + m) % m;
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+
+const speedWrap = document.querySelector('.speed-wrap');
+if (speedWrap && !document.getElementById('damageBar')) {
+  speedWrap.insertAdjacentHTML('beforeend', '<div class="damage-label"><span>КУЗОВ</span><span id="damageText">100%</span></div><div class="damage-bar"><i id="damageBar"></i></div>');
+}
+
+const ui = {
+  boot: $('boot'), bootStatus: $('bootStatus'), menu: $('menu'), start: $('startBtn') as HTMLButtonElement,
+  quality: $('qualityBtn') as HTMLButtonElement, hud: $('hud'), position: $('position'), lap: $('lap'),
+  raceTime: $('raceTime'), speed: $('speed'), nitroText: $('nitroText'), nitroBar: $('nitroBar') as HTMLElement,
+  damageText: $('damageText'), damageBar: $('damageBar') as HTMLElement,
+  countdown: $('countdown'), touch: $('touchControls'), pause: $('pauseBtn') as HTMLButtonElement,
+  pauseScreen: $('pauseScreen'), resume: $('resumeBtn') as HTMLButtonElement, restart: $('restartBtn') as HTMLButtonElement,
+  menuBtn: $('menuBtn') as HTMLButtonElement, finish: $('finishScreen'), finishTitle: $('finishTitle'),
+  finishTime: $('finishTime'), again: $('againBtn') as HTMLButtonElement, finishMenu: $('finishMenuBtn') as HTMLButtonElement,
+};
+
+class NeonApexGame {
+  renderer!: THREE.WebGLRenderer;
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(66, innerWidth / innerHeight, 0.08, 650);
+  clock = new THREE.Clock();
+  world!: RAPIER.World;
+  playerBody!: RAPIER.RigidBody;
+  playerMesh!: THREE.Group;
+  track!: THREE.CatmullRomCurve3;
+  trackLength = 1;
+  trackSamples: THREE.Vector3[] = [];
+  trackTangents: THREE.Vector3[] = [];
+  roadWidth = 15;
+  ai: AIState[] = [];
+  destructibles: Destructible[] = [];
+  keys = new Set<string>();
+  touch = { left: false, right: false, gas: false, brake: false, nitro: false };
+  state: RaceState = 'menu';
+  quality: Quality = 'auto';
+  countdown = 0;
+  raceSeconds = 0;
+  lap = 1;
+  lastTrackIndex = 0;
+  nitro = 100;
+  playerDamage = 0;
+  nitroActive = false;
+  nitroPulse = 0;
+  lastPlayerSpeed = 0;
+  lastImpactAt = 0;
+  cameraPos = new THREE.Vector3();
+  cameraLook = new THREE.Vector3();
+  nearestIndex = 0;
+  playerProgress = 0;
+  bestPosition = 6;
+  frame = 0;
+  skid = 0;
+  sun!: THREE.DirectionalLight;
+
+  async init() {
+    ui.bootStatus.textContent = 'Загрузка 3D и физики…';
+    await RAPIER.init();
+    this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    this.setupRenderer();
+    this.buildWorld();
+    this.buildTrack();
+    this.buildScenery();
+    this.buildPhysics();
+    this.spawnDestructibles();
+    this.spawnPlayer();
+    this.spawnAI();
+    this.bindControls();
+    this.setQuality('auto');
+    this.resetRace(false);
+    this.renderer.setAnimationLoop(() => this.loop());
+    ui.bootStatus.textContent = 'Готово';
+    setTimeout(() => {
+      ui.boot.classList.remove('active');
+      ui.boot.style.display = 'none';
+      ui.menu.classList.add('active');
+    }, 350);
+  }
+
+  setupRenderer() {
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer.setSize(innerWidth, innerHeight);
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.34;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    $('game').appendChild(this.renderer.domElement);
+    addEventListener('resize', () => this.resize());
+    this.renderer.domElement.addEventListener('webglcontextlost', e => e.preventDefault());
+  }
+
+  buildWorld() {
+    this.scene.background = new THREE.Color(0x07142b);
+    this.scene.fog = new THREE.FogExp2(0x07172e, 0.0056);
+    this.scene.add(new THREE.HemisphereLight(0x8ccfff, 0x121a26, 2.15));
+    this.sun = new THREE.DirectionalLight(0xf2f7ff, 3.15);
+    this.sun.position.set(-45, 80, 30);
+    this.sun.castShadow = true;

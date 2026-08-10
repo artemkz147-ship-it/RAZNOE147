@@ -1,0 +1,130 @@
+    this.sun.shadow.mapSize.set(1024, 1024);
+    this.sun.shadow.camera.left = -130; this.sun.shadow.camera.right = 130;
+    this.sun.shadow.camera.top = 130; this.sun.shadow.camera.bottom = -130;
+    this.scene.add(this.sun);
+
+    const moon = new THREE.Mesh(new THREE.SphereGeometry(7, 24, 16), new THREE.MeshBasicMaterial({ color: 0xc9e6ff }));
+    moon.position.set(-115, 78, -150);
+    this.scene.add(moon);
+
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(18, 24, 16),
+      new THREE.MeshBasicMaterial({ color: 0x2a67ff, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    glow.position.copy(moon.position);
+    this.scene.add(glow);
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(420, 420),
+      new THREE.MeshStandardMaterial({ color: 0x0b1820, roughness: 0.9, metalness: 0.08 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.04;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+
+    const districtLights = [
+      [-70, 18, -62, 0x00d9ff], [60, 16, -78, 0xff2c8c], [92, 18, 25, 0xffb42c],
+      [28, 20, 88, 0x9b65ff], [-68, 16, 66, 0x36ffad], [0, 22, -30, 0x2c8cff]
+    ] as const;
+    for (const [x, y, z, color] of districtLights) {
+      const l = new THREE.PointLight(color, 18, 74, 1.7);
+      l.position.set(x, y, z);
+      this.scene.add(l);
+    }
+  }
+
+  buildTrack() {
+    const pts = [
+      [-88, 0, 2], [-72, 0, -58], [-25, 0, -92], [32, 0, -94], [82, 0, -67],
+      [104, 0, -18], [92, 0, 40], [55, 0, 82], [2, 0, 96], [-50, 0, 78], [-92, 0, 42]
+    ].map(p => new THREE.Vector3(p[0], p[1], p[2]));
+    this.track = new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.22);
+    this.trackLength = this.track.getLength();
+    const N = 360;
+    this.trackSamples = Array.from({ length: N }, (_, i) => this.track.getPointAt(i / N));
+    this.trackTangents = Array.from({ length: N }, (_, i) => this.track.getTangentAt(i / N).normalize());
+
+    const verts: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+    for (let i = 0; i <= N; i++) {
+      const idx = i % N;
+      const p = this.trackSamples[idx];
+      const t = this.trackTangents[idx];
+      const normal = new THREE.Vector3(-t.z, 0, t.x);
+      const left = p.clone().addScaledVector(normal, this.roadWidth * 0.5);
+      const right = p.clone().addScaledVector(normal, -this.roadWidth * 0.5);
+      verts.push(left.x, 0.055, left.z, right.x, 0.055, right.z);
+      uvs.push(0, i / 8, 1, i / 8);
+      if (i < N) {
+        const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+        indices.push(a, b, c, b, d, c);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices); geo.computeVertexNormals();
+    const road = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x202932, roughness: 0.58, metalness: 0.28 }));
+    road.receiveShadow = true;
+    this.scene.add(road);
+
+    const markerGeo = new THREE.BoxGeometry(0.2, 0.04, 3.0);
+    const markerMat = new THREE.MeshStandardMaterial({ color: 0xf4fbff, emissive: 0x8ddfff, emissiveIntensity: 1.15 });
+    const markers = new THREE.InstancedMesh(markerGeo, markerMat, Math.floor(N / 4));
+    const m = new THREE.Matrix4(); const q = new THREE.Quaternion(); const s = new THREE.Vector3(1, 1, 1);
+    let mi = 0;
+    for (let i = 0; i < N; i += 4) {
+      const p = this.trackSamples[i], t = this.trackTangents[i];
+      const yaw = Math.atan2(-t.x, -t.z);
+      q.setFromAxisAngle(Y_AXIS, yaw);
+      m.compose(new THREE.Vector3(p.x, 0.09, p.z), q, s);
+      markers.setMatrixAt(mi++, m);
+    }
+    this.scene.add(markers);
+
+    const curbGeo = new THREE.BoxGeometry(1.7, 0.16, 0.58);
+    const curbMats = [
+      new THREE.MeshStandardMaterial({ color: 0x25dfff, emissive: 0x0f6f88, emissiveIntensity: 0.7, roughness: 0.4 }),
+      new THREE.MeshStandardMaterial({ color: 0xff397e, emissive: 0x76132f, emissiveIntensity: 0.7, roughness: 0.4 })
+    ];
+    for (let phase = 0; phase < 2; phase++) {
+      const curbs = new THREE.InstancedMesh(curbGeo, curbMats[phase], Math.floor(N / 3));
+      let ci = 0;
+      for (let i = phase * 3; i < N; i += 6) {
+        const p = this.trackSamples[i], t = this.trackTangents[i], n = new THREE.Vector3(-t.z, 0, t.x);
+        const yaw = Math.atan2(-t.x, -t.z); q.setFromAxisAngle(Y_AXIS, yaw);
+        for (const side of [-1, 1]) {
+          const cp = p.clone().addScaledVector(n, side * (this.roadWidth * .5 - .22));
+          m.compose(new THREE.Vector3(cp.x, .13, cp.z), q, s); curbs.setMatrixAt(ci++, m);
+          if (ci >= curbs.count) break;
+        }
+        if (ci >= curbs.count) break;
+      }
+      curbs.count = ci;
+      this.scene.add(curbs);
+    }
+
+    const railGeo = new THREE.BoxGeometry(5.8, 0.85, 0.26);
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x44546b, metalness: 0.82, roughness: 0.27 });
+    const railCount = Math.floor(N / 5) * 2;
+    const rails = new THREE.InstancedMesh(railGeo, railMat, railCount);
+    let ri = 0;
+    for (let i = 0; i < N; i += 5) {
+      const p = this.trackSamples[i], t = this.trackTangents[i];
+      const n = new THREE.Vector3(-t.z, 0, t.x);
+      const yaw = Math.atan2(-t.x, -t.z);
+      q.setFromAxisAngle(Y_AXIS, yaw);
+      for (const side of [-1, 1]) {
+        const rp = p.clone().addScaledVector(n, side * (this.roadWidth * 0.5 + 0.75));
+        m.compose(new THREE.Vector3(rp.x, 0.48, rp.z), q, s);
+        rails.setMatrixAt(ri++, m);
+      }
+    }
+    rails.castShadow = true; rails.receiveShadow = true;
+    this.scene.add(rails);
+
+    const start = this.trackSamples[0], tangent = this.trackTangents[0];
+    const yaw = Math.atan2(-tangent.x, -tangent.z);
+    const startLine = new THREE.Mesh(
