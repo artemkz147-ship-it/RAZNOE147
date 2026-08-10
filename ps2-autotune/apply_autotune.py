@@ -101,9 +101,19 @@ replace_exact(
 ''',
 )
 
-# Visible fork branding only. Package/JNI identifiers intentionally stay unchanged,
-# minimizing compatibility risk with the large native core. The Gradle workflow gives
-# the APK a separate applicationId, so it installs beside official ARMSX2.
+# The sideload flavour normally contains ARMSX2's own GitHub updater. Our APK has a
+# different applicationId, so an official ARMSX2 APK cannot update it. Disable that
+# updater rather than offering an update which Android would reject as another app.
+build_gradle = ROOT / "platforms/android/app/build.gradle.kts"
+replace_exact(
+    build_gradle,
+    '            buildConfigField("boolean", "IN_APP_UPDATER", "true")\n',
+    '            buildConfigField("boolean", "IN_APP_UPDATER", "false")\n',
+)
+
+# Visible fork branding only. Java/Kotlin package + JNI class identifiers intentionally
+# stay unchanged, minimizing compatibility risk with the large native core. The Gradle
+# workflow gives the APK a separate applicationId so it installs beside official ARMSX2.
 strings = ANDROID / "res/values/strings.xml"
 if strings.exists():
     text = strings.read_text(encoding="utf-8")
