@@ -16,15 +16,9 @@ import kr.co.iefriends.pcsx2.NativeApp
 import kotlin.math.max
 
 /**
- * Conservative closed-loop tuner for settings which are safe to change while a
- * game is running.
- *
- * The controller intentionally avoids EE/VU cycle hacks: those can make a title
- * benchmark faster while changing game logic. Resolution, Android scheduling
- * hints and thermal response do not alter PS2 timing semantics.
- *
- * Tuning uses PerformanceMetrics::GetSpeed(), not rendered FPS. A native 30 FPS
- * PS2 game can still be running at 100% emulation speed.
+ * Conservative closed-loop tuner. Stability build never changes renderer,
+ * thread placement, EE/VU timing or experimental core switches. It waits for a
+ * fully established game session and then may change only internal resolution.
  */
 object AdaptiveAutoTune {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -39,11 +33,6 @@ object AdaptiveAutoTune {
         val cpuCriticalMs: Float get() = max(eeMs, vuMs)
         val graphicsCriticalMs: Float get() = max(gsMs, gpuMs)
 
-        /**
-         * A clearly CPU/VU-limited frame should not be punished by lowering
-         * internal resolution. Keep a generous margin because GS time can contain
-         * synchronization/wait time and mobile GPU timers are not always available.
-         */
         fun clearlyCpuBound(): Boolean {
             if (!isUsable()) return false
             return cpuCriticalMs >= 4.0f && cpuCriticalMs > graphicsCriticalMs * 1.30f
@@ -61,12 +50,8 @@ object AdaptiveAutoTune {
     fun start(gameKey: String?, boot: Settings) {
         stop()
         if (!AutoTune.isEnabled() || gameKey.isNullOrBlank()) return
-
-        // Don't fight intentional caps / speed changes. GetSpeed() would correctly
-        // report the requested speed, but that target is not an AutoTune failure.
         if (!boot.frameLimitEnable || boot.nominalSpeedPercent != 100) return
 
-        // Explicit global/per-game resolution means "hands off".
         val explicitGlobalScale = runCatching { ConfigStore.loadGlobal().upscaleFloat != 1.0f }.getOrDefault(false)
         val explicitGameScale = runCatching { ConfigStore.loadOverrides(gameKey)?.has("upscaleFloat") == true }.getOrDefault(false)
         if (explicitGlobalScale || explicitGameScale) return
@@ -82,10 +67,14 @@ object AdaptiveAutoTune {
             var cooldownUntil = 0L
             var lastCpuBoundLogAt = 0L
 
-            // Let BIOS/boot logos, shader compilation and initial FMV settle. They are
-            // poor representatives of the actual game workload.
-            delay(12_000)
-            NativeApp.emulog("AUTOTUNE start game=$gameKey scale=$currentScale ${AutoTune.diagnosticLine(context)}")
+            // Stability hotfix: do nothing during BIOS, renderer creation, shader-cache
+            // setup, early FMVs and initial GameDB patches. A crash in that phase can
+            // therefore not be caused by the adaptive controller.
+            delay(30_000)
+            val initialSpeed = runCatching { NativeApp.getEmulationSpeed() }.getOrDefault(0f)
+            if (!initialSpeed.isFinite() || initialSpeed < 5f) return@launch
+
+            NativeApp.emulog("AUTOTUNE stable-start game=$gameKey scale=$currentScale ${AutoTune.diagnosticLine(context)}")
 
             while (isActive) {
                 delay(2_000)
@@ -112,36 +101,21 @@ object AdaptiveAutoTune {
                 var reason: String? = null
                 var persistAdjustment = true
 
-                // Predictive thermal control: 1.0 headroom means Android expects the
-                // device to reach the SEVERE throttling threshold. Back off GPU work
-                // before the throttling spike arrives. This temporary heat response is
-                // never learned as the title's normal quality profile.
-                if (
-                    forecastHeadroom != null && forecastHeadroom >= 0.92f &&
-                    currentScale > minScale
-                ) {
+                if (forecastHeadroom != null && forecastHeadroom >= 0.92f && currentScale > minScale) {
                     val drop = if (forecastHeadroom >= 1.0f) 0.50f else 0.25f
                     next = (currentScale - drop).coerceAtLeast(minScale)
                     reason = "thermal forecast=${"%.2f".format(forecastHeadroom)}"
                     persistAdjustment = false
-                }
-                // Fallback for devices without thermal-headroom forecasting.
-                else if (thermal >= PowerManager.THERMAL_STATUS_SEVERE && currentScale > minScale) {
+                } else if (thermal >= PowerManager.THERMAL_STATUS_SEVERE && currentScale > minScale) {
                     val drop = if (thermal >= PowerManager.THERMAL_STATUS_CRITICAL) 0.50f else 0.25f
                     next = (currentScale - drop).coerceAtLeast(minScale)
                     reason = "thermal status=$thermal"
                     persistAdjustment = false
-                }
-                // Sustained low emulation speed normally means reduce GPU load. But if
-                // native PerformanceMetrics says EE/VU time clearly dominates GS/GPU,
-                // resolution is not the bottleneck. Preserve image quality instead of
-                // blindly walking all the way down to 1x with no speed benefit.
-                else if (avg < 0.90f && currentScale > minScale) {
+                } else if (avg < 0.90f && currentScale > minScale) {
                     if (load.clearlyCpuBound()) {
                         if (now - lastCpuBoundLogAt >= 20_000L) {
                             NativeApp.emulog(
-                                "AUTOTUNE CPU-bound: keep scale=$currentScale " +
-                                    "speed=${"%.1f".format(avg * 100f)}% ${load.line()}"
+                                "AUTOTUNE CPU-bound: keep scale=$currentScale speed=${"%.1f".format(avg * 100f)}% ${load.line()}"
                             )
                             lastCpuBoundLogAt = now
                         }
@@ -150,10 +124,7 @@ object AdaptiveAutoTune {
                         next = (currentScale - drop).coerceAtLeast(minScale)
                         reason = "slow speed=${"%.1f".format(avg * 100f)}% ${load.line()}"
                     }
-                }
-                // Only raise quality when emulation is full-speed, stable, the phone
-                // isn't warm, and the 10-second forecast is comfortably below severe.
-                else if (
+                } else if (
                     thermal <= PowerManager.THERMAL_STATUS_LIGHT &&
                     (forecastHeadroom == null || forecastHeadroom < 0.75f) &&
                     avg >= 0.992f && worst >= 0.975f && spread <= 0.03f &&
@@ -175,8 +146,6 @@ object AdaptiveAutoTune {
                     avg >= 0.96f && thermal < PowerManager.THERMAL_STATUS_MODERATE &&
                     (forecastHeadroom == null || forecastHeadroom < 0.85f)
                 ) {
-                    // A stable working value is useful on the next launch even when no
-                    // adjustment was necessary. Never learn a heat-degraded value.
                     AutoTune.saveLearnedScale(gameKey, currentScale)
                 }
             }
@@ -210,11 +179,6 @@ object AdaptiveAutoTune {
         }.getOrDefault(PowerManager.THERMAL_STATUS_NONE)
     }
 
-    /**
-     * Android 11+ predicts how much of the thermal envelope will be used in the
-     * near future; 1.0 is the SEVERE throttling threshold. Null means unsupported
-     * or temporarily unavailable (NaN while the platform gathers samples).
-     */
     private fun thermalHeadroom(context: Context, forecastSeconds: Int): Float? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
         val value = runCatching {
