@@ -48,8 +48,8 @@ jobs:
         run: |
           printf '\n%s\n' \
             'armsx2.applicationId=com.artemkz147.ps2autotune' \
-            'armsx2.versionName=1.0.0-autotune' \
-            'armsx2.versionCode=147001' \
+            'armsx2.versionName=1.0.1-stability' \
+            'armsx2.versionCode=147002' \
             >> upstream/platforms/android/gradle.properties
 
       - name: Record exact source
@@ -58,6 +58,7 @@ jobs:
           mkdir -p dist
           {
             echo "PS2 AutoTune Android"
+            echo "build=1.0.1-stability"
             echo "application_id=com.artemkz147.ps2autotune"
             echo "overlay_repo=${GITHUB_REPOSITORY}"
             echo "overlay_commit=${GITHUB_SHA}"
@@ -95,6 +96,12 @@ jobs:
           test -f "$ANDROID_HOME/platforms/android-37/android.jar"
           test -x "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
 
+      - name: Restore persistent test signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: ps2-autotune-debug-keystore-v1
+
       - name: Create installable debug signing key
         shell: bash
         run: |
@@ -103,7 +110,7 @@ jobs:
             keytool -genkeypair -v \
               -keystore "$HOME/.android/debug.keystore" \
               -storepass android -alias androiddebugkey -keypass android \
-              -dname "CN=Android Debug,O=Android,C=US" \
+              -dname "CN=PS2 AutoTune Development,O=artemkz147,C=DE" \
               -keyalg RSA -keysize 2048 -validity 10000 >/dev/null 2>&1
           fi
 
@@ -122,7 +129,7 @@ jobs:
         shell: bash
         run: |
           test -s dist/PS2-AutoTune-Android-universal.apk
-          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner" verify --verbose dist/PS2-AutoTune-Android-universal.apk
+          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner" verify --verbose --print-certs dist/PS2-AutoTune-Android-universal.apk > dist/APK-VERIFY.txt
           "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/aapt" dump badging dist/PS2-AutoTune-Android-universal.apk | head -n 5
           sha256sum dist/PS2-AutoTune-Android-universal.apk > dist/SHA256SUMS.txt
           ls -lh dist
@@ -146,9 +153,10 @@ jobs:
             dist/PS2-AutoTune-Android-universal.apk \
             dist/SOURCE-MANIFEST.txt \
             dist/SHA256SUMS.txt \
+            dist/APK-VERIFY.txt \
             --target "$GITHUB_SHA" \
-            --title "PS2 AutoTune Android — test build" \
-            --notes "Automatic Android test build from branch ps2-autotune-android. Based on ARMSX2 ${UPSTREAM_REF}; includes local device/game AutoTune. BIOS and game images are not included." \
+            --title "PS2 AutoTune Android — stability build" \
+            --notes "Stability hotfix based on ARMSX2 ${UPSTREAM_REF}. Launch-time renderer/core settings are left to upstream/GameDB; experimental ADPF stays off. AutoTune adapts safe internal resolution after boot. BIOS and game images are not included." \
             --prerelease
 
       - name: Record successful build in branch
@@ -157,6 +165,7 @@ jobs:
         run: |
           {
             echo "status=SUCCESS"
+            echo "build=1.0.1-stability"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             echo "source_commit=${GITHUB_SHA}"
             echo "upstream_ref=${UPSTREAM_REF}"
@@ -176,6 +185,7 @@ jobs:
         run: |
           {
             echo "status=FAILURE"
+            echo "build=1.0.1-stability"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             echo "source_commit=${GITHUB_SHA}"
             echo "actions_url=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
