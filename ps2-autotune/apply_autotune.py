@@ -59,10 +59,9 @@ new_resolve = '''    fun resolveForGame(serial: String?): Settings {
 '''
 replace_exact(config_store, old_resolve, new_resolve)
 
-# PCSX2 PerformanceMetrics::GetFPS() is rendered game FPS. Many perfectly full-speed
-# PS2 games intentionally render at 30 FPS on a ~60 Hz virtual console, so FPS/refresh
-# is NOT a valid performance signal. Expose GetSpeed() (100 = native emulation speed)
-# through one tiny JNI call and make the adaptive loop use that instead.
+# PCSX2 already tracks canonical emulation speed as a percentage. Expose GetSpeed()
+# (100 = native console speed) through one tiny JNI call so the tuner follows the
+# emulator's own timing metric rather than recreating it from frontend counters.
 native_java = ANDROID / "java/kr/co/iefriends/pcsx2/NativeApp.java"
 replace_exact(
     native_java,
@@ -98,6 +97,28 @@ replace_exact(
                 } finally {
                     com.armsx2.config.AdaptiveAutoTune.stop()
                 }
+''',
+)
+
+# ARMSX2's optional Discord Social SDK is proprietary and is not present in a clean
+# GPL source checkout. The tagged source still contains one direct Kotlin type
+# reference, which makes a source-only build fail at compile time. Resolve that
+# optional class reflectively instead: when the SDK is bundled upstream it still
+# receives the Activity; when absent, runCatching keeps Discord disabled without
+# affecting the emulator or AutoTune.
+discord_auth = KOTLIN / "discord/DiscordAuthActivity.kt"
+replace_exact(
+    discord_auth,
+    '''        runCatching { com.discord.socialsdk.DiscordSocialSdkInit.setEngineActivity(this) }
+            .onFailure { Log.w("ARMSX2DiscordSvc", "setEngineActivity failed: ${it.message}") }
+''',
+    '''        runCatching {
+            val initClass = Class.forName("com.discord.socialsdk.DiscordSocialSdkInit")
+            val method = initClass.methods.firstOrNull {
+                it.name == "setEngineActivity" && it.parameterCount == 1
+            } ?: error("Discord setEngineActivity is unavailable")
+            method.invoke(null, this)
+        }.onFailure { Log.w("ARMSX2DiscordSvc", "setEngineActivity failed: ${it.message}") }
 ''',
 )
 
