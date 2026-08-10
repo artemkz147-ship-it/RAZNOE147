@@ -23,9 +23,10 @@ global.document={
   addEventListener(t,f){(listeners.document[t]??=[]).push(f)},hidden:false,body:{children:[{}]}
 };
 global.requestAnimationFrame=(fn)=>{raf.push(fn);return raf.length};
-for(const file of ['umk3-data.js','hd-atlases.js','game.js','hd-renderer.js']){
+for(const file of ['umk3-data.js','version.js','hd-atlases.js','game.js','hd-renderer.js']){
   const code=fs.readFileSync(process.cwd()+'/web/'+file,'utf8');vm.runInThisContext(code,{filename:file});
 }
+if(global.UMK3_BUILD?.version!=='0.5.0'||global.UMK3_DATA.version!=='0.5.0')throw new Error('0.5.0 build metadata missing');
 let ts=0;
 function step(n=1){for(let i=0;i<n;i++){const q=raf;raf=[];ts+=16.6667;for(const fn of q)fn(ts)}}
 function key(code,type='keydown'){const ev={code,preventDefault(){}};(listeners.window[type]||[]).forEach(fn=>fn(ev))}
@@ -51,4 +52,4 @@ global.UMK3_HD_ATLASES.ensure(g.player.data);global.UMK3_HD_ATLASES.ensure(g.ene
 if(global.UMK3_HD_ATLASES.stats().ready<2)throw new Error('Fight atlases not ready');
 if(window.UMK3_DATA.allPlayable.length<25)throw new Error('Roster incomplete');
 if(window.UMK3_DATA.stages.length<16)throw new Error('Stages incomplete');
-console.log(`SMOKE_HD_OK state=${g.state} roster=${window.UMK3_DATA.allPlayable.length} stages=${window.UMK3_DATA.stages.length} atlases=${global.UMK3_HD_ATLASES.stats().ready}`);
+console.log(`SMOKE_HD_OK version=${window.UMK3_DATA.version} state=${g.state} roster=${window.UMK3_DATA.allPlayable.length} stages=${window.UMK3_DATA.stages.length} atlases=${global.UMK3_HD_ATLASES.stats().ready}`);
