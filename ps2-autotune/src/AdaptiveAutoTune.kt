@@ -18,6 +18,11 @@ import kr.co.iefriends.pcsx2.NativeApp
  * Conservative closed-loop tuner for the one setting which is both measurable
  * and safe to change during gameplay: internal rendering resolution.
  *
+ * IMPORTANT: tuning uses PerformanceMetrics::GetSpeed(), not rendered FPS.
+ * A perfectly healthy 30 FPS PS2 title still runs at 100% emulation speed on a
+ * 59.94 Hz virtual console. Using FPS/refresh here would incorrectly punish every
+ * native-30-FPS title.
+ *
  * CPU/VU timing hacks are intentionally NOT changed at runtime. A wrong cycle
  * hack can make a game faster but less correct; a resolution change cannot alter
  * PS2 game logic. This is what makes the learning loop suitable as a default.
@@ -30,9 +35,9 @@ object AdaptiveAutoTune {
         stop()
         if (!AutoTune.isEnabled() || gameKey.isNullOrBlank()) return
 
-        // Don't fight intentional caps / speed changes. FPS/nominal would otherwise
-        // look like a performance failure even when the user requested it.
-        if (!boot.frameLimitEnable || boot.fpsLimit > 0 || boot.nominalSpeedPercent != 100) return
+        // Don't fight intentional caps / speed changes. GetSpeed() would correctly
+        // report the requested speed, but that target is not an AutoTune failure.
+        if (!boot.frameLimitEnable || boot.nominalSpeedPercent != 100) return
 
         // Explicit global/per-game resolution means "hands off".
         val explicitGlobalScale = runCatching { ConfigStore.loadGlobal().upscaleFloat != 1.0f }.getOrDefault(false)
@@ -56,12 +61,11 @@ object AdaptiveAutoTune {
 
             while (isActive) {
                 delay(2_000)
-                val fps = runCatching { NativeApp.getFPS() }.getOrDefault(0f)
-                val nominal = runCatching { NativeApp.getNominalFrameRate() }.getOrDefault(0f)
-                if (!fps.isFinite() || !nominal.isFinite() || fps < 5f || nominal < 20f) continue
+                val speedPercent = runCatching { NativeApp.getEmulationSpeed() }.getOrDefault(0f)
+                if (!speedPercent.isFinite() || speedPercent < 5f) continue
 
-                val ratio = (fps / nominal).coerceIn(0f, 1.25f)
-                samples.addLast(ratio)
+                val speedRatio = (speedPercent / 100f).coerceIn(0f, 1.25f)
+                samples.addLast(speedRatio)
                 while (samples.size > 6) samples.removeFirst()
                 if (samples.size < 5) continue
 
@@ -87,14 +91,14 @@ object AdaptiveAutoTune {
                     reason = "thermal status=$thermal"
                     persistAdjustment = false
                 }
-                // Sustained <90% native speed: lower resolution. Severe misses use a
-                // half-step; otherwise quarter-step. Never go below the device floor.
+                // Sustained <90% native emulation speed: lower resolution. Severe misses
+                // use a half-step; otherwise quarter-step. Never go below device floor.
                 else if (avg < 0.90f && currentScale > minScale) {
                     val drop = if (avg < 0.78f) 0.50f else 0.25f
                     next = (currentScale - drop).coerceAtLeast(minScale)
-                    reason = "slow avg=${"%.3f".format(avg)}"
+                    reason = "slow speed=${"%.1f".format(avg * 100f)}%"
                 }
-                // Only raise quality when the title is full-speed, stable AND the
+                // Only raise quality when emulation is full-speed, stable AND the
                 // phone is not already warming up.
                 else if (
                     thermal <= PowerManager.THERMAL_STATUS_LIGHT &&
@@ -102,7 +106,7 @@ object AdaptiveAutoTune {
                     currentScale < maxScale
                 ) {
                     next = (currentScale + 0.25f).coerceAtMost(maxScale)
-                    reason = "headroom avg=${"%.3f".format(avg)}"
+                    reason = "headroom speed=${"%.1f".format(avg * 100f)}%"
                 }
 
                 if (reason != null && next != currentScale) {
