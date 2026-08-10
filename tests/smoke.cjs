@@ -26,7 +26,8 @@ global.requestAnimationFrame=(fn)=>{raf.push(fn);return raf.length};
 for(const file of ['boot-guard.js','umk3-data.js','version.js','hd-atlases.js','game.js','hd-renderer.js','raster-runtime.js']){
   const code=fs.readFileSync(process.cwd()+'/web/'+file,'utf8');vm.runInThisContext(code,{filename:file});
 }
-if(global.UMK3_BUILD?.version!=='0.6.0'||global.UMK3_DATA.version!=='0.6.0')throw new Error('0.6.0 build metadata missing');
+if(global.UMK3_BUILD?.version!=='0.7.0'||global.UMK3_DATA.version!=='0.7.0')throw new Error('0.7.0 build metadata missing');
+if(global.UMK3_BUILD?.renderer!=='prerendered-48f-hd-v4-layered-stages')throw new Error('Real-art renderer metadata missing');
 if(!global.__UMK3_RASTER__)throw new Error('Raster runtime missing');
 let ts=0;
 function step(n=1){for(let i=0;i<n;i++){const q=raf;raf=[];ts+=16.6667;for(const fn of q)fn(ts)}}
@@ -51,4 +52,4 @@ if(!g.player||!g.enemy)throw new Error('Fighters missing');
 if(window.UMK3_DATA.allPlayable.length<25)throw new Error('Roster incomplete');
 if(window.UMK3_DATA.stages.length<16)throw new Error('Stages incomplete');
 if(global.__UMK3_RASTER__.fReady.size<25||global.__UMK3_RASTER__.sReady.size<16)throw new Error('Raster caches incomplete');
-console.log(`SMOKE_RASTER_OK version=${window.UMK3_DATA.version} state=${g.state} roster=${window.UMK3_DATA.allPlayable.length} stages=${window.UMK3_DATA.stages.length} fighterCache=${global.__UMK3_RASTER__.fReady.size}`);
+console.log(`SMOKE_REALART_OK version=${window.UMK3_DATA.version} state=${g.state} roster=${window.UMK3_DATA.allPlayable.length} stages=${window.UMK3_DATA.stages.length} fighterCache=${global.__UMK3_RASTER__.fReady.size}`);
