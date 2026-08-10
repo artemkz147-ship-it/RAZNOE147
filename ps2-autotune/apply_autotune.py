@@ -28,8 +28,6 @@ if not (ROOT / ".git").exists():
 if not KOTLIN.exists():
     fail(f"Android Kotlin source tree missing: {KOTLIN}")
 
-# Add our two source files without forking/copying the huge upstream tree into the
-# user's repository. The workflow records the exact upstream tag + our patch commit.
 config_dir = KOTLIN / "config"
 config_dir.mkdir(parents=True, exist_ok=True)
 for name in ("AutoTune.kt", "AdaptiveAutoTune.kt"):
@@ -38,8 +36,9 @@ for name in ("AutoTune.kt", "AdaptiveAutoTune.kt"):
         fail(f"missing overlay source {src}")
     shutil.copy2(src, config_dir / name)
 
-# Insert AutoTune between global defaults and sparse user per-game overrides.
-# Explicit per-game values therefore remain the final/highest-priority layer.
+# Keep upstream/GameDB launch configuration intact. AutoTune.resolve() in the
+# stability build returns the base settings unchanged; per-game overrides still
+# remain the highest-priority layer exactly as upstream expects.
 config_store = config_dir / "ConfigStore.kt"
 old_resolve = '''    fun resolveForGame(serial: String?): Settings {
         val global = loadGlobal()
@@ -59,10 +58,9 @@ new_resolve = '''    fun resolveForGame(serial: String?): Settings {
 '''
 replace_exact(config_store, old_resolve, new_resolve)
 
-# PCSX2 already tracks canonical emulation speed and per-thread frame costs.
-# Expose those metrics through tiny JNI calls so the tuner can tell a real
-# GS/GPU bottleneck from an EE/VU bottleneck instead of blindly reducing image
-# quality whenever the game falls below full speed.
+# Expose native performance metrics. They are sampled only after the game has
+# been running for a while; no experimental scheduler/core switches are enabled
+# during VM startup in this stability build.
 native_java = ANDROID / "java/kr/co/iefriends/pcsx2/NativeApp.java"
 replace_exact(
     native_java,
@@ -115,25 +113,9 @@ Java_kr_co_iefriends_pcsx2_NativeApp_getGpuTimeMs(JNIEnv*, jclass) {
 '''
 replace_exact(native_cpp, old_speed_jni, new_speed_jni)
 
-# ARMSX2 2.6.5.9 already contains a native Android ADPF implementation, but
-# upstream intentionally defaults its UI preference to OFF while it gathers
-# community testing. PS2 AutoTune makes it the default for fresh installs:
-# Android's PerformanceHintManager can then place/clock the emulator's periodic
-# EE/GS/VU workload against the real frame deadline. An explicit user OFF value
-# is still respected because SharedPreferences stores it and getBoolean returns it.
-adpf_default_hits = 0
-for path in KOTLIN.rglob("*.kt"):
-    text = path.read_text(encoding="utf-8")
-    old = 'prefs.getBoolean("ui.adpf", false)'
-    if old in text:
-        text2 = text.replace(old, 'prefs.getBoolean("ui.adpf", true)')
-        adpf_default_hits += text.count(old)
-        path.write_text(text2, encoding="utf-8")
-if adpf_default_hits == 0:
-    fail("could not find ARMSX2 ui.adpf default")
+# IMPORTANT stability hotfix: leave ARMSX2's experimental ADPF preference at
+# its upstream default OFF. It can be re-enabled later after device testing.
 
-# Start the adaptive learner on a different coroutine pool before the blocking VM
-# loop; always cancel it when the VM exits/crashes back to the library.
 runtime = KOTLIN / "runtime/MainActivityRuntime.kt"
 replace_exact(
     runtime,
@@ -147,12 +129,6 @@ replace_exact(
 ''',
 )
 
-# ARMSX2's optional Discord Social SDK is proprietary and is not present in a clean
-# GPL source checkout. The tagged source still contains one direct Kotlin type
-# reference, which makes a source-only build fail at compile time. Resolve that
-# optional class reflectively instead: when the SDK is bundled upstream it still
-# receives the Activity; when absent, runCatching keeps Discord disabled without
-# affecting the emulator or AutoTune.
 discord_auth = KOTLIN / "discord/DiscordAuthActivity.kt"
 replace_exact(
     discord_auth,
@@ -169,9 +145,6 @@ replace_exact(
 ''',
 )
 
-# The sideload flavour normally contains ARMSX2's own GitHub updater. Our APK has a
-# different applicationId, so an official ARMSX2 APK cannot update it. Disable that
-# updater rather than offering an update which Android would reject as another app.
 build_gradle = ROOT / "platforms/android/app/build.gradle.kts"
 replace_exact(
     build_gradle,
@@ -179,9 +152,6 @@ replace_exact(
     '            buildConfigField("boolean", "IN_APP_UPDATER", "false")\n',
 )
 
-# Visible fork branding only. Java/Kotlin package + JNI class identifiers intentionally
-# stay unchanged, minimizing compatibility risk with the large native core. The Gradle
-# workflow gives the APK a separate applicationId so it installs beside official ARMSX2.
 strings = ANDROID / "res/values/strings.xml"
 if strings.exists():
     text = strings.read_text(encoding="utf-8")
@@ -195,4 +165,4 @@ if strings.exists():
     if count:
         strings.write_text(text2, encoding="utf-8")
 
-print(f"AutoTune overlay applied successfully (ADPF defaults patched: {adpf_default_hits})")
+print("AutoTune stability overlay applied successfully (ADPF default preserved OFF)")
