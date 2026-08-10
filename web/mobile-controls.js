@@ -47,7 +47,6 @@ for(const b of document.querySelectorAll('.touch')){
 }
 window.addEventListener('blur',reset);document.addEventListener('visibilitychange',()=>{if(document.hidden)reset()});
 
-// Native touch flow for screens that were keyboard-only in the first prototypes.
 function logicalPoint(e){
   const r=canvas.getBoundingClientRect(),s=Math.min(r.width/1280,r.height/720);
   return{x:(e.clientX-r.left-(r.width-1280*s)/2)/s,y:(e.clientY-r.top-(r.height-720*s)/2)/s};
@@ -58,20 +57,22 @@ canvas?.addEventListener('pointerdown',e=>{
     const p=logicalPoint(e),cols=7,cw=132,ch=122,sx=(1280-cols*cw)/2,sy=92;
     const col=Math.floor((p.x-sx)/cw),row=Math.floor((p.y-sy)/ch),idx=row*cols+col;
     const roster=window.UMK3_DATA?.allPlayable||[];
-    if(col>=0&&col<cols&&row>=0&&idx>=0&&idx<roster.length){
-      g.select=idx;navigator.vibrate?.(14);tapKey('Enter');e.preventDefault();
-    }
+    if(col>=0&&col<cols&&row>=0&&idx>=0&&idx<roster.length){g.select=idx;navigator.vibrate?.(14);tapKey('Enter');e.preventDefault()}
   }else if(g.state==='tower'||g.state==='gameover'||g.state==='ending'){
     navigator.vibrate?.(9);tapKey('Enter');e.preventDefault();
   }
 },{passive:false});
 
-// Android CI and diagnostics can prove the complete touch flow reached an actual fight.
 let lastState='';
 setInterval(()=>{
   const s=window.__UMK3_DEBUG__?.game?.state||'boot';
-  if(s!==lastState){lastState=s;console.log(`UMK3_STATE=${s}`)}
-},400);
+  if(s!==lastState){
+    lastState=s;console.log(`UMK3_STATE=${s}`);
+    const inFight=s==='fight';
+    if(gear)gear.hidden=!inFight;
+    if(!inFight&&panel)panel.classList.remove('open');
+  }
+},250);
 
 const KEY='umk3hd.mobile.controls.v1';
 let cfg={scale:1,opacity:.82,buttons:1};
@@ -85,7 +86,7 @@ const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(cfg))}catch(_){}appl
 apply();
 
 if(gear&&panel){
-  gear.hidden=false;
+  gear.hidden=true;
   gear.addEventListener('pointerdown',e=>{e.preventDefault();panel.classList.toggle('open');navigator.vibrate?.(10)});
   const bind=(id,key,min,max)=>{
     const el=document.getElementById(id);if(!el)return;el.value=cfg[key];
