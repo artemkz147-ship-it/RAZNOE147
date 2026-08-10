@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Fetch CC0 prerendered fighter sources
+        run: bash tools/fetch_cc0_sources.sh | tee cc0-source-inventory.txt
+
       - name: Generate baked raster asset pack
         run: |
           python3 tools/build_assets.py
@@ -95,8 +98,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: umk3-0.6.0-emulator-evidence
+          name: umk3-cc0-inventory-and-emulator-evidence
           path: |
+            cc0-source-inventory.txt
             emulator-start.txt
             emulator-runtime.log
             emulator-launch.png
@@ -105,7 +109,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: umk3-hd-0.6.0-debug-apk
+          name: umk3-hd-realart-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
