@@ -59,8 +59,35 @@ new_resolve = '''    fun resolveForGame(serial: String?): Settings {
 '''
 replace_exact(config_store, old_resolve, new_resolve)
 
-# Start the adaptive FPS learner on a different coroutine pool before the blocking
-# VM loop; always cancel it when the VM exits/crashes back to the library.
+# PCSX2 PerformanceMetrics::GetFPS() is rendered game FPS. Many perfectly full-speed
+# PS2 games intentionally render at 30 FPS on a ~60 Hz virtual console, so FPS/refresh
+# is NOT a valid performance signal. Expose GetSpeed() (100 = native emulation speed)
+# through one tiny JNI call and make the adaptive loop use that instead.
+native_java = ANDROID / "java/kr/co/iefriends/pcsx2/NativeApp.java"
+replace_exact(
+    native_java,
+    "\tpublic static native float getFPS();\n",
+    "\tpublic static native float getFPS();\n\tpublic static native float getEmulationSpeed();\n",
+)
+
+native_cpp = ANDROID / "cpp/native-lib.cpp"
+old_speed_jni = '''extern "C"
+JNIEXPORT jfloat JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_getFPS(JNIEnv *env, jclass clazz) {
+    return (jfloat)PerformanceMetrics::GetFPS();
+}
+'''
+new_speed_jni = old_speed_jni + '''
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_getEmulationSpeed(JNIEnv*, jclass) {
+    return (jfloat)PerformanceMetrics::GetSpeed();
+}
+'''
+replace_exact(native_cpp, old_speed_jni, new_speed_jni)
+
+# Start the adaptive learner on a different coroutine pool before the blocking VM
+# loop; always cancel it when the VM exits/crashes back to the library.
 runtime = KOTLIN / "runtime/MainActivityRuntime.kt"
 replace_exact(
     runtime,
@@ -75,7 +102,8 @@ replace_exact(
 )
 
 # Visible fork branding only. Package/JNI identifiers intentionally stay unchanged,
-# minimizing compatibility risk with the large native core.
+# minimizing compatibility risk with the large native core. The Gradle workflow gives
+# the APK a separate applicationId, so it installs beside official ARMSX2.
 strings = ANDROID / "res/values/strings.xml"
 if strings.exists():
     text = strings.read_text(encoding="utf-8")
