@@ -8,14 +8,13 @@ import com.armsx2.runtime.MainActivityRuntime
 import kotlin.math.round
 
 /**
- * PS2 AutoTune launch-time resolver.
+ * PS2 AutoTune capability + learned-quality store.
  *
- * Design goals:
- *  - preserve PCSX2/ARMSX2 compatibility defaults;
- *  - only make conservative, measurable performance choices;
- *  - let explicit per-game overrides win (ConfigStore merges them after this layer);
- *  - remember the resolution learned by AdaptiveAutoTune for each title;
- *  - never enable the aggressive VU hacks which are known to break some games.
+ * Stability rule: NEVER rewrite renderer / MTVU / framebuffer paths / audio
+ * SIMD or any other core setting before the VM has successfully booted.
+ * ARMSX2/PCSX2 GameDB + user settings remain the complete launch-time source
+ * of truth. AdaptiveAutoTune may later change only the live internal resolution,
+ * which does not alter PS2 timing or renderer backend selection.
  */
 object AutoTune {
     private const val PREF_ENABLED = "autotune.enabled"
@@ -98,8 +97,6 @@ object AutoTune {
             }
         }
 
-        // Mali naming is less linear than Adreno. Keep this intentionally broad;
-        // runtime emulation-speed learning corrects the initial estimate after boot.
         if (isMali) {
             score += when {
                 Regex("""(?i)Mali-G7\d\d""").containsMatchIn(gpu) -> 2
@@ -126,50 +123,11 @@ object AutoTune {
     }
 
     /**
-     * Inserts the automatic layer between global defaults and explicit game overrides.
-     * ConfigStore must merge the user's sparse per-game override AFTER this result.
+     * Launch-time stability gate. Keep ARMSX2/PCSX2 settings byte-for-byte as
+     * resolved by its normal config + GameDB layers. AutoTune starts only after
+     * boot and only touches live internal resolution.
      */
-    fun resolve(context: Context, gameKey: String?, base: Settings): Settings {
-        if (!isEnabled()) return base
-        val cap = capability(context)
-
-        val modeDelta = when (mode()) {
-            "performance" -> -0.5f
-            "quality" -> 0.5f
-            else -> 0f
-        }
-        val modeMax = (cap.maxBalancedScale + modeDelta).coerceIn(0.75f, 3.0f)
-        val learned = gameKey?.let { learnedScale(it) }
-
-        // Treat a non-default global scale as an explicit user preference.
-        val scale = if (base.upscaleFloat != 1.0f) {
-            base.upscaleFloat
-        } else {
-            (learned ?: modeMax).coerceIn(minScale(cap), modeMax)
-        }
-
-        // Respect an explicitly selected global renderer. With Auto, prefer Vulkan
-        // on Adreno; leave Mali/unknown on ARMSX2's own runtime selection because
-        // vendor GLES/Vulkan quality varies significantly by firmware.
-        val renderer = if (base.renderer != "auto") base.renderer
-        else if (cap.isAdreno) "vulkan" else "auto"
-
-        return base.copy(
-            renderer = renderer,
-            upscaleFloat = quarterStep(scale),
-            mtvu = cap.cores >= 6,
-            // Tile GPUs benefit most; this is a non-visual batching optimization.
-            coalesceRenderPasses = cap.deviceClass != DeviceClass.LOW,
-            // Keep the safe Adreno fast path on; never force the known-risk Mali path.
-            adrenoFbFetch = if (cap.isAdreno) true else base.adrenoFbFetch,
-            forceMaliFbFetch = false,
-            // SIMD reverb preserves the effect while lowering ARM CPU cost.
-            spu2NeonReverb = cap.deviceClass != DeviceClass.ULTRA,
-            // Deliberately keep risky timing/coherency hacks disabled.
-            vuDeferredWrites = false,
-            vuSkipStallSim = false,
-        )
-    }
+    fun resolve(context: Context, gameKey: String?, base: Settings): Settings = base
 
     fun learnedScale(gameKey: String): Float? {
         val raw = runCatching {
@@ -203,7 +161,7 @@ object AutoTune {
 
     fun diagnosticLine(context: Context): String {
         val c = capability(context)
-        return "AutoTune class=${c.deviceClass} cores=${c.cores} ram=${"%.1f".format(c.ramGb)}GB gpu=${c.gpu} soc=${c.soc} mode=${mode()}"
+        return "AutoTune class=${c.deviceClass} cores=${c.cores} ram=${"%.1f".format(c.ramGb)}GB gpu=${c.gpu} soc=${c.soc} mode=${mode()} stableBoot=1"
     }
 
     private fun quarterStep(value: Float): Float = round(value * 4f) / 4f
