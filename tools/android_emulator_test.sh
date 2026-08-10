@@ -8,6 +8,12 @@ ACTIVITY="$PKG/.MainActivity"
 EMU="$ANDROID_HOME/emulator/emulator"
 ADB_TIMEOUT=12
 
+# Keep avdmanager and emulator on exactly the same AVD directory. GitHub runners
+# can expose different Android user-home defaults between command-line tools.
+export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$PWD/.android-user}"
+export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$PWD/.android-avd}"
+mkdir -p "$ANDROID_USER_HOME" "$ANDROID_AVD_HOME"
+
 rm -f emulator-*.log emulator-*.txt emulator-*.png emulator.pid
 
 adb_t() { timeout --signal=KILL "${ADB_TIMEOUT}s" adb "$@"; }
@@ -38,8 +44,10 @@ cleanup() {
 trap cleanup EXIT
 
 # Recreate a clean AVD so launch tests are reproducible.
-avdmanager delete avd -n "$AVD_NAME" >/dev/null 2>&1 || true
-echo no | avdmanager create avd --force -n "$AVD_NAME" -k 'system-images;android-31;google_apis;x86_64' -d pixel_6 > avd-create.log
+rm -rf "$ANDROID_AVD_HOME/$AVD_NAME.avd" "$ANDROID_AVD_HOME/$AVD_NAME.ini"
+echo no | avdmanager create avd --force -n "$AVD_NAME" -k 'system-images;android-31;google_apis;x86_64' -d pixel_6 -p "$ANDROID_AVD_HOME/$AVD_NAME.avd" > avd-create.log
+"$EMU" -list-avds | tee emulator-avds.txt
+grep -qx "$AVD_NAME" emulator-avds.txt
 
 # GitHub-hosted x86_64 runners should expose KVM after the permission step.
 # Software x86 emulation is intentionally rejected because it can stall for hours.
@@ -169,9 +177,14 @@ adb_t shell input tap "$TOWER_X" "$TOWER_Y"
 sleep 5
 
 # Android controls are CSS overlays positioned against the physical viewport.
-HP_X=$((W-22-84-41)); HP_Y=$((H-18-218+41))
-PAD_X=$((24+95)); PAD_Y=$((H-22-95)); PAD_RIGHT=$((PAD_X+58))
-printf 'HP=%s,%s PAD=%s,%s->%s,%s\n' "$HP_X" "$HP_Y" "$PAD_X" "$PAD_Y" "$PAD_RIGHT" "$PAD_Y" | tee -a emulator-touch.txt
+# Pixel 6 coarse-pointer media query uses the 1.08 desktop-scale override at landscape size.
+CONTROL_PCT=108
+HP_X=$((W-22-(84*CONTROL_PCT/100)-(41*CONTROL_PCT/100)))
+HP_Y=$((H-18-(218*CONTROL_PCT/100)+(41*CONTROL_PCT/100)))
+PAD_X=$((24+(95*CONTROL_PCT/100)))
+PAD_Y=$((H-22-(95*CONTROL_PCT/100)))
+PAD_RIGHT=$((PAD_X+(58*CONTROL_PCT/100)))
+printf 'HP=%s,%s PAD=%s,%s->%s,%s SCALE=%s%%\n' "$HP_X" "$HP_Y" "$PAD_X" "$PAD_Y" "$PAD_RIGHT" "$PAD_Y" "$CONTROL_PCT" | tee -a emulator-touch.txt
 
 adb_t shell input tap "$HP_X" "$HP_Y"
 sleep 1
