@@ -1,60 +1,49 @@
-# Project status — UMK3 HD Fan Remake 0.5.0
+# Project status — UMK3 HD Fan Remake 0.6.0
 
-## Реализовано
+## Исправление после неудачной 0.5.0
 
-- Отдельная ветка `umk3-hd-fan-remake`.
-- Офлайн HTML5/Canvas fighting runtime внутри Android WebView.
-- Логическое разрешение 1280×720 с адаптивным масштабированием.
-- Landscape fullscreen, immersive mode и display cutout support.
-- 25 доступных бойцов + Motaro и Shao Kahn.
-- 16 арен.
-- Character Select и Arcade/Kombat Tower.
-- Best-of-three, таймер 99, health bars и round markers.
-- LP / HP / LK / HK / BLOCK / RUN.
-- Командный input buffer F/B/U/D.
-- Standing/crouching/jumping attacks, sweep, uppercut, throw, block и run meter.
-- Индивидуальные special move archetypes и Fatality command checking.
-- CPU AI, combo counter, hit-chain logic.
-- Finish Him / Finish Her и stage fatalities.
-- Particles, blood toggle, hit flash, screen shake, synthesized SFX и haptics.
-- Android touch controls.
+Версия 0.5.0 была слишком маленькой WebView-сборкой (~53 KB APK без настоящего raster asset pack) и пользователь сообщил, что она не открывалась на устройстве. Эта версия больше не считается валидным результатом.
 
-## HD presentation layer 0.5.0
+## 0.6.0
 
-- `hd-atlases.js` создаёт ленивый фиксированный 16-frame atlas для каждого бойца.
-- Кадры: idle, walk/run, crouch, jump, базовые удары, hit, block, special, victory.
-- Atlas создаётся только для реально нужных персонажей, чтобы не раздувать память Android WebView.
-- Поддержаны отдельные силуэты/детали для основных типов бойцов, включая Motaro и Shao Kahn.
-- `hd-renderer.js` работает отдельным presentation canvas поверх боевого runtime.
-- Физика, hitboxes, damage, input buffer и AI не зависят от нового renderer.
-- Character Select использует atlas-представление бойцов.
-- Все 16 арен получили отдельный многослойный HD/vector presentation renderer с освещением, перспективой, glow и анимированным окружением.
-- Переработаны title, tower, HUD, game-over и ending screens.
-- Если в будущем заменить atlas source на baked PNG/WebP/AI/hand-drawn assets, боевой код менять не потребуется.
+- Android versionCode 6 / versionName 0.6.0.
+- Добавлен boot guard в JavaScript.
+- MainActivity обёрнута защитой запуска и показывает диагностический экран вместо молчаливого завершения при ошибке.
+- Добавлен baked raster pipeline `tools/build_assets.py`.
+- В build генерируются 27 fighter PNG atlases и 16 raster stage PNG.
+- В APK проверяется наличие реальных fighter/stage assets.
+- CI отклоняет APK меньше 5 MB.
+- Добавлен отдельный raster presentation runtime.
+- Добавлен реальный Android emulator launch-test через ADB.
 
-## Проверено
+## Реально проверено
 
-Предварительный HD CI run `31388146699` успешно прошёл:
+GitHub Actions run: `31397761355`.
+Head commit: `fdad03e8dca43aede75ad14c37b50c70e9d7e2df`.
 
-1. checkout;
-2. Node setup;
-3. syntax check `umk3-data.js`;
-4. syntax check `hd-atlases.js`;
-5. syntax check `game.js`;
-6. syntax check `hd-renderer.js`;
-7. расширенный HD smoke-test;
-8. Java 17;
-9. Android SDK 35;
-10. Gradle 8.7;
-11. `assembleDebug`;
-12. проверку ненулевого APK;
-13. upload artifact.
+Успешно прошли:
 
-После фиксации `versionName 0.5.0`, `versionCode 5`, `version.js` и документации запускается отдельная финальная CI-пересборка; её run/artifact фиксируется после завершения.
+1. генерация baked raster asset pack;
+2. проверка количества/размера raster assets;
+3. JavaScript syntax checks;
+4. raster fighting-loop smoke test;
+5. Android SDK / Gradle setup;
+6. `assembleDebug`;
+7. проверка, что APK больше 5 MB;
+8. проверка наличия `assets/fighters/scorpion/atlas.png` и `assets/stages/subway.png` внутри APK;
+9. установка APK на Android API 31 emulator через `adb install`;
+10. холодный запуск `com.raznoe147.umk3hd/.MainActivity` со статусом `ok`;
+11. процесс приложения остаётся жив;
+12. MainActivity остаётся resumed;
+13. logcat: `Page finished: file:///android_asset/index.html`;
+14. logcat: `Runtime check: true`;
+15. отсутствие `FATAL EXCEPTION`;
+16. сохранение screenshot emulator evidence.
 
-## Что ещё не называем финальным 1.0
+APK artifact: `umk3-hd-0.6.0-debug-apk`, artifact id `9066423388`.
+Emulator evidence artifact: `umk3-0.6.0-emulator-evidence`, artifact id `9066422443`.
+APK artifact size: 11,692,719 bytes zipped artifact; extracted APK 11,825,921 bytes.
 
-- HD atlas 0.5.0 — собственный фиксированный vector-atlas layer. Это заметный шаг выше runtime stick/vector renderer 0.4.0, но он не выдаётся за финальный hand-drawn/AI artwork коммерческого уровня.
-- Для максимального one-to-one ощущения UMK3 ещё требуется ручной tuning некоторых frame timing/hitbox tables и редких finishing/secret systems.
-- Оригинальные Midway/Warner sprite sheets, музыка и аудио не включаются в репозиторий.
-- Установка APK на физический Android-девайс этим CI не автоматизирована; проверяются логика, компиляция и APK artifact.
+## Честное ограничение
+
+0.6.0 теперь является реальным устанавливаемым raster build и подтверждённо запускается на Android emulator. При этом художественный уровень sprite atlases всё ещё не является финальным коммерческим HD-remaster: это следующий отдельный этап качества графики.
