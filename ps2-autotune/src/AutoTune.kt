@@ -35,6 +35,8 @@ object AutoTune {
         val maxBalancedScale: Float,
     )
 
+    @Volatile private var cachedCapability: Capability? = null
+
     fun isEnabled(): Boolean =
         runCatching { MainActivityRuntime.prefs.getBoolean(PREF_ENABLED, true) }.getOrDefault(true)
 
@@ -55,6 +57,8 @@ object AutoTune {
     }
 
     fun capability(context: Context): Capability {
+        cachedCapability?.let { return it }
+
         val cores = DeviceTier.coreCount()
         val ramBytes = runCatching {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -95,7 +99,7 @@ object AutoTune {
         }
 
         // Mali naming is less linear than Adreno. Keep this intentionally broad;
-        // runtime FPS learning will correct the initial estimate after first boot.
+        // runtime emulation-speed learning corrects the initial estimate after boot.
         if (isMali) {
             score += when {
                 Regex("""(?i)Mali-G7\d\d""").containsMatchIn(gpu) -> 2
@@ -118,6 +122,7 @@ object AutoTune {
             DeviceClass.ULTRA -> 2.5f
         }
         return Capability(cls, cores, ramGb, gpu, soc, isAdreno, isMali, scale)
+            .also { cachedCapability = it }
     }
 
     /**
