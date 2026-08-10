@@ -18,6 +18,11 @@ jobs:
       - name: Fetch CC0 prerendered fighter sources
         run: bash tools/fetch_cc0_sources.sh | tee cc0-source-inventory.txt
 
+      - name: Build CC0 visual contact sheets
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 tools/make_cc0_contact_sheets.py
+
       - name: Generate baked raster asset pack
         run: |
           python3 tools/build_assets.py
@@ -102,6 +107,7 @@ jobs:
           name: umk3-cc0-inventory-and-emulator-evidence
           path: |
             cc0-source-inventory.txt
+            cc0-previews/
             emulator-start.txt
             emulator-runtime.log
             emulator-launch.png
