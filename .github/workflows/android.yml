@@ -10,38 +10,102 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-and-launch-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Generate baked raster asset pack
+        run: |
+          python3 tools/build_assets.py
+          test "$(find web/assets/fighters -name atlas.png | wc -l)" -ge 25
+          test "$(find web/assets/stages -name '*.png' | wc -l)" -ge 16
+          test "$(du -sb web/assets | cut -f1)" -gt 5000000
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify JavaScript and HD fighting loop
+
+      - name: Verify JavaScript and raster fighting loop
         run: |
+          node --check web/boot-guard.js
           node --check web/umk3-data.js
           node --check web/version.js
           node --check web/hd-atlases.js
           node --check web/game.js
           node --check web/hd-renderer.js
+          node --check web/raster-runtime.js
           node tests/smoke.cjs
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - uses: android-actions/setup-android@v4
+
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK exists
-        run: test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Reject tiny shell APK
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          bytes=$(stat -c%s app/build/outputs/apk/debug/app-debug.apk)
+          echo "APK_BYTES=$bytes"
+          test "$bytes" -gt 5000000
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/fighters/scorpion/atlas.png'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/stages/subway.png'
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+
+      - name: Install and launch on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell am force-stop com.raznoe147.umk3hd
+            adb shell am start -W -n com.raznoe147.umk3hd/.MainActivity | tee emulator-start.txt
+            sleep 8
+            adb shell pidof com.raznoe147.umk3hd
+            adb shell dumpsys activity activities | grep -q 'mResumedActivity.*com.raznoe147.umk3hd'
+            adb logcat -d -s UMK3HD:I '*:S' | tee emulator-runtime.log
+            grep -q 'Runtime check: true' emulator-runtime.log
+            if adb logcat -d -v brief | grep -q 'FATAL EXCEPTION'; then adb logcat -d -v brief; exit 1; fi
+            adb exec-out screencap -p > emulator-launch.png
+            test -s emulator-launch.png
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: umk3-0.6.0-emulator-evidence
+          path: |
+            emulator-start.txt
+            emulator-runtime.log
+            emulator-launch.png
+          if-no-files-found: warn
+          retention-days: 14
+
       - uses: actions/upload-artifact@v4
         with:
-          name: umk3-hd-0.5.0-debug-apk
+          name: umk3-hd-0.6.0-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
