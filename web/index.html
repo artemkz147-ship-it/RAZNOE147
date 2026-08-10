@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="theme-color" content="#050506" />
+  <title>UMK3 HD Fan Remake</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main id="app">
+    <canvas id="game" width="1280" height="720" aria-label="UMK3 HD Fan Remake"></canvas>
+    <div id="touch-ui" aria-hidden="true">
+      <div class="dpad">
+        <button data-key="left" class="touch left">◀</button>
+        <button data-key="up" class="touch up">▲</button>
+        <button data-key="right" class="touch right">▶</button>
+        <button data-key="down" class="touch down">▼</button>
+        <button data-key="run" class="touch run">RUN</button>
+      </div>
+      <div class="actions">
+        <button data-key="punch" class="touch punch">P</button>
+        <button data-key="kick" class="touch kick">K</button>
+        <button data-key="block" class="touch block">BL</button>
+        <button data-key="special" class="touch special">SP</button>
+      </div>
+    </div>
+    <button id="pause" aria-label="Пауза">Ⅱ</button>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
