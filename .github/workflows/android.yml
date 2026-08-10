@@ -96,7 +96,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm || true
 
-      - name: Install and launch on Android emulator
+      - name: Install, navigate by touch, and fight on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 31
@@ -107,17 +107,38 @@ jobs:
           disable-animations: true
           script: |
             adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell settings put secure immersive_mode_confirmations confirmed || true
             adb logcat -c
             adb shell am force-stop com.raznoe147.umk3hd
             adb shell am start -W -n com.raznoe147.umk3hd/.MainActivity | tee emulator-start.txt
-            sleep 8
+            sleep 5
             adb shell pidof com.raznoe147.umk3hd
             adb shell dumpsys activity activities | grep -q 'mResumedActivity.*com.raznoe147.umk3hd'
             adb logcat -d -s UMK3HD:I '*:S' | tee emulator-runtime.log
             grep -q 'Runtime check: true' emulator-runtime.log
+
+            size=$(adb shell wm size | tail -1 | grep -oE '[0-9]+x[0-9]+' | tail -1)
+            W=${size%x*}; H=${size#*x}
+            if [ "$W" -lt "$H" ]; then T=$W; W=$H; H=$T; fi
+            echo "TOUCH_SCREEN=${W}x${H}" | tee emulator-touch.txt
+
+            # Title -> character select.
+            adb shell input tap $((W*50/100)) $((H*55/100)); sleep 1
+            # Tap first portrait in the 7-column grid; mobile-controls.js confirms the selection.
+            adb shell input tap $((W*25/100)) $((H*25/100)); sleep 1
+            # Tower -> fight.
+            adb shell input tap $((W*50/100)) $((H*55/100)); sleep 3
+            # Real touch inputs during fight: action button and left movement pad.
+            adb shell input tap $((W*82/100)) $((H*48/100)); sleep 1
+            adb shell input swipe $((W*12/100)) $((H*69/100)) $((W*18/100)) $((H*69/100)) 450; sleep 1
+
+            adb logcat -d -s UMK3HD:V '*:S' | tee emulator-touch.log
+            grep -q 'UMK3_STATE=select' emulator-touch.log
+            grep -q 'UMK3_STATE=tower' emulator-touch.log
+            grep -q 'UMK3_STATE=fight' emulator-touch.log
             if adb logcat -d -v brief | grep -q 'FATAL EXCEPTION'; then adb logcat -d -v brief; exit 1; fi
-            adb exec-out screencap -p > emulator-launch.png
-            test -s emulator-launch.png
+            adb exec-out screencap -p > emulator-fight.png
+            test -s emulator-fight.png
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -130,7 +151,9 @@ jobs:
             cc0-previews/
             emulator-start.txt
             emulator-runtime.log
-            emulator-launch.png
+            emulator-touch.txt
+            emulator-touch.log
+            emulator-fight.png
           if-no-files-found: warn
           retention-days: 14
 
