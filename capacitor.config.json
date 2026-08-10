@@ -1,0 +1,11 @@
+{
+  "appId": "com.artemkz.echoruins",
+  "appName": "Echo Ruins",
+  "webDir": "dist",
+  "backgroundColor": "#050910",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}
