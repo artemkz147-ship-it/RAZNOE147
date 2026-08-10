@@ -6,22 +6,33 @@ AVD_NAME="umk3_ci_api31"
 PKG="com.raznoe147.umk3hd"
 ACTIVITY="$PKG/.MainActivity"
 EMU="$ANDROID_HOME/emulator/emulator"
+ADB_TIMEOUT=12
 
 rm -f emulator-*.log emulator-*.txt emulator-*.png emulator.pid
 
+adb_t() { timeout --signal=KILL "${ADB_TIMEOUT}s" adb "$@"; }
+adb_quiet() { timeout --signal=KILL "${ADB_TIMEOUT}s" adb "$@" >/dev/null 2>&1 || true; }
+
 capture_diag() {
-  adb logcat -d -v threadtime > emulator-full.log 2>/dev/null || true
-  adb logcat -d -s UMK3HD:V '*:S' > emulator-runtime.log 2>/dev/null || true
-  adb shell dumpsys meminfo "$PKG" > emulator-meminfo.txt 2>/dev/null || true
-  adb shell dumpsys activity activities > emulator-activities.txt 2>/dev/null || true
-  adb shell dumpsys window displays > emulator-window.txt 2>/dev/null || true
-  adb exec-out screencap -p > emulator-diagnostic.png 2>/dev/null || true
+  adb_t logcat -d -v threadtime > emulator-full.log 2>/dev/null || true
+  adb_t logcat -d -s UMK3HD:V '*:S' > emulator-runtime.log 2>/dev/null || true
+  adb_t shell dumpsys meminfo "$PKG" > emulator-meminfo.txt 2>/dev/null || true
+  adb_t shell dumpsys activity activities > emulator-activities.txt 2>/dev/null || true
+  adb_t shell dumpsys window displays > emulator-window.txt 2>/dev/null || true
+  adb_t exec-out screencap -p > emulator-diagnostic.png 2>/dev/null || true
+  tail -300 emulator-process.log > emulator-process-tail.log 2>/dev/null || true
 }
 cleanup() {
   rc=$?
+  set +e
   capture_diag
-  adb emu kill >/dev/null 2>&1 || true
-  if [[ -f emulator.pid ]]; then kill "$(cat emulator.pid)" >/dev/null 2>&1 || true; fi
+  adb_quiet emu kill
+  if [[ -f emulator.pid ]]; then
+    pid="$(cat emulator.pid 2>/dev/null || true)"
+    [[ -n "$pid" ]] && kill "$pid" >/dev/null 2>&1 || true
+    sleep 1
+    [[ -n "$pid" ]] && kill -9 "$pid" >/dev/null 2>&1 || true
+  fi
   exit "$rc"
 }
 trap cleanup EXIT
@@ -30,68 +41,103 @@ trap cleanup EXIT
 avdmanager delete avd -n "$AVD_NAME" >/dev/null 2>&1 || true
 echo no | avdmanager create avd --force -n "$AVD_NAME" -k 'system-images;android-31;google_apis;x86_64' -d pixel_6 > avd-create.log
 
-ACCEL=(-accel off)
-if [[ -e /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]; then ACCEL=(-accel on); fi
-printf 'ACCEL=%s\n' "${ACCEL[*]}" | tee emulator-accel.txt
+# GitHub-hosted x86_64 runners should expose KVM after the permission step.
+# Software x86 emulation is intentionally rejected because it can stall for hours.
+if [[ ! -e /dev/kvm || ! -r /dev/kvm || ! -w /dev/kvm ]]; then
+  echo 'KVM is unavailable; refusing an unbounded software-emulation run.' | tee emulator-accel.txt
+  ls -l /dev/kvm >> emulator-accel.txt 2>&1 || true
+  exit 2
+fi
+echo 'ACCEL=-accel on' | tee emulator-accel.txt
 
 nohup "$EMU" -avd "$AVD_NAME" \
   -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim \
-  -camera-back none -camera-front none -memory 2048 -cores 2 "${ACCEL[@]}" \
+  -camera-back none -camera-front none -memory 2048 -cores 2 -accel on \
   > emulator-process.log 2>&1 &
 echo $! > emulator.pid
 
-# Do not let a broken emulator process hang CI forever.
-timeout 180 adb wait-for-device
+# Wait for transport while also making sure the emulator process is still alive.
+transport=0
+for i in $(seq 1 90); do
+  if ! kill -0 "$(cat emulator.pid)" 2>/dev/null; then
+    echo 'Emulator process exited before adb transport appeared' >&2
+    tail -200 emulator-process.log >&2 || true
+    exit 1
+  fi
+  if timeout 3s adb get-state 2>/dev/null | grep -q '^device$'; then transport=1; break; fi
+  sleep 1
+done
+if [[ "$transport" -ne 1 ]]; then
+  echo 'ADB transport did not become ready within 90 seconds' >&2
+  tail -200 emulator-process.log >&2 || true
+  exit 1
+fi
+
 boot=0
-for i in $(seq 1 180); do
+for i in $(seq 1 120); do
   if ! kill -0 "$(cat emulator.pid)" 2>/dev/null; then
     echo 'Emulator process exited before Android booted' >&2
     tail -200 emulator-process.log >&2 || true
     exit 1
   fi
-  value="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+  value="$(timeout 5s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
   if [[ "$value" == "1" ]]; then boot=1; break; fi
+  if (( i % 15 == 0 )); then
+    echo "boot wait ${i}s"
+    tail -20 emulator-process.log || true
+  fi
   sleep 1
 done
-test "$boot" -eq 1
-adb shell input keyevent 82 || true
-adb shell settings put secure immersive_mode_confirmations confirmed || true
-adb shell settings put system accelerometer_rotation 0 || true
-adb shell settings put system user_rotation 1 || true
+if [[ "$boot" -ne 1 ]]; then
+  echo 'Android did not report sys.boot_completed=1 within 120 seconds' >&2
+  exit 1
+fi
+
+adb_t shell input keyevent 82 || true
+adb_t shell settings put secure immersive_mode_confirmations confirmed || true
+adb_t shell settings put system accelerometer_rotation 0 || true
+adb_t shell settings put system user_rotation 1 || true
 sleep 2
 
-adb shell getprop > emulator-props.txt
-adb shell cmd webviewupdate getCurrentWebViewPackage > emulator-webview.txt 2>&1 || true
-adb devices -l > emulator-devices.txt
+adb_t shell getprop > emulator-props.txt
+adb_t shell cmd webviewupdate getCurrentWebViewPackage > emulator-webview.txt 2>&1 || true
+adb_t devices -l > emulator-devices.txt
 
-adb install -r "$APK" | tee emulator-install.txt
-adb logcat -c
-adb shell am force-stop "$PKG"
-adb shell am start -W -n "$ACTIVITY" | tee emulator-start.txt
+adb_t install -r "$APK" | tee emulator-install.txt
+adb_t logcat -c
+adb_t shell am force-stop "$PKG"
+adb_t shell am start -W -n "$ACTIVITY" | tee emulator-start.txt
 
 resumed=0
 for i in $(seq 1 20); do
-  if adb shell dumpsys activity activities | grep -q "mResumedActivity.*$PKG"; then resumed=1; break; fi
+  if timeout 6s adb shell dumpsys activity activities 2>/dev/null | grep -q "mResumedActivity.*$PKG"; then resumed=1; break; fi
   sleep 1
 done
-test "$resumed" -eq 1
+if [[ "$resumed" -ne 1 ]]; then
+  echo 'MainActivity never became resumed' >&2
+  exit 1
+fi
 
 ready=0
 for i in $(seq 1 35); do
-  adb logcat -d -s UMK3HD:I '*:S' > emulator-runtime-info.log
+  timeout 6s adb logcat -d -s UMK3HD:I '*:S' > emulator-runtime-info.log 2>/dev/null || true
   if grep -q 'Runtime check: true' emulator-runtime-info.log; then ready=1; break; fi
   if grep -qE 'Fatal boot error|rendererGone|PAGE_LOAD_TIMEOUT|WEB_RUNTIME_NOT_READY|WEB error' emulator-runtime-info.log; then break; fi
   sleep 1
 done
-cat emulator-runtime-info.log
-adb exec-out screencap -p > emulator-title.png
-test "$ready" -eq 1
+cat emulator-runtime-info.log || true
+adb_t exec-out screencap -p > emulator-title.png
+if [[ "$ready" -ne 1 ]]; then
+  echo 'Web runtime did not become ready' >&2
+  exit 1
+fi
 
 # Resolve the actual landscape display and the letterboxed 1280x720 game canvas.
 read W H < <(python3 - <<'PY'
 import re,subprocess
-s=subprocess.check_output(['adb','shell','wm','size'],text=True)
+s=subprocess.check_output(['timeout','8s','adb','shell','wm','size'],text=True)
 m=re.findall(r'(\d+)x(\d+)',s)
+assert m, s
 w,h=map(int,m[-1])
 if w<h:w,h=h,w
 print(w,h)
@@ -109,42 +155,39 @@ PY
 printf 'SCREEN=%sx%s CANVAS_TITLE=%s,%s SCORPION=%s,%s TOWER=%s,%s\n' "$W" "$H" "$TITLE_X" "$TITLE_Y" "$SCORPION_X" "$SCORPION_Y" "$TOWER_X" "$TOWER_Y" | tee emulator-touch.txt
 
 # Title -> Select.
-adb shell input tap "$TITLE_X" "$TITLE_Y"
+adb_t shell input tap "$TITLE_X" "$TITLE_Y"
 sleep 2
-adb exec-out screencap -p > emulator-select.png
+adb_t exec-out screencap -p > emulator-select.png
 
 # Select Scorpion using logical portrait coordinates transformed through the letterbox.
-adb shell input tap "$SCORPION_X" "$SCORPION_Y"
+adb_t shell input tap "$SCORPION_X" "$SCORPION_Y"
 sleep 2
-adb exec-out screencap -p > emulator-tower.png
+adb_t exec-out screencap -p > emulator-tower.png
 
 # Tower -> Fight.
-adb shell input tap "$TOWER_X" "$TOWER_Y"
+adb_t shell input tap "$TOWER_X" "$TOWER_Y"
 sleep 5
 
 # Android controls are CSS overlays positioned against the physical viewport.
-# High Punch center: actions right 22, container 306x218, HP right 84/top 0, button 82.
 HP_X=$((W-22-84-41)); HP_Y=$((H-18-218+41))
-# Analog pad center: left 24 / bottom 22 / size 190.
 PAD_X=$((24+95)); PAD_Y=$((H-22-95)); PAD_RIGHT=$((PAD_X+58))
 printf 'HP=%s,%s PAD=%s,%s->%s,%s\n' "$HP_X" "$HP_Y" "$PAD_X" "$PAD_Y" "$PAD_RIGHT" "$PAD_Y" | tee -a emulator-touch.txt
 
-adb shell input tap "$HP_X" "$HP_Y"
+adb_t shell input tap "$HP_X" "$HP_Y"
 sleep 1
-adb shell input swipe "$PAD_X" "$PAD_Y" "$PAD_RIGHT" "$PAD_Y" 500
+adb_t shell input swipe "$PAD_X" "$PAD_Y" "$PAD_RIGHT" "$PAD_Y" 500
 sleep 2
 
-adb logcat -d -s UMK3HD:V '*:S' | tee emulator-touch.log
+adb_t logcat -d -s UMK3HD:V '*:S' | tee emulator-touch.log
 grep -q 'UMK3_STATE=select' emulator-touch.log
 grep -q 'UMK3_STATE=tower' emulator-touch.log
 grep -q 'UMK3_STATE=fight' emulator-touch.log
-if adb logcat -d -v brief | grep -q 'FATAL EXCEPTION'; then exit 1; fi
+if timeout 8s adb logcat -d -v brief 2>/dev/null | grep -q 'FATAL EXCEPTION'; then exit 1; fi
 
-adb exec-out screencap -p > emulator-fight.png
+adb_t exec-out screencap -p > emulator-fight.png
 test -s emulator-fight.png
 
-# Keep final diagnostics, then disable EXIT trap's error semantics and cleanly stop the emulator.
 capture_diag
 trap - EXIT
-adb emu kill >/dev/null 2>&1 || true
+adb_quiet emu kill
 exit 0
