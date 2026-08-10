@@ -1,0 +1,44 @@
+name: Build Shadow Ronin APK
+on:
+  push:
+    branches: ["game/shadow-ronin-2d"]
+  pull_request:
+    branches: ["main", "game/shadow-ronin-2d"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build game
+        run: npm run build
+      - name: Create Android shell
+        run: npx cap add android
+      - name: Patch Android fullscreen and landscape
+        run: node scripts/patch-android.mjs
+      - name: Sync web bundle
+        run: npx cap sync android
+      - name: Build debug APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug --no-daemon
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shadow-Ronin-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
