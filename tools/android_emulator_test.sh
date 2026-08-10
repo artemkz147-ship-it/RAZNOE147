@@ -7,6 +7,7 @@ PKG="com.raznoe147.umk3hd"
 ACTIVITY="$PKG/.MainActivity"
 EMU="$ANDROID_HOME/emulator/emulator"
 ADB_TIMEOUT=12
+ADB_LONG_TIMEOUT=120
 
 # Keep avdmanager and emulator on exactly the same AVD directory. GitHub runners
 # can expose different Android user-home defaults between command-line tools.
@@ -17,6 +18,7 @@ mkdir -p "$ANDROID_USER_HOME" "$ANDROID_AVD_HOME"
 rm -f emulator-*.log emulator-*.txt emulator-*.png emulator.pid
 
 adb_t() { timeout --signal=KILL "${ADB_TIMEOUT}s" adb "$@"; }
+adb_long() { timeout --signal=KILL "${ADB_LONG_TIMEOUT}s" adb "$@"; }
 adb_quiet() { timeout --signal=KILL "${ADB_TIMEOUT}s" adb "$@" >/dev/null 2>&1 || true; }
 
 capture_diag() {
@@ -101,6 +103,23 @@ if [[ "$boot" -ne 1 ]]; then
   exit 1
 fi
 
+# sys.boot_completed can become 1 before Package Manager has finished its cold-boot
+# reconciliation. Wait for pm explicitly so a large APK install is not killed while
+# Android is still bringing package services online.
+pm_ready=0
+for i in $(seq 1 60); do
+  if timeout 8s adb shell pm path android 2>/dev/null | grep -q '^package:'; then
+    pm_ready=1
+    echo "PACKAGE_MANAGER_READY_AT=${i}s" | tee emulator-pm-ready.txt
+    break
+  fi
+  sleep 1
+done
+if [[ "$pm_ready" -ne 1 ]]; then
+  echo 'Package Manager did not become ready within 60 seconds after boot' >&2
+  exit 1
+fi
+
 adb_t shell input keyevent 82 || true
 adb_t shell settings put secure immersive_mode_confirmations confirmed || true
 adb_t shell settings put system accelerometer_rotation 0 || true
@@ -111,10 +130,16 @@ adb_t shell getprop > emulator-props.txt
 adb_t shell cmd webviewupdate getCurrentWebViewPackage > emulator-webview.txt 2>&1 || true
 adb_t devices -l > emulator-devices.txt
 
-adb_t install -r "$APK" | tee emulator-install.txt
+# First install after a cold API 31 boot can legitimately take well over 12 seconds
+# because dex/package work happens concurrently. Give install and cold Activity start
+# their own bounded long timeout while keeping all diagnostics fail-fast.
+adb_long install -r -t "$APK" | tee emulator-install.txt
+grep -q 'Success' emulator-install.txt
+adb_t shell pm path "$PKG" | tee emulator-package.txt
+grep -q "package:" emulator-package.txt
 adb_t logcat -c
 adb_t shell am force-stop "$PKG"
-adb_t shell am start -W -n "$ACTIVITY" | tee emulator-start.txt
+adb_long shell am start -W -n "$ACTIVITY" | tee emulator-start.txt
 
 resumed=0
 for i in $(seq 1 20); do
