@@ -11,7 +11,7 @@ if(!coarse){ if(gear)gear.hidden=true; return; }
 
 const CODE={left:'ArrowLeft',right:'ArrowRight',up:'ArrowUp',down:'ArrowDown'};
 const held=new Set();
-let padPointer=null;
+let padPointer=null,lastTouchDir='';
 const dispatch=(code,down)=>window.dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{code,bubbles:true,cancelable:true}));
 const tapKey=code=>{dispatch(code,true);setTimeout(()=>dispatch(code,false),34)};
 const setDir=next=>{
@@ -20,6 +20,9 @@ const setDir=next=>{
     if(want&&!has){held.add(k);dispatch(CODE[k],true)}
     if(!want&&has){held.delete(k);dispatch(CODE[k],false)}
   }
+  const sig=['up','down','left','right'].filter(k=>next.has(k)).join('+');
+  if(sig&&sig!==lastTouchDir){lastTouchDir=sig;console.log(`UMK3_TOUCH_DIR=${sig}`)}
+  if(!sig)lastTouchDir='';
 };
 const reset=()=>{setDir(new Set());if(knob)knob.style.transform='translate(-50%,-50%)'};
 const updatePad=e=>{
@@ -42,7 +45,10 @@ if(pad){
 }
 
 for(const b of document.querySelectorAll('.touch')){
-  b.addEventListener('pointerdown',e=>{b.setPointerCapture?.(e.pointerId);navigator.vibrate?.(6)},{passive:true});
+  b.addEventListener('pointerdown',e=>{
+    b.setPointerCapture?.(e.pointerId);navigator.vibrate?.(6);
+    if(b.dataset.key)console.log(`UMK3_TOUCH=${b.dataset.key}`);
+  },{passive:true});
   b.addEventListener('contextmenu',e=>e.preventDefault());
 }
 window.addEventListener('blur',reset);document.addEventListener('visibilitychange',()=>{if(document.hidden)reset()});
