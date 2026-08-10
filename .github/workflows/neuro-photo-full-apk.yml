@@ -1,9 +1,9 @@
 name: NeuroPhoto Full Android APK
 
 on:
-  push:
+  pull_request:
     branches:
-      - neuro-photo-editor
+      - main
     paths:
       - 'neuro-photo/full-build.trigger'
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: neuro-photo-full-${{ github.ref }}
+  group: neuro-photo-full-pr-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout project branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -100,10 +102,11 @@ jobs:
       - name: Publish prerelease APK
         env:
           GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          SHORT_SHA="${GITHUB_SHA::7}"
+          SHORT_SHA="${SOURCE_SHA::7}"
           TAG="neurophoto-full-${SHORT_SHA}"
           TITLE="НейроФото Full ${SHORT_SHA}"
           NOTES="Офлайн Android APK со встроенной Stable Diffusion 1.5 GGUF Q4_0. Модель выполняется локально на телефоне; платный AI API и собственный сервер не нужны. Первый запуск копирует встроенную модель в приватное хранилище приложения."
@@ -116,7 +119,7 @@ jobs:
             gh release create "$TAG" \
               dist/NeuroPhoto-full.apk \
               dist/NeuroPhoto-full.apk.sha256 \
-              --target "$GITHUB_SHA" \
+              --target "$SOURCE_SHA" \
               --title "$TITLE" \
               --notes "$NOTES" \
               --prerelease
