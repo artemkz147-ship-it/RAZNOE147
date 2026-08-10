@@ -1,0 +1,1 @@
+Verify chapter-to-level black-screen fix for Shadow Ronin 1.0.1.
