@@ -25,7 +25,7 @@ env:
 
 jobs:
   android:
-    name: Android arm64 APK
+    name: Android arm64 universal APK
     runs-on: ubuntu-24.04
     timeout-minutes: 90
 
@@ -42,12 +42,22 @@ jobs:
       - name: Apply AutoTune source overlay
         run: python3 ps2-autotune/apply_autotune.py upstream
 
+      - name: Give the fork its own Android identity
+        shell: bash
+        run: |
+          cat >> upstream/platforms/android/gradle.properties <<'EOF'
+          armsx2.applicationId=com.artemkz147.ps2autotune
+          armsx2.versionName=1.0.0-autotune
+          armsx2.versionCode=147001
+          EOF
+
       - name: Record exact source
         shell: bash
         run: |
           mkdir -p dist
           {
             echo "PS2 AutoTune Android"
+            echo "application_id=com.artemkz147.ps2autotune"
             echo "overlay_repo=${GITHUB_REPOSITORY}"
             echo "overlay_commit=${GITHUB_SHA}"
             echo "upstream_repo=ARMSX2/ARMSX2"
@@ -67,10 +77,22 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install NDK and CMake
+      - name: Install Android build dependencies
         shell: bash
         run: |
-          yes | sdkmanager "ndk;28.2.13676358" "cmake;3.31.6" >/dev/null || true
+          yes | sdkmanager "platforms;android-37" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.31.6" >/dev/null || true
+
+      - name: Create installable debug signing key
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android -alias androiddebugkey -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA -keysize 2048 -validity 10000 >/dev/null 2>&1
+          fi
 
       - name: Fetch shader compiler dependencies
         working-directory: upstream/platforms/android
@@ -79,16 +101,17 @@ jobs:
       - name: Install Rust Android target
         run: rustup target add aarch64-linux-android
 
-      - name: Build release APK
+      - name: Build universal 4K + 16K APK
         working-directory: upstream/platforms/android
-        run: ./gradlew :app:assembleRelease --stacktrace --no-daemon
+        run: ./tools/build-universal-page-apk.sh "$GITHUB_WORKSPACE/dist/PS2-AutoTune-Android-universal.apk"
 
-      - name: Collect APK
+      - name: Verify package and APK
         shell: bash
         run: |
-          APK="$(find upstream/platforms/android/app/build/outputs/apk -type f -name '*.apk' | sort | head -n 1)"
-          test -n "$APK"
-          cp "$APK" dist/PS2-AutoTune-Android-arm64.apk
+          test -s dist/PS2-AutoTune-Android-universal.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose dist/PS2-AutoTune-Android-universal.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging dist/PS2-AutoTune-Android-universal.apk | head -n 5
+          sha256sum dist/PS2-AutoTune-Android-universal.apk > dist/SHA256SUMS.txt
           ls -lh dist
 
       - name: Upload installable build
