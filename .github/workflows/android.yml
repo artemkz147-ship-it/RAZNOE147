@@ -17,10 +17,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify JavaScript and fighting loop
+      - name: Verify JavaScript and HD fighting loop
         run: |
           node --check web/umk3-data.js
+          node --check web/hd-atlases.js
           node --check web/game.js
+          node --check web/hd-renderer.js
           node tests/smoke.cjs
       - uses: actions/setup-java@v4
         with:
