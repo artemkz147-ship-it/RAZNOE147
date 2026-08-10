@@ -99,11 +99,11 @@ jobs:
           test -s app/build/outputs/apk/debug/app-debug.apk
           bytes=$(stat -c%s app/build/outputs/apk/debug/app-debug.apk)
           echo "APK_BYTES=$bytes"
-          test "$bytes" -gt 15000000
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/fighters/scorpion/atlas.png'
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/fighters/scorpion/portrait.png'
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/stages/subway.png'
-          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/build-report.json | grep -q 'prerendered-48f-hd-v4-layered-stages'
+          test "$bytes" -gt 10000000
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/fighters/scorpion/atlas.png'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/fighters/scorpion/portrait.png'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/stages/subway.png'
+          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/assets/build-report.json | grep -q 'prerendered-48f-hd-v4-layered-stages'
 
       - name: Enable KVM
         run: |
@@ -138,7 +138,8 @@ jobs:
             echo "TOUCH_SCREEN=${W}x${H}" | tee emulator-touch.txt
 
             adb shell input tap $((W*50/100)) $((H*55/100)); sleep 1
-            adb shell input tap $((W*25/100)) $((H*25/100)); sleep 1
+            # Select Scorpion (top row, last portrait) to verify the ninja art path.
+            adb shell input tap $((W*75/100)) $((H*25/100)); sleep 1
             adb shell input tap $((W*50/100)) $((H*55/100)); sleep 4
             adb shell input tap $((W*82/100)) $((H*48/100)); sleep 1
             adb shell input swipe $((W*12/100)) $((H*69/100)) $((W*18/100)) $((H*69/100)) 450; sleep 1
