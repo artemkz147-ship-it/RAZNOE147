@@ -1,0 +1,6 @@
+status=failure
+source_sha=d2fa0bd54e98817c4aa232fbc7c902be69e6ead9
+run_id=31377933281
+tag=neurophoto-full-d2fa0bd
+release_url=
+completed_at=2026-08-10T10:11:09Z
