@@ -1,10 +1,12 @@
 {
   "name": "neon-apex-racing",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/prepare-v2.mjs",
     "dev": "vite --host 0.0.0.0",
+    "prebuild": "node scripts/prepare-v2.mjs",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "android:add": "npx cap add android",
