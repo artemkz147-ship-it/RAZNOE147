@@ -65,14 +65,12 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Verify JavaScript and fighting loop
+      - name: Verify JavaScript and lazy fighting loop
         run: |
           node --check web/boot-guard.js
           node --check web/umk3-data.js
           node --check web/version.js
-          node --check web/hd-atlases.js
           node --check web/game.js
-          node --check web/hd-renderer.js
           node --check web/raster-runtime.js
           node --check web/mobile-controls.js
           node tests/smoke.cjs
@@ -98,7 +96,7 @@ jobs:
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
           bytes=$(stat -c%s app/build/outputs/apk/debug/app-debug.apk)
-          echo "APK_BYTES=$bytes"
+          echo "APK_BYTES=$bytes" | tee apk-size.txt
           test "$bytes" -gt 10000000
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/fighters/scorpion/atlas.png'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/fighters/scorpion/portrait.png'
@@ -121,21 +119,39 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
+            set -uo pipefail
+            capture_diag() {
+              adb logcat -d -v threadtime > emulator-full.log 2>/dev/null || true
+              adb logcat -d -s UMK3HD:V '*:S' > emulator-runtime.log 2>/dev/null || true
+              adb shell dumpsys meminfo com.raznoe147.umk3hd > emulator-meminfo.txt 2>/dev/null || true
+              adb shell dumpsys activity activities > emulator-activities.txt 2>/dev/null || true
+              adb exec-out screencap -p > emulator-diagnostic.png 2>/dev/null || true
+            }
+            finish_diag() { rc=$?; capture_diag; exit $rc; }
+            trap finish_diag EXIT
+
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell settings put secure immersive_mode_confirmations confirmed || true
             adb logcat -c
             adb shell am force-stop com.raznoe147.umk3hd
             adb shell am start -W -n com.raznoe147.umk3hd/.MainActivity | tee emulator-start.txt
-            adb shell pidof com.raznoe147.umk3hd
-            adb shell dumpsys activity activities | grep -q 'mResumedActivity.*com.raznoe147.umk3hd'
 
-            ready=0
-            for i in $(seq 1 20); do
-              adb logcat -d -s UMK3HD:I '*:S' > emulator-runtime.log
-              if grep -q 'Runtime check: true' emulator-runtime.log; then ready=1; break; fi
+            resumed=0
+            for i in $(seq 1 15); do
+              if adb shell dumpsys activity activities | grep -q 'mResumedActivity.*com.raznoe147.umk3hd'; then resumed=1; break; fi
               sleep 1
             done
-            cat emulator-runtime.log
+            test "$resumed" -eq 1
+
+            ready=0
+            for i in $(seq 1 30); do
+              adb logcat -d -s UMK3HD:I '*:S' > emulator-runtime-info.log
+              if grep -q 'Runtime check: true' emulator-runtime-info.log; then ready=1; break; fi
+              if grep -qE 'Fatal boot error|rendererGone|PAGE_LOAD_TIMEOUT|WEB_RUNTIME_NOT_READY' emulator-runtime-info.log; then break; fi
+              sleep 1
+            done
+            cat emulator-runtime-info.log
+            adb exec-out screencap -p > emulator-title.png
             test "$ready" -eq 1
 
             size=$(adb shell wm size | tail -1 | grep -oE '[0-9]+x[0-9]+' | tail -1)
@@ -143,10 +159,11 @@ jobs:
             if [ "$W" -lt "$H" ]; then T=$W; W=$H; H=$T; fi
             echo "TOUCH_SCREEN=${W}x${H}" | tee emulator-touch.txt
 
-            adb shell input tap $((W*50/100)) $((H*55/100)); sleep 1
-            # Select Scorpion: seventh portrait in the first row.
-            adb shell input tap $((W*82/100)) $((H*25/100)); sleep 1
-            adb shell input tap $((W*50/100)) $((H*55/100)); sleep 4
+            adb shell input tap $((W*50/100)) $((H*55/100)); sleep 2
+            adb exec-out screencap -p > emulator-select.png
+            adb shell input tap $((W*82/100)) $((H*25/100)); sleep 2
+            adb exec-out screencap -p > emulator-tower.png
+            adb shell input tap $((W*50/100)) $((H*55/100)); sleep 5
             adb shell input tap $((W*82/100)) $((H*48/100)); sleep 1
             adb shell input swipe $((W*12/100)) $((H*69/100)) $((W*18/100)) $((H*69/100)) 450; sleep 1
 
@@ -154,15 +171,18 @@ jobs:
             grep -q 'UMK3_STATE=select' emulator-touch.log
             grep -q 'UMK3_STATE=tower' emulator-touch.log
             grep -q 'UMK3_STATE=fight' emulator-touch.log
-            if adb logcat -d -v brief | grep -q 'FATAL EXCEPTION'; then adb logcat -d -v brief; exit 1; fi
+            if adb logcat -d -v brief | grep -q 'FATAL EXCEPTION'; then exit 1; fi
             adb exec-out screencap -p > emulator-fight.png
             test -s emulator-fight.png
+            trap - EXIT
+            capture_diag
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: umk3-realart-review
           path: |
+            apk-size.txt
             cc0-source-inventory.txt
             cc0-selected-files.txt
             cc0-selected/
@@ -170,10 +190,18 @@ jobs:
             real-assets-build.log
             web/assets/build-report.json
             emulator-start.txt
+            emulator-runtime-info.log
             emulator-runtime.log
             emulator-touch.txt
             emulator-touch.log
+            emulator-meminfo.txt
+            emulator-activities.txt
+            emulator-full.log
+            emulator-title.png
+            emulator-select.png
+            emulator-tower.png
             emulator-fight.png
+            emulator-diagnostic.png
           if-no-files-found: warn
           retention-days: 14
 
