@@ -20,6 +20,14 @@ def replace_if_present(path: Path, old: str, new: str) -> None:
         path.write_text(text.replace(old, new), encoding="utf-8")
 
 
+def replace_literal(path: Path, old: str, new: str) -> None:
+    """Replace only complete Dart string literals, never identifiers."""
+    text = path.read_text(encoding="utf-8")
+    text = text.replace(f"'{old}'", f"'{new}'")
+    text = text.replace(f'"{old}"', f'"{new}"')
+    path.write_text(text, encoding="utf-8")
+
+
 # Branding/package.
 replace_required(
     ROOT / "android/app/build.gradle",
@@ -37,44 +45,42 @@ replace_required(
     'android:label="НейроФото"',
 )
 
-# Keep the upstream Dart package name intact so imports stay stable, only rebrand visible copy.
-for dart_file in (ROOT / "lib").glob("*.dart"):
-    for old, new in {
-        "Local Diffusion": "НейроФото",
-        "Storage Permission Required": "Нужен доступ к файлам",
-        "Grant Permission": "Разрешить доступ",
-        "Load Model": "Загрузить модель",
-        "Select Model": "Выбрать модель",
-        "Model": "Модель",
-        "Generate": "Создать",
-        "Image to Image": "Стилизация фото",
-        "Img2Img": "Стилизация фото",
-        "Inpainting": "Замена по маске",
-        "Outpainting": "Расширение кадра",
-        "Upscaler": "Улучшение качества",
-        "Upscale": "Улучшить",
-        "PhotoMaker": "Портрет по референсу",
-        "Scribble to Image": "По наброску",
-        "Prompt": "Что изменить",
-        "Negative Prompt": "Чего не должно быть",
-        "Steps": "Шаги",
-        "Width": "Ширина",
-        "Height": "Высота",
-        "Seed": "Seed",
-        "Strength": "Сила изменения",
-        "Backend": "Ускорение",
-        "CPU": "CPU",
-        "Vulkan": "Vulkan",
-        "OpenCL": "OpenCL",
-        "Save Image": "Сохранить фото",
-        "Save": "Сохранить",
-        "Cancel": "Отмена",
-        "Close": "Закрыть",
-        "Error": "Ошибка",
-    }.items():
-        replace_if_present(dart_file, old, new)
+# Visible UI text only. Exact quoted literals are changed, identifiers remain untouched.
+translations = {
+    "Local Diffusion": "НейроФото",
+    "Storage Permission Required": "Нужен доступ к файлам",
+    "Grant Permission": "Разрешить доступ",
+    "Load Model": "Загрузить модель",
+    "Select Model": "Выбрать модель",
+    "Model": "Модель",
+    "Generate": "Создать",
+    "Image to Image": "Стилизация фото",
+    "Img2Img": "Стилизация фото",
+    "Inpainting": "Замена по маске",
+    "Outpainting": "Расширение кадра",
+    "Upscaler": "Улучшение качества",
+    "Upscale": "Улучшить",
+    "PhotoMaker": "Портрет по референсу",
+    "Scribble to Image": "По наброску",
+    "Prompt": "Что изменить",
+    "Negative Prompt": "Чего не должно быть",
+    "Steps": "Шаги",
+    "Width": "Ширина",
+    "Height": "Высота",
+    "Strength": "Сила изменения",
+    "Backend": "Ускорение",
+    "Save Image": "Сохранить фото",
+    "Save": "Сохранить",
+    "Cancel": "Отмена",
+    "Close": "Закрыть",
+    "Error": "Ошибка",
+}
 
-# Replace the permission explanation with a Russian, user-oriented text.
+for dart_file in (ROOT / "lib").glob("*.dart"):
+    for old, new in translations.items():
+        replace_literal(dart_file, old, new)
+
+# Replace one longer user-facing permission sentence safely.
 main_dart = ROOT / "lib/main.dart"
 replace_if_present(
     main_dart,
@@ -82,7 +88,6 @@ replace_if_present(
     'НейроФото хранит локальные нейросети и результаты на телефоне. Разрешите доступ к файлам — фотографии никуда не отправляются.',
 )
 
-# Rename output APK after Flutter build via a small marker consumed by CI.
 (ROOT / ".neurophoto-customized").write_text(
     "NeuroPhoto customization applied\n", encoding="utf-8"
 )
