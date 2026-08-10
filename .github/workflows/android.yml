@@ -20,6 +20,7 @@ jobs:
       - name: Verify JavaScript and HD fighting loop
         run: |
           node --check web/umk3-data.js
+          node --check web/version.js
           node --check web/hd-atlases.js
           node --check web/game.js
           node --check web/hd-renderer.js
@@ -40,7 +41,7 @@ jobs:
         run: test -s app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: umk3-hd-debug-apk
+          name: umk3-hd-0.5.0-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
