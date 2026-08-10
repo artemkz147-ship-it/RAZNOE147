@@ -126,11 +126,17 @@ jobs:
             adb logcat -c
             adb shell am force-stop com.raznoe147.umk3hd
             adb shell am start -W -n com.raznoe147.umk3hd/.MainActivity | tee emulator-start.txt
-            sleep 6
             adb shell pidof com.raznoe147.umk3hd
             adb shell dumpsys activity activities | grep -q 'mResumedActivity.*com.raznoe147.umk3hd'
-            adb logcat -d -s UMK3HD:I '*:S' | tee emulator-runtime.log
-            grep -q 'Runtime check: true' emulator-runtime.log
+
+            ready=0
+            for i in $(seq 1 20); do
+              adb logcat -d -s UMK3HD:I '*:S' > emulator-runtime.log
+              if grep -q 'Runtime check: true' emulator-runtime.log; then ready=1; break; fi
+              sleep 1
+            done
+            cat emulator-runtime.log
+            test "$ready" -eq 1
 
             size=$(adb shell wm size | tail -1 | grep -oE '[0-9]+x[0-9]+' | tail -1)
             W=${size%x*}; H=${size#*x}
