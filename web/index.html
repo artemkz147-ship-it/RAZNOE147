@@ -11,32 +11,43 @@
 <body>
   <main id="app">
     <canvas id="game" width="1280" height="720" aria-label="UMK3 HD Fan Remake"></canvas>
+
     <div id="touch-ui" aria-hidden="true">
-      <div class="dpad">
-        <button data-key="left" class="touch left">◀</button>
-        <button data-key="up" class="touch up">▲</button>
-        <button data-key="right" class="touch right">▶</button>
-        <button data-key="down" class="touch down">▼</button>
+      <div id="move-pad" aria-label="Движение">
+        <span class="pad-ring"></span><span class="pad-cross"></span><span id="move-knob"></span>
       </div>
+
       <div class="run-zone">
         <button data-key="RUN" class="touch run">RUN</button>
-        <button data-key="BL" class="touch block">BL</button>
+        <button data-key="BL" class="touch block">BLOCK</button>
       </div>
+
       <div class="actions">
-        <button data-key="HP" class="touch hp">HP</button>
-        <button data-key="LP" class="touch lp">LP</button>
-        <button data-key="HK" class="touch hk">HK</button>
-        <button data-key="LK" class="touch lk">LK</button>
-        <button data-key="SPECIAL" class="touch special">SP</button>
+        <button data-key="HP" class="touch hp"><b>HP</b><small>HIGH PUNCH</small></button>
+        <button data-key="LP" class="touch lp"><b>LP</b><small>LOW PUNCH</small></button>
+        <button data-key="HK" class="touch hk"><b>HK</b><small>HIGH KICK</small></button>
+        <button data-key="LK" class="touch lk"><b>LK</b><small>LOW KICK</small></button>
       </div>
     </div>
+
     <button id="pause" aria-label="Пауза">Ⅱ</button>
+    <button id="controls-gear" aria-label="Настройки управления" hidden>⚙</button>
+    <section id="controls-panel" aria-label="Настройки управления">
+      <header>УПРАВЛЕНИЕ</header>
+      <label>Общий размер <input id="control-size" type="range" min="0.72" max="1.28" step="0.02" /></label>
+      <label>Размер кнопок <input id="button-size" type="range" min="0.78" max="1.24" step="0.02" /></label>
+      <label>Прозрачность <input id="control-opacity" type="range" min="0.38" max="1" step="0.02" /></label>
+      <button id="controls-reset">СБРОСИТЬ</button>
+      <p>Левый стик поддерживает диагонали. Кнопки работают одновременно несколькими пальцами.</p>
+    </section>
   </main>
+
   <script src="umk3-data.js"></script>
   <script src="version.js"></script>
   <script src="hd-atlases.js"></script>
   <script src="game.js"></script>
   <script src="hd-renderer.js"></script>
   <script src="raster-runtime.js"></script>
+  <script src="mobile-controls.js"></script>
 </body>
 </html>
