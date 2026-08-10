@@ -1,0 +1,130 @@
+    longitudinal = clamp(longitudinal + (nitroOn ? (longitudinal < 16 ? 38 : 30) * dt : 0), -12, top);
+    this.nitro = clamp(this.nitro + (nitroOn ? -23 * dt : 9.5 * dt), 0, 100);
+    const drift = input.brake && Math.abs(longitudinal) > 11;
+    const grip = drift ? Math.pow(.982, dt * 60) : Math.pow(.84, dt * 60);
+    lateral *= grip; this.skid = THREE.MathUtils.lerp(this.skid, drift ? 1 : 0, 1 - Math.pow(.06, dt));
+    const speedFactor = clamp(Math.abs(longitudinal) / 32, .12, 1.2);
+    const yawRate = steer * (0.45 + 1.55 * speedFactor) * (longitudinal >= 0 ? 1 : -1) * (drift ? 1.22 : 1);
+    this.playerBody.setAngvel({ x: 0, y: yawRate, z: 0 }, true);
+    const newVel = forward.multiplyScalar(longitudinal).add(right.multiplyScalar(lateral)); newVel.y = rv.y;
+    this.playerBody.setLinvel({ x: newVel.x, y: newVel.y, z: newVel.z }, true);
+
+    const rotNow = this.playerBody.rotation(); const e = new THREE.Euler().setFromQuaternion(new THREE.Quaternion(rotNow.x, rotNow.y, rotNow.z, rotNow.w), 'YXZ');
+    const yaw = e.y; this.playerBody.setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, true);
+
+    const p = this.playerBody.translation(); if (p.y < -2) this.respawnAtNearest();
+    this.updateProgress(longitudinal);
+    const kmh = Math.max(0, longitudinal * 3.6); ui.speed.textContent = `${Math.round(kmh)}`; ui.nitroText.textContent = `${Math.round(this.nitro)}%`; ui.nitroBar.style.transform = `scaleX(${this.nitro / 100})`;
+    const flames = this.playerMesh.userData.flames as THREE.Group | undefined;
+    if (flames) { flames.visible = nitroOn; this.nitroPulse += dt * 24; const pulse = .85 + Math.sin(this.nitroPulse) * .18; flames.scale.set(1, pulse, 1); }
+  }
+
+  updateProgress(forwardSpeed: number) {
+    const p = this.playerBody.translation(); let best = Infinity; let idx = this.nearestIndex;
+    for (let i = 0; i < this.trackSamples.length; i++) { const s = this.trackSamples[i]; const dx = s.x - p.x, dz = s.z - p.z, d = dx * dx + dz * dz; if (d < best) { best = d; idx = i; } }
+    if (this.lastTrackIndex > this.trackSamples.length * .82 && idx < this.trackSamples.length * .18 && forwardSpeed > 5) {
+      this.lap++; if (this.lap > 3) { this.finishRace(); return; } ui.lap.textContent = `${this.lap}`;
+    }
+    if (this.lastTrackIndex < this.trackSamples.length * .18 && idx > this.trackSamples.length * .82 && forwardSpeed < -4 && this.lap > 1) { this.lap--; ui.lap.textContent = `${this.lap}`; }
+    this.nearestIndex = idx; this.lastTrackIndex = idx; this.playerProgress = (this.lap - 1) + idx / this.trackSamples.length;
+  }
+
+  respawnAtNearest() {
+    const i = this.nearestIndex; const p = this.trackSamples[i], t = this.trackTangents[i]; const yaw = Math.atan2(-t.x, -t.z);
+    this.playerBody.setTranslation({ x: p.x, y: .9, z: p.z }, true); this.playerBody.setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, true); this.playerBody.setLinvel({ x: 0, y: 0, z: 0 }, true); this.playerBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  }
+
+  updateAI(dt: number) {
+    for (let i = 0; i < this.ai.length; i++) {
+      const a = this.ai[i]; if (this.state === 'race') {
+        const wobble = Math.sin(this.raceSeconds * .47 + i * 2.2) * 1.1;
+        const playerCatch = clamp((this.playerProgress * this.trackLength - a.distance) * .018, -2.5, 2.5);
+        const damagePenalty = a.damage * .035;
+        a.distance += Math.max(12, a.speed + wobble + playerCatch - damagePenalty) * dt;
+      }
+      const t = mod(a.distance / this.trackLength, 1); const p = this.track.getPointAt(t); const tan = this.track.getTangentAt(t).normalize(); const n = new THREE.Vector3(-tan.z, 0, tan.x);
+      const pos = p.clone().addScaledVector(n, a.lane); pos.y = .82;
+      const yaw = Math.atan2(-tan.x, -tan.z); const rot = new THREE.Quaternion().setFromAxisAngle(Y_AXIS, yaw);
+      if (dt === 0) { a.body.setTranslation({ x: pos.x, y: pos.y, z: pos.z }, true); a.body.setRotation({ x: rot.x, y: rot.y, z: rot.z, w: rot.w }, true); }
+      else { a.body.setNextKinematicTranslation({ x: pos.x, y: pos.y, z: pos.z }); a.body.setNextKinematicRotation({ x: rot.x, y: rot.y, z: rot.z, w: rot.w }); }
+      a.mesh.position.set(pos.x, pos.y - .74, pos.z); a.mesh.quaternion.copy(rot);
+    }
+  }
+
+  checkImpacts() {
+    const v = this.playerBody.linvel(); const speedNow = Math.hypot(v.x, v.y, v.z);
+    const input = this.input(); const drop = this.lastPlayerSpeed - speedNow;
+    const now = performance.now();
+    if (!input.brake && drop > 7.5 && this.lastPlayerSpeed > 14 && now - this.lastImpactAt > 220) {
+      this.lastImpactAt = now;
+      this.playerDamage = clamp(this.playerDamage + drop * 1.85, 0, 100);
+      this.setCarDamage(this.playerMesh, this.playerDamage);
+      this.camera.position.x += (Math.random() - .5) * .5;
+      this.camera.position.y += Math.random() * .25;
+    }
+
+    const pp = this.playerBody.translation();
+    for (const a of this.ai) {
+      const ap = a.body.translation(); const dx = pp.x - ap.x, dz = pp.z - ap.z;
+      if (dx * dx + dz * dz < 8.4 && speedNow > 10 && now - this.lastImpactAt > 160) {
+        const hit = clamp(speedNow * .16, 2, 11); a.damage = clamp(a.damage + hit, 0, 100); this.setCarDamage(a.mesh, a.damage);
+      }
+    }
+    this.lastPlayerSpeed = speedNow;
+    const integrity = 100 - this.playerDamage;
+    ui.damageText.textContent = `${Math.round(integrity)}%`; ui.damageBar.style.transform = `scaleX(${integrity / 100})`;
+  }
+
+  syncDestructibles() {
+    for (const d of this.destructibles) {
+      const p = d.body.translation(), q = d.body.rotation();
+      d.mesh.position.set(p.x, p.y, p.z); d.mesh.quaternion.set(q.x, q.y, q.z, q.w);
+    }
+  }
+
+  updatePosition() {
+    const scores = [{ player: true, progress: this.playerProgress }, ...this.ai.map(a => ({ player: false, progress: a.distance / this.trackLength }))].sort((a,b) => b.progress - a.progress);
+    const pos = scores.findIndex(s => s.player) + 1; this.bestPosition = pos; ui.position.textContent = `${pos}`;
+  }
+
+  syncPlayerMesh() {
+    const p = this.playerBody.translation(), q = this.playerBody.rotation(); this.playerMesh.position.set(p.x, p.y - .43, p.z); this.playerMesh.quaternion.set(q.x, q.y, q.z, q.w);
+    const bodyLean = clamp(this.playerBody.angvel().y * -.055, -.09, .09); this.playerMesh.rotation.z = bodyLean;
+  }
+
+  updateCamera(dt: number) {
+    const p = this.playerMesh.position; const q = this.playerMesh.quaternion; const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(q).setY(0).normalize();
+    const speed = Math.min(1, parseFloat(ui.speed.textContent || '0') / 245); const nitroKick = this.nitroActive ? 1 : 0;
+    const desired = p.clone().addScaledVector(forward, -7.4 - speed * 2.2 - nitroKick * .8).add(new THREE.Vector3(0, 3.9 + speed * .9, 0));
+    const look = p.clone().addScaledVector(forward, 7 + speed * 5.5 + nitroKick * 2.5).add(new THREE.Vector3(0, 1.0, 0));
+    const a = 1 - Math.pow(.0015, dt); this.cameraPos.lerp(desired, a); this.cameraLook.lerp(look, a); this.camera.position.copy(this.cameraPos); this.camera.lookAt(this.cameraLook);
+    this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, 66 + speed * 9 + nitroKick * 6, 1 - Math.pow(.01, dt)); this.camera.updateProjectionMatrix();
+  }
+
+  formatTime(sec: number) { const m = Math.floor(sec / 60); const s = Math.floor(sec % 60); const ms = Math.floor((sec % 1) * 1000); return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`; }
+
+  finishRace() {
+    if (this.state === 'finish') return; this.updatePosition(); this.state = 'finish'; ui.touch.classList.add('hidden'); ui.hud.classList.add('hidden'); ui.finishTitle.textContent = `${this.bestPosition} МЕСТО`; ui.finishTime.textContent = this.formatTime(this.raceSeconds); ui.finish.classList.add('active');
+  }
+
+  updateCountdown(dt: number) {
+    this.countdown -= dt; const n = Math.ceil(this.countdown); ui.countdown.textContent = n > 0 ? `${Math.min(3, n)}` : 'GO!';
+    if (this.countdown <= -.55) { this.state = 'race'; ui.countdown.classList.add('hidden'); this.clock.getDelta(); }
+  }
+
+  loop() {
+    const dt = Math.min(this.clock.getDelta(), 1 / 20); this.frame++;
+    if (this.state === 'countdown') this.updateCountdown(dt);
+    if (this.state === 'race') {
+      this.raceSeconds += dt; ui.raceTime.textContent = this.formatTime(this.raceSeconds);
+      this.updatePlayer(dt); this.updateAI(dt); this.world.timestep = dt; this.world.step(); this.checkImpacts(); this.updatePosition();
+    } else if (this.state !== 'paused') this.updateAI(0);
+    this.syncDestructibles(); this.syncPlayerMesh(); this.updateCamera(dt || 1/60); this.renderer.render(this.scene, this.camera);
+  }
+
+  resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); this.setQuality(this.quality); }
+}
+
+const game = new NeonApexGame();
+game.init().catch(err => {
+  console.error(err);
