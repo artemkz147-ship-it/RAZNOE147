@@ -38,6 +38,7 @@ jobs:
           node --check web/game.js
           node --check web/hd-renderer.js
           node --check web/raster-runtime.js
+          node --check web/mobile-controls.js
           node tests/smoke.cjs
 
       - uses: actions/setup-java@v4
