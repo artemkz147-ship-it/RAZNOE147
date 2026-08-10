@@ -50,7 +50,8 @@ object AdaptiveAutoTune {
         }
 
         fun isUsable(): Boolean =
-            listOf(eeMs, gsMs, vuMs, gpuMs).any { it.isFinite() && it > 0.05f }
+            cpuCriticalMs.isFinite() && graphicsCriticalMs.isFinite() &&
+                cpuCriticalMs > 0.05f && graphicsCriticalMs > 0.05f
 
         fun line(): String =
             "ee=${"%.2f".format(eeMs)}ms gs=${"%.2f".format(gsMs)}ms " +
