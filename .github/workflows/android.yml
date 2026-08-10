@@ -23,6 +23,24 @@ jobs:
           python3 -m pip install --quiet pillow
           python3 tools/make_cc0_contact_sheets.py
 
+      - name: Export selected source samples for art integration
+        run: |
+          mkdir -p cc0-selected
+          cp .cc0-sources/singles/verlaine.gif cc0-selected/
+          cp .cc0-sources/singles/female-ninja.gif cc0-selected/
+          cp .cc0-sources/singles/ava-lee.gif cc0-selected/
+          cp .cc0-sources/singles/tasen-defender.png cc0-selected/
+          find .cc0-sources/mustermenschen -maxdepth 1 -type f \( \
+            -iname '*Nick Adler*' -o -iname '*Danny Van Damage*' -o -iname '*Raf Boulder*' -o \
+            -iname '*Byron Verlaine*' -o -iname '*Ava Lee*Thai*' -o -iname '*Tasen woman 1 Tasen*' -o \
+            -iname '*Tasen woman 2 Tasen*' -o -iname '*Tasen man 1*' -o -iname '*Kelvin Zone*' -o \
+            -iname '*Susa No Mikoto Tasen*' -o -iname '*Komato berserker*' \) -print0 | xargs -0 -I{} cp '{}' cc0-selected/ || true
+          for f in Idle.png Walk.png WalkBack.png Run.png Jump.png Kick.png Attack1.png Block.png Crouch.png CrouchSlash.png Impact.png Slash.png Slash2.png PowerUp.png Death.png; do
+            p=".cc0-sources/dark-knight/Knight 2D/Sprites/$f"; test -f "$p" && cp "$p" "cc0-selected/knight-$f"
+          done
+          find cc0-selected -type f -printf '%s\t%f\n' | sort -nr | tee cc0-selected-files.txt
+          test "$(find cc0-selected -type f | wc -l)" -ge 12
+
       - name: Generate baked raster asset pack
         run: |
           python3 tools/build_assets.py
@@ -104,9 +122,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: umk3-cc0-inventory-and-emulator-evidence
+          name: umk3-cc0-art-review
           path: |
             cc0-source-inventory.txt
+            cc0-selected-files.txt
+            cc0-selected/
             cc0-previews/
             emulator-start.txt
             emulator-runtime.log
