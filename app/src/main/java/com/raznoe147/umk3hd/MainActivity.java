@@ -22,6 +22,7 @@ import android.widget.TextView;
 
 public class MainActivity extends Activity {
     private static final String TAG = "UMK3HD";
+    private static final String BUILD_VERSION = "0.7.0";
     private WebView webView;
     private FrameLayout root;
     private TextView diagnostic;
@@ -67,7 +68,7 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override public void onPageFinished(WebView view, String url) {
                 Log.i(TAG, "Page finished: " + url);
-                new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRuntime(view), 2500);
+                new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRuntime(view), 3500);
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
@@ -82,7 +83,7 @@ public class MainActivity extends Activity {
 
     private void verifyRuntime(WebView view) {
         if (view == null) return;
-        view.evaluateJavascript("(function(){return !!(window.__UMK3_DEBUG__&&window.__UMK3_RASTER__);})()", value -> {
+        view.evaluateJavascript("(function(){return !!(window.__UMK3_DEBUG__&&window.__UMK3_RASTER__&&window.UMK3_BUILD&&window.UMK3_BUILD.version==='0.7.0');})()", value -> {
             Log.i(TAG, "Runtime check: " + value);
             if (!"true".equals(value)) showDiagnostic("Игра загрузилась не полностью. Код ошибки: WEB_RUNTIME_NOT_READY");
         });
@@ -103,7 +104,7 @@ public class MainActivity extends Activity {
             diagnostic.setPadding(30,30,30,30);
             root.addView(diagnostic, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
         }
-        diagnostic.setText(text + "\n\nВерсия 0.6.0");
+        diagnostic.setText(text + "\n\nВерсия " + BUILD_VERSION);
         diagnostic.bringToFront();
     }
 
