@@ -1,0 +1,166 @@
+name: NeuroPhoto Full Android APK
+
+on:
+  push:
+    branches:
+      - neuro-photo-editor
+    paths:
+      - 'neuro-photo/full-build.trigger'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: neuro-photo-full-neuro-photo-editor
+  cancel-in-progress: true
+
+jobs:
+  build-full-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      MODEL_REVISION: f41080936c76af537542aedf67f0dab94e1f337f
+      MODEL_FILE: stable-diffusion-v1-5-pruned-emaonly-Q4_0.gguf
+      MODEL_SHA256: b8944e9fe0b69b36ae1b5bb0185b3a7b8ef14347fe0fa9af6c64c4829022261f
+      SOURCE_SHA: ${{ github.sha }}
+
+    steps:
+      - name: Checkout project branch
+        uses: actions/checkout@v4
+        with:
+          ref: neuro-photo-editor
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter 3.27.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.4'
+          channel: stable
+          cache: true
+
+      - name: Clone pinned Local Diffusion upstream
+        run: |
+          git clone https://github.com/rmatif/Local-Diffusion.git upstream
+          cd upstream
+          git checkout 184b7f92cf2f810e7d5eb4b04b190a5da829005f
+          git lfs pull || true
+
+      - name: Apply NeuroPhoto base customization
+        run: python3 neuro-photo/tools/customize_upstream.py upstream
+
+      - name: Apply NeuroPhoto Full customization
+        run: python3 neuro-photo/tools/customize_full_upstream.py upstream
+
+      - name: Remove bundled Android system libraries
+        run: python3 neuro-photo/tools/prepare_full_native_libs.py upstream
+
+      - name: Download pinned SD1.5 Q4 model
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p upstream/android/app/src/main/assets/models
+          URL="https://huggingface.co/second-state/stable-diffusion-v1-5-GGUF/resolve/${MODEL_REVISION}/${MODEL_FILE}?download=true"
+          OUT="upstream/android/app/src/main/assets/models/neurophoto-sd15-q4.gguf"
+          curl -L --fail --retry 5 --retry-all-errors --connect-timeout 30 \
+            --progress-bar "$URL" -o "$OUT"
+          echo "${MODEL_SHA256}  ${OUT}" | sha256sum -c -
+          test "$(stat -c%s "$OUT")" = "1566768416"
+          ls -lh "$OUT"
+
+      - name: Resolve Flutter packages
+        working-directory: upstream
+        run: flutter pub get
+
+      - name: Analyze patched production Dart sources
+        working-directory: upstream
+        run: flutter analyze lib --no-fatal-infos --no-fatal-warnings
+
+      - name: Build Full release APK
+        working-directory: upstream
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: Verify APK and native libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/apkcheck
+          cp upstream/build/app/outputs/flutter-apk/app-release.apk dist/NeuroPhoto-full.apk
+          sha256sum dist/NeuroPhoto-full.apk | tee dist/NeuroPhoto-full.apk.sha256
+          SIZE=$(stat -c%s dist/NeuroPhoto-full.apk)
+          echo "APK bytes: ${SIZE}"
+          test "$SIZE" -lt 2147483648
+          unzip -q dist/NeuroPhoto-full.apk 'lib/arm64-v8a/*.so' -d dist/apkcheck
+          test ! -e dist/apkcheck/lib/arm64-v8a/libc.so
+          test ! -e dist/apkcheck/lib/arm64-v8a/libm.so
+          test ! -e dist/apkcheck/lib/arm64-v8a/libdl.so
+          echo 'ELF LOAD alignment:'
+          for lib in dist/apkcheck/lib/arm64-v8a/*.so; do
+            echo "--- $lib"
+            readelf -lW "$lib" | awk '/LOAD/{print $NF}' | sort -u
+          done
+          if find dist/apkcheck/lib/arm64-v8a -name '*.so' -print0 | xargs -0 -n1 sh -c 'readelf -lW "$0" | awk "/LOAD/{print \$NF}" | grep -qx 0x1000'; then
+            echo 'Found a 4 KiB-aligned native library in the final APK' >&2
+            exit 1
+          fi
+          ls -lh dist/NeuroPhoto-full.apk dist/NeuroPhoto-full.apk.sha256
+
+      - name: Publish prerelease APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${SOURCE_SHA::7}"
+          TAG="neurophoto-full-${SHORT_SHA}"
+          TITLE="НейроФото Full ${SHORT_SHA}"
+          NOTES="Офлайн Android APK со встроенной Stable Diffusion 1.5 GGUF Q4_0. Модель выполняется локально на телефоне; платный AI API и собственный сервер не нужны. Первый запуск копирует встроенную модель в приватное хранилище приложения."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              dist/NeuroPhoto-full.apk \
+              dist/NeuroPhoto-full.apk.sha256 \
+              --clobber
+          else
+            gh release create "$TAG" \
+              dist/NeuroPhoto-full.apk \
+              dist/NeuroPhoto-full.apk.sha256 \
+              --target "$SOURCE_SHA" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --prerelease
+          fi
+          gh release view "$TAG"
+
+      - name: Record final Full build status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINAL_STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${SOURCE_SHA::7}"
+          TAG="neurophoto-full-${SHORT_SHA}"
+          RELEASE_URL=""
+          if [ "$FINAL_STATUS" = "success" ]; then
+            RELEASE_URL="$(gh release view "$TAG" --json url -q .url 2>/dev/null || true)"
+          fi
+          {
+            echo "status=${FINAL_STATUS}"
+            echo "source_sha=${SOURCE_SHA}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "tag=${TAG}"
+            echo "release_url=${RELEASE_URL}"
+            echo "completed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > neuro-photo/full-build-status.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add neuro-photo/full-build-status.txt
+          git commit -m "NeuroPhoto Full: record ${FINAL_STATUS} build" || true
+          git push origin HEAD:neuro-photo-editor

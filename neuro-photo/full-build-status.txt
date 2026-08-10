@@ -1,0 +1,6 @@
+status=success
+source_sha=558d08179b5a54caeb0060c645417e2a24a75368
+run_id=31378226628
+tag=neurophoto-full-558d081
+release_url=https://github.com/artemkz147-ship-it/RAZNOE147/releases/tag/neurophoto-full-558d081
+completed_at=2026-08-10T10:20:10Z

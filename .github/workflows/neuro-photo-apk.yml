@@ -1,0 +1,85 @@
+name: NeuroPhoto Android APK
+
+on:
+  push:
+    branches:
+      - neuro-photo-editor
+    paths:
+      - 'neuro-photo/tools/customize_upstream.py'
+      - '.github/workflows/neuro-photo-apk.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'neuro-photo/tools/customize_upstream.py'
+      - '.github/workflows/neuro-photo-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neuro-photo-lite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-lite-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout project branch
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter 3.27.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.4'
+          channel: stable
+          cache: true
+
+      - name: Clone pinned Local Diffusion upstream
+        run: |
+          git clone https://github.com/rmatif/Local-Diffusion.git upstream
+          cd upstream
+          git checkout 184b7f92cf2f810e7d5eb4b04b190a5da829005f
+          git lfs pull || true
+
+      - name: Apply NeuroPhoto customization
+        run: python3 neuro-photo/tools/customize_upstream.py upstream
+
+      - name: Resolve Flutter packages
+        working-directory: upstream
+        run: flutter pub get
+
+      - name: Flutter diagnostics
+        working-directory: upstream
+        run: flutter doctor -v
+
+      - name: Build release APK
+        working-directory: upstream
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: Collect APK
+        run: |
+          mkdir -p dist
+          cp upstream/build/app/outputs/flutter-apk/app-release.apk dist/NeuroPhoto-lite.apk
+          sha256sum dist/NeuroPhoto-lite.apk | tee dist/NeuroPhoto-lite.apk.sha256
+          ls -lh dist/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeuroPhoto-lite-apk
+          path: |
+            dist/NeuroPhoto-lite.apk
+            dist/NeuroPhoto-lite.apk.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
