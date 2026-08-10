@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/.cc0-sources"
 rm -rf "$SRC"
-mkdir -p "$SRC/mustermenschen" "$SRC/singles" "$SRC/backgrounds"
+mkdir -p "$SRC/mustermenschen" "$SRC/singles" "$SRC/backgrounds" "$SRC/v5"
 
 fetch(){
   local url="$1" out="$2"
@@ -13,13 +13,20 @@ fetch(){
 }
 
 # All sources below are CC0/public-domain assets from OpenGameArt.
-# Fighters / animation bases.
+# Legacy / specialist fighter animation bases.
 fetch 'https://opengameart.org/sites/default/files/Mustermenshen%201_0.zip' "$SRC/Mustermenshen1.zip"
 fetch 'https://opengameart.org/sites/default/files/Verlaineopen.gif' "$SRC/singles/verlaine.gif"
 fetch 'https://opengameart.org/sites/default/files/1_4.gif' "$SRC/singles/female-ninja.gif"
 fetch 'https://opengameart.org/sites/default/files/AvaLee-sheet_0.gif' "$SRC/singles/ava-lee.gif"
 fetch 'https://opengameart.org/sites/default/files/Spritesheet32bits_0.png' "$SRC/singles/tasen-defender.png"
 fetch 'https://opengameart.org/sites/default/files/Knight%202D.zip' "$SRC/Knight2D.zip"
+
+# V5 high-resolution masters. Both are CC0 Universal Prototype 2 sequences with
+# thousands of prerendered cels. Stonewall is the realistic/Iray male master;
+# Erika is a high-resolution indexed female master from the compatible template.
+fetch 'https://opengameart.org/sites/default/files/stonewall_realistic_sequence.gif' "$SRC/v5/stonewall-realistic.gif"
+fetch 'https://opengameart.org/sites/default/files/erika_sequence.gif' "$SRC/v5/erika-realistic.gif"
+
 unzip -q "$SRC/Mustermenshen1.zip" -d "$SRC/mustermenschen"
 unzip -q "$SRC/Knight2D.zip" -d "$SRC/dark-knight"
 
@@ -34,6 +41,6 @@ for spec in 'AbandonCity:AbandonCity.zip' 'DarkCity:DarkCity.zip' 'StarryNight:S
 done
 
 echo '--- CC0 SOURCE INVENTORY ---'
-find "$SRC" -type f -printf '%s\t%p\n' | sort -nr | head -220
+find "$SRC" -type f -printf '%s\t%p\n' | sort -nr | head -240
 printf 'SOURCE_BYTES='; du -sb "$SRC" | cut -f1
 printf 'SOURCE_FILES='; find "$SRC" -type f | wc -l
