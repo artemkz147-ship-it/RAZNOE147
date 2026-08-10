@@ -1,0 +1,23 @@
+{
+  "name": "echo-ruins-3d-platformer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "android:add": "npx cap add android",
+    "android:sync": "npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.4.2",
+    "@capacitor/core": "8.4.2",
+    "@dimforge/rapier3d-compat": "0.19.3",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.4.2",
+    "vite": "7.1.1"
+  }
+}
