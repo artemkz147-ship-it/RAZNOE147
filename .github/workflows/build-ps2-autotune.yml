@@ -6,6 +6,11 @@ on:
     paths:
       - 'ps2-autotune/**'
       - '.github/workflows/build-ps2-autotune.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ps2-autotune/**'
+      - '.github/workflows/build-ps2-autotune.yml'
   workflow_dispatch:
 
 permissions:
