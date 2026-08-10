@@ -1,5 +1,8 @@
 package com.armsx2.config
 
+import android.content.Context
+import android.os.Build
+import android.os.PowerManager
 import com.armsx2.runtime.MainActivityRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,20 +72,35 @@ object AdaptiveAutoTune {
                 val worst = samples.minOrNull() ?: avg
                 val best = samples.maxOrNull() ?: avg
                 val spread = best - worst
+                val thermal = thermalStatus(context)
 
                 var next = currentScale
                 var reason: String? = null
+                var persistAdjustment = true
 
+                // If Android reports serious heat, lower GPU work before thermal throttling
+                // turns into frame-time spikes. This is temporary and is deliberately NOT
+                // learned as the game's normal profile.
+                if (thermal >= PowerManager.THERMAL_STATUS_SEVERE && currentScale > minScale) {
+                    val drop = if (thermal >= PowerManager.THERMAL_STATUS_CRITICAL) 0.50f else 0.25f
+                    next = (currentScale - drop).coerceAtLeast(minScale)
+                    reason = "thermal status=$thermal"
+                    persistAdjustment = false
+                }
                 // Sustained <90% native speed: lower resolution. Severe misses use a
                 // half-step; otherwise quarter-step. Never go below the device floor.
-                if (avg < 0.90f && currentScale > minScale) {
+                else if (avg < 0.90f && currentScale > minScale) {
                     val drop = if (avg < 0.78f) 0.50f else 0.25f
                     next = (currentScale - drop).coerceAtLeast(minScale)
                     reason = "slow avg=${"%.3f".format(avg)}"
                 }
-                // Only raise quality when the title is both full-speed and stable.
-                // Long cooldown prevents oscillation around a scene boundary.
-                else if (avg >= 0.992f && worst >= 0.975f && spread <= 0.03f && currentScale < maxScale) {
+                // Only raise quality when the title is full-speed, stable AND the
+                // phone is not already warming up.
+                else if (
+                    thermal <= PowerManager.THERMAL_STATUS_LIGHT &&
+                    avg >= 0.992f && worst >= 0.975f && spread <= 0.03f &&
+                    currentScale < maxScale
+                ) {
                     next = (currentScale + 0.25f).coerceAtMost(maxScale)
                     reason = "headroom avg=${"%.3f".format(avg)}"
                 }
@@ -91,13 +109,13 @@ object AdaptiveAutoTune {
                     val old = currentScale
                     currentScale = next
                     runCatching { NativeApp.renderUpscalemultiplier(currentScale) }
-                    AutoTune.saveLearnedScale(gameKey, currentScale)
+                    if (persistAdjustment) AutoTune.saveLearnedScale(gameKey, currentScale)
                     NativeApp.emulog("AUTOTUNE scale $old -> $currentScale ($reason)")
                     samples.clear()
                     cooldownUntil = now + if (next < old) 14_000L else 28_000L
-                } else if (avg >= 0.96f) {
+                } else if (avg >= 0.96f && thermal < PowerManager.THERMAL_STATUS_MODERATE) {
                     // A stable working value is useful on the next launch even when no
-                    // adjustment was necessary this pass.
+                    // adjustment was necessary this pass. Never learn a heat-degraded value.
                     AutoTune.saveLearnedScale(gameKey, currentScale)
                 }
             }
@@ -114,5 +132,13 @@ object AdaptiveAutoTune {
         val old = job ?: return
         job = null
         old.cancelAndJoin()
+    }
+
+    private fun thermalStatus(context: Context): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return PowerManager.THERMAL_STATUS_NONE
+        return runCatching {
+            (context.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.currentThermalStatus
+                ?: PowerManager.THERMAL_STATUS_NONE
+        }.getOrDefault(PowerManager.THERMAL_STATUS_NONE)
     }
 }
