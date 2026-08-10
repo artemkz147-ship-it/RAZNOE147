@@ -1,56 +1,59 @@
-# Project status — UMK3 HD Fan Remake
+# Project status — UMK3 HD Fan Remake 0.4.0
 
-## Implemented now
+## Реализовано
 
-- Dedicated project branch: `umk3-hd-fan-remake`.
-- Clean-room HTML5/Canvas fighting runtime.
-- 1280x720 logical render target with responsive scaling.
-- Android landscape WebView shell with immersive fullscreen and display-cutout handling.
-- Offline packaging: the APK bundles the `web/` game files and does not require a server or API.
-- 28-character roster data including classic/console-era UMK3 fighters and bosses.
-- 10 arena definitions with procedural/parallax-style vector backgrounds.
-- Character select screen.
-- Arcade tower progression.
-- Best-of-three round flow, 99-second timer, health bars and round markers.
-- Movement, crouch, jump, run meter, block, punch, kick and character special action.
-- CPU opponent logic.
-- Projectiles, teleport/charge/stomp-style specials, freeze effect, hit stun, block stun and knockback.
-- Combo counter.
-- Hit particles, screen shake, impact flash and synthesized sound effects.
-- Mobile touch controls and keyboard controls.
-- Pause handling and pause-on-background.
-- HD asset replacement convention documented in `docs/ASSET_PIPELINE.md`.
-- GitHub Actions Android build pipeline.
-- Automated Node smoke test wired into CI before APK compilation.
+- Отдельная ветка `umk3-hd-fan-remake`.
+- Офлайн HTML5/Canvas fighting runtime внутри Android WebView.
+- Логическое разрешение 1280×720 с адаптивным масштабированием.
+- Landscape fullscreen, immersive mode и поддержка display cutout.
+- 25 доступных бойцов + Motaro и Shao Kahn как боссы.
+- 16 переработанных арен.
+- Character Select и Arcade/Kombat Tower.
+- Best-of-three, таймер 99, health bars и round markers.
+- Шестикнопочная схема LP / HP / LK / HK / BLOCK / RUN.
+- Командный input buffer с относительными F/B/U/D.
+- Standing/crouching/jumping attacks, sweep, uppercut, throw, block и run meter.
+- Индивидуальные special move archetypes: projectiles, spear, freeze, net, teleport, bombs, ground attacks, reflect, morph, telekinesis, stomp и др.
+- CPU AI.
+- Combo counter и hit-chain logic.
+- Finish Him / Finish Her.
+- Character Fatality command checking и stage fatalities.
+- Procedural HD/vector fighter renderer с отдельными стилями персонажей.
+- Динамические procedural/vector версии всех текущих арен.
+- Particles, blood toggle, hit flash, screen shake, synthesized SFX и haptics.
+- Мобильный D-pad + LP/HP/LK/HK/BLOCK/RUN.
+- GitHub Actions APK pipeline.
 
-## Verified in the current development environment
+## Проверено
 
-- `web/game.js` passes Node syntax checking.
-- Automated mock-runtime smoke test passes the flow:
-  - title
-  - character select
-  - arcade tower
-  - fight
-  - touch HUD activation
-  - punch input
-  - special input
-  - render/update loop remains alive
+Для commit `8eb35b5786edab2c328e9caadcdaacc33763bf7e` GitHub Actions run `31386810132` завершился успешно.
 
-## Not yet claimed as finished
+Успешно прошли:
 
-- Final hand-drawn/AI-assisted HD frame-by-frame fighter sprite atlases are not yet present.
-- Final HD stage artwork is not yet present; current stages are original procedural/vector fallbacks.
-- Exact frame data, every original UMK3 combo, every fatality, friendship, babality, brutality and hidden-code behavior have not yet been recreated one-for-one.
-- Original Midway/Warner sprites, music and sound files are intentionally not bundled.
-- A successful Android APK artifact has not yet been observed through the available GitHub connector, so APK completion is not claimed yet.
+1. checkout;
+2. Node setup;
+3. `node --check web/umk3-data.js`;
+4. `node --check web/game.js`;
+5. `node tests/smoke.cjs`;
+6. Java 17 setup;
+7. Android SDK 35 setup;
+8. Gradle 8.7 setup;
+9. `gradle :app:assembleDebug --stacktrace`;
+10. проверка существования ненулевого `app-debug.apk`;
+11. загрузка APK в GitHub Actions artifact.
 
-## Next production milestones
+Artifact: `umk3-hd-debug-apk`, artifact id `9062039739`.
 
-1. Replace vector fighter fallback with atlas-based animation renderer.
-2. Produce complete HD atlas for Scorpion and Sub-Zero as the reference quality bar.
-3. Lock UMK3-faithful frame timing and move tables for those two fighters.
-4. Produce HD Subway stage and validate camera/parallax composition.
-5. Expand exact move/animation data across the roster.
-6. Add finishers and stage fatalities.
-7. Confirm GitHub Actions APK artifact and run-device installation.
-8. Continue fighter/stage asset production until the full roster and stage set are converted.
+## Что ещё не называем финальным 1.0
+
+- Текущий современный визуал бойцов — собственный runtime HD/vector redraw, а не полный комплект покадровых hand-drawn/AI sprite atlases для каждого движения.
+- Для абсолютного one-to-one соответствия ещё потребуется вручную довести frame timing/hitboxes каждого оригинального приёма и все редкие finishing systems/secret codes.
+- Оригинальные Midway/Warner sprite sheets, музыка и аудио не включаются в репозиторий.
+- Реальная установка APK на физический Android-девайс этим CI не проверяется; проверены успешная компиляция и наличие APK.
+
+## Следующий уровень качества
+
+- Atlas renderer поверх уже существующей боевой логики.
+- Reference-quality HD animation sets для Scorpion/Sub-Zero, после чего масштабирование пайплайна на весь ростер.
+- Более сложные многослойные HD stage assets при сохранении текущих динамических fallback-арен.
+- Полное расширение finishing systems и tuning точных hitbox/frame tables.
