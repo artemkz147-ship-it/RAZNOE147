@@ -1,0 +1,11 @@
+{
+  "appId": "com.artemkz.shadowronin",
+  "appName": "Shadow Ronin",
+  "webDir": "dist",
+  "backgroundColor": "#06070b",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}
