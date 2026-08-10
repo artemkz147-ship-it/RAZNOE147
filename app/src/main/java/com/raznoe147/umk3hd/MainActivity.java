@@ -2,6 +2,8 @@ package com.raznoe147.umk3hd;
 
 import android.app.Activity;
 import android.graphics.Color;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -13,7 +15,10 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -23,19 +28,24 @@ import android.widget.TextView;
 public class MainActivity extends Activity {
     private static final String TAG = "UMK3HD";
     private static final String BUILD_VERSION = "0.7.0";
+    private static final String START_URL = "file:///android_asset/index.html";
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private WebView webView;
     private FrameLayout root;
     private TextView diagnostic;
+    private boolean pageFinished = false;
+    private boolean runtimeReady = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.i(TAG, "BOOT onCreate version=" + BUILD_VERSION + " sdk=" + Build.VERSION.SDK_INT);
         try {
             requestWindowFeature(Window.FEATURE_NO_TITLE);
             getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON, WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             getWindow().setStatusBarColor(Color.BLACK);
             getWindow().setNavigationBarColor(Color.BLACK);
-            if (android.os.Build.VERSION.SDK_INT >= 28) {
+            if (Build.VERSION.SDK_INT >= 28) {
                 WindowManager.LayoutParams lp = getWindow().getAttributes();
                 lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
                 getWindow().setAttributes(lp);
@@ -51,8 +61,17 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void createWebView() {
-        webView = new WebView(getApplicationContext());
+    private void createWebView() throws Exception {
+        String[] topAssets = getAssets().list("");
+        boolean hasIndex = false;
+        if (topAssets != null) {
+            for (String name : topAssets) if ("index.html".equals(name)) { hasIndex = true; break; }
+        }
+        Log.i(TAG, "BOOT asset index=" + hasIndex);
+        if (!hasIndex) throw new IllegalStateException("index.html missing from APK assets");
+
+        // Activity context is intentional: it gives WebView the correct display/configuration lifecycle.
+        webView = new WebView(this);
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -62,31 +81,77 @@ public class MainActivity extends Activity {
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
         s.setSupportZoom(false);
+        s.setLoadsImagesAutomatically(true);
+        s.setBlockNetworkLoads(true);
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
         webView.setBackgroundColor(Color.BLACK);
-        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        // Do not force a separate hardware layer: default WebView compositing is more stable on vendor GPUs.
+
         webView.setWebViewClient(new WebViewClient() {
-            @Override public void onPageFinished(WebView view, String url) {
-                Log.i(TAG, "Page finished: " + url);
-                new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRuntime(view), 3500);
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                Log.i(TAG, "BOOT pageStarted " + url);
             }
-        });
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override public boolean onConsoleMessage(ConsoleMessage cm) {
-                Log.d(TAG, "JS " + cm.messageLevel() + ": " + cm.message() + " @" + cm.lineNumber());
+
+            @Override public void onPageFinished(WebView view, String url) {
+                pageFinished = true;
+                Log.i(TAG, "BOOT pageFinished " + url);
+                verifyRuntimeWithRetry(view, 0);
+            }
+
+            @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                String u = request != null && request.getUrl() != null ? request.getUrl().toString() : "unknown";
+                String msg = error != null ? String.valueOf(error.getDescription()) : "unknown";
+                Log.e(TAG, "WEB error url=" + u + " msg=" + msg);
+                if (START_URL.equals(u)) showDiagnostic("Ошибка загрузки интерфейса:\n" + msg);
+            }
+
+            @Override public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                boolean crash = detail != null && detail.didCrash();
+                int priority = detail != null ? detail.rendererPriorityAtExit() : -1;
+                Log.e(TAG, "WEB rendererGone crash=" + crash + " priority=" + priority);
+                showDiagnostic("WebView остановил графический процесс. Код: RENDER_PROCESS_GONE\ncrash=" + crash + " priority=" + priority);
                 return true;
             }
         });
+
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onConsoleMessage(ConsoleMessage cm) {
+                Log.v(TAG, "JS " + cm.messageLevel() + ": " + cm.message() + " @" + cm.lineNumber());
+                return true;
+            }
+        });
+
         root.addView(webView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        webView.loadUrl("file:///android_asset/index.html");
+        Log.i(TAG, "BOOT loadUrl " + START_URL);
+        webView.loadUrl(START_URL);
+
+        mainHandler.postDelayed(() -> {
+            if (!pageFinished && !isFinishing()) {
+                Log.e(TAG, "BOOT watchdog page-not-finished");
+                showDiagnostic("WebView не завершил загрузку. Код: PAGE_LOAD_TIMEOUT");
+            }
+        }, 15000);
     }
 
-    private void verifyRuntime(WebView view) {
-        if (view == null) return;
-        view.evaluateJavascript("(function(){return !!(window.__UMK3_DEBUG__&&window.__UMK3_RASTER__&&window.UMK3_BUILD&&window.UMK3_BUILD.version==='0.7.0');})()", value -> {
-            Log.i(TAG, "Runtime check: " + value);
-            if (!"true".equals(value)) showDiagnostic("Игра загрузилась не полностью. Код ошибки: WEB_RUNTIME_NOT_READY");
-        });
+    private void verifyRuntimeWithRetry(WebView view, int attempt) {
+        if (view == null || runtimeReady || isFinishing()) return;
+        view.evaluateJavascript(
+            "(function(){try{return !!(window.__UMK3_DEBUG__&&window.__UMK3_RASTER__&&window.UMK3_BUILD&&window.UMK3_BUILD.version==='0.7.0');}catch(e){return false;}})()",
+            value -> {
+                boolean ready = "true".equals(value);
+                Log.i(TAG, "Runtime probe attempt=" + attempt + " value=" + value);
+                if (ready) {
+                    runtimeReady = true;
+                    Log.i(TAG, "Runtime check: true");
+                    return;
+                }
+                if (attempt < 19) {
+                    mainHandler.postDelayed(() -> verifyRuntimeWithRetry(view, attempt + 1), 750);
+                } else {
+                    Log.e(TAG, "Runtime check: false after retries");
+                    showDiagnostic("Игра загрузилась не полностью. Код: WEB_RUNTIME_NOT_READY");
+                }
+            });
     }
 
     private void showDiagnostic(String text) {
@@ -98,10 +163,10 @@ public class MainActivity extends Activity {
         if (diagnostic == null) {
             diagnostic = new TextView(this);
             diagnostic.setTextColor(Color.WHITE);
-            diagnostic.setBackgroundColor(0xDD660000);
+            diagnostic.setBackgroundColor(0xEE650000);
             diagnostic.setTextSize(16f);
             diagnostic.setGravity(Gravity.CENTER);
-            diagnostic.setPadding(30,30,30,30);
+            diagnostic.setPadding(30, 30, 30, 30);
             root.addView(diagnostic, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
         }
         diagnostic.setText(text + "\n\nВерсия " + BUILD_VERSION);
@@ -109,7 +174,7 @@ public class MainActivity extends Activity {
     }
 
     private void enterImmersiveMode() {
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
+        if (Build.VERSION.SDK_INT >= 30) {
             WindowInsetsController c = getWindow().getInsetsController();
             if (c != null) {
                 c.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
@@ -124,8 +189,8 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus) { super.onWindowFocusChanged(hasFocus); if (hasFocus) enterImmersiveMode(); }
-    @Override protected void onResume() { super.onResume(); enterImmersiveMode(); if (webView != null) webView.onResume(); }
-    @Override protected void onPause() { if (webView != null) webView.onPause(); super.onPause(); }
-    @Override protected void onDestroy() { if (webView != null) { webView.stopLoading(); webView.destroy(); webView=null; } super.onDestroy(); }
+    @Override protected void onResume() { super.onResume(); Log.i(TAG, "LIFECYCLE onResume"); enterImmersiveMode(); if (webView != null) webView.onResume(); }
+    @Override protected void onPause() { Log.i(TAG, "LIFECYCLE onPause"); if (webView != null) webView.onPause(); super.onPause(); }
+    @Override protected void onDestroy() { Log.i(TAG, "LIFECYCLE onDestroy"); mainHandler.removeCallbacksAndMessages(null); if (webView != null) { webView.stopLoading(); webView.destroy(); webView=null; } super.onDestroy(); }
     @Override public void onBackPressed() { if (webView != null && webView.canGoBack()) webView.goBack(); else super.onBackPressed(); }
 }
