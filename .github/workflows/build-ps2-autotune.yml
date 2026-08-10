@@ -1,18 +1,23 @@
 name: Build PS2 AutoTune APK
 
 on:
+  push:
+    branches: [ps2-autotune-android]
+    paths:
+      - 'ps2-autotune/**'
+      - '.github/workflows/build-ps2-autotune.yml'
   pull_request:
-    branches: [ps2-autotune-ci-base]
+    branches: [main, ps2-autotune-ci-base]
     paths:
       - 'ps2-autotune/**'
       - '.github/workflows/build-ps2-autotune.yml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: ps2-autotune-validation-${{ github.ref }}
+  group: ps2-autotune-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -83,6 +88,7 @@ jobs:
             "build-tools;${ANDROID_BUILD_TOOLS}" \
             "ndk;28.2.13676358" \
             "cmake;3.31.6"
+
           if [ -d "$ANDROID_HOME/platforms/android-37.0" ] && [ ! -e "$ANDROID_HOME/platforms/android-37" ]; then
             ln -s android-37.0 "$ANDROID_HOME/platforms/android-37"
           fi
@@ -128,3 +134,19 @@ jobs:
           path: dist/*
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish test APK in Releases
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release delete ps2-autotune-ci --cleanup-tag --yes >/dev/null 2>&1 || true
+          gh release create ps2-autotune-ci \
+            dist/PS2-AutoTune-Android-universal.apk \
+            dist/SOURCE-MANIFEST.txt \
+            dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "PS2 AutoTune Android — test build" \
+            --notes "Automatic Android test build from branch ps2-autotune-android. Based on ARMSX2 ${UPSTREAM_REF}; includes local device/game AutoTune. BIOS and game images are not included." \
+            --prerelease
