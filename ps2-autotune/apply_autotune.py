@@ -59,14 +59,20 @@ new_resolve = '''    fun resolveForGame(serial: String?): Settings {
 '''
 replace_exact(config_store, old_resolve, new_resolve)
 
-# PCSX2 already tracks canonical emulation speed as a percentage. Expose GetSpeed()
-# (100 = native console speed) through one tiny JNI call so the tuner follows the
-# emulator's own timing metric rather than recreating it from frontend counters.
+# PCSX2 already tracks canonical emulation speed and per-thread frame costs.
+# Expose those metrics through tiny JNI calls so the tuner can tell a real
+# GS/GPU bottleneck from an EE/VU bottleneck instead of blindly reducing image
+# quality whenever the game falls below full speed.
 native_java = ANDROID / "java/kr/co/iefriends/pcsx2/NativeApp.java"
 replace_exact(
     native_java,
     "\tpublic static native float getFPS();\n",
-    "\tpublic static native float getFPS();\n\tpublic static native float getEmulationSpeed();\n",
+    "\tpublic static native float getFPS();\n"
+    "\tpublic static native float getEmulationSpeed();\n"
+    "\tpublic static native float getCpuThreadTimeMs();\n"
+    "\tpublic static native float getGsThreadTimeMs();\n"
+    "\tpublic static native float getVuThreadTimeMs();\n"
+    "\tpublic static native float getGpuTimeMs();\n",
 )
 
 native_cpp = ANDROID / "cpp/native-lib.cpp"
@@ -82,8 +88,49 @@ JNIEXPORT jfloat JNICALL
 Java_kr_co_iefriends_pcsx2_NativeApp_getEmulationSpeed(JNIEnv*, jclass) {
     return (jfloat)PerformanceMetrics::GetSpeed();
 }
+
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_getCpuThreadTimeMs(JNIEnv*, jclass) {
+    return (jfloat)PerformanceMetrics::GetCPUThreadAverageTime();
+}
+
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_getGsThreadTimeMs(JNIEnv*, jclass) {
+    return (jfloat)PerformanceMetrics::GetGSThreadAverageTime();
+}
+
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_getVuThreadTimeMs(JNIEnv*, jclass) {
+    return (jfloat)PerformanceMetrics::GetVUThreadAverageTime();
+}
+
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_getGpuTimeMs(JNIEnv*, jclass) {
+    return (jfloat)PerformanceMetrics::GetGPUAverageTime();
+}
 '''
 replace_exact(native_cpp, old_speed_jni, new_speed_jni)
+
+# ARMSX2 2.6.5.9 already contains a native Android ADPF implementation, but
+# upstream intentionally defaults its UI preference to OFF while it gathers
+# community testing. PS2 AutoTune makes it the default for fresh installs:
+# Android's PerformanceHintManager can then place/clock the emulator's periodic
+# EE/GS/VU workload against the real frame deadline. An explicit user OFF value
+# is still respected because SharedPreferences stores it and getBoolean returns it.
+adpf_default_hits = 0
+for path in KOTLIN.rglob("*.kt"):
+    text = path.read_text(encoding="utf-8")
+    old = 'prefs.getBoolean("ui.adpf", false)'
+    if old in text:
+        text2 = text.replace(old, 'prefs.getBoolean("ui.adpf", true)')
+        adpf_default_hits += text.count(old)
+        path.write_text(text2, encoding="utf-8")
+if adpf_default_hits == 0:
+    fail("could not find ARMSX2 ui.adpf default")
 
 # Start the adaptive learner on a different coroutine pool before the blocking VM
 # loop; always cancel it when the VM exits/crashes back to the library.
@@ -148,4 +195,4 @@ if strings.exists():
     if count:
         strings.write_text(text2, encoding="utf-8")
 
-print("AutoTune overlay applied successfully")
+print(f"AutoTune overlay applied successfully (ADPF defaults patched: {adpf_default_hits})")
