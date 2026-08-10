@@ -12,7 +12,7 @@ on:
 jobs:
   build-and-launch-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -28,25 +28,24 @@ jobs:
         run: |
           mkdir -p cc0-selected
           cp .cc0-sources/singles/verlaine.gif cc0-selected/
-          cp .cc0-sources/singles/female-ninja.gif cc0-selected/
-          cp .cc0-sources/singles/ava-lee.gif cc0-selected/
           cp .cc0-sources/singles/tasen-defender.png cc0-selected/
           find .cc0-sources/mustermenschen -maxdepth 1 -type f \( \
             -iname '*Nick Adler*' -o -iname '*Danny Van Damage*' -o -iname '*Raf Boulder*' -o \
-            -iname '*Byron Verlaine*' -o -iname '*Ava Lee*Thai*' -o -iname '*Tasen woman 1 Tasen*' -o \
-            -iname '*Tasen woman 2 Tasen*' -o -iname '*Tasen man 1*' -o -iname '*Kelvin Zone*' -o \
+            -iname '*Ava Lee*Thai*' -o -iname '*Tasen woman 1 Tasen*' -o \
             -iname '*Susa No Mikoto Tasen*' -o -iname '*Komato berserker*' \) -print0 | xargs -0 -I{} cp '{}' cc0-selected/ || true
           find cc0-selected -type f -printf '%s\t%f\n' | sort -nr | tee cc0-selected-files.txt
-          test "$(find cc0-selected -type f | wc -l)" -ge 10
+          test "$(find cc0-selected -type f | wc -l)" -ge 8
 
-      - name: Generate real 48-frame HD asset pack
+      - name: Generate v5 anchored realistic 48-frame asset pack
         run: |
           rm -rf web/assets
-          python3 tools/build_real_assets_v4.py | tee real-assets-build.log
+          python3 tools/build_real_assets_v5.py | tee real-assets-build.log
+          python3 tools/apply_v5_runtime_patch.py
           test "$(find web/assets/fighters -name atlas.png | wc -l)" -ge 25
           test "$(find web/assets/fighters -name portrait.png | wc -l)" -ge 25
           test "$(find web/assets/stages -name '*.png' | wc -l)" -ge 16
-          grep -q 'prerendered-48f-hd-v4-layered-stages' web/assets/build-report.json
+          grep -q 'prerendered-48f-hd-v5-anchored-realistic' web/assets/build-report.json
+          grep -q 'shared-scale-bottom-anchor+silhouette-costume' web/assets/build-report.json
           python3 - <<'PY'
           from PIL import Image
           import json
@@ -58,6 +57,8 @@ jobs:
           assert Image.open('web/assets/fighters/scorpion/atlas.png').size==(2880,2880)
           assert Image.open('web/assets/fighters/scorpion/portrait.png').size==(512,512)
           assert Image.open('web/assets/stages/subway.png').size==(1920,1080)
+          assert Image.open('web/assets/ui/portrait-atlas.jpg').size[0]>=1120
+          assert Image.open('web/assets/ui/title-bg.jpg').size==(1280,720)
           print('REAL_PACK_BYTES',sum(p.stat().st_size for p in Path('web/assets').rglob('*') if p.is_file()))
           PY
           test "$(du -sb web/assets | cut -f1)" -gt 20000000
@@ -109,7 +110,9 @@ jobs:
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/fighters/scorpion/atlas.png'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/fighters/scorpion/portrait.png'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/stages/subway.png'
-          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/assets/build-report.json | grep -q 'prerendered-48f-hd-v4-layered-stages'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/ui/portrait-atlas.jpg'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/ui/title-bg.jpg'
+          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/assets/build-report.json | grep -q 'prerendered-48f-hd-v5-anchored-realistic'
 
       - name: Enable KVM when available
         run: |
@@ -125,23 +128,27 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: umk3-realart-review
+          name: umk3-v5-realart-review
           path: |
             apk-size.txt
             cc0-source-inventory.txt
             cc0-selected-files.txt
-            cc0-selected/
             cc0-previews/
             real-assets-build.log
             web/assets/build-report.json
+            web/assets/ui/portrait-atlas.jpg
+            web/assets/ui/title-bg.jpg
             avd-create.log
+            emulator-avds.txt
             emulator-accel.txt
             emulator-process.log
             emulator-process-tail.log
             emulator-props.txt
             emulator-webview.txt
             emulator-devices.txt
+            emulator-pm-ready.txt
             emulator-install.txt
+            emulator-package.txt
             emulator-start.txt
             emulator-runtime-info.log
             emulator-runtime.log
@@ -161,7 +168,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: umk3-prerendered-hd-debug-apk
+          name: umk3-v5-realistic-android-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
