@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+const path='src/main.js';
+let s=fs.readFileSync(path,'utf8');
+const replace=(from,to)=>{if(s.includes(from))s=s.replace(from,to);};
+replace("constructor(){this.ctx=null;this.master=.8;}","constructor(){this.ctx=null;this.master=.8;this.ambient=[];}");
+replace("  jump(){this.tone(210,.08,'triangle',.05,170);}","  startAmbience(world=0){if(!save.settings.music)return;this.stopAmbience();this.ensure();const base=[55,62,49,58,46][world]||55;const t=this.ctx.currentTime;for(const [mul,gain,type] of [[1,.008,'sine'],[1.5,.003,'triangle']]){const o=this.ctx.createOscillator(),g=this.ctx.createGain();o.type=type;o.frequency.setValueAtTime(base*mul,t);g.gain.setValueAtTime(gain,t);o.connect(g).connect(this.ctx.destination);o.start();this.ambient.push({o,g});}}\n  stopAmbience(){for(const a of this.ambient){try{a.g.gain.setTargetAtTime(.0001,this.ctx.currentTime,.08);a.o.stop(this.ctx.currentTime+.35);}catch{}}this.ambient=[];}\n  jump(){this.tone(210,.08,'triangle',.05,170);}");
+replace("modal.querySelector('#musicToggle').onclick=()=>{save.settings.music=!save.settings.music;modal.querySelector('#musicToggle').classList.toggle('on',save.settings.music);persist(save);};","modal.querySelector('#musicToggle').onclick=()=>{save.settings.music=!save.settings.music;modal.querySelector('#musicToggle').classList.toggle('on',save.settings.music);if(!save.settings.music)sfx.stopAmbience();persist(save);};");
+replace("this.runDeaths=0;this.collected=0;this.totalCoins=0;","this.runDeaths=0;this.collected=0;this.killBonus=0;this.totalCoins=0;");
+replace("this.showToast(`ГЛАВА ${this.level.world+1}`,`${this.theme.name} · ${this.level.title}`,1700);","sfx.startAmbience(this.level.world);this.showToast(`ГЛАВА ${this.level.world+1}`,`${this.theme.name} · ${this.level.title}`,1700);");
+replace("clearUI();save.stats.playSeconds+=Math.floor((this.time.now-this.startedAt)/1000);persist(save);","clearUI();sfx.stopAmbience();save.stats.playSeconds+=Math.floor((this.time.now-this.startedAt)/1000);persist(save);");
+replace("this.checkpointObj=this.physics.add.staticImage(Math.floor(this.level.width*.52),560,'checkpoint')","const cpX=Math.floor(this.level.width*.52);this.addPlatform(cpX,635,220,30,1);this.checkpointObj=this.physics.add.staticImage(cpX,560,'checkpoint')");
+replace("const sx=Math.floor(this.level.width*this.level.secretXRatio);this.secret=","const sx=Math.floor(this.level.width*this.level.secretXRatio);this.addPlatform(sx,430,180,28,1);this.secret=");
+replace("this.physics.add.overlap(this.playerShots,this.enemies,(b,e)=>{if(!e.active)return;b.destroy();this.damageEnemy(e,b.damage||1);});","for(const e of this.enemies)this.physics.add.overlap(this.playerShots,e,(b,target)=>{if(!target.active)return;b.destroy();this.damageEnemy(target,b.damage||1);});");
+replace("save.stats.kills++;this.collected+=2+this.level.world;","save.stats.kills++;this.killBonus+=2+this.level.world;");
+replace("bossSpread(count,speed,damage){for(let i=0;i<count;i++){const ang=Phaser.Math.Linear(-Math.PI*.85,-Math.PI*.15,count===1?.5:i/(count-1));","bossSpread(count,speed,damage){const base=Phaser.Math.Angle.Between(this.boss.x,this.boss.y,this.player.x,this.player.y);for(let i=0;i<count;i++){const spread=count===1?0:Phaser.Math.Linear(-.65,.65,i/(count-1));const ang=base+spread;");
+replace("const reward=35+this.level.world*15+this.level.stage*6+stars*12+(this.level.boss?70:0);","const reward=35+this.level.world*15+this.level.stage*6+stars*12+(this.level.boss?70:0)+this.killBonus;");
+fs.writeFileSync(path,s);
+console.log('Shadow Ronin gameplay prebuild patches applied.');
