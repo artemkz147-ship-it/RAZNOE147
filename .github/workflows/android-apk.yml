@@ -3,6 +3,8 @@ name: Build Neon Apex APK
 on:
   push:
     branches: ["neon-rush-3d-racing"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
