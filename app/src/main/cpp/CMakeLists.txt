@@ -20,6 +20,8 @@ target_include_directories(racing_native PRIVATE
     ${CMAKE_ANDROID_NDK}/sources/android/native_app_glue
 )
 
+target_link_options(racing_native PRIVATE "-u" "ANativeActivity_onCreate")
+
 find_library(android-lib android)
 find_library(log-lib log)
 find_library(egl-lib EGL)
