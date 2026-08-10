@@ -1,9 +1,10 @@
 {
   "name": "echo-ruins-3d-platformer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "assets": "node scripts/fetch-game-assets.mjs",
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
