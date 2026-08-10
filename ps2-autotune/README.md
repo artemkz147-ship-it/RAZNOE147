@@ -6,7 +6,7 @@ Android PS2 emulator fork built as a source overlay on top of the open-source AR
 
 - **Device-aware first launch:** CPU core count, RAM, SoC and GPU family seed a safe starting profile.
 - **Per-game learning:** every title can remember the internal resolution that actually maintained native PS2 emulation speed on this device.
-- **Correct speed metric:** AutoTune uses `PerformanceMetrics::GetSpeed()` through a small JNI bridge. A native 30-FPS game running at 100% console speed is therefore not mistaken for a slow game.
+- **Correct speed metric:** AutoTune uses `PerformanceMetrics::GetSpeed()` through a small JNI bridge, so tuning follows PCSX2's own canonical 100%-speed measurement instead of guessing from frontend counters.
 - **Closed-loop tuning:** sustained speed loss reduces internal resolution; stable full-speed headroom can raise it.
 - **Thermal-aware:** Android thermal status can temporarily lower GPU load before severe throttling; heat-degraded values are not learned as the game's permanent profile.
 - **Hysteresis/cooldowns:** prevents quality from bouncing every few seconds when a scene changes.
@@ -15,6 +15,7 @@ Android PS2 emulator fork built as a source overlay on top of the open-source AR
 - **No server/API required:** tuning and learning happen locally on the Android device.
 - **Separate Android package:** `com.artemkz147.ps2autotune`, so the test build can coexist with official ARMSX2.
 - **Universal page-size APK:** CI uses ARMSX2's own 4K + 16K Android builder for old and new ARM64 Android devices.
+- **Source-only build:** ARMSX2's optional proprietary Discord Social SDK is not required. The one direct upstream reference is resolved reflectively so Discord simply stays unavailable when the proprietary SDK is absent; PS2 emulation is unaffected.
 
 ## Source base
 
@@ -53,7 +54,7 @@ The engine is functional without a network connection. Per-title compatibility/g
 The workflow `.github/workflows/build-ps2-autotune.yml`:
 
 1. Checks out ARMSX2 `2.6.5.9` recursively.
-2. Applies this source overlay, including the `GetSpeed()` JNI bridge.
+2. Applies this source overlay, including the `GetSpeed()` JNI bridge and source-only Discord fallback.
 3. Builds the official universal 4K + 16K sideload APK.
 4. Verifies APK signing/alignment and writes SHA-256.
 5. Uploads the APK as an Actions artifact and, on a successful branch build, publishes it as the `ps2-autotune-ci` prerelease together with `SOURCE-MANIFEST.txt`.
