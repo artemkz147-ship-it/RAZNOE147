@@ -150,3 +150,39 @@ jobs:
             --title "PS2 AutoTune Android — test build" \
             --notes "Automatic Android test build from branch ps2-autotune-android. Based on ARMSX2 ${UPSTREAM_REF}; includes local device/game AutoTune. BIOS and game images are not included." \
             --prerelease
+
+      - name: Record successful build in branch
+        if: github.event_name != 'pull_request' && success()
+        shell: bash
+        run: |
+          {
+            echo "status=SUCCESS"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "source_commit=${GITHUB_SHA}"
+            echo "upstream_ref=${UPSTREAM_REF}"
+            echo "apk_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/ps2-autotune-ci/PS2-AutoTune-Android-universal.apk"
+            echo "sha256_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/ps2-autotune-ci/SHA256SUMS.txt"
+            echo "finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > ps2-autotune/BUILD-STATUS.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ps2-autotune/BUILD-STATUS.txt
+          git commit -m "ci(ps2): record successful APK build [skip actions]"
+          git push origin HEAD:"${GITHUB_REF_NAME}"
+
+      - name: Record failed build in branch
+        if: github.event_name != 'pull_request' && failure()
+        shell: bash
+        run: |
+          {
+            echo "status=FAILURE"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "source_commit=${GITHUB_SHA}"
+            echo "actions_url=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > ps2-autotune/BUILD-STATUS.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ps2-autotune/BUILD-STATUS.txt
+          git commit -m "ci(ps2): record failed APK build [skip actions]"
+          git push origin HEAD:"${GITHUB_REF_NAME}"
