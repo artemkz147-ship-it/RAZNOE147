@@ -2,6 +2,8 @@ name: Build Echo Ruins APK
 on:
   push:
     branches: ["game/3d-platformer-echo-ruins"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 permissions:
   contents: read
