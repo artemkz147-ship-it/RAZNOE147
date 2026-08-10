@@ -7,7 +7,7 @@ on:
       - 'ps2-autotune/**'
       - '.github/workflows/build-ps2-autotune.yml'
   pull_request:
-    branches: [main]
+    branches: [main, ps2-autotune-ci-base]
     paths:
       - 'ps2-autotune/**'
       - '.github/workflows/build-ps2-autotune.yml'
@@ -83,16 +83,12 @@ jobs:
       - name: Install Android 17 build dependencies
         shell: bash
         run: |
-          # Android 17 / API 37 is still exposed by sdkmanager as android-37.0
-          # on current preview repositories even though Gradle's compileSdk is 37.
           sdkmanager --channel=3 \
             "platforms;android-37.0" \
             "build-tools;${ANDROID_BUILD_TOOLS}" \
             "ndk;28.2.13676358" \
             "cmake;3.31.6"
 
-          # Some tooling looks for $ANDROID_HOME/platforms/android-37 when compileSdk=37.
-          # Normalize the preview directory name without copying the platform contents.
           if [ -d "$ANDROID_HOME/platforms/android-37.0" ] && [ ! -e "$ANDROID_HOME/platforms/android-37" ]; then
             ln -s android-37.0 "$ANDROID_HOME/platforms/android-37"
           fi
