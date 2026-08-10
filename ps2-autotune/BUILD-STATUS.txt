@@ -1,0 +1,7 @@
+status=SUCCESS
+workflow_run_id=31388325011
+source_commit=22cfb0302eb22882de64051ad2b4d5a8e271e674
+upstream_ref=2.6.5.9
+apk_url=https://github.com/artemkz147-ship-it/RAZNOE147/releases/download/ps2-autotune-ci/PS2-AutoTune-Android-universal.apk
+sha256_url=https://github.com/artemkz147-ship-it/RAZNOE147/releases/download/ps2-autotune-ci/SHA256SUMS.txt
+finished_utc=2026-08-10T12:59:13Z
