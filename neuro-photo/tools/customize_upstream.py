@@ -28,7 +28,7 @@ def replace_literal(path: Path, old: str, new: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-# Branding/package.
+# Android branding/package. Keep namespace, applicationId and launcher Activity aligned.
 replace_required(
     ROOT / "android/app/build.gradle",
     'namespace "com.example.local_diffusion"',
@@ -43,6 +43,11 @@ replace_required(
     ROOT / "android/app/src/main/AndroidManifest.xml",
     'android:label="Local Diffusion"',
     'android:label="НейроФото"',
+)
+replace_required(
+    ROOT / "android/app/src/main/kotlin/com/example/local_diffusion/MainActivity.kt",
+    "package com.example.local_diffusion",
+    "package com.artem147.neurophoto",
 )
 
 # Visible UI text only. Exact quoted literals are changed, identifiers remain untouched.
