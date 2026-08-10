@@ -59,4 +59,6 @@ The workflow `.github/workflows/build-ps2-autotune.yml`:
 4. Verifies APK signing/alignment and writes SHA-256.
 5. Uploads the APK as an Actions artifact and, on a successful branch build, publishes it as the `ps2-autotune-ci` prerelease together with `SOURCE-MANIFEST.txt`.
 
+Validation can also run against the temporary `ps2-autotune-ci-base` branch so the emulator branch can be compiled and tested without merging implementation code into `main`.
+
 The upstream self-updater is disabled in this fork because an official ARMSX2 package has a different Android application ID and cannot update this APK in place.
