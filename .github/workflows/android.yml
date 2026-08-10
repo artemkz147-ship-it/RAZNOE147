@@ -41,11 +41,11 @@ jobs:
       - name: Generate real 48-frame HD asset pack
         run: |
           rm -rf web/assets
-          python3 tools/build_real_assets.py | tee real-assets-build.log
+          python3 tools/build_real_assets_v4.py | tee real-assets-build.log
           test "$(find web/assets/fighters -name atlas.png | wc -l)" -ge 25
           test "$(find web/assets/fighters -name portrait.png | wc -l)" -ge 25
           test "$(find web/assets/stages -name '*.png' | wc -l)" -ge 16
-          grep -q 'prerendered-48f-hd-v3' web/assets/build-report.json
+          grep -q 'prerendered-48f-hd-v4-layered-stages' web/assets/build-report.json
           python3 - <<'PY'
           from PIL import Image
           import json
@@ -103,7 +103,7 @@ jobs:
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/fighters/scorpion/atlas.png'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/fighters/scorpion/portrait.png'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/stages/subway.png'
-          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/build-report.json | grep -q 'prerendered-48f-hd-v3'
+          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/build-report.json | grep -q 'prerendered-48f-hd-v4-layered-stages'
 
       - name: Enable KVM
         run: |
