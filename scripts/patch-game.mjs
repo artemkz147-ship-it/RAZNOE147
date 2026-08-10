@@ -14,5 +14,18 @@ replace("this.physics.add.overlap(this.playerShots,this.enemies,(b,e)=>{if(!e.ac
 replace("save.stats.kills++;this.collected+=2+this.level.world;","save.stats.kills++;this.killBonus+=2+this.level.world;");
 replace("bossSpread(count,speed,damage){for(let i=0;i<count;i++){const ang=Phaser.Math.Linear(-Math.PI*.85,-Math.PI*.15,count===1?.5:i/(count-1));","bossSpread(count,speed,damage){const base=Phaser.Math.Angle.Between(this.boss.x,this.boss.y,this.player.x,this.player.y);for(let i=0;i<count;i++){const spread=count===1?0:Phaser.Math.Linear(-.65,.65,i/(count-1));const ang=base+spread;");
 replace("const reward=35+this.level.world*15+this.level.stage*6+stars*12+(this.level.boss?70:0);","const reward=35+this.level.world*15+this.level.stage*6+stars*12+(this.level.boss?70:0)+this.killBonus;");
+
+// Phaser Arcade Physics helpers such as setAllowGravity/setImmovable belong to Body,
+// not to the Image GameObject. Calling them on the image crashed GameScene during
+// level construction and left only a black canvas after choosing a chapter.
+replace(
+  "addSaw(x,y,moving=false){const s=this.physics.add.image(x,y,'saw').setDepth(5).setAllowGravity(false).setImmovable(true);s.body.setCircle(17,7,7);",
+  "addSaw(x,y,moving=false){const s=this.physics.add.image(x,y,'saw').setDepth(5);s.body.setAllowGravity(false).setImmovable(true);s.body.setCircle(17,7,7);"
+);
+
+if(s.includes(".setDepth(5).setAllowGravity(false).setImmovable(true)")){
+  throw new Error('Unsafe Arcade Image physics chain is still present');
+}
+
 fs.writeFileSync(path,s);
 console.log('Shadow Ronin gameplay prebuild patches applied.');
