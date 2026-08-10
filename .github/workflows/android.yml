@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch CC0 prerendered fighter sources
+      - name: Fetch CC0 prerendered fighter and stage sources
         run: bash tools/fetch_cc0_sources.sh | tee cc0-source-inventory.txt
 
       - name: Build CC0 visual contact sheets
@@ -23,7 +23,7 @@ jobs:
           python3 -m pip install --quiet pillow
           python3 tools/make_cc0_contact_sheets.py
 
-      - name: Export selected source samples for art integration
+      - name: Export selected source samples for art review
         run: |
           mkdir -p cc0-selected
           cp .cc0-sources/singles/verlaine.gif cc0-selected/
@@ -35,24 +35,37 @@ jobs:
             -iname '*Byron Verlaine*' -o -iname '*Ava Lee*Thai*' -o -iname '*Tasen woman 1 Tasen*' -o \
             -iname '*Tasen woman 2 Tasen*' -o -iname '*Tasen man 1*' -o -iname '*Kelvin Zone*' -o \
             -iname '*Susa No Mikoto Tasen*' -o -iname '*Komato berserker*' \) -print0 | xargs -0 -I{} cp '{}' cc0-selected/ || true
-          for f in Idle.png Walk.png WalkBack.png Run.png Jump.png Kick.png Attack1.png Block.png Crouch.png CrouchSlash.png Impact.png Slash.png Slash2.png PowerUp.png Death.png; do
-            p=".cc0-sources/dark-knight/Knight 2D/Sprites/$f"; test -f "$p" && cp "$p" "cc0-selected/knight-$f"
-          done
           find cc0-selected -type f -printf '%s\t%f\n' | sort -nr | tee cc0-selected-files.txt
-          test "$(find cc0-selected -type f | wc -l)" -ge 12
+          test "$(find cc0-selected -type f | wc -l)" -ge 10
 
-      - name: Generate baked raster asset pack
+      - name: Generate real 48-frame HD asset pack
         run: |
-          python3 tools/build_assets.py
+          rm -rf web/assets
+          python3 tools/build_real_assets.py | tee real-assets-build.log
           test "$(find web/assets/fighters -name atlas.png | wc -l)" -ge 25
+          test "$(find web/assets/fighters -name portrait.png | wc -l)" -ge 25
           test "$(find web/assets/stages -name '*.png' | wc -l)" -ge 16
-          test "$(du -sb web/assets | cut -f1)" -gt 5000000
+          grep -q 'prerendered-48f-hd-v3' web/assets/build-report.json
+          python3 - <<'PY'
+          from PIL import Image
+          import json
+          from pathlib import Path
+          r=json.loads(Path('web/assets/build-report.json').read_text())
+          assert r['fighterFrame']==[360,480]
+          assert r['fighterAtlas']==[2880,2880]
+          assert len(r['fighters'])>=25 and len(r['stages'])>=16
+          assert Image.open('web/assets/fighters/scorpion/atlas.png').size==(2880,2880)
+          assert Image.open('web/assets/fighters/scorpion/portrait.png').size==(512,512)
+          assert Image.open('web/assets/stages/subway.png').size==(1920,1080)
+          print('REAL_PACK_BYTES',sum(p.stat().st_size for p in Path('web/assets').rglob('*') if p.is_file()))
+          PY
+          test "$(du -sb web/assets | cut -f1)" -gt 20000000
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Verify JavaScript and raster fighting loop
+      - name: Verify JavaScript and fighting loop
         run: |
           node --check web/boot-guard.js
           node --check web/umk3-data.js
@@ -81,14 +94,16 @@ jobs:
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
 
-      - name: Reject tiny shell APK
+      - name: Reject shell or old-art APK
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
           bytes=$(stat -c%s app/build/outputs/apk/debug/app-debug.apk)
           echo "APK_BYTES=$bytes"
-          test "$bytes" -gt 5000000
+          test "$bytes" -gt 15000000
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/fighters/scorpion/atlas.png'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/fighters/scorpion/portrait.png'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/stages/subway.png'
+          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/build-report.json | grep -q 'prerendered-48f-hd-v3'
 
       - name: Enable KVM
         run: |
@@ -111,7 +126,7 @@ jobs:
             adb logcat -c
             adb shell am force-stop com.raznoe147.umk3hd
             adb shell am start -W -n com.raznoe147.umk3hd/.MainActivity | tee emulator-start.txt
-            sleep 5
+            sleep 6
             adb shell pidof com.raznoe147.umk3hd
             adb shell dumpsys activity activities | grep -q 'mResumedActivity.*com.raznoe147.umk3hd'
             adb logcat -d -s UMK3HD:I '*:S' | tee emulator-runtime.log
@@ -122,13 +137,9 @@ jobs:
             if [ "$W" -lt "$H" ]; then T=$W; W=$H; H=$T; fi
             echo "TOUCH_SCREEN=${W}x${H}" | tee emulator-touch.txt
 
-            # Title -> character select.
             adb shell input tap $((W*50/100)) $((H*55/100)); sleep 1
-            # Tap first portrait in the 7-column grid; mobile-controls.js confirms the selection.
             adb shell input tap $((W*25/100)) $((H*25/100)); sleep 1
-            # Tower -> fight.
-            adb shell input tap $((W*50/100)) $((H*55/100)); sleep 3
-            # Real touch inputs during fight: action button and left movement pad.
+            adb shell input tap $((W*50/100)) $((H*55/100)); sleep 4
             adb shell input tap $((W*82/100)) $((H*48/100)); sleep 1
             adb shell input swipe $((W*12/100)) $((H*69/100)) $((W*18/100)) $((H*69/100)) 450; sleep 1
 
@@ -143,12 +154,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: umk3-cc0-art-review
+          name: umk3-realart-review
           path: |
             cc0-source-inventory.txt
             cc0-selected-files.txt
             cc0-selected/
             cc0-previews/
+            real-assets-build.log
+            web/assets/build-report.json
             emulator-start.txt
             emulator-runtime.log
             emulator-touch.txt
@@ -159,7 +172,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: umk3-hd-realart-debug-apk
+          name: umk3-prerendered-hd-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
