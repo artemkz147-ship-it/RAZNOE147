@@ -6,6 +6,7 @@ import build_real_assets as b
 
 SRC=b.SRC
 OUT=b.OUT
+(OUT/'ui').mkdir(parents=True, exist_ok=True)
 ORIG_SOURCE=b.source_for
 ORIG_RAW=b.raw_frames
 MALE=SRC/'v5'/'stonewall-realistic.gif'
