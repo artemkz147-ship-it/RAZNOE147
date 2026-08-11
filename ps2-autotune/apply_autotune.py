@@ -14,7 +14,7 @@ KOTLIN = ANDROID / "java/com/armsx2"
 
 
 def fail(msg: str) -> None:
-    raise SystemExit(f"AutoTune patch failed: {msg}")
+    raise SystemExit(f"PS2 AutoTune patch failed: {msg}")
 
 
 def replace_exact(path: pathlib.Path, old: str, new: str) -> None:
@@ -30,16 +30,19 @@ if not KOTLIN.exists():
     fail(f"Android Kotlin source tree missing: {KOTLIN}")
 
 # ---------------------------------------------------------------------------
-# PS2 AutoTune sources
+# 1.0.3 SAFE BOOT
 # ---------------------------------------------------------------------------
-config_dir = KOTLIN / "config"
-config_dir.mkdir(parents=True, exist_ok=True)
-for name in ("AutoTune.kt", "AdaptiveAutoTune.kt"):
-    src = HERE / "src" / name
-    if not src.exists():
-        fail(f"missing overlay source {src}")
-    shutil.copy2(src, config_dir / name)
+# Do NOT patch ConfigStore, NativeApp.java, native-lib.cpp, renderer settings,
+# affinity, ADPF or the VM run loop in this build. A tester reported that the
+# game surface appeared and then the VM exited. Until that device is stable we
+# keep the emulation launch path byte-for-byte upstream ARMSX2/PCSX2.
+#
+# AutoTune sources stay in this repository for later re-introduction, but they
+# are intentionally not copied into the Android source tree here.
 
+# Optional private built-in BIOS installer. This is pure Kotlin and performs no
+# JNI/native calls before emucore init. Public/source builds contain no firmware
+# assets; a private post-build can add assets/builtin_bios/*.bin.
 bios_dir = KOTLIN / "bios"
 bios_dir.mkdir(parents=True, exist_ok=True)
 builtin_bios_src = HERE / "src" / "BuiltinBios.kt"
@@ -47,116 +50,20 @@ if not builtin_bios_src.exists():
     fail(f"missing overlay source {builtin_bios_src}")
 shutil.copy2(builtin_bios_src, bios_dir / "BuiltinBios.kt")
 
-# Keep upstream/GameDB launch configuration intact. AutoTune.resolve() in the
-# stability build returns the base settings unchanged; per-game overrides still
-# remain the highest-priority layer exactly as upstream expects.
-config_store = config_dir / "ConfigStore.kt"
-old_resolve = '''    fun resolveForGame(serial: String?): Settings {
-        val global = loadGlobal()
-        if (serial == null) return global
-        val overrides = loadOverrides(serial) ?: return global
-        return Settings.merge(global, overrides)
-    }
-'''
-new_resolve = '''    fun resolveForGame(serial: String?): Settings {
-        val global = loadGlobal()
-        val context = MainActivityRuntime.instance?.applicationContext
-        val automatic = if (context != null) AutoTune.resolve(context, serial, global) else global
-        if (serial == null) return automatic
-        val overrides = loadOverrides(serial) ?: return automatic
-        return Settings.merge(automatic, overrides)
-    }
-'''
-replace_exact(config_store, old_resolve, new_resolve)
-
-# Expose native performance metrics. They are sampled only after the game has
-# been running for a while; no experimental scheduler/core switches are enabled
-# during VM startup in this stability build.
-native_java = ANDROID / "java/kr/co/iefriends/pcsx2/NativeApp.java"
-replace_exact(
-    native_java,
-    "\tpublic static native float getFPS();\n",
-    "\tpublic static native float getFPS();\n"
-    "\tpublic static native float getEmulationSpeed();\n"
-    "\tpublic static native float getCpuThreadTimeMs();\n"
-    "\tpublic static native float getGsThreadTimeMs();\n"
-    "\tpublic static native float getVuThreadTimeMs();\n"
-    "\tpublic static native float getGpuTimeMs();\n",
-)
-
-native_cpp = ANDROID / "cpp/native-lib.cpp"
-old_speed_jni = '''extern "C"
-JNIEXPORT jfloat JNICALL
-Java_kr_co_iefriends_pcsx2_NativeApp_getFPS(JNIEnv *env, jclass clazz) {
-    return (jfloat)PerformanceMetrics::GetFPS();
-}
-'''
-new_speed_jni = old_speed_jni + '''
-extern "C"
-JNIEXPORT jfloat JNICALL
-Java_kr_co_iefriends_pcsx2_NativeApp_getEmulationSpeed(JNIEnv*, jclass) {
-    return (jfloat)PerformanceMetrics::GetSpeed();
-}
-
-extern "C"
-JNIEXPORT jfloat JNICALL
-Java_kr_co_iefriends_pcsx2_NativeApp_getCpuThreadTimeMs(JNIEnv*, jclass) {
-    return (jfloat)PerformanceMetrics::GetCPUThreadAverageTime();
-}
-
-extern "C"
-JNIEXPORT jfloat JNICALL
-Java_kr_co_iefriends_pcsx2_NativeApp_getGsThreadTimeMs(JNIEnv*, jclass) {
-    return (jfloat)PerformanceMetrics::GetGSThreadAverageTime();
-}
-
-extern "C"
-JNIEXPORT jfloat JNICALL
-Java_kr_co_iefriends_pcsx2_NativeApp_getVuThreadTimeMs(JNIEnv*, jclass) {
-    return (jfloat)PerformanceMetrics::GetVUThreadAverageTime();
-}
-
-extern "C"
-JNIEXPORT jfloat JNICALL
-Java_kr_co_iefriends_pcsx2_NativeApp_getGpuTimeMs(JNIEnv*, jclass) {
-    return (jfloat)PerformanceMetrics::GetGPUAverageTime();
-}
-'''
-replace_exact(native_cpp, old_speed_jni, new_speed_jni)
-
-# IMPORTANT stability hotfix: leave ARMSX2's experimental ADPF preference at
-# its upstream default OFF. It can be re-enabled later after device testing.
-
 runtime = KOTLIN / "runtime/MainActivityRuntime.kt"
 replace_exact(
     runtime,
-    "                NativeApp.runVMThread(m_szGamefile)\n",
-    '''                com.armsx2.config.AdaptiveAutoTune.start(currentGame.value?.settingsKey, bootCfg)
-                try {
-                    NativeApp.runVMThread(m_szGamefile)
-                } finally {
-                    com.armsx2.config.AdaptiveAutoTune.stop()
-                }
-''',
-)
-
-# Optional private built-in BIOS package. The public/source build has no firmware
-# assets, so this is a no-op there. A post-build APK may contain assets/builtin_bios/*.bin;
-# on startup each candidate is copied to app-private storage and validated by emucore
-# before one is selected. This avoids ever selecting a truncated/bad BIOS.
-replace_exact(
-    runtime,
     '''        bios.value = prefs.getString("bios", null)
         biosDir.value = prefs.getString("biosDir", null)
 ''',
     '''        bios.value = prefs.getString("bios", null)
         biosDir.value = prefs.getString("biosDir", null)
+        // Safe before emucore init: this installer uses Kotlin file checks only.
         com.armsx2.bios.BuiltinBios.installIfPresent(applicationContext)
 ''',
 )
 
 # One remaining user-facing toast in MainActivityRuntime was still hard-coded in English.
-# Translate it directly so the Russian-default build does not leak English here.
 runtime_text = runtime.read_text(encoding="utf-8")
 runtime_text = runtime_text.replace(
     '"Turn on Emulate USB Keyboard (Network settings) first"',
@@ -167,9 +74,6 @@ runtime.write_text(runtime_text, encoding="utf-8")
 # ---------------------------------------------------------------------------
 # Russian-first UI
 # ---------------------------------------------------------------------------
-# ARMSX2 already ships a full live i18n system and assets/i18n/ru.json. Make
-# Russian the first-run/default language for PS2 AutoTune while preserving the
-# language picker, so a user can still choose another language later.
 i18n = KOTLIN / "i18n/I18n.kt"
 replace_exact(i18n, '    var current by mutableStateOf("en")\n', '    var current by mutableStateOf("ru")\n')
 replace_exact(i18n, '    var selected by mutableStateOf(SYSTEM_CODE)\n', '    var selected by mutableStateOf("ru")\n')
@@ -179,15 +83,12 @@ replace_exact(
     '        val selection = if (saved != null && languages.any { it.code == saved }) saved else "ru"\n',
 )
 
-# Polish the most visible machine-translated Russian strings. Keep upstream's
-# complete key set and only replace values, so future/new UI keys still fall back
-# through the normal I18n mechanism instead of disappearing.
 ru_path = ANDROID / "assets/i18n/ru.json"
 if not ru_path.exists():
     fail(f"Russian translation missing: {ru_path}")
 ru = json.loads(ru_path.read_text(encoding="utf-8"))
 ru.update({
-    "about.tagline": "Быстрый современный эмулятор PlayStation 2 для Android с автоматической настройкой.",
+    "about.tagline": "Быстрый современный эмулятор PlayStation 2 для Android.",
     "about.pcsx2.description": "PS2 AutoTune создан на базе открытого эмулятора PCSX2 и ядра ARMSX2.",
     "about.repository.description": "Исходный код, сборки и список известных проблем.",
     "info.serial": "Серийный номер",
@@ -216,11 +117,26 @@ ru.update({
     "action.importFolder": "Импортировать папку",
     "action.export": "Экспортировать",
     "action.confirm": "Подтвердить",
+
+    # Do not call game images "ROM/ПЗУ" in Russian onboarding. For a normal
+    # Android user these are simply PS2 games / game files.
+    "setup.page.roms.title": "Выберите папку с играми",
+    "setup.button.pickRomsFolder": "Выбрать папку с играми",
+    "setup.step.rom.title": "Папки с играми",
+    "setup.step.rom.description": "Выберите одну или несколько папок, где хранятся ваши игры для PS2. Поддерживаются ISO, CHD, BIN, IMG, MDF и GZ.",
+    "games.card.rescanRomsFolder": "Пересканировать папки с играми",
+    "games.empty.noFolders.title": "Папки с играми не выбраны",
+    "games.empty.noFolders.body": "Добавьте одну или несколько папок с играми в настройках.",
+    "setup.step.appData.description.allFiles": "Здесь хранятся карты памяти, сохранения и настройки эмулятора. Игры добавляются отдельно.",
+    "setup.step.appData.description.play": "Здесь хранятся карты памяти, сохранения и настройки эмулятора. Игры добавляются отдельно.",
+    "setup.step.bios.title": "BIOS PS2",
+    "setup.step.bios.description": "BIOS уже встроен в эту сборку. При необходимости здесь можно выбрать другой BIOS вручную.",
+    "setup.page.bios.title": "BIOS PS2",
 })
 ru_path.write_text(json.dumps(ru, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 # ---------------------------------------------------------------------------
-# Source-only GPL build fixes / branding
+# Clean source-only GPL build fixes / fork branding
 # ---------------------------------------------------------------------------
 discord_auth = KOTLIN / "discord/DiscordAuthActivity.kt"
 replace_exact(
@@ -258,4 +174,4 @@ if strings.exists():
     if count:
         strings.write_text(text2, encoding="utf-8")
 
-print("AutoTune RU stability overlay applied (Russian default, optional validated built-in BIOS, ADPF OFF)")
+print("PS2 AutoTune 1.0.3 SAFE BOOT overlay applied: upstream VM path, Russian UI, built-in BIOS installer")
