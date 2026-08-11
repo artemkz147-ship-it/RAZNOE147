@@ -9,8 +9,6 @@ EMU="$ANDROID_HOME/emulator/emulator"
 ADB_TIMEOUT=12
 ADB_LONG_TIMEOUT=120
 
-# Keep avdmanager and emulator on exactly the same AVD directory. GitHub runners
-# can expose different Android user-home defaults between command-line tools.
 export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$PWD/.android-user}"
 export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$PWD/.android-avd}"
 mkdir -p "$ANDROID_USER_HOME" "$ANDROID_AVD_HOME"
@@ -45,14 +43,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Recreate a clean AVD so launch tests are reproducible.
 rm -rf "$ANDROID_AVD_HOME/$AVD_NAME.avd" "$ANDROID_AVD_HOME/$AVD_NAME.ini"
 echo no | avdmanager create avd --force -n "$AVD_NAME" -k 'system-images;android-31;google_apis;x86_64' -d pixel_6 -p "$ANDROID_AVD_HOME/$AVD_NAME.avd" > avd-create.log
 "$EMU" -list-avds | tee emulator-avds.txt
 grep -qx "$AVD_NAME" emulator-avds.txt
 
-# GitHub-hosted x86_64 runners should expose KVM after the permission step.
-# Software x86 emulation is intentionally rejected because it can stall for hours.
 if [[ ! -e /dev/kvm || ! -r /dev/kvm || ! -w /dev/kvm ]]; then
   echo 'KVM is unavailable; refusing an unbounded software-emulation run.' | tee emulator-accel.txt
   ls -l /dev/kvm >> emulator-accel.txt 2>&1 || true
@@ -66,7 +61,6 @@ nohup "$EMU" -avd "$AVD_NAME" \
   > emulator-process.log 2>&1 &
 echo $! > emulator.pid
 
-# Wait for transport while also making sure the emulator process is still alive.
 transport=0
 for i in $(seq 1 90); do
   if ! kill -0 "$(cat emulator.pid)" 2>/dev/null; then
@@ -92,10 +86,7 @@ for i in $(seq 1 120); do
   fi
   value="$(timeout 5s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
   if [[ "$value" == "1" ]]; then boot=1; break; fi
-  if (( i % 15 == 0 )); then
-    echo "boot wait ${i}s"
-    tail -20 emulator-process.log || true
-  fi
+  if (( i % 15 == 0 )); then echo "boot wait ${i}s"; tail -20 emulator-process.log || true; fi
   sleep 1
 done
 if [[ "$boot" -ne 1 ]]; then
@@ -103,15 +94,10 @@ if [[ "$boot" -ne 1 ]]; then
   exit 1
 fi
 
-# sys.boot_completed can become 1 before Package Manager has finished its cold-boot
-# reconciliation. Wait for pm explicitly so a large APK install is not killed while
-# Android is still bringing package services online.
 pm_ready=0
 for i in $(seq 1 60); do
   if timeout 8s adb shell pm path android 2>/dev/null | grep -q '^package:'; then
-    pm_ready=1
-    echo "PACKAGE_MANAGER_READY_AT=${i}s" | tee emulator-pm-ready.txt
-    break
+    pm_ready=1; echo "PACKAGE_MANAGER_READY_AT=${i}s" | tee emulator-pm-ready.txt; break
   fi
   sleep 1
 done
@@ -130,13 +116,10 @@ adb_t shell getprop > emulator-props.txt
 adb_t shell cmd webviewupdate getCurrentWebViewPackage > emulator-webview.txt 2>&1 || true
 adb_t devices -l > emulator-devices.txt
 
-# First install after a cold API 31 boot can legitimately take well over 12 seconds
-# because dex/package work happens concurrently. Give install and cold Activity start
-# their own bounded long timeout while keeping all diagnostics fail-fast.
 adb_long install -r -t "$APK" | tee emulator-install.txt
 grep -q 'Success' emulator-install.txt
 adb_t shell pm path "$PKG" | tee emulator-package.txt
-grep -q "package:" emulator-package.txt
+grep -q 'package:' emulator-package.txt
 adb_t logcat -c
 adb_t shell am force-stop "$PKG"
 adb_long shell am start -W -n "$ACTIVITY" | tee emulator-start.txt
@@ -146,10 +129,7 @@ for i in $(seq 1 20); do
   if timeout 6s adb shell dumpsys activity activities 2>/dev/null | grep -q "mResumedActivity.*$PKG"; then resumed=1; break; fi
   sleep 1
 done
-if [[ "$resumed" -ne 1 ]]; then
-  echo 'MainActivity never became resumed' >&2
-  exit 1
-fi
+if [[ "$resumed" -ne 1 ]]; then echo 'MainActivity never became resumed' >&2; exit 1; fi
 
 ready=0
 for i in $(seq 1 35); do
@@ -160,17 +140,12 @@ for i in $(seq 1 35); do
 done
 cat emulator-runtime-info.log || true
 adb_t exec-out screencap -p > emulator-title.png
-if [[ "$ready" -ne 1 ]]; then
-  echo 'Web runtime did not become ready' >&2
-  exit 1
-fi
+if [[ "$ready" -ne 1 ]]; then echo 'Web runtime did not become ready' >&2; exit 1; fi
 
-# Resolve the actual landscape display and the letterboxed 1280x720 game canvas.
 read W H < <(python3 - <<'PY'
 import re,subprocess
 s=subprocess.check_output(['timeout','8s','adb','shell','wm','size'],text=True)
-m=re.findall(r'(\d+)x(\d+)',s)
-assert m, s
+m=re.findall(r'(\d+)x(\d+)',s); assert m,s
 w,h=map(int,m[-1])
 if w<h:w,h=h,w
 print(w,h)
@@ -178,8 +153,7 @@ PY
 )
 read TITLE_X TITLE_Y SCORPION_X SCORPION_Y TOWER_X TOWER_Y < <(python3 - "$W" "$H" <<'PY'
 import sys
-W,H=map(float,sys.argv[1:])
-s=min(W/1280.0,H/720.0);ox=(W-1280*s)/2;oy=(H-720*s)/2
+W,H=map(float,sys.argv[1:]);s=min(W/1280.0,H/720.0);ox=(W-1280*s)/2;oy=(H-720*s)/2
 def p(x,y):return round(ox+x*s),round(oy+y*s)
 pts=[p(640,396),p(1036,153),p(640,396)]
 print(*(v for pt in pts for v in pt))
@@ -187,39 +161,74 @@ PY
 )
 printf 'SCREEN=%sx%s CANVAS_TITLE=%s,%s SCORPION=%s,%s TOWER=%s,%s\n' "$W" "$H" "$TITLE_X" "$TITLE_Y" "$SCORPION_X" "$SCORPION_Y" "$TOWER_X" "$TOWER_Y" | tee emulator-touch.txt
 
-# Title -> Select.
+wait_marker() {
+  local marker="$1" seconds="${2:-12}" out="${3:-emulator-js-live.log}"
+  for _ in $(seq 1 "$seconds"); do
+    timeout 6s adb logcat -d -s UMK3HD:V '*:S' > "$out" 2>/dev/null || true
+    if grep -q "$marker" "$out"; then return 0; fi
+    sleep 1
+  done
+  echo "Timed out waiting for JS marker: $marker" >&2
+  cat "$out" >&2 || true
+  return 1
+}
+
+# Title -> Select, and wait for the actual JS state before taking screenshots.
 adb_t shell input tap "$TITLE_X" "$TITLE_Y"
-sleep 2
+wait_marker 'UMK3_STATE=select' 15
 adb_t exec-out screencap -p > emulator-select.png
 
-# Select Scorpion using logical portrait coordinates transformed through the letterbox.
+# Select Scorpion -> Tower.
 adb_t shell input tap "$SCORPION_X" "$SCORPION_Y"
-sleep 2
+wait_marker 'UMK3_STATE=tower' 15
 adb_t exec-out screencap -p > emulator-tower.png
 
 # Tower -> Fight.
 adb_t shell input tap "$TOWER_X" "$TOWER_Y"
-sleep 5
+wait_marker 'UMK3_STATE=fight' 20
+sleep 2
 
-# Android controls are CSS overlays positioned against the physical viewport.
-# Pixel 6 coarse-pointer media query uses the 1.08 desktop-scale override at landscape size.
-CONTROL_PCT=108
-HP_X=$((W-22-(84*CONTROL_PCT/100)-(41*CONTROL_PCT/100)))
-HP_Y=$((H-18-(218*CONTROL_PCT/100)+(41*CONTROL_PCT/100)))
-PAD_X=$((24+(95*CONTROL_PCT/100)))
-PAD_Y=$((H-22-(95*CONTROL_PCT/100)))
-PAD_RIGHT=$((PAD_X+(58*CONTROL_PCT/100)))
-printf 'HP=%s,%s PAD=%s,%s->%s,%s SCALE=%s%%\n' "$HP_X" "$HP_Y" "$PAD_X" "$PAD_Y" "$PAD_RIGHT" "$PAD_Y" "$CONTROL_PCT" | tee -a emulator-touch.txt
+# Read the actual CSS viewport and control rectangles from WebView. This avoids
+# guessing Android density, immersive insets, CSS media-query scale or letterbox.
+wait_marker 'UMK3_TOUCH_RECT_HP=' 12 emulator-geometry.log
+wait_marker 'UMK3_TOUCH_RECT_PAD=' 12 emulator-geometry.log
+VIEW_LINE="$(grep 'UMK3_VIEWPORT=' emulator-geometry.log | tail -1)"
+HP_LINE="$(grep 'UMK3_TOUCH_RECT_HP=' emulator-geometry.log | tail -1)"
+PAD_LINE="$(grep 'UMK3_TOUCH_RECT_PAD=' emulator-geometry.log | tail -1)"
+printf '%s\n%s\n%s\n' "$VIEW_LINE" "$HP_LINE" "$PAD_LINE" | tee emulator-dom-geometry.txt
+
+read HP_X HP_Y PAD_X PAD_Y PAD_RIGHT < <(python3 - "$W" "$H" "$VIEW_LINE" "$HP_LINE" "$PAD_LINE" <<'PY'
+import re,sys
+W,H=map(float,sys.argv[1:3]);v,hp,pad=sys.argv[3:6]
+m=re.search(r'UMK3_VIEWPORT=(\d+),(\d+),([\d.]+)',v);assert m,v
+vw,vh=map(float,m.group(1,2))
+def rect(line,key):
+    m=re.search(rf'UMK3_TOUCH_RECT_{key}=(-?[\d.]+),(-?[\d.]+),([\d.]+),([\d.]+)',line);assert m,line
+    return tuple(map(float,m.groups()))
+hx,hy,hw,hh=rect(hp,'HP');px,py,pw,ph=rect(pad,'PAD')
+sx=W/vw;sy=H/vh
+# Tap exact HP center. Start the stick in its exact center and move 28% of its
+# DOM width to the right, staying safely inside the circular pointer target.
+hpc=((hx+hw*.5)*sx,(hy+hh*.5)*sy)
+pc=((px+pw*.5)*sx,(py+ph*.5)*sy)
+pr=((px+pw*.78)*sx,(py+ph*.5)*sy)
+print(*(round(x) for x in (*hpc,*pc,pr[0])))
+PY
+)
+printf 'DOM_HP=%s,%s DOM_PAD=%s,%s->%s,%s\n' "$HP_X" "$HP_Y" "$PAD_X" "$PAD_Y" "$PAD_RIGHT" "$PAD_Y" | tee -a emulator-touch.txt
 
 adb_t shell input tap "$HP_X" "$HP_Y"
-sleep 1
+wait_marker 'UMK3_TOUCH=HP' 8
 adb_t shell input swipe "$PAD_X" "$PAD_Y" "$PAD_RIGHT" "$PAD_Y" 500
-sleep 2
+wait_marker 'UMK3_TOUCH_DIR=right' 8
+sleep 1
 
 adb_t logcat -d -s UMK3HD:V '*:S' | tee emulator-touch.log
 grep -q 'UMK3_STATE=select' emulator-touch.log
 grep -q 'UMK3_STATE=tower' emulator-touch.log
 grep -q 'UMK3_STATE=fight' emulator-touch.log
+grep -q 'UMK3_TOUCH=HP' emulator-touch.log
+grep -q 'UMK3_TOUCH_DIR=right' emulator-touch.log
 if timeout 8s adb logcat -d -v brief 2>/dev/null | grep -q 'FATAL EXCEPTION'; then exit 1; fi
 
 adb_t exec-out screencap -p > emulator-fight.png
