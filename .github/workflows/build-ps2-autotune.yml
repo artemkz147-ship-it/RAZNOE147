@@ -48,8 +48,8 @@ jobs:
         run: |
           printf '\n%s\n' \
             'armsx2.applicationId=com.artemkz147.ps2autotune' \
-            'armsx2.versionName=1.0.1-stability' \
-            'armsx2.versionCode=147002' \
+            'armsx2.versionName=1.0.2-ru-bios' \
+            'armsx2.versionCode=147003' \
             >> upstream/platforms/android/gradle.properties
 
       - name: Record exact source
@@ -58,7 +58,7 @@ jobs:
           mkdir -p dist
           {
             echo "PS2 AutoTune Android"
-            echo "build=1.0.1-stability"
+            echo "build=1.0.2-ru-bios"
             echo "application_id=com.artemkz147.ps2autotune"
             echo "overlay_repo=${GITHUB_REPOSITORY}"
             echo "overlay_commit=${GITHUB_SHA}"
@@ -66,6 +66,8 @@ jobs:
             echo "upstream_ref=${UPSTREAM_REF}"
             echo "upstream_commit=${UPSTREAM_SHA}"
             echo "license=GPL-3.0"
+            echo "public_build_bios=not_included"
+            echo "private_postbuild_assets=assets/builtin_bios/*.bin supported and emucore-validated"
           } > dist/SOURCE-MANIFEST.txt
 
       - name: Set up JDK 17
@@ -95,6 +97,7 @@ jobs:
           fi
           test -f "$ANDROID_HOME/platforms/android-37/android.jar"
           test -x "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+          test -x "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/zipalign"
 
       - name: Restore persistent test signing key
         uses: actions/cache@v4
@@ -134,6 +137,17 @@ jobs:
           sha256sum dist/PS2-AutoTune-Android-universal.apk > dist/SHA256SUMS.txt
           ls -lh dist
 
+      # The private user-specific BIOS files are NOT committed or published. Export
+      # the official Android signing tools with the CI artifact so ChatGPT can add
+      # the user's uploaded BIOS assets locally, align the modified APK and re-sign it.
+      - name: Export post-build signing tools
+        shell: bash
+        run: |
+          cp "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/lib/apksigner.jar" dist/apksigner.jar
+          cp "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/zipalign" dist/zipalign
+          chmod +x dist/zipalign
+          ls -lh dist/apksigner.jar dist/zipalign
+
       - name: Upload Actions artifact
         uses: actions/upload-artifact@v4
         with:
@@ -155,8 +169,8 @@ jobs:
             dist/SHA256SUMS.txt \
             dist/APK-VERIFY.txt \
             --target "$GITHUB_SHA" \
-            --title "PS2 AutoTune Android — stability build" \
-            --notes "Stability hotfix based on ARMSX2 ${UPSTREAM_REF}. Launch-time renderer/core settings are left to upstream/GameDB; experimental ADPF stays off. AutoTune adapts safe internal resolution after boot. BIOS and game images are not included." \
+            --title "PS2 AutoTune Android — RU/BIO-ready stability build" \
+            --notes "Russian-first stability build based on ARMSX2 ${UPSTREAM_REF}. Public release contains no Sony BIOS. The app supports locally-added assets/builtin_bios firmware, validates each candidate through emucore, and selects a valid BIOS automatically. Experimental ADPF stays off; AutoTune adapts only safe internal resolution after boot." \
             --prerelease
 
       - name: Record successful build in branch
@@ -165,7 +179,7 @@ jobs:
         run: |
           {
             echo "status=SUCCESS"
-            echo "build=1.0.1-stability"
+            echo "build=1.0.2-ru-bios"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             echo "source_commit=${GITHUB_SHA}"
             echo "upstream_ref=${UPSTREAM_REF}"
@@ -185,7 +199,7 @@ jobs:
         run: |
           {
             echo "status=FAILURE"
-            echo "build=1.0.1-stability"
+            echo "build=1.0.2-ru-bios"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             echo "source_commit=${GITHUB_SHA}"
             echo "actions_url=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
