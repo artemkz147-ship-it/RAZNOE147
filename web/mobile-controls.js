@@ -11,7 +11,7 @@ if(!coarse){ if(gear)gear.hidden=true; return; }
 
 const CODE={left:'ArrowLeft',right:'ArrowRight',up:'ArrowUp',down:'ArrowDown'};
 const held=new Set();
-let padPointer=null,lastTouchDir='';
+let padPointer=null,lastTouchDir='',rectSignature='';
 const dispatch=(code,down)=>window.dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{code,bubbles:true,cancelable:true}));
 const tapKey=code=>{dispatch(code,true);setTimeout(()=>dispatch(code,false),34)};
 const setDir=next=>{
@@ -69,6 +69,22 @@ canvas?.addEventListener('pointerdown',e=>{
   }
 },{passive:false});
 
+function rectLine(name,el){
+  if(!el)return `${name}=missing`;
+  const r=el.getBoundingClientRect();
+  return `${name}=${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}`;
+}
+function logControlGeometry(){
+  const hp=document.querySelector('.touch[data-key="HP"]');
+  if(!hp||!pad)return;
+  const sig=`${window.innerWidth}x${window.innerHeight}@${window.devicePixelRatio}|${rectLine('HP',hp)}|${rectLine('PAD',pad)}`;
+  if(sig===rectSignature)return;
+  rectSignature=sig;
+  console.log(`UMK3_VIEWPORT=${Math.round(window.innerWidth)},${Math.round(window.innerHeight)},${Number(window.devicePixelRatio||1).toFixed(3)}`);
+  console.log(`UMK3_TOUCH_RECT_${rectLine('HP',hp)}`);
+  console.log(`UMK3_TOUCH_RECT_${rectLine('PAD',pad)}`);
+}
+
 let lastState='';
 setInterval(()=>{
   const s=window.__UMK3_DEBUG__?.game?.state||'boot';
@@ -77,6 +93,10 @@ setInterval(()=>{
     const inFight=s==='fight';
     if(gear)gear.hidden=!inFight;
     if(!inFight&&panel)panel.classList.remove('open');
+    if(inFight){rectSignature='';requestAnimationFrame(()=>requestAnimationFrame(logControlGeometry))}
+  }else if(s==='fight'){
+    // Also catch delayed CSS/layout changes after immersive mode or orientation settles.
+    logControlGeometry();
   }
 },250);
 
@@ -88,7 +108,7 @@ const apply=()=>{
   root.style.setProperty('--control-opacity',String(cfg.opacity));
   root.style.setProperty('--button-scale',String(cfg.buttons));
 };
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(cfg))}catch(_){}apply()};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(cfg))}catch(_){}apply();rectSignature=''};
 apply();
 
 if(gear&&panel){
