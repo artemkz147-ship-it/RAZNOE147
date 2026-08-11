@@ -1,31 +1,36 @@
 package com.armsx2.bios
 
 import android.content.Context
-import android.os.ParcelFileDescriptor
 import androidx.core.content.edit
-import com.armsx2.BiosInfo
 import com.armsx2.runtime.MainActivityRuntime
-import kr.co.iefriends.pcsx2.NativeApp
 import java.io.File
 
 /**
- * Installs BIOS images which are optionally present in APK assets/builtin_bios/.
+ * Installs optional user-supplied PS2 BIOS images from APK assets/builtin_bios/.
  *
- * The public/source build deliberately contains no firmware files. A private
- * post-build may add user-supplied BIOS images to that asset directory without
- * changing code. On first launch every embedded candidate is copied into the
- * app-private BIOS folder and validated by emucore itself via getBiosInfoFromFd.
- * Invalid/truncated images are ignored instead of ever being selected for boot.
+ * IMPORTANT: this code deliberately does NOT call emucore/JNI. It runs while the
+ * Android activity is still starting, before NativeApp.initializeOnce() installs
+ * PCSX2's base settings layer. Calling BIOS parser JNI that early is unnecessary
+ * and can destabilize startup on some devices.
  *
- * Selection priority is Europe -> USA -> Japan -> any other valid region. An
- * already configured valid BIOS always wins, so the automatic installer never
- * overwrites a later manual choice.
+ * We only do a conservative ROM sanity check here: a normal PS2 BIOS dump is
+ * exactly 4 MiB and contains the ROMVER entry plus a 14-character ROM version
+ * record such as 0200EC20041104. The real core still performs its normal BIOS
+ * loading/validation when the VM boots.
  */
 object BuiltinBios {
     private const val ASSET_DIR = "builtin_bios"
     private const val FILE_PREFIX = "builtin_"
+    private const val PS2_BIOS_SIZE = 4L * 1024L * 1024L
+    private const val PROBE_BYTES = 256 * 1024
 
-    private data class Candidate(val file: File, val info: BiosInfo)
+    enum class Region { JAPAN, USA, EUROPE, OTHER }
+
+    data class Candidate(
+        val file: File,
+        val region: Region,
+        val romVersion: String,
+    )
 
     fun installIfPresent(context: Context): String? {
         val current = MainActivityRuntime.bios.value
@@ -46,42 +51,61 @@ object BuiltinBios {
         for (assetName in assetNames) {
             val safeName = assetName.replace(Regex("[^A-Za-z0-9._-]"), "_")
             val dst = File(biosDir, FILE_PREFIX + safeName)
-            val copied = copyAssetAtomically(context, "$ASSET_DIR/$assetName", dst)
-            if (!copied) continue
-            val info = probe(dst) ?: continue
-            valid += Candidate(dst, info)
+            if (!copyAssetAtomically(context, "$ASSET_DIR/$assetName", dst)) continue
+            val candidate = probe(dst) ?: run {
+                runCatching { dst.delete() }
+                continue
+            }
+            valid += candidate
         }
         if (valid.isEmpty()) return null
 
-        // Region values are the native BiosTools values: 0 JP, 1 USA, 2 EU.
-        val chosen = valid.firstOrNull { it.info.region == 2 }
-            ?: valid.firstOrNull { it.info.region == 1 }
-            ?: valid.firstOrNull { it.info.region == 0 }
+        // Prefer the modern European dump supplied for this private build.
+        // USA is next if a valid one is supplied later; Japan remains a fallback.
+        val chosen = valid.firstOrNull { it.region == Region.EUROPE }
+            ?: valid.firstOrNull { it.region == Region.USA }
+            ?: valid.firstOrNull { it.region == Region.JAPAN }
             ?: valid.first()
 
         MainActivityRuntime.bios.value = chosen.file.absolutePath
         MainActivityRuntime.prefs.edit { putString("bios", chosen.file.absolutePath) }
-        runCatching {
-            NativeApp.emulog(
-                "BUILTIN_BIOS selected=${chosen.file.name} region=${chosen.info.region} " +
-                    "version=${chosen.info.versionString} valid=${valid.size}/${assetNames.size}"
-            )
-        }
+        android.util.Log.i(
+            "PS2AutoTune",
+            "Bundled BIOS selected ${chosen.file.name} ${chosen.romVersion} region=${chosen.region}"
+        )
         return chosen.file.absolutePath
     }
 
-    private fun probe(file: File): BiosInfo? {
-        if (!file.isFile || file.length() < 512L) return null
+    /** Pure-Java/Kotlin sanity probe; safe before native/emucore init. */
+    private fun probe(file: File): Candidate? {
+        if (!file.isFile || file.length() != PS2_BIOS_SIZE) return null
+
         return runCatching {
-            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
-                NativeApp.getBiosInfoFromFd(pfd.detachFd())
+            val bytes = ByteArray(PROBE_BYTES)
+            val count = file.inputStream().buffered().use { it.read(bytes) }
+            if (count <= 0) return@runCatching null
+            val text = bytes.copyOf(count).toString(Charsets.ISO_8859_1)
+            if (!text.contains("ROMVER")) return@runCatching null
+
+            // Sony ROMVER payload examples:
+            //   0200EC20041104 = 2.00 Europe
+            //   0100JC20000117 = 1.00 Japan
+            // Fifth character identifies region (E/A/J/H/C/T...).
+            val match = Regex("[0-9]{4}[A-Z][A-Z][0-9]{8}").find(text)
+                ?: return@runCatching null
+            val rom = match.value
+            val region = when (rom.getOrNull(4)) {
+                'E' -> Region.EUROPE
+                'A' -> Region.USA
+                'J' -> Region.JAPAN
+                else -> Region.OTHER
             }
+            Candidate(file, region, rom)
         }.getOrNull()
     }
 
     private fun copyAssetAtomically(context: Context, assetPath: String, dst: File): Boolean {
-        // Keep an already extracted non-empty copy; validation below is still authoritative.
-        if (dst.isFile && dst.length() > 0L) return true
+        if (dst.isFile && probe(dst) != null) return true
         val tmp = File(dst.parentFile, ".${dst.name}.tmp")
         return runCatching {
             context.assets.open(assetPath).use { input ->
@@ -89,10 +113,12 @@ object BuiltinBios {
             }
             if (dst.exists()) dst.delete()
             if (!tmp.renameTo(dst)) {
-                tmp.inputStream().use { input -> dst.outputStream().use { output -> input.copyTo(output) } }
+                tmp.inputStream().use { input ->
+                    dst.outputStream().buffered().use { output -> input.copyTo(output) }
+                }
                 tmp.delete()
             }
-            dst.isFile && dst.length() > 0L
+            dst.isFile && dst.length() == PS2_BIOS_SIZE
         }.getOrElse {
             runCatching { tmp.delete() }
             false
