@@ -6,6 +6,11 @@ on:
     paths:
       - 'ps2-autotune/**'
       - '.github/workflows/build-ps2-autotune.yml'
+  pull_request:
+    branches: [main, ps2-autotune-ci-base]
+    paths:
+      - 'ps2-autotune/**'
+      - '.github/workflows/build-ps2-autotune.yml'
   workflow_dispatch:
 
 permissions:
@@ -219,4 +224,23 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add ps2-autotune/BUILD-STATUS.txt
           git commit -m 'ci(ps2): record Exynos-safe APK build [skip actions]'
+          git push origin HEAD:"${GITHUB_REF_NAME}"
+
+      - name: Record failed build
+        if: github.event_name != 'pull_request' && failure()
+        shell: bash
+        run: |
+          {
+            echo 'status=FAILURE'
+            echo 'build=1.0.5-exynos-safe-v29'
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "source_commit=${GITHUB_SHA}"
+            echo "upstream_ref=${UPSTREAM_REF}"
+            echo "actions_url=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > ps2-autotune/BUILD-STATUS.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ps2-autotune/BUILD-STATUS.txt
+          git commit -m 'ci(ps2): record failed Exynos-safe build [skip actions]'
           git push origin HEAD:"${GITHUB_REF_NAME}"
