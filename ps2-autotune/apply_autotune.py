@@ -30,15 +30,19 @@ if not KOTLIN.exists():
     fail(f"Android Kotlin source tree missing: {KOTLIN}")
 
 # ---------------------------------------------------------------------------
-# 1.0.3 SAFE BOOT
+# 1.0.4 CLEAN CORE / SAFE BOOT
 # ---------------------------------------------------------------------------
 # Do NOT patch ConfigStore, NativeApp.java, native-lib.cpp, renderer settings,
-# affinity, ADPF or the VM run loop in this build. A tester reported that the
-# game surface appeared and then the VM exited. Until that device is stable we
-# keep the emulation launch path byte-for-byte upstream ARMSX2/PCSX2.
-#
-# AutoTune sources stay in this repository for later re-introduction, but they
-# are intentionally not copied into the Android source tree here.
+# affinity, ADPF or the VM run loop in this build. The emulation path itself
+# remains upstream ARMSX2/PCSX2. 1.0.4 additionally clears stale core settings
+# left by earlier experimental builds while preserving ROM folders and saves.
+
+config_dir = KOTLIN / "config"
+config_dir.mkdir(parents=True, exist_ok=True)
+clean_reset_src = HERE / "src" / "CleanCoreReset.kt"
+if not clean_reset_src.exists():
+    fail(f"missing overlay source {clean_reset_src}")
+shutil.copy2(clean_reset_src, config_dir / "CleanCoreReset.kt")
 
 # Optional private built-in BIOS installer. This is pure Kotlin and performs no
 # JNI/native calls before emucore init. Public/source builds contain no firmware
@@ -53,10 +57,15 @@ shutil.copy2(builtin_bios_src, bios_dir / "BuiltinBios.kt")
 runtime = KOTLIN / "runtime/MainActivityRuntime.kt"
 replace_exact(
     runtime,
-    '''        bios.value = prefs.getString("bios", null)
+    '''        systemDir.value = prefs.getString("systemDir", null)
+        bios.value = prefs.getString("bios", null)
         biosDir.value = prefs.getString("biosDir", null)
 ''',
-    '''        bios.value = prefs.getString("bios", null)
+    '''        systemDir.value = prefs.getString("systemDir", null)
+        // One-time 1.0.4 recovery: clear only persisted emulator/core settings from
+        // earlier experimental APKs. Folder grants, game files and saves survive.
+        com.armsx2.config.CleanCoreReset.runOnce(applicationContext)
+        bios.value = prefs.getString("bios", null)
         biosDir.value = prefs.getString("biosDir", null)
         // Safe before emucore init: this installer uses Kotlin file checks only.
         com.armsx2.bios.BuiltinBios.installIfPresent(applicationContext)
@@ -117,9 +126,6 @@ ru.update({
     "action.importFolder": "Импортировать папку",
     "action.export": "Экспортировать",
     "action.confirm": "Подтвердить",
-
-    # Do not call game images "ROM/ПЗУ" in Russian onboarding. For a normal
-    # Android user these are simply PS2 games / game files.
     "setup.page.roms.title": "Выберите папку с играми",
     "setup.button.pickRomsFolder": "Выбрать папку с играми",
     "setup.step.rom.title": "Папки с играми",
@@ -174,4 +180,4 @@ if strings.exists():
     if count:
         strings.write_text(text2, encoding="utf-8")
 
-print("PS2 AutoTune 1.0.3 SAFE BOOT overlay applied: upstream VM path, Russian UI, built-in BIOS installer")
+print("PS2 AutoTune 1.0.4 CLEAN CORE overlay applied: upstream VM path, clean settings migration, Russian UI, built-in BIOS installer")
