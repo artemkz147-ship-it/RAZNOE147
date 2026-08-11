@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 import shutil
@@ -28,6 +29,9 @@ if not (ROOT / ".git").exists():
 if not KOTLIN.exists():
     fail(f"Android Kotlin source tree missing: {KOTLIN}")
 
+# ---------------------------------------------------------------------------
+# PS2 AutoTune sources
+# ---------------------------------------------------------------------------
 config_dir = KOTLIN / "config"
 config_dir.mkdir(parents=True, exist_ok=True)
 for name in ("AutoTune.kt", "AdaptiveAutoTune.kt"):
@@ -35,6 +39,13 @@ for name in ("AutoTune.kt", "AdaptiveAutoTune.kt"):
     if not src.exists():
         fail(f"missing overlay source {src}")
     shutil.copy2(src, config_dir / name)
+
+bios_dir = KOTLIN / "bios"
+bios_dir.mkdir(parents=True, exist_ok=True)
+builtin_bios_src = HERE / "src" / "BuiltinBios.kt"
+if not builtin_bios_src.exists():
+    fail(f"missing overlay source {builtin_bios_src}")
+shutil.copy2(builtin_bios_src, bios_dir / "BuiltinBios.kt")
 
 # Keep upstream/GameDB launch configuration intact. AutoTune.resolve() in the
 # stability build returns the base settings unchanged; per-game overrides still
@@ -129,6 +140,88 @@ replace_exact(
 ''',
 )
 
+# Optional private built-in BIOS package. The public/source build has no firmware
+# assets, so this is a no-op there. A post-build APK may contain assets/builtin_bios/*.bin;
+# on startup each candidate is copied to app-private storage and validated by emucore
+# before one is selected. This avoids ever selecting a truncated/bad BIOS.
+replace_exact(
+    runtime,
+    '''        bios.value = prefs.getString("bios", null)
+        biosDir.value = prefs.getString("biosDir", null)
+''',
+    '''        bios.value = prefs.getString("bios", null)
+        biosDir.value = prefs.getString("biosDir", null)
+        com.armsx2.bios.BuiltinBios.installIfPresent(applicationContext)
+''',
+)
+
+# One remaining user-facing toast in MainActivityRuntime was still hard-coded in English.
+# Translate it directly so the Russian-default build does not leak English here.
+runtime_text = runtime.read_text(encoding="utf-8")
+runtime_text = runtime_text.replace(
+    '"Turn on Emulate USB Keyboard (Network settings) first"',
+    '"Сначала включите «Эмуляция USB-клавиатуры» в настройках сети"',
+)
+runtime.write_text(runtime_text, encoding="utf-8")
+
+# ---------------------------------------------------------------------------
+# Russian-first UI
+# ---------------------------------------------------------------------------
+# ARMSX2 already ships a full live i18n system and assets/i18n/ru.json. Make
+# Russian the first-run/default language for PS2 AutoTune while preserving the
+# language picker, so a user can still choose another language later.
+i18n = KOTLIN / "i18n/I18n.kt"
+replace_exact(i18n, '    var current by mutableStateOf("en")\n', '    var current by mutableStateOf("ru")\n')
+replace_exact(i18n, '    var selected by mutableStateOf(SYSTEM_CODE)\n', '    var selected by mutableStateOf("ru")\n')
+replace_exact(
+    i18n,
+    '        val selection = if (saved != null && languages.any { it.code == saved }) saved else SYSTEM_CODE\n',
+    '        val selection = if (saved != null && languages.any { it.code == saved }) saved else "ru"\n',
+)
+
+# Polish the most visible machine-translated Russian strings. Keep upstream's
+# complete key set and only replace values, so future/new UI keys still fall back
+# through the normal I18n mechanism instead of disappearing.
+ru_path = ANDROID / "assets/i18n/ru.json"
+if not ru_path.exists():
+    fail(f"Russian translation missing: {ru_path}")
+ru = json.loads(ru_path.read_text(encoding="utf-8"))
+ru.update({
+    "about.tagline": "Быстрый современный эмулятор PlayStation 2 для Android с автоматической настройкой.",
+    "about.pcsx2.description": "PS2 AutoTune создан на базе открытого эмулятора PCSX2 и ядра ARMSX2.",
+    "about.repository.description": "Исходный код, сборки и список известных проблем.",
+    "info.serial": "Серийный номер",
+    "info.crc": "CRC",
+    "info.cover.label": "Своя обложка",
+    "info.setCover": "Установить обложку",
+    "info.changeCover": "Сменить обложку",
+    "info.removeCover": "Удалить обложку",
+    "info.exportSettings": "Экспортировать настройки",
+    "info.importSettings": "Импортировать настройки",
+    "tab.fixes": "Дополнительно",
+    "tab.controls": "Управление",
+    "tab.overlay": "Экранное управление",
+    "app.language.machineNote": "Интерфейс переведён на русский. Язык можно сменить в любой момент.",
+    "app.theme.system": "Как в системе",
+    "app.theme.light": "Светлая",
+    "app.theme.dark": "Тёмная",
+    "app.bootLogo": "Анимация запуска",
+    "action.play": "Запустить",
+    "action.resume": "Продолжить",
+    "action.settings": "Настройки",
+    "action.allSettings": "Все настройки",
+    "action.reset": "Сбросить",
+    "action.apply": "Применить",
+    "action.import": "Импортировать",
+    "action.importFolder": "Импортировать папку",
+    "action.export": "Экспортировать",
+    "action.confirm": "Подтвердить",
+})
+ru_path.write_text(json.dumps(ru, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+# ---------------------------------------------------------------------------
+# Source-only GPL build fixes / branding
+# ---------------------------------------------------------------------------
 discord_auth = KOTLIN / "discord/DiscordAuthActivity.kt"
 replace_exact(
     discord_auth,
@@ -165,4 +258,4 @@ if strings.exists():
     if count:
         strings.write_text(text2, encoding="utf-8")
 
-print("AutoTune stability overlay applied successfully (ADPF default preserved OFF)")
+print("AutoTune RU stability overlay applied (Russian default, optional validated built-in BIOS, ADPF OFF)")
