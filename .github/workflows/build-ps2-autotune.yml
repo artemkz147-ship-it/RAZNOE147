@@ -40,7 +40,7 @@ jobs:
           git clone --recursive --depth 1 --branch "$UPSTREAM_REF" https://github.com/ARMSX2/ARMSX2.git upstream
           echo "UPSTREAM_SHA=$(git -C upstream rev-parse HEAD)" >> "$GITHUB_ENV"
 
-      - name: Apply PS2 AutoTune safe-boot overlay
+      - name: Apply PS2 AutoTune clean-core overlay
         run: python3 ps2-autotune/apply_autotune.py upstream
 
       - name: Give the fork its own Android identity
@@ -48,8 +48,8 @@ jobs:
         run: |
           printf '\n%s\n' \
             'armsx2.applicationId=com.artemkz147.ps2autotune' \
-            'armsx2.versionName=1.0.3-safe-boot' \
-            'armsx2.versionCode=147004' \
+            'armsx2.versionName=1.0.4-clean-core' \
+            'armsx2.versionCode=147005' \
             >> upstream/platforms/android/gradle.properties
 
       - name: Record exact source
@@ -58,7 +58,7 @@ jobs:
           mkdir -p dist
           {
             echo "PS2 AutoTune Android"
-            echo "build=1.0.3-safe-boot"
+            echo "build=1.0.4-clean-core"
             echo "application_id=com.artemkz147.ps2autotune"
             echo "overlay_repo=${GITHUB_REPOSITORY}"
             echo "overlay_commit=${GITHUB_SHA}"
@@ -68,6 +68,8 @@ jobs:
             echo "license=GPL-3.0"
             echo "vm_launch_path=upstream_unmodified"
             echo "experimental_autotune_runtime=disabled"
+            echo "one_time_core_config_reset=enabled"
+            echo "rom_folders_and_saves=preserved"
             echo "public_build_bios=not_included"
             echo "private_postbuild_assets=assets/builtin_bios/*.bin supported; pre-init Kotlin sanity check only"
           } > dist/SOURCE-MANIFEST.txt
@@ -168,8 +170,8 @@ jobs:
             dist/SHA256SUMS.txt \
             dist/APK-VERIFY.txt \
             --target "$GITHUB_SHA" \
-            --title "PS2 AutoTune Android — 1.0.3 Safe Boot" \
-            --notes "Safe-boot diagnostic/stability build based on ARMSX2 ${UPSTREAM_REF}. The emulation VM launch path and native core are left unmodified from upstream. Russian UI is enabled by default. Public release contains no Sony BIOS; private APKs may add user-supplied assets/builtin_bios files, checked in Kotlin before native initialization." \
+            --title "PS2 AutoTune Android — 1.0.4 Clean Core" \
+            --notes "Clean-core recovery build based on ARMSX2 ${UPSTREAM_REF}. The native VM launch path remains upstream/unmodified. On the first 1.0.4 launch it clears persisted emulator/renderer configuration and generated shader caches left by earlier experimental APKs, while preserving game folders, BIOS choice, memory cards and savestates. Russian UI is enabled by default. Public release contains no Sony BIOS." \
             --prerelease
 
       - name: Record successful build in branch
@@ -178,7 +180,7 @@ jobs:
         run: |
           {
             echo "status=SUCCESS"
-            echo "build=1.0.3-safe-boot"
+            echo "build=1.0.4-clean-core"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             echo "source_commit=${GITHUB_SHA}"
             echo "upstream_ref=${UPSTREAM_REF}"
@@ -198,7 +200,7 @@ jobs:
         run: |
           {
             echo "status=FAILURE"
-            echo "build=1.0.3-safe-boot"
+            echo "build=1.0.4-clean-core"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             echo "source_commit=${GITHUB_SHA}"
             echo "actions_url=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
