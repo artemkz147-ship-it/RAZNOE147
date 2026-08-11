@@ -1,8 +1,7 @@
-status=SUCCESS
-build=1.0.4-clean-core
-workflow_run_id=31487752668
-source_commit=ab776a366bdf0224eae1c393dbcbd571a292c1b6
-upstream_ref=2.6.5.9
-apk_url=https://github.com/artemkz147-ship-it/RAZNOE147/releases/download/ps2-autotune-ci/PS2-AutoTune-Android-universal.apk
-sha256_url=https://github.com/artemkz147-ship-it/RAZNOE147/releases/download/ps2-autotune-ci/SHA256SUMS.txt
-finished_utc=2026-08-11T12:12:10Z
+status=FAILURE
+build=1.0.5-exynos-safe-v29
+workflow_run_id=31499950792
+source_commit=c69ff7c8b59dab41f0824afa86455a0a2da588c1
+upstream_ref=2.4.8
+actions_url=https://github.com/artemkz147-ship-it/RAZNOE147/actions/runs/31499950792
+finished_utc=2026-08-11T14:11:36Z
