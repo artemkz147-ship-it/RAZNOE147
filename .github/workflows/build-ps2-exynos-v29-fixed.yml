@@ -1,0 +1,272 @@
+name: Build PS2 Exynos Safe V29 Fixed
+
+on:
+  push:
+    branches: [ps2-autotune-android]
+    paths:
+      - '.github/workflows/build-ps2-exynos-v29-fixed.yml'
+      - 'ps2-autotune/apply_exynos_v29.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ps2-exynos-v29-fixed-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UPSTREAM_REF: '2.4.8'
+  ANDROID_BUILD_TOOLS: '36.0.0'
+  APP_ID: 'com.artemkz147.ps2autotune'
+  VERSION_NAME: '1.0.10-exynos-safe-v29-fixed'
+  VERSION_CODE: '147011'
+
+jobs:
+  android:
+    name: Exynos-safe V29 universal 4K+16K APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout overlay
+        uses: actions/checkout@v5
+
+      - name: Checkout pre-regression ARMSX2 V29 core
+        shell: bash
+        run: |
+          git clone --recursive --depth 1 --branch "$UPSTREAM_REF" https://github.com/ARMSX2/ARMSX2.git upstream
+          echo "UPSTREAM_SHA=$(git -C upstream rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Apply Russian Exynos-safe overlay and diagnostics
+        run: python3 ps2-autotune/apply_exynos_v29.py upstream
+
+      - name: Set Android identity
+        shell: bash
+        run: |
+          printf '\n%s\n' \
+            "armsx2.applicationId=${APP_ID}" \
+            "armsx2.versionName=${VERSION_NAME}" \
+            "armsx2.versionCode=${VERSION_CODE}" \
+            >> upstream/ARMSX2/gradle.properties
+
+      - name: Record source manifest
+        shell: bash
+        run: |
+          mkdir -p dist
+          {
+            echo 'PS2 AutoTune Android'
+            echo "build=${VERSION_NAME}"
+            echo "application_id=${APP_ID}"
+            echo "overlay_commit=${GITHUB_SHA}"
+            echo 'upstream_repo=ARMSX2/ARMSX2'
+            echo "upstream_ref=${UPSTREAM_REF}"
+            echo "upstream_commit=${UPSTREAM_SHA}"
+            echo 'core=Refresh V29 / 2.4.8 pre-Exynos-regression'
+            echo 'native_crash_report=enabled'
+            echo 'universal_pages=4K+16K'
+            echo 'public_build_bios=not_included'
+          } > dist/SOURCE-MANIFEST.txt
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: upstream/ARMSX2/**/*.gradle*
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+
+      - name: Install Android build dependencies
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          set +e
+          sdkmanager --channel=3 \
+            'platforms;android-36.1' \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
+            'ndk;28.2.13676358' \
+            'cmake;3.22.1'
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            sdkmanager --channel=3 \
+              'platforms;android-36' \
+              "build-tools;${ANDROID_BUILD_TOOLS}" \
+              'ndk;28.2.13676358' \
+              'cmake;3.22.1'
+          fi
+          test -x "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+          test -x "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/zipalign"
+
+      - name: Restore persistent CI signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: ps2-autotune-debug-keystore-v1
+
+      - name: Ensure signing key
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android -alias androiddebugkey -keypass android \
+              -dname 'CN=PS2 AutoTune Development,O=artemkz147,C=DE' \
+              -keyalg RSA -keysize 2048 -validity 10000 >/dev/null 2>&1
+          fi
+
+      - name: Fetch and verify shader compiler dependencies
+        shell: bash
+        working-directory: upstream/ARMSX2
+        run: |
+          SHADERC='app/src/main/cpp/3rdparty/shaderc'
+          DEPROOT="$SHADERC/third_party"
+          for attempt in 1 2 3; do
+            echo "shaderc dependency sync attempt ${attempt}"
+            python3 "$SHADERC/utils/git-sync-deps" || true
+            if [ -f "$DEPROOT/spirv-tools/CMakeLists.txt" ] && \
+               [ -f "$DEPROOT/spirv-headers/CMakeLists.txt" ] && \
+               [ -f "$DEPROOT/glslang/CMakeLists.txt" ]; then
+              break
+            fi
+            sleep $((attempt * 3))
+          done
+          clone_exact() {
+            local dest="$1" repo="$2" rev="$3"
+            rm -rf "$dest"
+            for attempt in 1 2 3; do
+              echo "repair $(basename "$dest") attempt ${attempt}"
+              if git clone --quiet "$repo" "$dest" && git -C "$dest" checkout --quiet "$rev"; then return 0; fi
+              rm -rf "$dest"
+              sleep $((attempt * 4))
+            done
+            return 1
+          }
+          [ -f "$DEPROOT/spirv-tools/CMakeLists.txt" ] || clone_exact "$DEPROOT/spirv-tools" https://github.com/KhronosGroup/SPIRV-Tools.git e4bceacf59fdfe742047e94e41ef65a48999a0dd
+          [ -f "$DEPROOT/spirv-headers/CMakeLists.txt" ] || clone_exact "$DEPROOT/spirv-headers" https://github.com/KhronosGroup/SPIRV-Headers.git 465055f6c9128772e20082e893d974146acf7a02
+          [ -f "$DEPROOT/glslang/CMakeLists.txt" ] || clone_exact "$DEPROOT/glslang" https://github.com/KhronosGroup/glslang.git 09c541ee5b22bbac307987b50d86ec2b4f683d75
+          test -f "$DEPROOT/spirv-tools/CMakeLists.txt"
+          test -f "$DEPROOT/spirv-headers/CMakeLists.txt"
+          test -f "$DEPROOT/glslang/CMakeLists.txt"
+
+      - name: Patch V29 legacy C prototypes
+        shell: bash
+        working-directory: upstream/ARMSX2
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/cpp/3rdparty/rcheevos/src/rc_client.c')
+          s = p.read_text()
+          old = 'rc_api_url_builder_t* (*custom_handler)();'
+          new = 'rc_api_url_builder_t* (*custom_handler)(void);'
+          if old not in s:
+              raise SystemExit('Expected V29 custom_handler prototype not found')
+          p.write_text(s.replace(old, new, 1))
+          print('Patched V29 rcheevos strict C prototype.')
+          PY
+
+      - name: Install Rust Android target
+        run: rustup target add aarch64-linux-android
+
+      - name: Build 4K core APK
+        shell: bash
+        working-directory: upstream/ARMSX2
+        run: |
+          chmod +x gradlew
+          RANLIB="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib"
+          LIBZIP='app/src/main/cpp/3rdparty/libzip/libzip.a'
+          set +e
+          ./gradlew --no-daemon :app:assembleGithubRelease \
+            -Parmsx2.nativeLibName=emucore_4k \
+            -Parmsx2.hostPageSize=0x1000
+          first_rc=$?
+          set -e
+          echo "First 4K build exit=${first_rc}"
+          if [ -s "$LIBZIP" ]; then
+            "$RANLIB" "$LIBZIP"
+            echo 'Indexed generated libzip.a after first 4K pass.'
+          fi
+          ./gradlew --no-daemon :app:assembleGithubRelease \
+            -Parmsx2.nativeLibName=emucore_4k \
+            -Parmsx2.hostPageSize=0x1000
+          apk=$(find app/build/outputs/apk -type f -name '*.apk' | head -n1)
+          test -n "$apk"
+          cp "$apk" "$GITHUB_WORKSPACE/dist/base-4k.apk"
+          unzip -l "$apk" | grep 'lib/arm64-v8a/libemucore_4k.so'
+
+      - name: Build 16K core APK
+        shell: bash
+        working-directory: upstream/ARMSX2
+        run: |
+          ./gradlew --no-daemon :app:clean
+          RANLIB="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib"
+          LIBZIP='app/src/main/cpp/3rdparty/libzip/libzip.a'
+          set +e
+          ./gradlew --no-daemon :app:assembleGithubRelease \
+            -Parmsx2.nativeLibName=emucore_16k \
+            -Parmsx2.hostPageSize=0x4000
+          first_rc=$?
+          set -e
+          echo "First 16K build exit=${first_rc}"
+          if [ -s "$LIBZIP" ]; then
+            "$RANLIB" "$LIBZIP"
+            echo 'Indexed generated libzip.a after first 16K pass.'
+          fi
+          ./gradlew --no-daemon :app:assembleGithubRelease \
+            -Parmsx2.nativeLibName=emucore_16k \
+            -Parmsx2.hostPageSize=0x4000
+          apk=$(find app/build/outputs/apk -type f -name '*.apk' | head -n1)
+          test -n "$apk"
+          cp "$apk" "$GITHUB_WORKSPACE/dist/base-16k.apk"
+          unzip -l "$apk" | grep 'lib/arm64-v8a/libemucore_16k.so'
+
+      - name: Merge universal 4K + 16K APK
+        shell: bash
+        run: |
+          rm -rf merge-apk && mkdir merge-apk
+          unzip -q dist/base-4k.apk -d merge-apk
+          rm -rf merge-apk/META-INF
+          mkdir -p merge-apk/lib/arm64-v8a
+          unzip -p dist/base-16k.apk lib/arm64-v8a/libemucore_16k.so > merge-apk/lib/arm64-v8a/libemucore_16k.so
+          test -s merge-apk/lib/arm64-v8a/libemucore_4k.so
+          test -s merge-apk/lib/arm64-v8a/libemucore_16k.so
+          (cd merge-apk && zip -q -r ../dist/universal-unaligned.apk .)
+          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/zipalign" -P 16 -f 4 dist/universal-unaligned.apk dist/PS2-AutoTune-Exynos-Safe-V29-Fixed-universal.apk
+          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner" sign --ks "$HOME/.android/debug.keystore" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android dist/PS2-AutoTune-Exynos-Safe-V29-Fixed-universal.apk
+          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner" verify --verbose --print-certs dist/PS2-AutoTune-Exynos-Safe-V29-Fixed-universal.apk > dist/APK-VERIFY.txt
+          unzip -l dist/PS2-AutoTune-Exynos-Safe-V29-Fixed-universal.apk | grep -E 'libemucore_(4k|16k)\.so'
+          sha256sum dist/PS2-AutoTune-Exynos-Safe-V29-Fixed-universal.apk > dist/SHA256SUMS.txt
+          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/aapt" dump badging dist/PS2-AutoTune-Exynos-Safe-V29-Fixed-universal.apk > dist/APK-BADGING.txt
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS2-AutoTune-Exynos-Safe-V29-Fixed
+          path: |
+            dist/PS2-AutoTune-Exynos-Safe-V29-Fixed-universal.apk
+            dist/SOURCE-MANIFEST.txt
+            dist/SHA256SUMS.txt
+            dist/APK-VERIFY.txt
+            dist/APK-BADGING.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release delete ps2-exynos-v29-fixed --cleanup-tag --yes >/dev/null 2>&1 || true
+          gh release create ps2-exynos-v29-fixed \
+            dist/PS2-AutoTune-Exynos-Safe-V29-Fixed-universal.apk \
+            dist/SOURCE-MANIFEST.txt dist/SHA256SUMS.txt dist/APK-VERIFY.txt dist/APK-BADGING.txt \
+            --target "$GITHUB_SHA" \
+            --title 'PS2 AutoTune 1.0.10 — Exynos Safe V29 Fixed' \
+            --notes 'Refresh V29 / ARMSX2 2.4.8 compatibility build with Russian overlay and crash diagnostics. Public artifact contains no BIOS.' \
+            --prerelease

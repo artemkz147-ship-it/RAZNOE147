@@ -1,0 +1,246 @@
+name: Build PS2 AutoTune APK
+
+on:
+  push:
+    branches: [ps2-autotune-android]
+    paths:
+      - 'ps2-autotune/**'
+      - '.github/workflows/build-ps2-autotune.yml'
+  pull_request:
+    branches: [main, ps2-autotune-ci-base]
+    paths:
+      - 'ps2-autotune/**'
+      - '.github/workflows/build-ps2-autotune.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ps2-autotune-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UPSTREAM_REF: '2.4.8'
+  ANDROID_BUILD_TOOLS: '36.0.0'
+
+jobs:
+  android:
+    name: Android Exynos-safe universal APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout overlay
+        uses: actions/checkout@v5
+
+      - name: Checkout last pre-regression ARMSX2 core
+        shell: bash
+        run: |
+          git clone --recursive --depth 1 --branch "$UPSTREAM_REF" https://github.com/ARMSX2/ARMSX2.git upstream
+          echo "UPSTREAM_SHA=$(git -C upstream rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Apply Exynos-safe Russian overlay
+        run: python3 ps2-autotune/apply_exynos_v29.py upstream
+
+      - name: Give fork its own Android identity
+        shell: bash
+        run: |
+          printf '\n%s\n' \
+            'armsx2.applicationId=com.artemkz147.ps2autotune' \
+            'armsx2.versionName=1.0.5-exynos-safe-v29' \
+            'armsx2.versionCode=147006' \
+            >> upstream/ARMSX2/gradle.properties
+
+      - name: Record source manifest
+        shell: bash
+        run: |
+          mkdir -p dist
+          {
+            echo 'PS2 AutoTune Android'
+            echo 'build=1.0.5-exynos-safe-v29'
+            echo 'application_id=com.artemkz147.ps2autotune'
+            echo "overlay_commit=${GITHUB_SHA}"
+            echo 'upstream_repo=ARMSX2/ARMSX2'
+            echo "upstream_ref=${UPSTREAM_REF}"
+            echo "upstream_commit=${UPSTREAM_SHA}"
+            echo 'reason=ARMSX2 issue 256 reports immediate game-launch crash on Samsung/Exynos beginning with Refresh V30; V29 is the pre-regression core'
+            echo 'native_crash_report=enabled'
+            echo 'public_build_bios=not_included'
+          } > dist/SOURCE-MANIFEST.txt
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: upstream/ARMSX2/**/*.gradle*
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+
+      - name: Install Android build dependencies
+        shell: bash
+        run: |
+          set +e
+          sdkmanager --channel=3 \
+            'platforms;android-36.1' \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
+            'ndk;28.2.13676358' \
+            'cmake;3.31.6'
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            sdkmanager --channel=3 \
+              'platforms;android-36' \
+              "build-tools;${ANDROID_BUILD_TOOLS}" \
+              'ndk;28.2.13676358' \
+              'cmake;3.31.6'
+          fi
+          test -x "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+          test -x "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/zipalign"
+
+      - name: Restore persistent CI signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: ps2-autotune-debug-keystore-v1
+
+      - name: Ensure signing key
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android -alias androiddebugkey -keypass android \
+              -dname 'CN=PS2 AutoTune Development,O=artemkz147,C=DE' \
+              -keyalg RSA -keysize 2048 -validity 10000 >/dev/null 2>&1
+          fi
+
+      - name: Fetch shader compiler dependencies
+        working-directory: upstream/ARMSX2
+        run: python3 app/src/main/cpp/3rdparty/shaderc/utils/git-sync-deps
+
+      - name: Install Rust Android target
+        run: rustup target add aarch64-linux-android
+
+      - name: Build 4K core APK
+        shell: bash
+        working-directory: upstream/ARMSX2
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleGithubRelease \
+            -Parmsx2.nativeLibName=emucore_4k \
+            -Parmsx2.hostPageSize=0x1000
+          apk=$(find app/build/outputs/apk -type f -name '*.apk' | head -n1)
+          test -n "$apk"
+          cp "$apk" "$GITHUB_WORKSPACE/dist/base-4k.apk"
+          unzip -l "$apk" | grep 'lib/arm64-v8a/libemucore_4k.so'
+
+      - name: Build 16K core APK
+        shell: bash
+        working-directory: upstream/ARMSX2
+        run: |
+          ./gradlew --no-daemon :app:clean
+          ./gradlew --no-daemon :app:assembleGithubRelease \
+            -Parmsx2.nativeLibName=emucore_16k \
+            -Parmsx2.hostPageSize=0x4000
+          apk=$(find app/build/outputs/apk -type f -name '*.apk' | head -n1)
+          test -n "$apk"
+          cp "$apk" "$GITHUB_WORKSPACE/dist/base-16k.apk"
+          unzip -l "$apk" | grep 'lib/arm64-v8a/libemucore_16k.so'
+
+      - name: Merge universal 4K + 16K APK
+        shell: bash
+        run: |
+          rm -rf merge-apk
+          mkdir merge-apk
+          unzip -q dist/base-4k.apk -d merge-apk
+          rm -rf merge-apk/META-INF
+          mkdir -p merge-apk/lib/arm64-v8a
+          unzip -p dist/base-16k.apk lib/arm64-v8a/libemucore_16k.so > merge-apk/lib/arm64-v8a/libemucore_16k.so
+          test -s merge-apk/lib/arm64-v8a/libemucore_4k.so
+          test -s merge-apk/lib/arm64-v8a/libemucore_16k.so
+          (cd merge-apk && zip -q -r ../dist/universal-unaligned.apk .)
+          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/zipalign" -P 16 -f 4 \
+            dist/universal-unaligned.apk dist/PS2-AutoTune-Exynos-Safe-universal.apk
+          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner" sign \
+            --ks "$HOME/.android/debug.keystore" --ks-key-alias androiddebugkey \
+            --ks-pass pass:android --key-pass pass:android \
+            dist/PS2-AutoTune-Exynos-Safe-universal.apk
+          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner" verify --verbose --print-certs \
+            dist/PS2-AutoTune-Exynos-Safe-universal.apk > dist/APK-VERIFY.txt
+          unzip -l dist/PS2-AutoTune-Exynos-Safe-universal.apk | grep -E 'libemucore_(4k|16k)\.so'
+          sha256sum dist/PS2-AutoTune-Exynos-Safe-universal.apk > dist/SHA256SUMS.txt
+
+      - name: Export post-build tools
+        shell: bash
+        run: |
+          cp "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/lib/apksigner.jar" dist/apksigner.jar
+          cp "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/zipalign" dist/zipalign
+          chmod +x dist/zipalign
+          rm -f dist/base-4k.apk dist/base-16k.apk dist/universal-unaligned.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS2-AutoTune-Exynos-Safe
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish source-only test release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release delete ps2-autotune-ci --cleanup-tag --yes >/dev/null 2>&1 || true
+          gh release create ps2-autotune-ci \
+            dist/PS2-AutoTune-Exynos-Safe-universal.apk \
+            dist/SOURCE-MANIFEST.txt dist/SHA256SUMS.txt dist/APK-VERIFY.txt \
+            --target "$GITHUB_SHA" \
+            --title 'PS2 AutoTune 1.0.5 — Exynos Safe V29' \
+            --notes 'Compatibility build using the last ARMSX2 Refresh core before the Samsung/Exynos immediate-game-launch regression reported in issue #256. Public artifact contains no BIOS.' \
+            --prerelease
+
+      - name: Record successful build
+        if: github.event_name != 'pull_request' && success()
+        shell: bash
+        run: |
+          {
+            echo 'status=SUCCESS'
+            echo 'build=1.0.5-exynos-safe-v29'
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "source_commit=${GITHUB_SHA}"
+            echo "upstream_ref=${UPSTREAM_REF}"
+            echo "finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > ps2-autotune/BUILD-STATUS.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ps2-autotune/BUILD-STATUS.txt
+          git commit -m 'ci(ps2): record Exynos-safe APK build [skip actions]'
+          git push origin HEAD:"${GITHUB_REF_NAME}"
+
+      - name: Record failed build
+        if: github.event_name != 'pull_request' && failure()
+        shell: bash
+        run: |
+          {
+            echo 'status=FAILURE'
+            echo 'build=1.0.5-exynos-safe-v29'
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "source_commit=${GITHUB_SHA}"
+            echo "upstream_ref=${UPSTREAM_REF}"
+            echo "actions_url=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > ps2-autotune/BUILD-STATUS.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ps2-autotune/BUILD-STATUS.txt
+          git commit -m 'ci(ps2): record failed Exynos-safe build [skip actions]'
+          git push origin HEAD:"${GITHUB_REF_NAME}"
