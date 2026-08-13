@@ -16,6 +16,17 @@ RES = APP / "src/main/res"
 if not APP.exists() or not MAIN.exists():
     raise SystemExit(f"ARMSX2 2.4.8 Android tree not found under {ROOT}")
 
+# ARMSX2 V29 pins a SPIRV-Tools revision which builds SPIRV-Tools-static by
+# default, while the bundled old shaderc glue checks for a SPIRV-Tools target.
+# Give shaderc the legacy target name as an alias to the real static library.
+shaderc_third_party = APP / "src/main/cpp/3rdparty/shaderc/third_party/CMakeLists.txt"
+shaderc_cmake = shaderc_third_party.read_text(encoding="utf-8")
+spirv_marker = "    add_subdirectory(${SHADERC_SPIRV_TOOLS_DIR} spirv-tools)\n"
+spirv_alias = spirv_marker + "    if (TARGET SPIRV-Tools-static AND NOT TARGET SPIRV-Tools)\n      add_library(SPIRV-Tools ALIAS SPIRV-Tools-static)\n    endif()\n"
+if spirv_marker not in shaderc_cmake:
+    raise SystemExit("shaderc SPIRV-Tools add_subdirectory marker not found")
+shaderc_third_party.write_text(shaderc_cmake.replace(spirv_marker, spirv_alias, 1), encoding="utf-8")
+
 # -----------------------------------------------------------------------------
 # Built-in BIOS compatibility helper. Firmware bytes are never committed; a
 # private post-build can place user-supplied files into assets/builtin_bios/.
@@ -193,7 +204,7 @@ MAIN.write_text(main, encoding="utf-8")
 strings = RES / "values/strings.xml"
 if strings.exists():
     s = strings.read_text(encoding="utf-8")
-    s = re.sub(r'(<string\\s+name="app_name"[^>]*>).*?(</string>)', r'\\1PS2 AutoTune Exynos Safe\\2', s, count=1, flags=re.S)
+    s = re.sub(r'(<string\s+name="app_name"[^>]*>).*?(</string>)', r'\1PS2 AutoTune Exynos Safe\2', s, count=1, flags=re.S)
     strings.write_text(s, encoding="utf-8")
 
 # Main Russian pass for V29, which predates the later JSON i18n layer. We keep
