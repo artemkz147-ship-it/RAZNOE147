@@ -1,0 +1,28 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.raznoe147.umk3hd'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.raznoe147.umk3hd'
+        minSdk 24
+        targetSdk 35
+        versionCode 7
+        versionName '0.7.0'
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs = ['../web']
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}

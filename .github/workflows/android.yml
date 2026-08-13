@@ -1,0 +1,212 @@
+name: Android APK
+
+on:
+  push:
+    branches:
+      - umk3-hd-fan-remake
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-launch-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch CC0 prerendered fighter and stage sources
+        run: bash tools/fetch_cc0_sources.sh | tee cc0-source-inventory.txt
+
+      - name: Build CC0 visual contact sheets
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 tools/make_cc0_contact_sheets.py
+
+      - name: Export selected source samples for art review
+        run: |
+          mkdir -p cc0-selected
+          cp .cc0-sources/singles/verlaine.gif cc0-selected/
+          cp .cc0-sources/singles/tasen-defender.png cc0-selected/
+          find .cc0-sources/mustermenschen -maxdepth 1 -type f \( \
+            -iname '*Nick Adler*' -o -iname '*Danny Van Damage*' -o -iname '*Raf Boulder*' -o \
+            -iname '*Ava Lee*Thai*' -o -iname '*Tasen woman 1 Tasen*' -o \
+            -iname '*Susa No Mikoto Tasen*' -o -iname '*Komato berserker*' \) -print0 | xargs -0 -I{} cp '{}' cc0-selected/ || true
+          find cc0-selected -type f -printf '%s\t%f\n' | sort -nr | tee cc0-selected-files.txt
+          test "$(find cc0-selected -type f | wc -l)" -ge 8
+
+      - name: Generate v7 diverse cinematic 48-frame asset pack
+        run: |
+          rm -rf web/assets v6-review
+          python3 tools/build_real_assets_v7.py | tee real-assets-build.log
+
+          # Reuse only the proven v6 cinematic STAGE composition. Skip its old
+          # fighter overlay loop entirely; v7 fighters must stay source-diverse.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tools/postprocess_v6_art.py')
+          s=p.read_text(encoding='utf-8')
+          a=s.index('processed=[]')
+          z=s.index('# Rebuild single fast portrait atlas.',a)
+          s=s[:a]+"processed=[]\nprint('V7_STAGE_ONLY_SKIP_FIGHTERS')\n"+s[z:]
+          p.write_text(s,encoding='utf-8')
+          PY
+          python3 tools/postprocess_v6_art.py | tee stage-postprocess.log
+          python3 tools/postprocess_v7_ui.py | tee v7-ui.log
+          python3 tools/apply_v5_runtime_patch.py
+          python3 tools/make_v6_review.py
+
+          test "$(find web/assets/fighters -name atlas.png | wc -l)" -ge 25
+          test "$(find web/assets/fighters -name portrait.png | wc -l)" -ge 25
+          test "$(find web/assets/stages -name '*.png' | wc -l)" -ge 16
+          grep -q 'prerendered-48f-hd-v7-diverse-roster-cinematic' web/assets/build-report.json
+          grep -q 'v7-diverse-sources+stable-anchor+organic-ninja-cloth+clean-portraits' web/assets/build-report.json
+          grep -q 'v6-multidonor-cinematic-16' web/assets/build-report.json
+          python3 - <<'PY'
+          from PIL import Image,ImageStat
+          import json
+          from pathlib import Path
+          r=json.loads(Path('web/assets/build-report.json').read_text())
+          assert r['fighterFrame']==[360,480]
+          assert r['fighterAtlas']==[2880,2880]
+          assert len(r['fighters'])>=25 and len(r['stages'])>=16
+          sources={x.get('source') for x in r['fighters'] if x.get('source')}
+          # The old v6 failure had nearly the entire roster on one Stonewall body.
+          assert len(sources)>=12,sources
+          assert Image.open('web/assets/fighters/scorpion/atlas.png').size==(2880,2880)
+          assert Image.open('web/assets/fighters/scorpion/portrait.png').size==(512,512)
+          assert Image.open('web/assets/stages/subway.png').size==(1920,1080)
+          assert Image.open('web/assets/stages/waterfront.png').size==(1920,1080)
+          assert Image.open('web/assets/ui/portrait-atlas.jpg').size[0]>=1120
+          assert Image.open('web/assets/ui/title-bg.jpg').size==(1280,720)
+          for n in ['subway','kahn-kave','lost-portal','pit3','scorpion-lair','soul','temple','waterfront']:
+              im=Image.open(f'web/assets/stages/{n}.png').convert('RGB').resize((96,54))
+              st=ImageStat.Stat(im);spread=sum(st.var)/3
+              extrema=max(ch[1] for ch in im.getextrema())-min(ch[0] for ch in im.getextrema())
+              assert spread>35 and extrema>35,(n,spread,extrema)
+          print('UNIQUE_FIGHTER_SOURCES',len(sources),sorted(sources))
+          print('REAL_PACK_BYTES',sum(p.stat().st_size for p in Path('web/assets').rglob('*') if p.is_file()))
+          PY
+          test "$(du -sb web/assets | cut -f1)" -gt 20000000
+          test -s v6-review/stages-contact.jpg
+          test -s v6-review/scorpion-48f.jpg
+          test -s v6-review/kitana-48f.jpg
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify JavaScript and lazy fighting loop
+        run: |
+          node --check web/boot-guard.js
+          node --check web/umk3-data.js
+          node --check web/version.js
+          node --check web/game.js
+          node --check web/raster-runtime.js
+          node --check web/mobile-controls.js
+          node tests/smoke.cjs
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK, emulator and API 31 image
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "platform-tools" \
+            "emulator" \
+            "system-images;android-31;google_apis;x86_64"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Reject shell or old-art APK
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          bytes=$(stat -c%s app/build/outputs/apk/debug/app-debug.apk)
+          echo "APK_BYTES=$bytes" | tee apk-size.txt
+          test "$bytes" -gt 10000000
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/fighters/scorpion/atlas.png'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/fighters/scorpion/portrait.png'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/stages/subway.png'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/assets/ui/portrait-atlas.jpg'
+          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/assets/build-report.json | grep -q 'prerendered-48f-hd-v7-diverse-roster-cinematic'
+
+      - name: Enable KVM when available
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -l /dev/kvm || true
+
+      - name: Boot official emulator, install APK and verify full touch fight
+        timeout-minutes: 8
+        run: |
+          bash tools/android_emulator_test.sh app/build/outputs/apk/debug/app-debug.apk
+          grep -q 'UMK3_TOUCH=HP' emulator-touch.log
+          grep -q 'UMK3_TOUCH_DIR=right' emulator-touch.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: umk3-v7-realart-review
+          path: |
+            apk-size.txt
+            cc0-source-inventory.txt
+            cc0-selected-files.txt
+            cc0-previews/
+            real-assets-build.log
+            stage-postprocess.log
+            v7-ui.log
+            v6-review/
+            web/assets/build-report.json
+            web/assets/ui/portrait-atlas.jpg
+            web/assets/ui/title-bg.jpg
+            avd-create.log
+            emulator-avds.txt
+            emulator-accel.txt
+            emulator-process.log
+            emulator-process-tail.log
+            emulator-props.txt
+            emulator-webview.txt
+            emulator-devices.txt
+            emulator-pm-ready.txt
+            emulator-install.txt
+            emulator-package.txt
+            emulator-start.txt
+            emulator-runtime-info.log
+            emulator-runtime.log
+            emulator-js-live.log
+            emulator-geometry.log
+            emulator-dom-geometry.txt
+            emulator-touch.txt
+            emulator-touch.log
+            emulator-meminfo.txt
+            emulator-activities.txt
+            emulator-window.txt
+            emulator-full.log
+            emulator-title.png
+            emulator-select.png
+            emulator-tower.png
+            emulator-fight.png
+            emulator-diagnostic.png
+          if-no-files-found: warn
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: umk3-v7-diverse-android-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

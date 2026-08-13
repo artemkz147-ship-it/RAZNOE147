@@ -1,0 +1,122 @@
+name: Android Final V7
+
+on:
+  push:
+    branches:
+      - umk3-hd-fan-remake
+  workflow_dispatch:
+
+jobs:
+  final-v7-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare CC0 V7 assets
+        run: |
+          python3 -m pip install --quiet pillow
+          bash tools/fetch_cc0_sources.sh > cc0-source-inventory.txt
+          rm -rf web/assets v6-review
+          python3 tools/build_real_assets_v7.py | tee real-assets-build.log
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tools/postprocess_v6_art.py')
+          s=p.read_text(encoding='utf-8')
+          a=s.index('processed=[]')
+          z=s.index('# Rebuild single fast portrait atlas.',a)
+          s=s[:a]+"processed=[]\nprint('V7_STAGE_ONLY_SKIP_FIGHTERS')\n"+s[z:]
+          p.write_text(s,encoding='utf-8')
+          PY
+          python3 tools/postprocess_v6_art.py | tee stage-postprocess.log
+          python3 tools/postprocess_v7_ui.py | tee v7-ui.log
+          python3 tools/apply_v5_runtime_patch.py
+          test "$(find web/assets/fighters -name atlas.png | wc -l)" -ge 25
+          test "$(find web/assets/stages -name '*.png' | wc -l)" -ge 16
+          grep -q 'prerendered-48f-hd-v7-diverse-roster-cinematic' web/assets/build-report.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify game runtime
+        run: |
+          node --check web/game.js
+          node --check web/raster-runtime.js
+          node --check web/mobile-controls.js
+          node tests/smoke.cjs
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "platform-tools" \
+            "emulator" \
+            "system-images;android-31;google_apis;x86_64"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build V7 APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify APK payload
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          bytes=$(stat -c%s "$APK")
+          echo "APK_BYTES=$bytes" | tee apk-size.txt
+          test "$bytes" -gt 10000000
+          unzip -l "$APK" | grep -q 'assets/assets/fighters/scorpion/atlas.png'
+          unzip -l "$APK" | grep -q 'assets/assets/stages/subway.png'
+          unzip -p "$APK" assets/assets/build-report.json | grep -q 'prerendered-48f-hd-v7-diverse-roster-cinematic'
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          test -r /dev/kvm
+          test -w /dev/kvm
+
+      - name: Final Android touch acceptance
+        timeout-minutes: 8
+        run: |
+          bash tools/android_emulator_test_final.sh app/build/outputs/apk/debug/app-debug.apk
+          grep -q 'UMK3_STATE=fight' emulator-touch.log
+          grep -q 'UMK3_TOUCH=HP' emulator-touch.log
+          grep -q 'UMK3_TOUCH_DIR=right' emulator-touch.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: umk3-v7-final-diagnostics
+          path: |
+            apk-size.txt
+            emulator-touch.log
+            emulator-touch.txt
+            emulator-dom-geometry.txt
+            emulator-title.png
+            emulator-select.png
+            emulator-tower.png
+            emulator-fight.png
+            emulator-diagnostic.png
+          if-no-files-found: warn
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UMK3-HD-V7-Android-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
