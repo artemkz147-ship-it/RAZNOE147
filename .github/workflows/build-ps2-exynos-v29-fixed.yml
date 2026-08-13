@@ -19,8 +19,8 @@ env:
   UPSTREAM_REF: '2.4.8'
   ANDROID_BUILD_TOOLS: '36.0.0'
   APP_ID: 'com.artemkz147.ps2autotune'
-  VERSION_NAME: '1.0.9-exynos-safe-v29-fixed'
-  VERSION_CODE: '147010'
+  VERSION_NAME: '1.0.10-exynos-safe-v29-fixed'
+  VERSION_CODE: '147011'
 
 jobs:
   android:
@@ -161,18 +161,14 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('app/src/main/cpp/3rdparty/rcheevos/src/rapi/rc_api_common.c')
+          p = Path('app/src/main/cpp/3rdparty/rcheevos/src/rc_client.c')
           s = p.read_text()
-          changed = 0
-          for old, new in (
-              ('rc_api_url_build_dorequest_url()', 'rc_api_url_build_dorequest_url(void)'),
-              ('rc_api_url_build_dorequest_url_hosted()', 'rc_api_url_build_dorequest_url_hosted(void)'),
-          ):
-              if old in s:
-                  s = s.replace(old, new, 1)
-                  changed += 1
-          p.write_text(s)
-          print(f'Legacy rcheevos prototype patches applied: {changed}')
+          old = 'rc_api_url_builder_t* (*custom_handler)();'
+          new = 'rc_api_url_builder_t* (*custom_handler)(void);'
+          if old not in s:
+              raise SystemExit('Expected V29 custom_handler prototype not found')
+          p.write_text(s.replace(old, new, 1))
+          print('Patched V29 rcheevos strict C prototype.')
           PY
 
       - name: Install Rust Android target
@@ -183,6 +179,19 @@ jobs:
         working-directory: upstream/ARMSX2
         run: |
           chmod +x gradlew
+          RANLIB="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib"
+          LIBZIP='app/src/main/cpp/3rdparty/libzip/libzip.a'
+          set +e
+          ./gradlew --no-daemon :app:assembleGithubRelease \
+            -Parmsx2.nativeLibName=emucore_4k \
+            -Parmsx2.hostPageSize=0x1000
+          first_rc=$?
+          set -e
+          echo "First 4K build exit=${first_rc}"
+          if [ -s "$LIBZIP" ]; then
+            "$RANLIB" "$LIBZIP"
+            echo 'Indexed generated libzip.a after first 4K pass.'
+          fi
           ./gradlew --no-daemon :app:assembleGithubRelease \
             -Parmsx2.nativeLibName=emucore_4k \
             -Parmsx2.hostPageSize=0x1000
@@ -196,6 +205,19 @@ jobs:
         working-directory: upstream/ARMSX2
         run: |
           ./gradlew --no-daemon :app:clean
+          RANLIB="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib"
+          LIBZIP='app/src/main/cpp/3rdparty/libzip/libzip.a'
+          set +e
+          ./gradlew --no-daemon :app:assembleGithubRelease \
+            -Parmsx2.nativeLibName=emucore_16k \
+            -Parmsx2.hostPageSize=0x4000
+          first_rc=$?
+          set -e
+          echo "First 16K build exit=${first_rc}"
+          if [ -s "$LIBZIP" ]; then
+            "$RANLIB" "$LIBZIP"
+            echo 'Indexed generated libzip.a after first 16K pass.'
+          fi
           ./gradlew --no-daemon :app:assembleGithubRelease \
             -Parmsx2.nativeLibName=emucore_16k \
             -Parmsx2.hostPageSize=0x4000
@@ -245,6 +267,6 @@ jobs:
             dist/PS2-AutoTune-Exynos-Safe-V29-Fixed-universal.apk \
             dist/SOURCE-MANIFEST.txt dist/SHA256SUMS.txt dist/APK-VERIFY.txt dist/APK-BADGING.txt \
             --target "$GITHUB_SHA" \
-            --title 'PS2 AutoTune 1.0.9 — Exynos Safe V29 Fixed' \
+            --title 'PS2 AutoTune 1.0.10 — Exynos Safe V29 Fixed' \
             --notes 'Refresh V29 / ARMSX2 2.4.8 compatibility build with Russian overlay and crash diagnostics. Public artifact contains no BIOS.' \
             --prerelease
