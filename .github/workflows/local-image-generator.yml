@@ -7,28 +7,192 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  package:
+  build:
     runs-on: ubuntu-latest
+    env:
+      MODEL_TAG: local-model-v1
+      MODEL_NAME: stable-diffusion-v1-5-Q4_0.gguf
+      MODEL_SOURCE: https://huggingface.co/gpustack/stable-diffusion-v1-5-GGUF/resolve/main/stable-diffusion-v1-5-Q4_0.gguf?download=true
+      MODEL_RELEASE_URL: https://github.com/artemkz147-ship-it/RAZNOE147/releases/download/local-model-v1/stable-diffusion-v1-5-Q4_0.gguf
     steps:
-      - name: Download Local Diffusion APK
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Publish model to GitHub Release if needed
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          set -euxo pipefail
-          curl -fL --retry 5 --retry-delay 2 \
-            -o OfflineImageGenerator.apk \
-            https://github.com/rmatif/Local-Diffusion/releases/download/v0.3/local_diffusion_v0.3.apk
-          test -s OfflineImageGenerator.apk
-          file OfflineImageGenerator.apk
-          sha256sum OfflineImageGenerator.apk | tee OfflineImageGenerator.apk.sha256
+          set -euo pipefail
+          HAS_ASSET="false"
+          if gh release view "$MODEL_TAG" >/dev/null 2>&1; then
+            if gh release view "$MODEL_TAG" --json assets --jq '.assets[].name' | grep -Fxq "$MODEL_NAME"; then
+              HAS_ASSET="true"
+            fi
+          fi
+          if [ "$HAS_ASSET" = "true" ]; then
+            echo "Model release asset already exists."
+            exit 0
+          fi
+          curl -fL --retry 8 --retry-delay 5 --progress-bar "$MODEL_SOURCE" -o "$MODEL_NAME"
+          test -s "$MODEL_NAME"
+          ls -lh "$MODEL_NAME"
+          if ! gh release view "$MODEL_TAG" >/dev/null 2>&1; then
+            gh release create "$MODEL_TAG" --target local-image-generator --title "Offline Image Generator model" --notes "Stable Diffusion 1.5 Q4_0 model used by the Android app for fully local text-to-image and image-to-image generation."
+          fi
+          gh release upload "$MODEL_TAG" "$MODEL_NAME" --clobber
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Clone Local Diffusion source
+        run: |
+          set -euo pipefail
+          git clone https://github.com/rmatif/Local-Diffusion.git appsrc
+          cd appsrc
+          git checkout 184b7f92cf2f810e7d5eb4b04b190a5da829005f
+
+      - name: Patch automatic model setup
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          model_name = "stable-diffusion-v1-5-Q4_0.gguf"
+          model_url = "https://github.com/artemkz147-ship-it/RAZNOE147/releases/download/local-model-v1/stable-diffusion-v1-5-Q4_0.gguf"
+
+          method = f'''  Future<void> _ensureDefaultModel() async {{
+            final modelDirPath = await getModelDirectory();
+            final modelFile = File('$modelDirPath/{model_name}');
+            if (await modelFile.exists()) {{
+              if (mounted) {{
+                setState(() {{
+                  status = 'Модель найдена. Загрузка в память...';
+                }});
+              }}
+              _initializeProcessor(modelFile.path, true, SDType.NONE, Schedule.DEFAULT);
+              return;
+            }}
+
+            final partFile = File('${{modelFile.path}}.part');
+            HttpClient? client;
+            IOSink? sink;
+            try {{
+              if (await partFile.exists()) await partFile.delete();
+              if (mounted) {{
+                setState(() {{
+                  isModelLoading = true;
+                  loadingText = 'Скачивание модели';
+                  status = 'Первый запуск: скачивание модели ~1.75 ГБ';
+                }});
+              }}
+
+              client = HttpClient();
+              final request = await client.getUrl(Uri.parse('{model_url}'));
+              final response = await request.close();
+              if (response.statusCode != HttpStatus.ok) {{
+                throw HttpException('HTTP ${{response.statusCode}}');
+              }}
+
+              final total = response.contentLength;
+              int received = 0;
+              int lastUpdate = 0;
+              sink = partFile.openWrite();
+              await for (final chunk in response) {{
+                sink.add(chunk);
+                received += chunk.length;
+                if (received - lastUpdate >= 8 * 1024 * 1024 && mounted) {{
+                  lastUpdate = received;
+                  setState(() {{
+                    if (total > 0) {{
+                      final percent = (received * 100 / total).clamp(0, 100).toStringAsFixed(1);
+                      status = 'Скачивание модели: $percent%';
+                    }} else {{
+                      status = 'Скачано: ${{(received / 1024 / 1024).toStringAsFixed(0)}} МБ';
+                    }}
+                  }});
+                }}
+              }}
+              await sink.close();
+              sink = null;
+              client.close();
+              client = null;
+
+              await partFile.rename(modelFile.path);
+              if (mounted) {{
+                setState(() {{
+                  status = 'Модель скачана. Загрузка в память...';
+                }});
+              }}
+              _initializeProcessor(modelFile.path, true, SDType.NONE, Schedule.DEFAULT);
+            }} catch (e) {{
+              try {{ await sink?.close(); }} catch (_) {{}}
+              client?.close(force: true);
+              if (await partFile.exists()) {{
+                try {{ await partFile.delete(); }} catch (_) {{}}
+              }}
+              if (mounted) {{
+                setState(() {{
+                  isModelLoading = false;
+                  loadingText = '';
+                  status = 'Ошибка скачивания модели: $e';
+                }});
+              }}
+            }}
+          }}
+
+          '''
+
+          def patch_page(path_str):
+              p = Path(path_str)
+              s = p.read_text()
+              old = "    _cannyProcessor = CannyProcessor();\n    _cannyProcessor!.init();"
+              new = old + "\n    Future.microtask(_ensureDefaultModel);"
+              if old not in s:
+                  raise SystemExit(f"init marker not found in {p}")
+              s = s.replace(old, new, 1)
+              marker = "  Uint8List _ensureRgbFormat"
+              if marker not in s:
+                  raise SystemExit(f"method marker not found in {p}")
+              s = s.replace(marker, method + marker, 1)
+              p.write_text(s)
+
+          patch_page("appsrc/lib/main.dart")
+          patch_page("appsrc/lib/img2img_page.dart")
+
+          manifest = Path("appsrc/android/app/src/main/AndroidManifest.xml")
+          ms = manifest.read_text()
+          if "android.permission.INTERNET" not in ms:
+              ms = ms.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">', '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />')
+          ms = ms.replace('android:label="Local Diffusion"', 'android:label="Offline Image Generator"')
+          manifest.write_text(ms)
+          PY
+
+      - name: Build release APK
+        working-directory: appsrc
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk ../OfflineImageGenerator-AutoModel.apk
+
+      - name: Verify APK
+        run: |
+          set -euo pipefail
+          test -s OfflineImageGenerator-AutoModel.apk
+          file OfflineImageGenerator-AutoModel.apk
+          sha256sum OfflineImageGenerator-AutoModel.apk | tee OfflineImageGenerator-AutoModel.apk.sha256
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: OfflineImageGenerator-APK
+          name: OfflineImageGenerator-AutoModel-APK
           path: |
-            OfflineImageGenerator.apk
-            OfflineImageGenerator.apk.sha256
+            OfflineImageGenerator-AutoModel.apk
+            OfflineImageGenerator-AutoModel.apk.sha256
           if-no-files-found: error
           compression-level: 0
