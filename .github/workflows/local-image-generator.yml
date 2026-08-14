@@ -78,7 +78,7 @@ jobs:
               return;
             }}
 
-            final partFile = File('${{modelFile.path}}.part');
+            final partFile = File(modelFile.path + '.part');
             HttpClient? client;
             IOSink? sink;
             try {{
@@ -95,7 +95,7 @@ jobs:
               final request = await client.getUrl(Uri.parse('{model_url}'));
               final response = await request.close();
               if (response.statusCode != HttpStatus.ok) {{
-                throw HttpException('HTTP ${{response.statusCode}}');
+                throw HttpException('HTTP ' + response.statusCode.toString());
               }}
 
               final total = response.contentLength;
@@ -112,7 +112,7 @@ jobs:
                       final percent = (received * 100 / total).clamp(0, 100).toStringAsFixed(1);
                       status = 'Скачивание модели: $percent%';
                     }} else {{
-                      status = 'Скачано: ${{(received / 1024 / 1024).toStringAsFixed(0)}} МБ';
+                      status = 'Скачано: ' + (received / 1024 / 1024).toStringAsFixed(0) + ' МБ';
                     }}
                   }});
                 }}
