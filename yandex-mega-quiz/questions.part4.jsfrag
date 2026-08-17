@@ -1,0 +1,73 @@
+      const wrongR=shuffle([...new Set(rights.filter(x=>x!==r[1]))],rng).slice(0,3); out.push(makeChoice(`${prefix}-a-${i}`,category,difficulty,leftQ(r[0]),r[1],wrongR,rng));
+      const wrongL=shuffle([...new Set(rows.filter(x=>x[1]!==r[1]).map(x=>x[0]))],rng).slice(0,3); out.push(makeChoice(`${prefix}-b-${i}`,category,difficulty,rightQ(r[1]),r[0],wrongL,rng));
+    }); return out;
+  }
+  function addFacts(out,prefix,category,facts,diff='medium',rng){facts.forEach((f,i)=>out.push(makeChoice(`${prefix}-${i}`,category,diff,f[0],f[1],f[2],rng)))}
+  function buildMath(out,rng){
+    let id=0;
+    for(let a=3;a<=42;a+=3){for(let b=2;b<=18;b+=2){const val=a+b;out.push(makeChoice(`math-add-${id++}`,'math','easy',`Сколько будет ${a} + ${b}?`,String(val),shuffle([String(val+1),String(val-1),String(val+2)],rng),rng))}}
+    for(let a=12;a<=60;a+=4){for(let b=2;b<=10;b+=2){const val=a-b;out.push(makeChoice(`math-sub-${id++}`,'math','easy',`Сколько будет ${a} − ${b}?`,String(val),shuffle([String(val+1),String(val-2),String(val+3)],rng),rng))}}
+    for(let a=2;a<=12;a++){for(let b=2;b<=12;b++){const val=a*b;out.push(makeChoice(`math-mul-${id++}`,'math',a>8&&b>8?'medium':'easy',`Сколько будет ${a} × ${b}?`,String(val),shuffle([String(val+a),String(val-b),String(val+1)],rng),rng))}}
+    for(let d=2;d<=12;d++){for(let q=2;q<=12;q++){const n=d*q;out.push(makeChoice(`math-div-${id++}`,'math','medium',`Сколько будет ${n} ÷ ${d}?`,String(q),shuffle([String(q+1),String(Math.max(1,q-1)),String(q+2)],rng),rng))}}
+    for(let n=10;n<=90;n+=10){[10,20,25,50].forEach(p=>{const val=n*p/100; if(Number.isInteger(val)) out.push(makeChoice(`math-pct-${id++}`,'math','medium',`Чему равны ${p}% от ${n}?`,String(val),shuffle([String(val+5),String(Math.max(0,val-5)),String(n-p)],rng),rng))})}
+  }
+  function buildLogic(out,rng){
+    let id=0;
+    for(let s=1;s<=30;s++){
+      const step=2+(s%5), start=1+(s%9), seq=[start,start+step,start+step*2,start+step*3],ans=start+step*4;
+      out.push(makeChoice(`logic-seq-${id++}`,'logic',step>4?'medium':'easy',`Продолжите последовательность: ${seq.join(', ')}, …`,String(ans),shuffle([String(ans+step),String(ans-1),String(ans+1)],rng),rng));
+    }
+    const facts=[
+      ['Все ромбы — параллелограммы. Верно?','Верно',['Неверно'],'tf'],['Если сегодня среда, то через два дня будет пятница.','Верно',['Неверно'],'tf'],['У квадрата пять сторон.','Неверно',['Верно'],'tf'],['Чётное число при делении на 2 не даёт остатка.','Верно',['Неверно'],'tf'],['Если A больше B, а B больше C, то A больше C.','Верно',['Неверно'],'tf'],['Любое простое число является нечётным.','Неверно',['Верно'],'tf'],
+      ['Какое слово лишнее: метр, километр, сантиметр, килограмм?','килограмм',['метр','километр','сантиметр']],['Что тяжелее: килограмм железа или килограмм ваты?','Одинаково',['Железо','Вата','Зависит от температуры']],['Если у трёх кошек по четыре лапы, сколько лап всего?','12',['7','8','16']],['В коробке 5 красных и 5 синих шаров. Сколько минимум шаров надо взять вслепую, чтобы гарантированно получить два одного цвета?','3',['2','4','5']]
+    ];
+    facts.forEach((f,i)=>out.push(makeChoice(`logic-f-${i}`,'logic','medium',f[0],f[1],f[2].length===1?[...f[2],f[1]==='Верно'?'Точно верно':'Точно неверно','Нельзя определить']:f[2],rng,f[3]||'choice')))
+  }
+  function buildTF(out,rng){
+    const tfs=[
+      ['geography','Столица Австралии — Канберра.','Верно'],['geography','Столица Канады — Торонто.','Неверно'],['science','Кислород имеет химический символ O.','Верно'],['science','В одном байте 16 бит.','Неверно'],['space','Земля — третья планета от Солнца.','Верно'],['space','Сатурн ближе к Солнцу, чем Марс.','Неверно'],['nature','Киты относятся к млекопитающим.','Верно'],['nature','Пингвины умеют активно летать.','Неверно'],
+      ['history','Первый полёт человека в космос состоялся в 1961 году.','Верно'],['history','Пётр I основал Москву.','Неверно'],['literature','«1984» написал Джордж Оруэлл.','Верно'],['art','«Звёздную ночь» написал Винсент ван Гог.','Верно'],['music','«Щелкунчик» — балет Чайковского.','Верно'],['technology','HTML является языком разметки.','Верно'],['sports','В волейбольной команде на площадке шесть игроков.','Верно'],['games','Шахматная доска состоит из 64 клеток.','Верно'],
+      ['human','Сердце человека имеет четыре камеры.','Верно'],['human','Самая длинная кость человека — ключица.','Неверно'],['food','Хумус традиционно делают из нута.','Верно'],['transport','Спидометр показывает скорость.','Верно']
+    ];
+    tfs.forEach((x,i)=>out.push(makeChoice(`tf-${i}`,x[0],'easy',x[1],x[2],[x[2]==='Верно'?'Неверно':'Верно'],rng,'tf')))
+    capitals.forEach((r,i)=>{
+      const wrong=capitals[(i+7)%capitals.length][1];
+      out.push(makeChoice(`tf-cap-t-${i}`,'geography','easy',`${r[1]} — столица страны «${r[0]}».`,'Верно',['Неверно'],rng,'tf'));
+      out.push(makeChoice(`tf-cap-f-${i}`,'geography','easy',`${wrong} — столица страны «${r[0]}».`,'Неверно',['Верно'],rng,'tf'));
+    });
+    elements.forEach((r,i)=>{
+      const wrong=elements[(i+5)%elements.length][1];
+      out.push(makeChoice(`tf-el-t-${i}`,'science','medium',`Химический символ элемента «${r[0]}» — ${r[1]}.`,'Верно',['Неверно'],rng,'tf'));
+      out.push(makeChoice(`tf-el-f-${i}`,'science','medium',`Химический символ элемента «${r[0]}» — ${wrong}.`,'Неверно',['Верно'],rng,'tf'));
+    });
+    books.forEach((r,i)=>{
+      const wrong=books[(i+9)%books.length][1];
+      out.push(makeChoice(`tf-book-t-${i}`,'literature','medium',`${r[0]} написал ${r[1]}.`,'Верно',['Неверно'],rng,'tf'));
+      if(wrong!==r[1]) out.push(makeChoice(`tf-book-f-${i}`,'literature','medium',`${r[0]} написал ${wrong}.`,'Неверно',['Верно'],rng,'tf'));
+    });
+    paintings.forEach((r,i)=>{
+      const wrong=paintings[(i+4)%paintings.length][1];
+      out.push(makeChoice(`tf-art-t-${i}`,'art','medium',`Автор картины ${r[0]} — ${r[1]}.`,'Верно',['Неверно'],rng,'tf'));
+      out.push(makeChoice(`tf-art-f-${i}`,'art','medium',`Автор картины ${r[0]} — ${wrong}.`,'Неверно',['Верно'],rng,'tf'));
+    });
+  }
+
+  function buildBank(){
+    const rng=mulberry32(1472026), out=[];
+    out.push(...pairedQuestions('cap','geography',capitals,c=>`Столица какой страны — ${capitals.find(x=>x[0]===c)?.[1]||''}?`,cap=>`Столицей какой страны является ${cap}?`,rng));
+    // Replace first direction with the more natural country→capital wording.
+    out.filter(q=>q.id.startsWith('cap-a-')).forEach((q,i)=>{q.q=`Какой город является столицей страны «${capitals[i][0]}»?`;});
+    out.push(...pairedQuestions('elem','science',elements,e=>`Какой химический символ у элемента «${e}»?`,s=>`Какому элементу соответствует символ ${s}?`,rng,'medium'));
+    out.push(...pairedQuestions('book','literature',books,b=>`Кто написал ${b}?`,a=>`Какое произведение из списка написал ${a}?`,rng,'medium'));
+    out.push(...pairedQuestions('paint','art',paintings,p=>`Кто автор картины ${p}?`,a=>`Какую картину из списка написал ${a}?`,rng,'medium'));
+    out.push(...pairedQuestions('music','music',composers,w=>`Кто написал произведение ${w}?`,a=>`Какое произведение из списка связано с композитором ${a}?`,rng,'medium'));
+    addFacts(out,'hist','history',historyFacts,'medium',rng); addFacts(out,'sci','science',scienceFacts,'medium',rng); addFacts(out,'space','space',spaceFacts,'medium',rng); addFacts(out,'nature','nature',natureFacts,'easy',rng); addFacts(out,'human','human',humanFacts,'medium',rng);
+    addFacts(out,'tech','technology',technologyFacts,'medium',rng); addFacts(out,'sport','sports',sportsFacts,'easy',rng); addFacts(out,'lang','language',languageFacts,'medium',rng); addFacts(out,'culture','culture',cultureFacts,'medium',rng); addFacts(out,'food','food',foodFacts,'easy',rng); addFacts(out,'transport','transport',transportFacts,'easy',rng); addFacts(out,'games','games',gamesFacts,'easy',rng); addFacts(out,'cinema','cinema',cinemaFacts,'easy',rng);
+    inventions.forEach((r,i)=>{const wrong=shuffle(inventions.filter(x=>x!==r).map(x=>x[1]),rng).slice(0,3);out.push(makeChoice(`inv-${i}`,'technology','hard',`Кого чаще всего связывают с созданием или разработкой: ${r[0]}?`,r[1],wrong,rng))});
+    buildMath(out,rng); buildLogic(out,rng); buildTF(out,rng);
+    return out;
+  }
+
+  const QUESTIONS=buildBank();
+  window.QUIZ_DATA={CATEGORIES,QUESTIONS,shuffle,mulberry32};
+})();
