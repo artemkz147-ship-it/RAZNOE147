@@ -290,15 +290,134 @@
 
   function renderModes(){
     currentPage='modes';setActiveNav('modes');
+    screen.innerHTML=`<div class="page-head"><div><h1>Режимы игры</h1><p>Каждый режим меняет темп, риск и награды.</p></div></div><section class="mode-grid">${Object.keys(MODES).map(modeCard).join('')}</section><div class="section-head"><div><h2>Тематические раунды</h2><p>Выбери одну область знаний</p></div></div><section class="category-grid">${Object.entries(CATEGORIES).map(([id,c])=>categoryCard(id,c)).join('')}</section>`;
+  }
+  function renderCategories(){currentPage='categories';setActiveNav('modes');screen.innerHTML=`<div class="page-head"><div><h1>Все темы</h1><p>${Object.keys(CATEGORIES).length} направлений знаний</p></div></div><section class="category-grid">${Object.entries(CATEGORIES).map(([id,c])=>categoryCard(id,c)).join('')}</section>`}
+
+  async function renderDaily(){
+    currentPage='daily';setActiveNav('daily');resetDailyIfNeeded();
+    const qs=dailyQuests(),allClaimed=qs.every(q=>state.dailyClaimed.includes(q.id)),ev=eventOfDay();
+    const dCoins=Math.max(0,Math.floor(flagNum('daily_chest_coins',500))),dXp=Math.max(0,Math.floor(flagNum('daily_chest_xp',750)));
+    const weekOn=flagBool('weekly_enabled',true),calendarOn=flagBool('calendar_enabled',true),dailyLbOn=flagBool('daily_lb_enabled',true);
+    const wqs=weekOn?weeklyQuests():[],wAll=weekOn&&wqs.every(q=>state.weeklyClaimed.includes(q.id));
+    const wCoins=Math.max(0,Math.floor(flagNum('weekly_chest_coins',1200))),wXp=Math.max(0,Math.floor(flagNum('weekly_chest_xp',1800)));
+    const calIndex=clamp(Math.floor(state.calendarIndex||0),0,27),canCal=state.calendarLastClaimedDate!==dayKey();
+
+    const questHtml=(q,weekly=false)=>{
+      const val=Math.min(q.value(),q.target),done=val>=q.target,claimed=(weekly?state.weeklyClaimed:state.dailyClaimed).includes(q.id);
+      return `<div class="quest"><div class="quest-icon">${q.icon}</div><div><div class="quest-title-row"><h4>${esc(q.title)}</h4>${q.tier?`<span class="mini-tag">${esc(q.tier)}</span>`:''}</div><p>${esc(q.text)}</p><div class="progress"><i style="width:${clamp(val/q.target*100,0,100)}%"></i></div></div><div class="quest-reward"><b>+${q.reward} ●</b><button class="${claimed?'ghost':done?'primary':'secondary'}" data-${weekly?'weekly-claim':'claim'}="${q.id}" ${!done||claimed?'disabled':''}>${claimed?'Получено':done?'Забрать':`${fmt(val)}/${fmt(q.target)}`}</button></div></div>`;
+    };
+
+    screen.innerHTML=`<div class="page-head"><div><h1>Центр ежедневных активностей</h1><p>Новые задания появляются автоматически каждые сутки по серверному времени Яндекса.</p></div><button class="primary" data-mode="daily">Испытание дня</button></div>
+      <div class="league-banner event-banner"><div class="league-icon">${ev.icon}</div><div><div class="eyebrow">Событие дня</div><h3>${esc(ev.title)}</h3><p>${esc(ev.text)}</p></div></div>
+
+      ${calendarOn?`<div class="section-head"><div><h2>Календарь наград · 28 дней</h2><p>Пропустил день — прогресс не сгорает. Следующая награда ждёт возвращения.</p></div><button class="primary" data-calendar ${canCal?'':'disabled'}>${canCal?`Забрать день ${calIndex+1}`:'Сегодня получено'}</button></div>
+      <div class="content-card"><div class="calendar-grid">${Array.from({length:28},(_,i)=>{const r=calendarReward(i),done=i<calIndex||(calIndex===0&&state.calendarLastClaimedDate&&i===27),current=i===calIndex;return `<div class="calendar-day ${done?'done':''} ${current?'current':''} ${r.special?'special':''}"><small>День ${i+1}</small><b>${r.special?'🎁':'●'}</b><span>${r.coins} ●<br>+${r.xp} XP</span></div>`}).join('')}</div></div>`:''}
+
+      <div class="section-head"><div><h2>Задания сегодня</h2><p>3 обычных · 2 сложных · главное задание дня</p></div><div class="section-count">${state.dailyClaimed.length}/${qs.length}</div></div>
+      <div class="content-card"><div class="quest-list">${qs.map(q=>questHtml(q,false)).join('')}</div></div>
+      <div class="section-head"><div><h2>Сундук дня</h2><p>Открой после получения всех наград</p></div></div>
+      <div class="league-banner"><div class="league-icon">🎁</div><div><h3>${state.dailyChest?'Сундук открыт':`+${dCoins} монет и +${dXp} XP`}</h3><p>${state.dailyChest?'Возвращайся завтра — задания сгенерируются заново.':allClaimed?'Все задания закрыты — награда готова.':`Выполни ${qs.length} заданий и забери общий бонус.`}</p></div><button class="primary" style="margin-left:auto" data-chest ${!allClaimed||state.dailyChest?'disabled':''}>${state.dailyChest?'Получено':'Открыть'}</button></div>
+
+      ${weekOn?`<div class="section-head"><div><h2>Недельные задания</h2><p>Неделя начинается в понедельник · набор автоматически меняется</p></div><div class="section-count">${state.weeklyClaimed.length}/${wqs.length}</div></div>
+      <div class="content-card"><div class="quest-list">${wqs.map(q=>questHtml(q,true)).join('')}</div></div>
+      <div class="league-banner"><div class="league-icon">🏆</div><div><h3>${state.weeklyChest?'Недельный сундук открыт':`Сундук недели · ${wCoins} ● + ${wXp} XP`}</h3><p>${state.weeklyChest?'Новый набор появится в следующий понедельник.':wAll?'Все недельные цели выполнены.':'Закрой все недельные задания для большого бонуса.'}</p></div><button class="primary" style="margin-left:auto" data-weekly-chest ${!wAll||state.weeklyChest?'disabled':''}>${state.weeklyChest?'Получено':'Открыть'}</button></div>`:''}
+
+      ${dailyLbOn?`<div class="section-head"><div><h2>Рейтинг дня</h2><p>Лучший результат сегодняшнего «Испытания дня»</p></div><div class="section-count">${fmt(state.dailyProgress.bestDailyScore||0)} очков</div></div><div class="content-card" id="dailyLeaderWrap"><div class="empty">Загружаем рейтинг дня…</div></div>`:''}`;
+
+    if(dailyLbOn){
+      const lb=await Y.getDailyLeaderboard(epochDay());if(currentPage!=='daily')return;
+      const wrap=$('#dailyLeaderWrap');if(!wrap)return;
+      if(!lb?.entries?.length){wrap.innerHTML=`<div class="empty">${Y.local?'В локальном запуске рейтинг дня недоступен.':'Сегодня в таблице пока нет результатов. Для отправки своего результата войди в Яндекс ID.'}</div>`;return}
+      wrap.innerHTML=`<div class="leaderboard">${lb.entries.map(e=>`<div class="leader-row ${e.player?.uniqueID===Y.player?.getUniqueID?.()?'me':''}"><div class="leader-rank">${e.rank}</div><div class="leader-name"><b>${esc(e.player?.publicName||'Игрок')}</b><small>Испытание дня</small></div><div class="leader-score">${fmt(e.dayScore)}</div></div>`).join('')}</div>`;
+    }
+  }
+
+  async function renderRating(){
+    currentPage='rating';setActiveNav('rating');
+    screen.innerHTML=`<div class="page-head"><div><h1>Рейтинг игроков</h1><p>Глобальный лидерборд Яндекс Игр · техническое имя global_score</p></div></div><div class="league-banner"><div class="league-icon">♛</div><div><h3>${leagueName(ratingScore())}</h3><p>Твой рейтинг-счёт: ${fmt(ratingScore())}</p></div>${Y.isAuthorized()?'':'<button class="primary" data-auth style="margin-left:auto">Войти</button>'}</div><div class="content-card" id="leaderWrap"><div class="empty">Загружаем таблицу лидеров…</div></div>`;
+    const lb=await Y.getLeaderboard();if(currentPage!=='rating')return;
+    const wrap=$('#leaderWrap');
+    if(!lb?.entries?.length){wrap.innerHTML=`<div class="empty">${Y.local?'В локальном запуске глобальный рейтинг недоступен. После загрузки в Яндекс Игры здесь появятся реальные игроки.':'Лидерборд пока пуст или ещё не создан в Консоли Яндекс Игр.'}</div>`;return}
+    wrap.innerHTML=`<div class="leaderboard">${lb.entries.map(e=>`<div class="leader-row ${e.player?.uniqueID===Y.player?.getUniqueID?.()?'me':''}"><div class="leader-rank">${e.rank}</div><div class="leader-name"><b>${esc(e.player?.publicName||'Игрок')}</b><small>${leagueName(e.score)}</small></div><div class="leader-score">${fmt(e.score)}</div></div>`).join('')}</div>`;
+  }
+  function leagueName(score){if(score>=60000)return 'Лига Гениев';if(score>=25000)return 'Алмазная лига';if(score>=10000)return 'Золотая лига';if(score>=4000)return 'Серебряная лига';return 'Бронзовая лига'}
+
+  function renderProfile(){
+    currentPage='profile';setActiveNav('profile');syncHeader();const l=state.level,from=levelBase(l),to=levelNext(l),pct=clamp((state.xp-from)/(to-from)*100,0,100);const acc=state.totalAnswers?Math.round(state.correctAnswers/state.totalAnswers*100):0;
+    screen.innerHTML=`<div class="page-head"><div><h1>Профиль</h1><p>Твой прогресс, достижения и статистика.</p></div></div><div class="profile-grid">
+      <div class="content-card profile-card"><div class="avatar">🧠</div><h2>${Y.isAuthorized()?esc(Y.player?.getName?.()||'Игрок'):'Гость'}</h2><p style="color:var(--muted)">Уровень ${l} · ${leagueName(ratingScore())}</p><div class="xp-track"><i style="width:${pct}%"></i></div><small>${fmt(state.xp-from)} / ${fmt(to-from)} XP до следующего уровня</small><div class="action-row" style="margin-top:20px">${Y.isAuthorized()?'<button class="secondary" disabled>Яндекс ID подключён</button>':'<button class="primary" data-auth>Войти в Яндекс</button>'}</div></div>
+      <div><section class="stat-grid"><div class="metric"><small>Точность</small><b>${acc}%</b></div><div class="metric"><small>Серия дней</small><b>${state.streak} 🔥</b></div><div class="metric"><small>Лучший счёт</small><b>${fmt(state.bestScore)}</b></div><div class="metric"><small>Монеты</small><b>${fmt(state.coins)}</b></div></section><div class="section-head"><div><h2>Достижения</h2><p>${state.achievements.length} из ${ACHIEVEMENTS.length}</p></div></div><div class="badges-grid">${ACHIEVEMENTS.map(a=>`<div class="badge ${state.achievements.includes(a.id)?'':'locked'}"><div class="bicon">${a.icon}</div><b>${a.name}</b><small>${a.desc}</small></div>`).join('')}</div></div>
+    </div>`;
+  }
+
+  function renderShop(){
+    currentPage='shop';setActiveNav('');screen.innerHTML=`<div class="page-head"><div><h1>Помощь в викторине</h1><p>Монеты зарабатываются игрой и ежедневными заданиями.</p></div></div><section class="mode-grid">
+      <div class="mode-card"><span class="mode-icon">½</span><h3>50 / 50</h3><p>В каждом раунде один бесплатный шанс убрать два неверных ответа.</p><span class="mode-tag">встроено в раунд</span></div>
+      <div class="mode-card"><span class="mode-icon">↻</span><h3>Пропуск</h3><p>Меняет текущий вопрос без штрафа за ошибку.</p><span class="mode-tag">50 монет</span></div>
+      <div class="mode-card"><span class="mode-icon">♥</span><h3>Вторая жизнь</h3><p>В режиме выживания можно вернуть одну жизнь за rewarded video.</p><span class="mode-tag">по желанию</span></div>
+      <div class="mode-card"><span class="mode-icon">×2</span><h3>Двойная награда</h3><p>После раунда можно удвоить заработанные монеты за rewarded video.</p><span class="mode-tag">по желанию</span></div></section>`;
+  }
+
+  function buildSession(modeId,category=null){
+    const m=MODES[modeId]||MODES.classic;let pool=QUESTIONS;
+    if(category)pool=pool.filter(q=>q.category===category);if(m.filter)pool=pool.filter(m.filter);
+    let rng;if(m.daily)rng=mulberry32(Number(dayKey().replaceAll('-',''))+147);else rng=mulberry32((Date.now()^Math.floor(Math.random()*1e9))>>>0);
+    let selected=shuffle(pool,rng);
+    if(m.ladder){const easy=shuffle(pool.filter(q=>q.difficulty==='easy'),rng),medium=shuffle(pool.filter(q=>q.difficulty==='medium'),rng),hard=shuffle(pool.filter(q=>q.difficulty==='hard'),rng);selected=[...easy.slice(0,5),...medium.slice(0,6),...hard.slice(0,4)];if(selected.length<m.count)selected.push(...shuffle(pool.filter(q=>!selected.includes(q)),rng).slice(0,m.count-selected.length))}
+    else selected=selected.slice(0,Math.min(m.count,selected.length));
+    session={modeId,category,mode:m,questions:selected,index:0,score:0,correct:0,wrong:0,combo:0,maxCombo:0,hearts:m.hearts??null,startedAt:Date.now(),questionStarted:Date.now(),remaining:m.totalTime??m.perQuestion,totalRemaining:m.totalTime??null,paused:false,answered:false,lifeline:true,skipUsed:0,coinsEarned:0,xpEarned:0};
+  }
+  function startMode(modeId,category=null){
+    resetDailyIfNeeded();updateStreak();buildSession(modeId,category);currentPage='quiz';setActiveNav('');document.querySelector('#bottomNav').style.display='none';Y.gameplayStart();startTick();renderQuestion();queueSave();syncHeader();
+  }
+  function currentQuestion(){return session?.questions?.[session.index]}
+  function difficultyLabel(d){return d==='hard'?'Сложный':d==='medium'?'Средний':'Лёгкий'}
+  function renderQuestion(){
+    if(!session)return;if(session.index>=session.questions.length){finishSession();return}const q=currentQuestion();if(!q){finishSession();return}
+    session.answered=false;session.questionStarted=Date.now();if(session.mode.perQuestion)session.remaining=session.mode.perQuestion;
+    const total=session.mode.totalTime?session.mode.totalTime:session.mode.perQuestion;const progress=session.modeId==='blitz'?session.remaining/total:session.index/session.questions.length;
+    screen.innerHTML=`<div class="quiz-layout"><div class="quiz-top"><div class="round-meta"><small>${esc(session.mode.name)}</small><b>${session.modeId==='blitz'?`${session.correct} ✓`: `${session.index+1}/${session.questions.length}`}</b></div><div class="timer-wrap"><div id="timerBar" class="timer-bar" style="width:${session.modeId==='blitz'?100:100}%"></div></div><div class="round-meta" style="text-align:right"><small>Счёт</small><b id="quizScore">${fmt(session.score)}</b></div></div>
+      <article class="quiz-card"><div class="question-badges"><span class="pill">${CATEGORIES[q.category]?.emoji||'❓'} ${esc(CATEGORIES[q.category]?.name||q.category)}</span><span class="pill diff-${q.difficulty}">${difficultyLabel(q.difficulty)}</span>${session.hearts!==null?`<span class="pill">${'♥'.repeat(Math.max(0,session.hearts))}${'♡'.repeat(Math.max(0,(session.mode.hearts||0)-session.hearts))}</span>`:''}</div><h1 class="question">${esc(q.q)}</h1>
+      <div class="answers">${q.answers.map((a,i)=>`<button class="answer" data-answer="${i}"><span class="answer-key">${keys[i]||i+1}</span><span>${esc(a)}</span></button>`).join('')}</div>
+      <div class="quiz-footer"><div class="lifelines"><button class="life-btn" data-life ${session.lifeline?'':'disabled'}>½ 50/50</button><button class="life-btn" data-skip ${state.coins>=50?'':'disabled'}>↻ Пропуск · 50</button>${session.modeId==='survival'&&session.hearts<3?'<button class="life-btn" data-life-ad>♥ Жизнь · реклама</button>':''}</div><div class="combo">${session.combo>=2?`🔥 Серия ×${session.combo}`:''}</div></div></article></div>`;
+    updateTimerUI();
+  }
+  function startTick(){stopTick();tickTimer=setInterval(()=>{
+    if(!session||session.paused||session.answered)return;
+    session.remaining=Math.max(0,session.remaining-.1);updateTimerUI();
+    if(session.remaining<=0){if(session.modeId==='blitz')finishSession();else timeOut()}
+  },100)}
+  function stopTick(){clearInterval(tickTimer);tickTimer=null}
+  function updateTimerUI(){
+    const bar=$('#timerBar');if(!bar||!session)return;const total=session.modeId==='blitz'?session.mode.totalTime:session.mode.perQuestion;if(!total)return;const pct=clamp(session.remaining/total*100,0,100);bar.style.width=pct+'%';bar.classList.toggle('danger',pct<28)
+  }
+  function trackAnswer(q,ok){
+    const dp=state.dailyProgress,wp=state.weeklyProgress;
+    state.totalAnswers++;dp.answers++;wp.answers++;
     const cat=state.categoryStats[q.category]||(state.categoryStats[q.category]={answers:0,correct:0});cat.answers++;
-    if(!state.dailyProgress.categories.includes(q.category))state.dailyProgress.categories.push(q.category);
-    if(ok){session.correct++;session.combo++;session.maxCombo=Math.max(session.maxCombo,session.combo);state.correctAnswers++;state.dailyProgress.correct++;cat.correct++;const comboBonus=Math.min(200,(session.combo-1)*15);session.score+=base+comboBonus;showToast(session.combo>=3?`Верно! Серия ×${session.combo}`:'Верно!')}
+    if(!dp.categories.includes(q.category))dp.categories.push(q.category);
+    if(!wp.categories.includes(q.category))wp.categories.push(q.category);
+    if(ok){
+      state.correctAnswers++;dp.correct++;wp.correct++;cat.correct++;
+      dp.categoryCorrect[q.category]=(dp.categoryCorrect[q.category]||0)+1;
+      if(q.difficulty==='hard')dp.hardCorrect++;
+      if(Date.now()-session.questionStarted<=5000)dp.fastCorrect++;
+    }
+  }
+  function answerQuestion(idx){
+    if(!session||session.answered)return;const q=currentQuestion();session.answered=true;const buttons=[...document.querySelectorAll('.answer')];buttons.forEach(b=>b.disabled=true);const ok=idx===q.correct;
+    buttons[q.correct]?.classList.add('correct');if(!ok)buttons[idx]?.classList.add('wrong');
+    const timeBonus=Math.floor((session.remaining||0)*8),diff=q.difficulty==='hard'?1.5:q.difficulty==='medium'?1.2:1;
+    const base=Math.floor((100+timeBonus)*diff*(session.mode.multiplier||1)*questionEventMultiplier(q,session));
+    trackAnswer(q,ok);
+    if(ok){session.correct++;session.combo++;session.maxCombo=Math.max(session.maxCombo,session.combo);const comboBonus=Math.floor(Math.min(200,(session.combo-1)*15)*(eventOfDay().comboMultiplier||1));session.score+=base+comboBonus;showToast(session.combo>=3?`Верно! Серия ×${session.combo}`:'Верно!')}
     else{session.wrong++;session.combo=0;if(session.hearts!==null){session.hearts--;if(session.hearts<=0){showToast('Жизни закончились');setTimeout(finishSession,700);return}}showToast('Неверно')}
     state.dailyProgress.bestCombo=Math.max(state.dailyProgress.bestCombo,session.maxCombo);$('#quizScore').textContent=fmt(session.score);queueSave();
     setTimeout(()=>{if(!session)return;session.index++;if(session.modeId==='blitz'&&session.remaining<=0)finishSession();else renderQuestion()},720);
   }
   function timeOut(){
-    if(!session||session.answered)return;session.answered=true;const q=currentQuestion();state.totalAnswers++;state.dailyProgress.answers++;state.categoryStats[q.category]??={answers:0,correct:0};state.categoryStats[q.category].answers++;if(!state.dailyProgress.categories.includes(q.category))state.dailyProgress.categories.push(q.category);session.wrong++;session.combo=0;if(session.hearts!==null)session.hearts--;document.querySelectorAll('.answer').forEach((b,i)=>{b.disabled=true;if(i===q.correct)b.classList.add('correct')});showToast('Время вышло');
+    if(!session||session.answered)return;session.answered=true;const q=currentQuestion();trackAnswer(q,false);session.wrong++;session.combo=0;if(session.hearts!==null)session.hearts--;document.querySelectorAll('.answer').forEach((b,i)=>{b.disabled=true;if(i===q.correct)b.classList.add('correct')});showToast('Время вышло');
     if(session.hearts!==null&&session.hearts<=0){setTimeout(finishSession,700);return}setTimeout(()=>{if(session){session.index++;renderQuestion()}},720)
   }
   function useLifeLine(){
@@ -313,10 +432,24 @@
 
   async function finishSession(){
     if(!session)return;stopTick();Y.gameplayStop();const s=session;session=null;document.querySelector('#bottomNav').style.display='grid';
-    const answered=s.correct+s.wrong;const accuracy=answered?Math.round(s.correct/answered*100):0;const xp=Math.floor(s.score*.18+s.correct*18);const coins=Math.max(10,Math.floor(s.score/70));
-    state.gamesPlayed++;state.xp+=xp;state.coins+=coins;state.ratingPoints+=s.score;state.bestScore=Math.max(state.bestScore,s.score);state.dailyProgress.games++;state.dailyProgress.score+=s.score;state.dailyProgress.bestCombo=Math.max(state.dailyProgress.bestCombo,s.maxCombo);
+    const answered=s.correct+s.wrong,accuracy=answered?Math.round(s.correct/answered*100):0;
+    const xp=Math.floor((s.score*.18+s.correct*18)*sessionEventMultiplier(s,'xp'));
+    const coins=Math.max(10,Math.floor(s.score/70*sessionEventMultiplier(s,'coins')));
+    state.gamesPlayed++;state.xp+=xp;state.coins+=coins;state.ratingPoints+=s.score;state.bestScore=Math.max(state.bestScore,s.score);
+    state.dailyProgress.games++;state.dailyProgress.score+=s.score;state.dailyProgress.bestCombo=Math.max(state.dailyProgress.bestCombo,s.maxCombo);
+    state.weeklyProgress.games++;state.weeklyProgress.score+=s.score;
+    if(!state.dailyProgress.modes.includes(s.modeId))state.dailyProgress.modes.push(s.modeId);
+    if(!state.weeklyProgress.modes.includes(s.modeId))state.weeklyProgress.modes.push(s.modeId);
+    if(s.lifeline&&s.skipUsed===0)state.dailyProgress.noHintGames++;
+    if(answered>0&&accuracy===100)state.weeklyProgress.perfectGames++;
     const ms=state.modeStats[s.modeId]||(state.modeStats[s.modeId]={games:0,best:0,bestCombo:0});ms.games++;ms.best=Math.max(ms.best,s.score);ms.bestCombo=Math.max(ms.bestCombo,s.maxCombo);
-    if(s.mode.daily)state.dailyPlayed=dayKey();checkAchievements();queueSave(true);syncHeader();Y.setScore(ratingScore());
+    if(s.mode.daily){
+      const firstToday=state.dailyPlayed!==dayKey();
+      state.dailyPlayed=dayKey();state.dailyProgress.bestDailyScore=Math.max(state.dailyProgress.bestDailyScore||0,s.score);
+      if(firstToday)state.weeklyProgress.dailyChallengeDays++;
+      if(flagBool('daily_lb_enabled',true))Y.setDailyScore(epochDay(),state.dailyProgress.bestDailyScore);
+    }
+    checkAchievements();queueSave(true);syncHeader();Y.setScore(ratingScore());
     state.adCounter=(state.adCounter||0)+1;queueSave();
     renderResult(s,{answered,accuracy,xp,coins});
     if(state.adCounter%3===0)setTimeout(()=>Y.fullscreenAd(),250);
@@ -342,7 +475,10 @@
     if(t.dataset.skip!==undefined){useSkip();return}
     if(t.dataset.lifeAd!==undefined){reviveByAd();return}
     if(t.dataset.claim){claimQuest(t.dataset.claim);return}
+    if(t.dataset.weeklyClaim){claimWeeklyQuest(t.dataset.weeklyClaim);return}
     if(t.dataset.chest!==undefined){claimDailyChest();return}
+    if(t.dataset.weeklyChest!==undefined){claimWeeklyChest();return}
+    if(t.dataset.calendar!==undefined){claimCalendar();return}
     if(t.dataset.auth!==undefined){authorizeAndRefresh();return}
     if(t.dataset.replay){startMode(t.dataset.replay,t.dataset.cat||null);return}
     if(t.dataset.double){doubleReward(t.dataset.double,t);return}
@@ -359,7 +495,7 @@
   window.addEventListener('pagehide',()=>{saveLocal();Y.save(state);Y.gameplayStop()});
 
   async function boot(){
-    loadLocal();await Y.init();const cloud=await Y.loadSave();if(cloud)state=mergeState(state,cloud);resetDailyIfNeeded();updateStreak();checkAchievements();queueSave();syncHeader();renderHome();Y.gameReady();
+    loadLocal();await Y.init();flags=await Y.getFlags(DEFAULT_FLAGS);const cloud=await Y.loadSave();if(cloud)state=mergeState(state,cloud);resetDailyIfNeeded();updateStreak();checkAchievements();queueSave();syncHeader();renderHome();Y.gameReady();
     if(Y.local)showToast('Локальный режим: SDK Яндекс Игр не найден');
   }
   boot();
