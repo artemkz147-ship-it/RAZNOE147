@@ -19,10 +19,22 @@
   };
 
   const DEFAULT={
-    v:1,xp:0,coins:120,bestScore:0,ratingPoints:0,totalAnswers:0,correctAnswers:0,gamesPlayed:0,level:1,
-    streak:0,lastPlayDate:'',dailyDate:'',dailyProgress:{answers:0,correct:0,games:0,bestCombo:0,score:0,categories:[]},dailyClaimed:[],dailyChest:false,dailyPlayed:'',
+    v:2,xp:0,coins:120,bestScore:0,ratingPoints:0,totalAnswers:0,correctAnswers:0,gamesPlayed:0,level:1,
+    streak:0,lastPlayDate:'',dailyDate:'',
+    dailyProgress:{answers:0,correct:0,games:0,bestCombo:0,score:0,categories:[],hardCorrect:0,fastCorrect:0,modes:[],noHintGames:0,categoryCorrect:{},bestDailyScore:0},
+    dailyClaimed:[],dailyChest:false,dailyPlayed:'',
+    weekKey:'',weeklyProgress:{answers:0,correct:0,games:0,score:0,categories:[],modes:[],daysCompleted:0,dailyChallengeDays:0,perfectGames:0},
+    weeklyClaimed:[],weeklyChest:false,
+    calendarIndex:0,calendarLastClaimedDate:'',
     categoryStats:{},modeStats:{},achievements:[],adCounter:0,settings:{reducedMotion:false}
   };
+  const DEFAULT_FLAGS={
+    daily_quest_count:'6',daily_chest_coins:'500',daily_chest_xp:'750',
+    weekly_enabled:'true',weekly_chest_coins:'1200',weekly_chest_xp:'1800',
+    calendar_enabled:'true',daily_lb_enabled:'true',
+    special_event_enabled:'false',special_event_title:'',special_event_category:'',special_event_multiplier:'1.5'
+  };
+  let flags={...DEFAULT_FLAGS};
   let state=structuredClone(DEFAULT);
   let session=null;
   let saveTimer=null;
@@ -34,6 +46,12 @@
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const fmt=n=>new Intl.NumberFormat('ru-RU').format(Math.floor(n||0));
   const dayKey=()=>new Date(Y.serverTime()).toISOString().slice(0,10);
+  const epochDay=()=>Math.floor(Date.parse(dayKey()+'T00:00:00Z')/86400000);
+  const weekKey=()=>{
+    const d=new Date(dayKey()+'T00:00:00Z'),n=d.getUTCDay()||7;
+    d.setUTCDate(d.getUTCDate()-n+1);
+    return d.toISOString().slice(0,10);
+  };
   const levelOf=xp=>Math.floor(Math.sqrt((xp||0)/260))+1;
   const levelBase=l=>Math.pow(Math.max(0,l-1),2)*260;
   const levelNext=l=>Math.pow(l,2)*260;
@@ -44,10 +62,18 @@
     const next={...base,...incoming};
     next.settings={...base.settings,...incoming.settings};
     next.dailyProgress={...base.dailyProgress,...incoming.dailyProgress};
+    next.dailyProgress.categories=Array.isArray(incoming.dailyProgress?.categories)?incoming.dailyProgress.categories:[];
+    next.dailyProgress.modes=Array.isArray(incoming.dailyProgress?.modes)?incoming.dailyProgress.modes:[];
+    next.dailyProgress.categoryCorrect={...base.dailyProgress.categoryCorrect,...incoming.dailyProgress?.categoryCorrect};
+    next.weeklyProgress={...base.weeklyProgress,...incoming.weeklyProgress};
+    next.weeklyProgress.categories=Array.isArray(incoming.weeklyProgress?.categories)?incoming.weeklyProgress.categories:[];
+    next.weeklyProgress.modes=Array.isArray(incoming.weeklyProgress?.modes)?incoming.weeklyProgress.modes:[];
     next.categoryStats={...base.categoryStats,...incoming.categoryStats};
     next.modeStats={...base.modeStats,...incoming.modeStats};
     next.achievements=Array.isArray(incoming.achievements)?incoming.achievements:[];
     next.dailyClaimed=Array.isArray(incoming.dailyClaimed)?incoming.dailyClaimed:[];
+    next.weeklyClaimed=Array.isArray(incoming.weeklyClaimed)?incoming.weeklyClaimed:[];
+    next.v=2;
     return next;
   }
   function loadLocal(){try{const raw=localStorage.getItem('umniversum-save-v1');if(raw)state=mergeState(structuredClone(DEFAULT),JSON.parse(raw))}catch(e){console.warn(e)}}
@@ -68,10 +94,26 @@
   }
   function closeModal(){modalRoot.innerHTML=''}
 
+  const flagBool=(name,fallback=true)=>String(flags[name]??fallback).toLowerCase()!=='false';
+  const flagNum=(name,fallback)=>{const n=Number(flags[name]);return Number.isFinite(n)?n:fallback};
+
+  function resetWeeklyIfNeeded(){
+    const wk=weekKey();
+    if(state.weekKey!==wk){
+      state.weekKey=wk;
+      state.weeklyProgress={answers:0,correct:0,games:0,score:0,categories:[],modes:[],daysCompleted:0,dailyChallengeDays:0,perfectGames:0};
+      state.weeklyClaimed=[];state.weeklyChest=false;
+      queueSave();
+    }
+  }
   function resetDailyIfNeeded(){
+    resetWeeklyIfNeeded();
     const d=dayKey();
     if(state.dailyDate!==d){
-      state.dailyDate=d;state.dailyProgress={answers:0,correct:0,games:0,bestCombo:0,score:0,categories:[]};state.dailyClaimed=[];state.dailyChest=false;queueSave();
+      state.dailyDate=d;
+      state.dailyProgress={answers:0,correct:0,games:0,bestCombo:0,score:0,categories:[],hardCorrect:0,fastCorrect:0,modes:[],noHintGames:0,categoryCorrect:{},bestDailyScore:0};
+      state.dailyClaimed=[];state.dailyChest=false;
+      queueSave();
     }
   }
   function updateStreak(){
@@ -80,18 +122,65 @@
     state.streak=state.lastPlayDate===yesterday?state.streak+1:1;state.lastPlayDate=today;
   }
 
+  function eventOfDay(){
+    const seed=Number(dayKey().replaceAll('-',''));const rng=mulberry32(seed+991);
+    const catIds=Object.keys(CATEGORIES);
+    if(flagBool('special_event_enabled',false)){
+      const cat=String(flags.special_event_category||'').trim();
+      const mult=clamp(flagNum('special_event_multiplier',1.5),1,3);
+      return {id:'special',icon:'✨',title:String(flags.special_event_title||'Спецсобытие'),text:cat&&CATEGORIES[cat]?`В теме «${CATEGORIES[cat].name}» очки ×${mult}.`:`Все награды за раунды ×${mult}.`,categoryIds:cat&&CATEGORIES[cat]?[cat]:[],scoreMultiplier:cat?mult:1,rewardMultiplier:cat?1:mult};
+    }
+    const dow=new Date(dayKey()+'T00:00:00Z').getUTCDay();
+    if(dow===1)return {id:'science',icon:'🔬',title:'День науки',text:'Наука и космос дают +50% очков.',categoryIds:['science','space'],scoreMultiplier:1.5};
+    if(dow===2)return {id:'blitz',icon:'⚡',title:'Скоростной вторник',text:'В Блице сегодня двойной XP.',modeId:'blitz',xpMultiplier:2};
+    if(dow===3){
+      const cats=shuffle([...catIds],rng).slice(0,3);
+      return {id:'categories',icon:'🎯',title:'Битва категорий',text:`+50% очков: ${cats.map(x=>CATEGORIES[x].name).join(', ')}.`,categoryIds:cats,scoreMultiplier:1.5};
+    }
+    if(dow===4)return {id:'expert',icon:'✦',title:'День эксперта',text:'Сложные вопросы дают +35% очков.',hardMultiplier:1.35};
+    if(dow===5)return {id:'combo',icon:'🔥',title:'Охота за серией',text:'Бонус за серию увеличен в 1,5 раза.',comboMultiplier:1.5};
+    if(dow===6)return {id:'marathon',icon:'∞',title:'Большая суббота',text:'Награды за Марафон сегодня ×2.',modeId:'marathon',rewardMultiplier:2};
+    return {id:'cup',icon:'🏆',title:'Кубок воскресенья',text:'Испытание дня даёт ×1,5 награды. Борись за дневной топ.',modeId:'daily',rewardMultiplier:1.5};
+  }
+  function questionEventMultiplier(q,s){
+    const ev=eventOfDay();let m=1;
+    if(ev.categoryIds?.includes(q.category))m*=ev.scoreMultiplier||1;
+    if(ev.hardMultiplier&&q.difficulty==='hard')m*=ev.hardMultiplier;
+    if(ev.id==='special'&&!ev.categoryIds?.length)m*=ev.scoreMultiplier||1;
+    return m;
+  }
+  function sessionEventMultiplier(s,type){
+    const ev=eventOfDay();
+    if(ev.modeId&&ev.modeId!==s.modeId)return 1;
+    return type==='xp'?(ev.xpMultiplier||ev.rewardMultiplier||1):(ev.rewardMultiplier||1);
+  }
+
   function dailyQuests(){
     resetDailyIfNeeded();
     const seed=Number(dayKey().replaceAll('-',''));const rng=mulberry32(seed);
-    const pool=[
-      {id:'answers',icon:'❓',title:'Разминка',text:'Ответить на 20 вопросов',target:20,value:()=>state.dailyProgress.answers,reward:90},
-      {id:'correct',icon:'✓',title:'Точный ум',text:'Дать 15 верных ответов',target:15,value:()=>state.dailyProgress.correct,reward:110},
-      {id:'games',icon:'◆',title:'В движении',text:'Завершить 2 игровых раунда',target:2,value:()=>state.dailyProgress.games,reward:100},
-      {id:'combo',icon:'🔥',title:'Серия',text:'Сделать серию из 6 верных ответов',target:6,value:()=>state.dailyProgress.bestCombo,reward:120},
-      {id:'score',icon:'★',title:'Охота за очками',text:'Набрать 2500 очков за день',target:2500,value:()=>state.dailyProgress.score,reward:120},
-      {id:'categories',icon:'◎',title:'Кругозор',text:'Ответить в 5 разных темах',target:5,value:()=>state.dailyProgress.categories.length,reward:100}
+    const catIds=Object.keys(CATEGORIES),modeIds=['classic','blitz','survival','ladder','truefalse','hardcore','marathon'];
+    const chosenCat=catIds[Math.floor(rng()*catIds.length)],chosenMode=modeIds[Math.floor(rng()*modeIds.length)];
+    const catName=CATEGORIES[chosenCat]?.name||'выбранной теме',modeName=MODES[chosenMode]?.name||'режиме';
+    const normal=[
+      {id:'answers',icon:'❓',tier:'Обычное',title:'Разминка',text:'Ответить на 25 вопросов',target:25,value:()=>state.dailyProgress.answers,reward:100},
+      {id:'correct',icon:'✓',tier:'Обычное',title:'Точный ум',text:'Дать 18 верных ответов',target:18,value:()=>state.dailyProgress.correct,reward:120},
+      {id:'games',icon:'◆',tier:'Обычное',title:'В движении',text:'Завершить 3 игровых раунда',target:3,value:()=>state.dailyProgress.games,reward:110},
+      {id:'categories',icon:'◎',tier:'Обычное',title:'Кругозор',text:'Ответить в 6 разных темах',target:6,value:()=>state.dailyProgress.categories.length,reward:120},
+      {id:'modes',icon:'▦',tier:'Обычное',title:'Смена правил',text:'Сыграть в 3 разных режима',target:3,value:()=>state.dailyProgress.modes.length,reward:130},
+      {id:`cat_${chosenCat}`,icon:CATEGORIES[chosenCat]?.emoji||'🎓',tier:'Обычное',title:`Сегодня: ${catName}`,text:`Дать 6 верных ответов в теме «${catName}»`,target:6,value:()=>state.dailyProgress.categoryCorrect[chosenCat]||0,reward:140}
     ];
-    return shuffle(pool,rng).slice(0,3);
+    const hard=[
+      {id:'combo',icon:'🔥',tier:'Сложное',title:'Без ошибки',text:'Сделать серию из 8 верных ответов',target:8,value:()=>state.dailyProgress.bestCombo,reward:180},
+      {id:'score',icon:'★',tier:'Сложное',title:'Охота за очками',text:'Набрать 4500 очков за день',target:4500,value:()=>state.dailyProgress.score,reward:180},
+      {id:'hard',icon:'✦',tier:'Сложное',title:'Экспертный ответ',text:'Правильно ответить на 8 сложных вопросов',target:8,value:()=>state.dailyProgress.hardCorrect,reward:190},
+      {id:'fast',icon:'⚡',tier:'Сложное',title:'Молниеносно',text:'Дать 7 верных ответов быстрее чем за 5 секунд',target:7,value:()=>state.dailyProgress.fastCorrect,reward:190},
+      {id:'nohint',icon:'🧠',tier:'Сложное',title:'Своими силами',text:'Завершить 2 раунда без подсказок и пропусков',target:2,value:()=>state.dailyProgress.noHintGames,reward:200},
+      {id:`mode_${chosenMode}`,icon:MODES[chosenMode]?.icon||'◆',tier:'Сложное',title:`Мастер режима`,text:`Завершить раунд «${modeName}»`,target:1,value:()=>state.dailyProgress.modes.includes(chosenMode)?1:0,reward:200}
+    ];
+    const special={id:'day_challenge',icon:'☀',tier:'Главное',title:'Задание дня',text:'Пройти сегодняшнее Испытание дня',target:1,value:()=>state.dailyPlayed===dayKey()?1:0,reward:250};
+    const count=clamp(Math.floor(flagNum('daily_quest_count',6)),3,6);
+    const nNormal=Math.min(3,count-1),nHard=Math.max(0,count-1-nNormal);
+    return [...shuffle(normal,rng).slice(0,nNormal),...shuffle(hard,rng).slice(0,nHard),special];
   }
   function claimQuest(id){
     const q=dailyQuests().find(x=>x.id===id);if(!q)return;
@@ -101,8 +190,53 @@
   }
   function claimDailyChest(){
     const qs=dailyQuests();if(state.dailyChest)return;
-    if(!qs.every(q=>state.dailyClaimed.includes(q.id))){showToast('Сначала забери все 3 награды');return}
-    state.dailyChest=true;state.coins+=350;state.xp+=500;showToast('Сундук дня: +350 монет, +500 XP');queueSave();syncHeader();renderDaily();
+    if(!qs.every(q=>state.dailyClaimed.includes(q.id))){showToast('Сначала забери все награды за задания');return}
+    state.dailyChest=true;
+    const coins=Math.max(0,Math.floor(flagNum('daily_chest_coins',500))),xp=Math.max(0,Math.floor(flagNum('daily_chest_xp',750)));
+    state.coins+=coins;state.xp+=xp;state.weeklyProgress.daysCompleted++;
+    showToast(`Сундук дня: +${coins} монет, +${xp} XP`);queueSave();syncHeader();renderDaily();
+  }
+
+  function weeklyQuests(){
+    resetWeeklyIfNeeded();
+    const rng=mulberry32(Number(weekKey().replaceAll('-',''))+7331);
+    const pool=[
+      {id:'w_answers',icon:'❓',title:'Большая разминка',text:'Ответить на 150 вопросов за неделю',target:150,value:()=>state.weeklyProgress.answers,reward:400},
+      {id:'w_correct',icon:'✓',title:'Неделя точности',text:'Дать 100 верных ответов',target:100,value:()=>state.weeklyProgress.correct,reward:450},
+      {id:'w_games',icon:'◆',title:'Игровая неделя',text:'Завершить 15 раундов',target:15,value:()=>state.weeklyProgress.games,reward:400},
+      {id:'w_score',icon:'★',title:'Коллекционер очков',text:'Набрать 20 000 очков',target:20000,value:()=>state.weeklyProgress.score,reward:500},
+      {id:'w_categories',icon:'◎',title:'Энциклопедист недели',text:'Сыграть вопросы в 12 разных темах',target:12,value:()=>state.weeklyProgress.categories.length,reward:450},
+      {id:'w_modes',icon:'▦',title:'Все грани игры',text:'Сыграть в 6 разных режимов',target:6,value:()=>state.weeklyProgress.modes.length,reward:500},
+      {id:'w_daily',icon:'☀',title:'Испытатель недели',text:'Пройти Испытание дня в 4 разные даты',target:4,value:()=>state.weeklyProgress.dailyChallengeDays,reward:550},
+      {id:'w_perfect',icon:'🏆',title:'Идеальная форма',text:'Завершить 2 раунда со 100% точностью',target:2,value:()=>state.weeklyProgress.perfectGames,reward:600}
+    ];
+    const fixed={id:'w_days',icon:'📅',title:'Пять активных дней',text:'Полностью закрыть ежедневки в 5 разные даты',target:5,value:()=>state.weeklyProgress.daysCompleted,reward:650};
+    return [...shuffle(pool,rng).slice(0,4),fixed];
+  }
+  function claimWeeklyQuest(id){
+    const q=weeklyQuests().find(x=>x.id===id);if(!q)return;
+    if(q.value()<q.target){showToast('Недельное задание ещё не выполнено');return}
+    if(state.weeklyClaimed.includes(id)){showToast('Награда уже получена');return}
+    state.weeklyClaimed.push(id);state.coins+=q.reward;state.xp+=q.reward*2;showToast(`Недельная награда: +${q.reward} монет`);queueSave();syncHeader();renderDaily();
+  }
+  function claimWeeklyChest(){
+    if(state.weeklyChest)return;const qs=weeklyQuests();
+    if(!qs.every(q=>state.weeklyClaimed.includes(q.id))){showToast('Сначала забери все недельные награды');return}
+    const coins=Math.max(0,Math.floor(flagNum('weekly_chest_coins',1200))),xp=Math.max(0,Math.floor(flagNum('weekly_chest_xp',1800)));
+    state.weeklyChest=true;state.coins+=coins;state.xp+=xp;showToast(`Сундук недели: +${coins} монет, +${xp} XP`);queueSave();syncHeader();renderDaily();
+  }
+
+  function calendarReward(index){
+    const day=index+1,week=Math.ceil(day/7);
+    if(day%7===0)return {coins:350+week*150,xp:500+week*250,special:true};
+    return {coins:70+day*12,xp:90+day*16,special:false};
+  }
+  function claimCalendar(){
+    if(!flagBool('calendar_enabled',true))return;
+    const today=dayKey();if(state.calendarLastClaimedDate===today){showToast('Сегодняшняя награда уже получена');return}
+    const idx=clamp(Math.floor(state.calendarIndex||0),0,27),r=calendarReward(idx);
+    state.coins+=r.coins;state.xp+=r.xp;state.calendarLastClaimedDate=today;state.calendarIndex=(idx+1)%28;
+    showToast(`День ${idx+1}: +${r.coins} монет, +${r.xp} XP`);queueSave(true);syncHeader();renderDaily();
   }
 
   const ACHIEVEMENTS=[
@@ -138,6 +272,7 @@
           <button class="primary" data-mode="daily">${state.dailyPlayed===dayKey()?'Переиграть':'Начать испытание'}</button>
         </div>
       </section>
+      ${(()=>{const ev=eventOfDay();return `<div class="league-banner event-banner"><div class="league-icon">${ev.icon}</div><div><div class="eyebrow">Событие дня</div><h3>${esc(ev.title)}</h3><p>${esc(ev.text)}</p></div><button class="secondary" style="margin-left:auto" data-action="daily">Задания</button></div>`})()}
       <div class="section-head"><div><h2>Популярные режимы</h2><p>Меняй темп и правила игры</p></div><button data-action="modes">Показать все</button></div>
       <section class="mode-grid">${['classic','blitz','survival','ladder'].map(modeCard).join('')}</section>
       <div class="section-head"><div><h2>Твоя статистика</h2><p>Прогресс сохраняется автоматически</p></div></div>
@@ -155,82 +290,6 @@
 
   function renderModes(){
     currentPage='modes';setActiveNav('modes');
-    screen.innerHTML=`<div class="page-head"><div><h1>Режимы игры</h1><p>Каждый режим меняет темп, риск и награды.</p></div></div><section class="mode-grid">${Object.keys(MODES).map(modeCard).join('')}</section><div class="section-head"><div><h2>Тематические раунды</h2><p>Выбери одну область знаний</p></div></div><section class="category-grid">${Object.entries(CATEGORIES).map(([id,c])=>categoryCard(id,c)).join('')}</section>`;
-  }
-  function renderCategories(){currentPage='categories';setActiveNav('modes');screen.innerHTML=`<div class="page-head"><div><h1>Все темы</h1><p>${Object.keys(CATEGORIES).length} направлений знаний</p></div></div><section class="category-grid">${Object.entries(CATEGORIES).map(([id,c])=>categoryCard(id,c)).join('')}</section>`}
-
-  function renderDaily(){
-    currentPage='daily';setActiveNav('daily');resetDailyIfNeeded();const qs=dailyQuests();const allClaimed=qs.every(q=>state.dailyClaimed.includes(q.id));
-    screen.innerHTML=`<div class="page-head"><div><h1>Ежедневные задания</h1><p>Сброс в новые календарные сутки по серверному времени.</p></div><button class="primary" data-mode="daily">Испытание дня</button></div>
-      <div class="content-card"><div class="quest-list">${qs.map(q=>{const val=Math.min(q.value(),q.target),done=val>=q.target,claimed=state.dailyClaimed.includes(q.id);return `<div class="quest"><div class="quest-icon">${q.icon}</div><div><h4>${q.title}</h4><p>${q.text}</p><div class="progress"><i style="width:${clamp(val/q.target*100,0,100)}%"></i></div></div><div class="quest-reward"><b>+${q.reward} ●</b><button class="${claimed?'ghost':done?'primary':'secondary'}" data-claim="${q.id}" ${!done||claimed?'disabled':''}>${claimed?'Получено':done?'Забрать':`${val}/${q.target}`}</button></div></div>`}).join('')}</div></div>
-      <div class="section-head"><div><h2>Сундук дня</h2><p>Открой после получения всех трёх наград</p></div></div>
-      <div class="league-banner"><div class="league-icon">🎁</div><div><h3>${state.dailyChest?'Сундук открыт':'+350 монет и +500 XP'}</h3><p>${state.dailyChest?'Возвращайся завтра за новой серией заданий.':allClaimed?'Все задания закрыты — награда готова.':'Выполни три задания и забери общий бонус.'}</p></div><button class="primary" style="margin-left:auto" data-chest ${!allClaimed||state.dailyChest?'disabled':''}>${state.dailyChest?'Получено':'Открыть'}</button></div>`;
-  }
-
-  async function renderRating(){
-    currentPage='rating';setActiveNav('rating');
-    screen.innerHTML=`<div class="page-head"><div><h1>Рейтинг игроков</h1><p>Глобальный лидерборд Яндекс Игр · техническое имя global_score</p></div></div><div class="league-banner"><div class="league-icon">♛</div><div><h3>${leagueName(ratingScore())}</h3><p>Твой рейтинг-счёт: ${fmt(ratingScore())}</p></div>${Y.isAuthorized()?'':'<button class="primary" data-auth style="margin-left:auto">Войти</button>'}</div><div class="content-card" id="leaderWrap"><div class="empty">Загружаем таблицу лидеров…</div></div>`;
-    const lb=await Y.getLeaderboard();if(currentPage!=='rating')return;
-    const wrap=$('#leaderWrap');
-    if(!lb?.entries?.length){wrap.innerHTML=`<div class="empty">${Y.local?'В локальном запуске глобальный рейтинг недоступен. После загрузки в Яндекс Игры здесь появятся реальные игроки.':'Лидерборд пока пуст или ещё не создан в Консоли Яндекс Игр.'}</div>`;return}
-    wrap.innerHTML=`<div class="leaderboard">${lb.entries.map(e=>`<div class="leader-row ${e.player?.uniqueID===Y.player?.getUniqueID?.()?'me':''}"><div class="leader-rank">${e.rank}</div><div class="leader-name"><b>${esc(e.player?.publicName||'Игрок')}</b><small>${leagueName(e.score)}</small></div><div class="leader-score">${fmt(e.score)}</div></div>`).join('')}</div>`;
-  }
-  function leagueName(score){if(score>=60000)return 'Лига Гениев';if(score>=25000)return 'Алмазная лига';if(score>=10000)return 'Золотая лига';if(score>=4000)return 'Серебряная лига';return 'Бронзовая лига'}
-
-  function renderProfile(){
-    currentPage='profile';setActiveNav('profile');syncHeader();const l=state.level,from=levelBase(l),to=levelNext(l),pct=clamp((state.xp-from)/(to-from)*100,0,100);const acc=state.totalAnswers?Math.round(state.correctAnswers/state.totalAnswers*100):0;
-    screen.innerHTML=`<div class="page-head"><div><h1>Профиль</h1><p>Твой прогресс, достижения и статистика.</p></div></div><div class="profile-grid">
-      <div class="content-card profile-card"><div class="avatar">🧠</div><h2>${Y.isAuthorized()?esc(Y.player?.getName?.()||'Игрок'):'Гость'}</h2><p style="color:var(--muted)">Уровень ${l} · ${leagueName(ratingScore())}</p><div class="xp-track"><i style="width:${pct}%"></i></div><small>${fmt(state.xp-from)} / ${fmt(to-from)} XP до следующего уровня</small><div class="action-row" style="margin-top:20px">${Y.isAuthorized()?'<button class="secondary" disabled>Яндекс ID подключён</button>':'<button class="primary" data-auth>Войти в Яндекс</button>'}</div></div>
-      <div><section class="stat-grid"><div class="metric"><small>Точность</small><b>${acc}%</b></div><div class="metric"><small>Серия дней</small><b>${state.streak} 🔥</b></div><div class="metric"><small>Лучший счёт</small><b>${fmt(state.bestScore)}</b></div><div class="metric"><small>Монеты</small><b>${fmt(state.coins)}</b></div></section><div class="section-head"><div><h2>Достижения</h2><p>${state.achievements.length} из ${ACHIEVEMENTS.length}</p></div></div><div class="badges-grid">${ACHIEVEMENTS.map(a=>`<div class="badge ${state.achievements.includes(a.id)?'':'locked'}"><div class="bicon">${a.icon}</div><b>${a.name}</b><small>${a.desc}</small></div>`).join('')}</div></div>
-    </div>`;
-  }
-
-  function renderShop(){
-    currentPage='shop';setActiveNav('');screen.innerHTML=`<div class="page-head"><div><h1>Помощь в викторине</h1><p>Монеты зарабатываются игрой и ежедневными заданиями.</p></div></div><section class="mode-grid">
-      <div class="mode-card"><span class="mode-icon">½</span><h3>50 / 50</h3><p>В каждом раунде один бесплатный шанс убрать два неверных ответа.</p><span class="mode-tag">встроено в раунд</span></div>
-      <div class="mode-card"><span class="mode-icon">↻</span><h3>Пропуск</h3><p>Меняет текущий вопрос без штрафа за ошибку.</p><span class="mode-tag">50 монет</span></div>
-      <div class="mode-card"><span class="mode-icon">♥</span><h3>Вторая жизнь</h3><p>В режиме выживания можно вернуть одну жизнь за rewarded video.</p><span class="mode-tag">по желанию</span></div>
-      <div class="mode-card"><span class="mode-icon">×2</span><h3>Двойная награда</h3><p>После раунда можно удвоить заработанные монеты за rewarded video.</p><span class="mode-tag">по желанию</span></div></section>`;
-  }
-
-  function buildSession(modeId,category=null){
-    const m=MODES[modeId]||MODES.classic;let pool=QUESTIONS;
-    if(category)pool=pool.filter(q=>q.category===category);if(m.filter)pool=pool.filter(m.filter);
-    let rng;if(m.daily)rng=mulberry32(Number(dayKey().replaceAll('-',''))+147);else rng=mulberry32((Date.now()^Math.floor(Math.random()*1e9))>>>0);
-    let selected=shuffle(pool,rng);
-    if(m.ladder){const easy=shuffle(pool.filter(q=>q.difficulty==='easy'),rng),medium=shuffle(pool.filter(q=>q.difficulty==='medium'),rng),hard=shuffle(pool.filter(q=>q.difficulty==='hard'),rng);selected=[...easy.slice(0,5),...medium.slice(0,6),...hard.slice(0,4)];if(selected.length<m.count)selected.push(...shuffle(pool.filter(q=>!selected.includes(q)),rng).slice(0,m.count-selected.length))}
-    else selected=selected.slice(0,Math.min(m.count,selected.length));
-    session={modeId,category,mode:m,questions:selected,index:0,score:0,correct:0,wrong:0,combo:0,maxCombo:0,hearts:m.hearts??null,startedAt:Date.now(),questionStarted:Date.now(),remaining:m.totalTime??m.perQuestion,totalRemaining:m.totalTime??null,paused:false,answered:false,lifeline:true,skipUsed:0,coinsEarned:0,xpEarned:0};
-  }
-  function startMode(modeId,category=null){
-    resetDailyIfNeeded();updateStreak();buildSession(modeId,category);currentPage='quiz';setActiveNav('');document.querySelector('#bottomNav').style.display='none';Y.gameplayStart();startTick();renderQuestion();queueSave();syncHeader();
-  }
-  function currentQuestion(){return session?.questions?.[session.index]}
-  function difficultyLabel(d){return d==='hard'?'Сложный':d==='medium'?'Средний':'Лёгкий'}
-  function renderQuestion(){
-    if(!session)return;if(session.index>=session.questions.length){finishSession();return}const q=currentQuestion();if(!q){finishSession();return}
-    session.answered=false;session.questionStarted=Date.now();if(session.mode.perQuestion)session.remaining=session.mode.perQuestion;
-    const total=session.mode.totalTime?session.mode.totalTime:session.mode.perQuestion;const progress=session.modeId==='blitz'?session.remaining/total:session.index/session.questions.length;
-    screen.innerHTML=`<div class="quiz-layout"><div class="quiz-top"><div class="round-meta"><small>${esc(session.mode.name)}</small><b>${session.modeId==='blitz'?`${session.correct} ✓`: `${session.index+1}/${session.questions.length}`}</b></div><div class="timer-wrap"><div id="timerBar" class="timer-bar" style="width:${session.modeId==='blitz'?100:100}%"></div></div><div class="round-meta" style="text-align:right"><small>Счёт</small><b id="quizScore">${fmt(session.score)}</b></div></div>
-      <article class="quiz-card"><div class="question-badges"><span class="pill">${CATEGORIES[q.category]?.emoji||'❓'} ${esc(CATEGORIES[q.category]?.name||q.category)}</span><span class="pill diff-${q.difficulty}">${difficultyLabel(q.difficulty)}</span>${session.hearts!==null?`<span class="pill">${'♥'.repeat(Math.max(0,session.hearts))}${'♡'.repeat(Math.max(0,(session.mode.hearts||0)-session.hearts))}</span>`:''}</div><h1 class="question">${esc(q.q)}</h1>
-      <div class="answers">${q.answers.map((a,i)=>`<button class="answer" data-answer="${i}"><span class="answer-key">${keys[i]||i+1}</span><span>${esc(a)}</span></button>`).join('')}</div>
-      <div class="quiz-footer"><div class="lifelines"><button class="life-btn" data-life ${session.lifeline?'':'disabled'}>½ 50/50</button><button class="life-btn" data-skip ${state.coins>=50?'':'disabled'}>↻ Пропуск · 50</button>${session.modeId==='survival'&&session.hearts<3?'<button class="life-btn" data-life-ad>♥ Жизнь · реклама</button>':''}</div><div class="combo">${session.combo>=2?`🔥 Серия ×${session.combo}`:''}</div></div></article></div>`;
-    updateTimerUI();
-  }
-  function startTick(){stopTick();tickTimer=setInterval(()=>{
-    if(!session||session.paused||session.answered)return;
-    session.remaining=Math.max(0,session.remaining-.1);updateTimerUI();
-    if(session.remaining<=0){if(session.modeId==='blitz')finishSession();else timeOut()}
-  },100)}
-  function stopTick(){clearInterval(tickTimer);tickTimer=null}
-  function updateTimerUI(){
-    const bar=$('#timerBar');if(!bar||!session)return;const total=session.modeId==='blitz'?session.mode.totalTime:session.mode.perQuestion;if(!total)return;const pct=clamp(session.remaining/total*100,0,100);bar.style.width=pct+'%';bar.classList.toggle('danger',pct<28)
-  }
-  function answerQuestion(idx){
-    if(!session||session.answered)return;const q=currentQuestion();session.answered=true;const buttons=[...document.querySelectorAll('.answer')];buttons.forEach(b=>b.disabled=true);const ok=idx===q.correct;
-    buttons[q.correct]?.classList.add('correct');if(!ok)buttons[idx]?.classList.add('wrong');
-    const timeBonus=Math.floor((session.remaining||0)*8);const diff=q.difficulty==='hard'?1.5:q.difficulty==='medium'?1.2:1;const base=Math.floor((100+timeBonus)*diff*(session.mode.multiplier||1));
-    state.totalAnswers++;state.dailyProgress.answers++;
     const cat=state.categoryStats[q.category]||(state.categoryStats[q.category]={answers:0,correct:0});cat.answers++;
     if(!state.dailyProgress.categories.includes(q.category))state.dailyProgress.categories.push(q.category);
     if(ok){session.correct++;session.combo++;session.maxCombo=Math.max(session.maxCombo,session.combo);state.correctAnswers++;state.dailyProgress.correct++;cat.correct++;const comboBonus=Math.min(200,(session.combo-1)*15);session.score+=base+comboBonus;showToast(session.combo>=3?`Верно! Серия ×${session.combo}`:'Верно!')}
