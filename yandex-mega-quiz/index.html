@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="theme-color" content="#121834" />
+  <meta name="color-scheme" content="dark" />
+  <title>Умниверсум — Большая викторина</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="/sdk.js"></script>
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <button class="brand" data-action="home" aria-label="На главную">
+        <span class="brand-mark">У</span>
+        <span><b>Умниверсум</b><small>Большая викторина</small></span>
+      </button>
+      <div class="top-stats">
+        <button class="stat-chip" data-action="profile" title="Уровень"><span>⭐</span><b id="levelValue">1</b></button>
+        <button class="stat-chip" data-action="shop" title="Монеты"><span>●</span><b id="coinValue">0</b></button>
+        <button class="stat-chip streak-chip" data-action="daily" title="Серия дней"><span>🔥</span><b id="streakValue">0</b></button>
+      </div>
+    </header>
+
+    <main id="screen" class="screen" aria-live="polite"></main>
+
+    <nav class="bottom-nav" id="bottomNav">
+      <button data-action="home" class="nav-btn active"><span>⌂</span><small>Главная</small></button>
+      <button data-action="modes" class="nav-btn"><span>◆</span><small>Режимы</small></button>
+      <button data-action="daily" class="nav-btn"><span>✓</span><small>Задания</small></button>
+      <button data-action="rating" class="nav-btn"><span>♛</span><small>Рейтинг</small></button>
+      <button data-action="profile" class="nav-btn"><span>☺</span><small>Профиль</small></button>
+    </nav>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+  <div id="modalRoot"></div>
+
+  <script src="questions.js"></script>
+  <script src="yandex.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
