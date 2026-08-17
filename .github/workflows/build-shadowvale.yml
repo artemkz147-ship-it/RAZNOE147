@@ -41,7 +41,7 @@ jobs:
       - name: Validate Yandex Games package
         run: python3 tools/validate_build.py
 
-      - name: Browser WebGL smoke test
+      - name: Browser WebGL boss smoke test
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/shadowvale-vite.log 2>&1 &
           SERVER_PID=$!
@@ -51,18 +51,17 @@ jobs:
             sleep 1
           done
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          TEST_URL='http://127.0.0.1:4173/?autostart=1&debug-fast=1'
           "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --use-angle=swiftshader \
-            --window-size=1280,720 --virtual-time-budget=10000 --dump-dom \
-            'http://127.0.0.1:4173/?autostart=1' > /tmp/shadowvale-dom.html
+            --window-size=1280,720 --virtual-time-budget=6000 --dump-dom "$TEST_URL" > /tmp/shadowvale-dom.html
           grep -q 'data-game-ready="true"' /tmp/shadowvale-dom.html
-          grep -Eq 'data-game-state="(playing|upgrade)"' /tmp/shadowvale-dom.html
+          grep -Eq 'data-game-state="(playing|upgrade|gameover|victory)"' /tmp/shadowvale-dom.html
+          grep -q 'id="boss-bar-wrap" class="boss-bar-wrap"' /tmp/shadowvale-dom.html
           "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --use-angle=swiftshader \
-            --window-size=1280,720 --virtual-time-budget=8000 --screenshot=smoke-desktop.png \
-            'http://127.0.0.1:4173/?autostart=1'
+            --window-size=1280,720 --virtual-time-budget=3500 --screenshot=smoke-desktop.png "$TEST_URL"
           "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --use-angle=swiftshader \
-            --window-size=412,915 --virtual-time-budget=8000 --screenshot=smoke-mobile.png \
-            --user-agent='Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36' \
-            'http://127.0.0.1:4173/?autostart=1'
+            --window-size=412,915 --virtual-time-budget=3500 --screenshot=smoke-mobile.png \
+            --user-agent='Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36' "$TEST_URL"
           test -s smoke-desktop.png
           test -s smoke-mobile.png
           tail -40 /tmp/shadowvale-vite.log || true
