@@ -1,0 +1,35 @@
+name: Package Shadowvale Source
+
+on:
+  push:
+    branches:
+      - yandex-3d-survival-fantasy
+    paths:
+      - .github/workflows/package-shadowvale-source.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete project
+        uses: actions/checkout@v4
+      - name: Package source project
+        run: |
+          mkdir -p release-source/Shadowvale-Survivor-v1.0.0
+          rsync -a --exclude '.git' --exclude 'release-source' ./ release-source/Shadowvale-Survivor-v1.0.0/
+          cd release-source
+          zip -9 -r ../Shadowvale-Survivor-v1.0.0-SOURCE.zip Shadowvale-Survivor-v1.0.0
+          cd ..
+          unzip -t Shadowvale-Survivor-v1.0.0-SOURCE.zip
+          ls -lh Shadowvale-Survivor-v1.0.0-SOURCE.zip
+      - name: Upload full source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shadowvale-Survivor-v1.0.0-SOURCE
+          path: Shadowvale-Survivor-v1.0.0-SOURCE.zip
+          if-no-files-found: error
+          retention-days: 30
