@@ -1,0 +1,52 @@
+    if(!lb?.entries?.length){wrap.innerHTML=`<div class="empty">${Y.local?'В локальном запуске глобальный рейтинг недоступен. После загрузки в Яндекс Игры здесь появятся реальные игроки.':'Лидерборд пока пуст или ещё не создан в Консоли Яндекс Игр.'}</div>`;return}
+    wrap.innerHTML=`<div class="leaderboard">${lb.entries.map(e=>`<div class="leader-row ${e.player?.uniqueID===Y.player?.getUniqueID?.()?'me':''}"><div class="leader-rank">${e.rank}</div><div class="leader-name"><b>${esc(e.player?.publicName||'Игрок')}</b><small>${leagueName(e.score)}</small></div><div class="leader-score">${fmt(e.score)}</div></div>`).join('')}</div>`;
+  }
+  function leagueName(score){if(score>=60000)return 'Лига Гениев';if(score>=25000)return 'Алмазная лига';if(score>=10000)return 'Золотая лига';if(score>=4000)return 'Серебряная лига';return 'Бронзовая лига'}
+
+  function renderProfile(){
+    currentPage='profile';setActiveNav('profile');syncHeader();const l=state.level,from=levelBase(l),to=levelNext(l),pct=clamp((state.xp-from)/(to-from)*100,0,100);const acc=state.totalAnswers?Math.round(state.correctAnswers/state.totalAnswers*100):0;
+    screen.innerHTML=`<div class="page-head"><div><h1>Профиль</h1><p>Твой прогресс, достижения и статистика.</p></div></div><div class="profile-grid">
+      <div class="content-card profile-card"><div class="avatar">🧠</div><h2>${Y.isAuthorized()?esc(Y.player?.getName?.()||'Игрок'):'Гость'}</h2><p style="color:var(--muted)">Уровень ${l} · ${leagueName(ratingScore())}</p><div class="xp-track"><i style="width:${pct}%"></i></div><small>${fmt(state.xp-from)} / ${fmt(to-from)} XP до следующего уровня</small><div class="action-row" style="margin-top:20px">${Y.isAuthorized()?'<button class="secondary" disabled>Яндекс ID подключён</button>':'<button class="primary" data-auth>Войти в Яндекс</button>'}</div></div>
+      <div><section class="stat-grid"><div class="metric"><small>Точность</small><b>${acc}%</b></div><div class="metric"><small>Серия дней</small><b>${state.streak} 🔥</b></div><div class="metric"><small>Лучший счёт</small><b>${fmt(state.bestScore)}</b></div><div class="metric"><small>Монеты</small><b>${fmt(state.coins)}</b></div></section><div class="section-head"><div><h2>Достижения</h2><p>${state.achievements.length} из ${ACHIEVEMENTS.length}</p></div></div><div class="badges-grid">${ACHIEVEMENTS.map(a=>`<div class="badge ${state.achievements.includes(a.id)?'':'locked'}"><div class="bicon">${a.icon}</div><b>${a.name}</b><small>${a.desc}</small></div>`).join('')}</div></div>
+    </div>`;
+  }
+
+  function renderShop(){
+    currentPage='shop';setActiveNav('');screen.innerHTML=`<div class="page-head"><div><h1>Помощь в викторине</h1><p>Монеты зарабатываются игрой и ежедневными заданиями.</p></div></div><section class="mode-grid">
+      <div class="mode-card"><span class="mode-icon">½</span><h3>50 / 50</h3><p>В каждом раунде один бесплатный шанс убрать два неверных ответа.</p><span class="mode-tag">встроено в раунд</span></div>
+      <div class="mode-card"><span class="mode-icon">↻</span><h3>Пропуск</h3><p>Меняет текущий вопрос без штрафа за ошибку.</p><span class="mode-tag">50 монет</span></div>
+      <div class="mode-card"><span class="mode-icon">♥</span><h3>Вторая жизнь</h3><p>В режиме выживания можно вернуть одну жизнь за rewarded video.</p><span class="mode-tag">по желанию</span></div>
+      <div class="mode-card"><span class="mode-icon">×2</span><h3>Двойная награда</h3><p>После раунда можно удвоить заработанные монеты за rewarded video.</p><span class="mode-tag">по желанию</span></div></section>`;
+  }
+
+  function buildSession(modeId,category=null){
+    const m=MODES[modeId]||MODES.classic;let pool=QUESTIONS;
+    if(category)pool=pool.filter(q=>q.category===category);if(m.filter)pool=pool.filter(m.filter);
+    let rng;if(m.daily)rng=mulberry32(Number(dayKey().replaceAll('-',''))+147);else rng=mulberry32((Date.now()^Math.floor(Math.random()*1e9))>>>0);
+    let selected=shuffle(pool,rng);
+    if(m.ladder){const easy=shuffle(pool.filter(q=>q.difficulty==='easy'),rng),medium=shuffle(pool.filter(q=>q.difficulty==='medium'),rng),hard=shuffle(pool.filter(q=>q.difficulty==='hard'),rng);selected=[...easy.slice(0,5),...medium.slice(0,6),...hard.slice(0,4)];if(selected.length<m.count)selected.push(...shuffle(pool.filter(q=>!selected.includes(q)),rng).slice(0,m.count-selected.length))}
+    else selected=selected.slice(0,Math.min(m.count,selected.length));
+    session={modeId,category,mode:m,questions:selected,index:0,score:0,correct:0,wrong:0,combo:0,maxCombo:0,hearts:m.hearts??null,startedAt:Date.now(),questionStarted:Date.now(),remaining:m.totalTime??m.perQuestion,totalRemaining:m.totalTime??null,paused:false,answered:false,lifeline:true,skipUsed:0,coinsEarned:0,xpEarned:0};
+  }
+  function startMode(modeId,category=null){
+    resetDailyIfNeeded();updateStreak();buildSession(modeId,category);currentPage='quiz';setActiveNav('');document.querySelector('#bottomNav').style.display='none';Y.gameplayStart();startTick();renderQuestion();queueSave();syncHeader();
+  }
+  function currentQuestion(){return session?.questions?.[session.index]}
+  function difficultyLabel(d){return d==='hard'?'Сложный':d==='medium'?'Средний':'Лёгкий'}
+  function renderQuestion(){
+    if(!session)return;if(session.index>=session.questions.length){finishSession();return}const q=currentQuestion();if(!q){finishSession();return}
+    session.answered=false;session.questionStarted=Date.now();if(session.mode.perQuestion)session.remaining=session.mode.perQuestion;
+    const total=session.mode.totalTime?session.mode.totalTime:session.mode.perQuestion;const progress=session.modeId==='blitz'?session.remaining/total:session.index/session.questions.length;
+    screen.innerHTML=`<div class="quiz-layout"><div class="quiz-top"><div class="round-meta"><small>${esc(session.mode.name)}</small><b>${session.modeId==='blitz'?`${session.correct} ✓`: `${session.index+1}/${session.questions.length}`}</b></div><div class="timer-wrap"><div id="timerBar" class="timer-bar" style="width:${session.modeId==='blitz'?100:100}%"></div></div><div class="round-meta" style="text-align:right"><small>Счёт</small><b id="quizScore">${fmt(session.score)}</b></div></div>
+      <article class="quiz-card"><div class="question-badges"><span class="pill">${CATEGORIES[q.category]?.emoji||'❓'} ${esc(CATEGORIES[q.category]?.name||q.category)}</span><span class="pill diff-${q.difficulty}">${difficultyLabel(q.difficulty)}</span>${session.hearts!==null?`<span class="pill">${'♥'.repeat(Math.max(0,session.hearts))}${'♡'.repeat(Math.max(0,(session.mode.hearts||0)-session.hearts))}</span>`:''}</div><h1 class="question">${esc(q.q)}</h1>
+      <div class="answers">${q.answers.map((a,i)=>`<button class="answer" data-answer="${i}"><span class="answer-key">${keys[i]||i+1}</span><span>${esc(a)}</span></button>`).join('')}</div>
+      <div class="quiz-footer"><div class="lifelines"><button class="life-btn" data-life ${session.lifeline?'':'disabled'}>½ 50/50</button><button class="life-btn" data-skip ${state.coins>=50?'':'disabled'}>↻ Пропуск · 50</button>${session.modeId==='survival'&&session.hearts<3?'<button class="life-btn" data-life-ad>♥ Жизнь · реклама</button>':''}</div><div class="combo">${session.combo>=2?`🔥 Серия ×${session.combo}`:''}</div></div></article></div>`;
+    updateTimerUI();
+  }
+  function startTick(){stopTick();tickTimer=setInterval(()=>{
+    if(!session||session.paused||session.answered)return;
+    session.remaining=Math.max(0,session.remaining-.1);updateTimerUI();
+    if(session.remaining<=0){if(session.modeId==='blitz')finishSession();else timeOut()}
+  },100)}
+  function stopTick(){clearInterval(tickTimer);tickTimer=null}
+  function updateTimerUI(){
