@@ -26,16 +26,70 @@ jobs:
           from pathlib import Path
           p=Path('src/main.js')
           s=p.read_text(encoding='utf-8')
+
+          # Keep the authored weapon on the exact Knight hand bone.
           first="      if (!fallback && n.includes('hand')) fallback = o;"
           first_new="      if (!right && (n.includes('palm.r') || n.includes('palm_r') || n.includes('palm r'))) right = o;\n      if (!fallback && (n.includes('hand') || n.includes('palm'))) fallback = o;"
           second="      if (!right && n.includes('hand') && (n.includes('right') || n.includes('.r') || n.includes('_r') || n.endsWith('r'))) right = o;"
           second_new="      if (!right && (n.includes('hand') || n.includes('palm')) && (n.includes('right') || n.includes('.r') || n.includes('_r') || n.endsWith('r'))) right = o;"
-          if first in s:
-              s=s.replace(first,first_new)
-          if second in s:
-              s=s.replace(second,second_new)
-          if "n.includes('palm.r')" not in s:
-              raise SystemExit('Knight Palm.R attachment polish missing')
+          if first in s: s=s.replace(first,first_new)
+          if second in s: s=s.replace(second,second_new)
+
+          # The source Knight uses very dark materials intended for a light preview.
+          # Lift authored material colors so the complete silhouette, especially legs,
+          # remains readable against Shadowvale's dark floor without replacing the asset.
+          old_clone="""  cloneMaterials(model) {
+    model.traverse(o => {
+      if (o.isMesh) {
+        if (Array.isArray(o.material)) o.material = o.material.map(m=>m.clone());
+        else if (o.material) o.material = o.material.clone();
+      }
+    });
+  }"""
+          new_clone="""  cloneMaterials(model) {
+    const tune = m => {
+      if (!m) return m;
+      const n=(m.name||'').toLowerCase();
+      if (m.color && n==='armor') { m.color.setHex(0x60747d); m.roughness=.72; m.metalness=.08; }
+      if (m.color && n==='boots') m.color.setHex(0x563425);
+      if (m.color && n==='skin') m.color.setHex(0xc8925f);
+      return m;
+    };
+    model.traverse(o => {
+      if (o.isMesh) {
+        if (Array.isArray(o.material)) o.material = o.material.map(m=>tune(m.clone()));
+        else if (o.material) o.material = tune(o.material.clone());
+      }
+    });
+  }"""
+          if old_clone in s: s=s.replace(old_clone,new_clone)
+
+          # ShortSword's authored origin is at its handle. Preserve that origin when
+          # parenting to Palm.R instead of centering the whole blade around the hand.
+          old_sword="""    if (bone) {
+      bone.add(sword); sword.position.set(.03,.02,-.03); sword.rotation.set(Math.PI/2,0,0); sword.scale.setScalar(.88);
+    } else {
+      characterRoot.add(sword); sword.position.set(.48,1.02,.12); sword.rotation.set(Math.PI/2,0,-.18);
+    }"""
+          new_sword="""    if (bone) {
+      if (sword.children[0]) sword.children[0].position.set(0,0,0);
+      bone.add(sword); sword.position.set(0,0,0); sword.rotation.set(0,0,0); sword.scale.setScalar(.82);
+    } else {
+      characterRoot.add(sword); sword.position.set(.48,1.02,.12); sword.rotation.set(Math.PI/2,0,-.18);
+    }"""
+          if old_sword in s: s=s.replace(old_sword,new_sword)
+
+          old_menu="this.menuHero.action=this.menuHero.mixer.clipAction(idle);this.menuHero.action.play();}"
+          new_menu="this.menuHero.action=this.menuHero.mixer.clipAction(idle);this.menuHero.action.play();this.menuHero.action.time=.55;this.menuHero.mixer.update(0);}"
+          if old_menu in s: s=s.replace(old_menu,new_menu)
+
+          old_player="this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12);"
+          new_player="this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12); if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);}"
+          if old_player in s: s=s.replace(old_player,new_player)
+
+          required=["n.includes('palm.r')","m.color.setHex(0x60747d)","sword.children[0].position.set(0,0,0)","this.player.action.time=.55"]
+          missing=[x for x in required if x not in s]
+          if missing: raise SystemExit('Final character polish missing: '+', '.join(missing))
           p.write_text(s,encoding='utf-8')
           PY
           node --check src/main.js
@@ -80,7 +134,6 @@ jobs:
           echo '--- GAME STATE ---'
           grep -o 'data-game-ready="[^"]*"' /tmp/shadowvale-dom.html | head -1 || true
           grep -o 'data-game-state="[^"]*"' /tmp/shadowvale-dom.html | head -1 || true
-          grep 'boss-bar-wrap' /tmp/shadowvale-dom.html | head -1 || true
           grep -q 'data-game-ready="true"' /tmp/shadowvale-dom.html
           grep -Eq 'data-game-state="(playing|upgrade|gameover|victory)"' /tmp/shadowvale-dom.html
           "$CHROME" $CHROME_FLAGS --window-size=1280,720 --virtual-time-budget=5500 --screenshot=smoke-desktop.png "$TEST_URL"
@@ -94,12 +147,12 @@ jobs:
         shell: bash
         run: |
           if git diff --quiet -- src/main.js; then
-            echo 'Source already contains final rig polish.'
+            echo 'Source already contains final visual polish.'
           else
             git config user.name 'Shadowvale Release Bot'
             git config user.email 'actions@users.noreply.github.com'
             git add src/main.js
-            git commit -m 'Polish Knight Palm.R weapon attachment'
+            git commit -m 'Polish final Knight silhouette and weapon rig'
             git push origin HEAD:yandex-3d-survival-fantasy
           fi
 
