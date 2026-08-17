@@ -194,7 +194,7 @@ class Game {
     const model = cloneSkinned(gltf.scene); this.cloneMaterials(model); model.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(model), size = new THREE.Vector3(); box.getSize(size);
     model.scale.multiplyScalar(targetSize / Math.max(size.x,size.z,.001)); model.updateMatrixWorld(true);
-    const b = new THREE.Box3().setFromObject(model); model.position.y -= b.min.y;
+    const b = new THREE.Box3().setFromObject(model); model.position.y -= b.max.y;
     model.traverse(o => { if(o.isMesh){o.receiveShadow=true;o.castShadow=false;} });
     const root = new THREE.Group(); root.add(model); return root;
   }
@@ -281,7 +281,7 @@ class Game {
       damageTaken:Math.max(.68,1-m.ward*.02),crit:.06,dashCooldown:2.1,dashTimer:0,dashTime:0,invuln:0,facing:new THREE.Vector3(0,0,1),
       pickupRadius:4.1,regen:0,boltRank:0,boltDamage:18,boltDelay:1.75,orbitRank:0,soulGain:1,attackAnimUntil:0
     };
-    this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12); if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);}
+    this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12); if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);} if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);}
     this.updateHud();
   }
 
