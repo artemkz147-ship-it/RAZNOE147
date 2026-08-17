@@ -1,0 +1,29 @@
+    if(t.dataset.life!==undefined){useLifeLine();return}
+    if(t.dataset.skip!==undefined){useSkip();return}
+    if(t.dataset.lifeAd!==undefined){reviveByAd();return}
+    if(t.dataset.claim){claimQuest(t.dataset.claim);return}
+    if(t.dataset.weeklyClaim){claimWeeklyQuest(t.dataset.weeklyClaim);return}
+    if(t.dataset.chest!==undefined){claimDailyChest();return}
+    if(t.dataset.weeklyChest!==undefined){claimWeeklyChest();return}
+    if(t.dataset.calendar!==undefined){claimCalendar();return}
+    if(t.dataset.auth!==undefined){authorizeAndRefresh();return}
+    if(t.dataset.replay){startMode(t.dataset.replay,t.dataset.cat||null);return}
+    if(t.dataset.double){doubleReward(t.dataset.double,t);return}
+    if(t.dataset.modal==='close'){closeModal();return}
+    const a=t.dataset.action;if(!a)return;
+    ({home:renderHome,modes:renderModes,daily:renderDaily,rating:renderRating,profile:renderProfile,categories:renderCategories,shop:renderShop}[a]||renderHome)();
+  });
+
+  document.addEventListener('keydown',e=>{
+    if(!session||session.answered)return;const idx=['1','2','3','4','a','b','c','d','A','B','C','D'].indexOf(e.key);if(idx>=0)answerQuestion(idx%4)
+  });
+  document.addEventListener('visibilitychange',()=>{if(!session)return;session.paused=document.hidden;if(document.hidden)Y.gameplayStop();else Y.gameplayStart()});
+  Y.on('pause',()=>{if(session)session.paused=true});Y.on('resume',()=>{if(session){session.paused=false;Y.gameplayStart()}});
+  window.addEventListener('pagehide',()=>{saveLocal();Y.save(state);Y.gameplayStop()});
+
+  async function boot(){
+    loadLocal();await Y.init();flags=await Y.getFlags(DEFAULT_FLAGS);const cloud=await Y.loadSave();if(cloud)state=mergeState(state,cloud);resetDailyIfNeeded();updateStreak();checkAchievements();queueSave();syncHeader();renderHome();Y.gameReady();
+    if(Y.local)showToast('Локальный режим: SDK Яндекс Игр не найден');
+  }
+  boot();
+})();
