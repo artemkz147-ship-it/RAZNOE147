@@ -175,6 +175,8 @@ class Game {
       if (o.isMesh) {
         if (Array.isArray(o.material)) o.material = o.material.map(m=>m.clone());
         else if (o.material) o.material = o.material.clone();
+        const mats=Array.isArray(o.material)?o.material:[o.material];
+        for(const m of mats){const n=(m?.name||'').toLowerCase();if(m?.color&&n==='armor'){m.color.setHex(0x60747d);m.roughness=.72;m.metalness=.08;}if(m?.color&&n==='boots')m.color.setHex(0x563425);if(m?.color&&n==='skin')m.color.setHex(0xc8925f);}
       }
     });
   }
@@ -218,7 +220,8 @@ class Game {
     });
     const bone = right || fallback;
     if (bone) {
-      bone.add(sword); sword.position.set(.03,.02,-.03); sword.rotation.set(Math.PI/2,0,0); sword.scale.setScalar(.88);
+      if (sword.children[0]) sword.children[0].position.set(0,0,0);
+      bone.add(sword); sword.position.set(0,0,0); sword.rotation.set(0,0,0); sword.scale.setScalar(.82);
     } else {
       characterRoot.add(sword); sword.position.set(.48,1.02,.12); sword.rotation.set(Math.PI/2,0,-.18);
     }
@@ -248,7 +251,7 @@ class Game {
 
     this.menuHero = { root:this.prepareVisual(this.assets.hero,2.35), mixer:null, action:null };
     this.menuHero.root.position.set(0,0,2.2); this.menuHero.root.rotation.y=-.45; this.scene.add(this.menuHero.root); this.attachSword(this.menuHero.root);
-    this.menuHero.mixer = new THREE.AnimationMixer(this.menuHero.root); const idle=this.findClip(this.assets.hero,['idle']); if(idle){this.menuHero.action=this.menuHero.mixer.clipAction(idle);this.menuHero.action.play();}
+    this.menuHero.mixer = new THREE.AnimationMixer(this.menuHero.root); const idle=this.findClip(this.assets.hero,['idle']); if(idle){this.menuHero.action=this.menuHero.mixer.clipAction(idle);this.menuHero.action.play();this.menuHero.action.time=.55;this.menuHero.mixer.update(0);}
   }
 
   findClip(gltf, words) {
@@ -278,7 +281,7 @@ class Game {
       damageTaken:Math.max(.68,1-m.ward*.02),crit:.06,dashCooldown:2.1,dashTimer:0,dashTime:0,invuln:0,facing:new THREE.Vector3(0,0,1),
       pickupRadius:4.1,regen:0,boltRank:0,boltDamage:18,boltDelay:1.75,orbitRank:0,soulGain:1,attackAnimUntil:0
     };
-    this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12);
+    this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12); if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);}
     this.updateHud();
   }
 
