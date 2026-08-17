@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0c1013" />
+  <title>Shadowvale Survivor</title>
+  <script src="/sdk.js"></script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="game"></canvas>
+
+    <div id="loading" class="screen screen--visible">
+      <div class="brand-mark">SV</div>
+      <div class="loading-title" data-i18n="loadingTitle">ПРОБУЖДЕНИЕ ДОЛИНЫ</div>
+      <div class="loading-bar"><div id="loading-fill"></div></div>
+      <div id="loading-text" class="loading-text">0%</div>
+    </div>
+
+    <div id="menu" class="screen">
+      <div class="menu-card">
+        <div class="eyebrow">3D SURVIVAL ROGUELIKE</div>
+        <h1>SHADOWVALE<br><span>SURVIVOR</span></h1>
+        <p data-i18n="subtitle">Продержись 12 минут. Усиливай героя. Сломи Владыку Тумана.</p>
+        <div class="record-row">
+          <span data-i18n="best">Лучший забег</span>
+          <strong id="best-time">00:00</strong>
+        </div>
+        <button id="start-btn" class="primary" data-i18n="start">НАЧАТЬ ЗАБЕГ</button>
+        <button id="how-btn" class="secondary" data-i18n="controls">УПРАВЛЕНИЕ</button>
+        <div class="menu-note" data-i18n="menuNote">WASD / стрелки · рывок Space · на телефоне — виртуальный джойстик</div>
+      </div>
+    </div>
+
+    <div id="hud" class="hud hidden">
+      <div class="hud-top">
+        <div class="stat-pill"><span data-i18n="time">Время</span><b id="time">00:00</b></div>
+        <div class="stat-pill"><span data-i18n="level">Ур.</span><b id="level">1</b></div>
+        <div class="stat-pill"><span data-i18n="kills">Враги</span><b id="kills">0</b></div>
+      </div>
+      <div class="bars">
+        <div class="bar hp"><div id="hp-fill"></div><span id="hp-text">100 / 100</span></div>
+        <div class="bar xp"><div id="xp-fill"></div></div>
+      </div>
+      <div id="boss-warning" class="boss-warning hidden" data-i18n="bossIncoming">ВЛАДЫКА ТУМАНА ПРИБЛИЖАЕТСЯ</div>
+    </div>
+
+    <div id="upgrade" class="screen modal-screen">
+      <div class="upgrade-panel">
+        <div class="eyebrow" data-i18n="choosePower">ВЫБЕРИ СИЛУ</div>
+        <h2 data-i18n="levelUp">НОВЫЙ УРОВЕНЬ</h2>
+        <div id="upgrade-cards" class="upgrade-cards"></div>
+        <button id="reroll-btn" class="secondary ad-button"><span data-i18n="reroll">Обновить выбор</span> · ▶</button>
+      </div>
+    </div>
+
+    <div id="gameover" class="screen modal-screen">
+      <div class="gameover-card">
+        <div class="eyebrow" id="result-kicker">RUN ENDED</div>
+        <h2 id="result-title" data-i18n="fallen">ГЕРОЙ ПАЛ</h2>
+        <div class="result-grid">
+          <div><span data-i18n="time">Время</span><b id="result-time">00:00</b></div>
+          <div><span data-i18n="kills">Враги</span><b id="result-kills">0</b></div>
+          <div><span data-i18n="level">Ур.</span><b id="result-level">1</b></div>
+        </div>
+        <button id="revive-btn" class="primary ad-button"><span data-i18n="revive">ВОЗРОДИТЬСЯ</span> · ▶</button>
+        <button id="restart-btn" class="secondary" data-i18n="again">ЕЩЁ РАЗ</button>
+      </div>
+    </div>
+
+    <div id="controls-panel" class="screen modal-screen">
+      <div class="info-card">
+        <button id="close-controls" class="close">×</button>
+        <h2 data-i18n="controls">УПРАВЛЕНИЕ</h2>
+        <p data-i18n="controlsText">Двигайся WASD или стрелками. Герой атакует ближайшего врага автоматически. Space — рывок с короткой неуязвимостью. На телефоне используй джойстик слева и кнопку рывка справа.</p>
+      </div>
+    </div>
+
+    <div id="mobile-controls" class="mobile-controls hidden">
+      <div id="joystick" class="joystick"><div id="stick"></div></div>
+      <button id="dash-btn" class="dash-btn"><span>↯</span><small data-i18n="dash">РЫВОК</small></button>
+    </div>
+
+    <div id="toast" class="toast"></div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
