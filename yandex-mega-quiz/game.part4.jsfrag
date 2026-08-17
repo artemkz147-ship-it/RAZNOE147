@@ -1,74 +1,48 @@
-    const cat=state.categoryStats[q.category]||(state.categoryStats[q.category]={answers:0,correct:0});cat.answers++;
-    if(!state.dailyProgress.categories.includes(q.category))state.dailyProgress.categories.push(q.category);
-    if(ok){session.correct++;session.combo++;session.maxCombo=Math.max(session.maxCombo,session.combo);state.correctAnswers++;state.dailyProgress.correct++;cat.correct++;const comboBonus=Math.min(200,(session.combo-1)*15);session.score+=base+comboBonus;showToast(session.combo>=3?`Верно! Серия ×${session.combo}`:'Верно!')}
-    else{session.wrong++;session.combo=0;if(session.hearts!==null){session.hearts--;if(session.hearts<=0){showToast('Жизни закончились');setTimeout(finishSession,700);return}}showToast('Неверно')}
-    state.dailyProgress.bestCombo=Math.max(state.dailyProgress.bestCombo,session.maxCombo);$('#quizScore').textContent=fmt(session.score);queueSave();
-    setTimeout(()=>{if(!session)return;session.index++;if(session.modeId==='blitz'&&session.remaining<=0)finishSession();else renderQuestion()},720);
+    screen.innerHTML=`<div class="page-head"><div><h1>Режимы игры</h1><p>Каждый режим меняет темп, риск и награды.</p></div></div><section class="mode-grid">${Object.keys(MODES).map(modeCard).join('')}</section><div class="section-head"><div><h2>Тематические раунды</h2><p>Выбери одну область знаний</p></div></div><section class="category-grid">${Object.entries(CATEGORIES).map(([id,c])=>categoryCard(id,c)).join('')}</section>`;
   }
-  function timeOut(){
-    if(!session||session.answered)return;session.answered=true;const q=currentQuestion();state.totalAnswers++;state.dailyProgress.answers++;state.categoryStats[q.category]??={answers:0,correct:0};state.categoryStats[q.category].answers++;if(!state.dailyProgress.categories.includes(q.category))state.dailyProgress.categories.push(q.category);session.wrong++;session.combo=0;if(session.hearts!==null)session.hearts--;document.querySelectorAll('.answer').forEach((b,i)=>{b.disabled=true;if(i===q.correct)b.classList.add('correct')});showToast('Время вышло');
-    if(session.hearts!==null&&session.hearts<=0){setTimeout(finishSession,700);return}setTimeout(()=>{if(session){session.index++;renderQuestion()}},720)
-  }
-  function useLifeLine(){
-    if(!session||!session.lifeline||session.answered)return;const q=currentQuestion();const wrong=[...document.querySelectorAll('.answer')].filter((_,i)=>i!==q.correct);shuffle(wrong,Math.random).slice(0,Math.max(1,wrong.length-1)).forEach(b=>{b.disabled=true;b.style.visibility='hidden'});session.lifeline=false;const btn=$('[data-life]');if(btn)btn.disabled=true;showToast('Убраны лишние варианты')
-  }
-  function useSkip(){
-    if(!session||session.answered||state.coins<50)return;state.coins-=50;session.skipUsed++;session.index++;queueSave();syncHeader();showToast('Вопрос пропущен');renderQuestion()
-  }
-  async function reviveByAd(){
-    if(!session||session.modeId!=='survival'||session.hearts>=3)return;session.paused=true;const ok=await Y.rewardedAd();if(!session)return;session.paused=false;Y.gameplayStart();if(ok){session.hearts++;showToast('+1 жизнь');renderQuestion()}else showToast('Награда не получена')
+  function renderCategories(){currentPage='categories';setActiveNav('modes');screen.innerHTML=`<div class="page-head"><div><h1>Все темы</h1><p>${Object.keys(CATEGORIES).length} направлений знаний</p></div></div><section class="category-grid">${Object.entries(CATEGORIES).map(([id,c])=>categoryCard(id,c)).join('')}</section>`}
+
+  async function renderDaily(){
+    currentPage='daily';setActiveNav('daily');resetDailyIfNeeded();
+    const qs=dailyQuests(),allClaimed=qs.every(q=>state.dailyClaimed.includes(q.id)),ev=eventOfDay();
+    const dCoins=Math.max(0,Math.floor(flagNum('daily_chest_coins',500))),dXp=Math.max(0,Math.floor(flagNum('daily_chest_xp',750)));
+    const weekOn=flagBool('weekly_enabled',true),calendarOn=flagBool('calendar_enabled',true),dailyLbOn=flagBool('daily_lb_enabled',true);
+    const wqs=weekOn?weeklyQuests():[],wAll=weekOn&&wqs.every(q=>state.weeklyClaimed.includes(q.id));
+    const wCoins=Math.max(0,Math.floor(flagNum('weekly_chest_coins',1200))),wXp=Math.max(0,Math.floor(flagNum('weekly_chest_xp',1800)));
+    const calIndex=clamp(Math.floor(state.calendarIndex||0),0,27),canCal=state.calendarLastClaimedDate!==dayKey();
+
+    const questHtml=(q,weekly=false)=>{
+      const val=Math.min(q.value(),q.target),done=val>=q.target,claimed=(weekly?state.weeklyClaimed:state.dailyClaimed).includes(q.id);
+      return `<div class="quest"><div class="quest-icon">${q.icon}</div><div><div class="quest-title-row"><h4>${esc(q.title)}</h4>${q.tier?`<span class="mini-tag">${esc(q.tier)}</span>`:''}</div><p>${esc(q.text)}</p><div class="progress"><i style="width:${clamp(val/q.target*100,0,100)}%"></i></div></div><div class="quest-reward"><b>+${q.reward} ●</b><button class="${claimed?'ghost':done?'primary':'secondary'}" data-${weekly?'weekly-claim':'claim'}="${q.id}" ${!done||claimed?'disabled':''}>${claimed?'Получено':done?'Забрать':`${fmt(val)}/${fmt(q.target)}`}</button></div></div>`;
+    };
+
+    screen.innerHTML=`<div class="page-head"><div><h1>Центр ежедневных активностей</h1><p>Новые задания появляются автоматически каждые сутки по серверному времени Яндекса.</p></div><button class="primary" data-mode="daily">Испытание дня</button></div>
+      <div class="league-banner event-banner"><div class="league-icon">${ev.icon}</div><div><div class="eyebrow">Событие дня</div><h3>${esc(ev.title)}</h3><p>${esc(ev.text)}</p></div></div>
+
+      ${calendarOn?`<div class="section-head"><div><h2>Календарь наград · 28 дней</h2><p>Пропустил день — прогресс не сгорает. Следующая награда ждёт возвращения.</p></div><button class="primary" data-calendar ${canCal?'':'disabled'}>${canCal?`Забрать день ${calIndex+1}`:'Сегодня получено'}</button></div>
+      <div class="content-card"><div class="calendar-grid">${Array.from({length:28},(_,i)=>{const r=calendarReward(i),done=i<calIndex||(calIndex===0&&state.calendarLastClaimedDate&&i===27),current=i===calIndex;return `<div class="calendar-day ${done?'done':''} ${current?'current':''} ${r.special?'special':''}"><small>День ${i+1}</small><b>${r.special?'🎁':'●'}</b><span>${r.coins} ●<br>+${r.xp} XP</span></div>`}).join('')}</div></div>`:''}
+
+      <div class="section-head"><div><h2>Задания сегодня</h2><p>3 обычных · 2 сложных · главное задание дня</p></div><div class="section-count">${state.dailyClaimed.length}/${qs.length}</div></div>
+      <div class="content-card"><div class="quest-list">${qs.map(q=>questHtml(q,false)).join('')}</div></div>
+      <div class="section-head"><div><h2>Сундук дня</h2><p>Открой после получения всех наград</p></div></div>
+      <div class="league-banner"><div class="league-icon">🎁</div><div><h3>${state.dailyChest?'Сундук открыт':`+${dCoins} монет и +${dXp} XP`}</h3><p>${state.dailyChest?'Возвращайся завтра — задания сгенерируются заново.':allClaimed?'Все задания закрыты — награда готова.':`Выполни ${qs.length} заданий и забери общий бонус.`}</p></div><button class="primary" style="margin-left:auto" data-chest ${!allClaimed||state.dailyChest?'disabled':''}>${state.dailyChest?'Получено':'Открыть'}</button></div>
+
+      ${weekOn?`<div class="section-head"><div><h2>Недельные задания</h2><p>Неделя начинается в понедельник · набор автоматически меняется</p></div><div class="section-count">${state.weeklyClaimed.length}/${wqs.length}</div></div>
+      <div class="content-card"><div class="quest-list">${wqs.map(q=>questHtml(q,true)).join('')}</div></div>
+      <div class="league-banner"><div class="league-icon">🏆</div><div><h3>${state.weeklyChest?'Недельный сундук открыт':`Сундук недели · ${wCoins} ● + ${wXp} XP`}</h3><p>${state.weeklyChest?'Новый набор появится в следующий понедельник.':wAll?'Все недельные цели выполнены.':'Закрой все недельные задания для большого бонуса.'}</p></div><button class="primary" style="margin-left:auto" data-weekly-chest ${!wAll||state.weeklyChest?'disabled':''}>${state.weeklyChest?'Получено':'Открыть'}</button></div>`:''}
+
+      ${dailyLbOn?`<div class="section-head"><div><h2>Рейтинг дня</h2><p>Лучший результат сегодняшнего «Испытания дня»</p></div><div class="section-count">${fmt(state.dailyProgress.bestDailyScore||0)} очков</div></div><div class="content-card" id="dailyLeaderWrap"><div class="empty">Загружаем рейтинг дня…</div></div>`:''}`;
+
+    if(dailyLbOn){
+      const lb=await Y.getDailyLeaderboard(epochDay());if(currentPage!=='daily')return;
+      const wrap=$('#dailyLeaderWrap');if(!wrap)return;
+      if(!lb?.entries?.length){wrap.innerHTML=`<div class="empty">${Y.local?'В локальном запуске рейтинг дня недоступен.':'Сегодня в таблице пока нет результатов. Для отправки своего результата войди в Яндекс ID.'}</div>`;return}
+      wrap.innerHTML=`<div class="leaderboard">${lb.entries.map(e=>`<div class="leader-row ${e.player?.uniqueID===Y.player?.getUniqueID?.()?'me':''}"><div class="leader-rank">${e.rank}</div><div class="leader-name"><b>${esc(e.player?.publicName||'Игрок')}</b><small>Испытание дня</small></div><div class="leader-score">${fmt(e.dayScore)}</div></div>`).join('')}</div>`;
+    }
   }
 
-  async function finishSession(){
-    if(!session)return;stopTick();Y.gameplayStop();const s=session;session=null;document.querySelector('#bottomNav').style.display='grid';
-    const answered=s.correct+s.wrong;const accuracy=answered?Math.round(s.correct/answered*100):0;const xp=Math.floor(s.score*.18+s.correct*18);const coins=Math.max(10,Math.floor(s.score/70));
-    state.gamesPlayed++;state.xp+=xp;state.coins+=coins;state.ratingPoints+=s.score;state.bestScore=Math.max(state.bestScore,s.score);state.dailyProgress.games++;state.dailyProgress.score+=s.score;state.dailyProgress.bestCombo=Math.max(state.dailyProgress.bestCombo,s.maxCombo);
-    const ms=state.modeStats[s.modeId]||(state.modeStats[s.modeId]={games:0,best:0,bestCombo:0});ms.games++;ms.best=Math.max(ms.best,s.score);ms.bestCombo=Math.max(ms.bestCombo,s.maxCombo);
-    if(s.mode.daily)state.dailyPlayed=dayKey();checkAchievements();queueSave(true);syncHeader();Y.setScore(ratingScore());
-    state.adCounter=(state.adCounter||0)+1;queueSave();
-    renderResult(s,{answered,accuracy,xp,coins});
-    if(state.adCounter%3===0)setTimeout(()=>Y.fullscreenAd(),250);
-  }
-  function renderResult(s,r){
-    currentPage='result';setActiveNav('');screen.innerHTML=`<div class="content-card result-card"><div class="result-orb">${r.accuracy>=90?'🏆':r.accuracy>=70?'🌟':'🧠'}</div><div class="eyebrow">${esc(s.mode.name)} завершён</div><h1>${fmt(s.score)} очков</h1><p>${resultPhrase(r.accuracy)}</p><div class="result-stats"><div class="metric"><small>Верно</small><b>${s.correct}</b></div><div class="metric"><small>Точность</small><b>${r.accuracy}%</b></div><div class="metric"><small>Серия</small><b>×${s.maxCombo}</b></div><div class="metric"><small>Награда</small><b>+${r.coins} ●</b></div></div><p>Получено <b>+${r.xp} XP</b>. Рейтинг-счёт: <b>${fmt(ratingScore())}</b>.</p><div class="action-row"><button class="primary" data-replay="${s.modeId}" data-cat="${s.category||''}">Ещё раз</button><button class="secondary" data-double="${r.coins}">×2 монеты · реклама</button><button class="ghost" data-action="home">На главную</button></div></div>`;
-  }
-  function resultPhrase(a){if(a===100)return 'Идеальный раунд. Ни одной ошибки!';if(a>=90)return 'Очень сильный результат.';if(a>=75)return 'Отличный кругозор — ещё немного до идеала.';if(a>=55)return 'Хорошая база. Следующий раунд будет ещё лучше.';return 'Каждый вопрос прокачивает знания. Попробуй другой режим.'}
-  async function doubleReward(amount,button){
-    if(button.disabled)return;button.disabled=true;const ok=await Y.rewardedAd();if(ok){state.coins+=Number(amount)||0;queueSave(true);syncHeader();showToast(`Ещё +${amount} монет`);button.textContent='Награда получена'}else{button.disabled=false;showToast('Видео не завершено')}
-  }
-
-  async function authorizeAndRefresh(){
-    const ok=await Y.authorize();if(ok){const cloud=await Y.loadSave();if(cloud){state=mergeState(state,cloud);saveLocal()}syncHeader();showToast('Вход выполнен');if(currentPage==='rating')renderRating();else renderProfile()}else showToast('Не удалось войти')
-  }
-
-  document.addEventListener('click',e=>{
-    const t=e.target.closest('button');if(!t)return;
-    if(t.dataset.answer!==undefined){answerQuestion(Number(t.dataset.answer));return}
-    if(t.dataset.mode){startMode(t.dataset.mode);return}
-    if(t.dataset.category){startMode('classic',t.dataset.category);return}
-    if(t.dataset.life!==undefined){useLifeLine();return}
-    if(t.dataset.skip!==undefined){useSkip();return}
-    if(t.dataset.lifeAd!==undefined){reviveByAd();return}
-    if(t.dataset.claim){claimQuest(t.dataset.claim);return}
-    if(t.dataset.chest!==undefined){claimDailyChest();return}
-    if(t.dataset.auth!==undefined){authorizeAndRefresh();return}
-    if(t.dataset.replay){startMode(t.dataset.replay,t.dataset.cat||null);return}
-    if(t.dataset.double){doubleReward(t.dataset.double,t);return}
-    if(t.dataset.modal==='close'){closeModal();return}
-    const a=t.dataset.action;if(!a)return;
-    ({home:renderHome,modes:renderModes,daily:renderDaily,rating:renderRating,profile:renderProfile,categories:renderCategories,shop:renderShop}[a]||renderHome)();
-  });
-
-  document.addEventListener('keydown',e=>{
-    if(!session||session.answered)return;const idx=['1','2','3','4','a','b','c','d','A','B','C','D'].indexOf(e.key);if(idx>=0)answerQuestion(idx%4)
-  });
-  document.addEventListener('visibilitychange',()=>{if(!session)return;session.paused=document.hidden;if(document.hidden)Y.gameplayStop();else Y.gameplayStart()});
-  Y.on('pause',()=>{if(session)session.paused=true});Y.on('resume',()=>{if(session){session.paused=false;Y.gameplayStart()}});
-  window.addEventListener('pagehide',()=>{saveLocal();Y.save(state);Y.gameplayStop()});
-
-  async function boot(){
-    loadLocal();await Y.init();const cloud=await Y.loadSave();if(cloud)state=mergeState(state,cloud);resetDailyIfNeeded();updateStreak();checkAchievements();queueSave();syncHeader();renderHome();Y.gameReady();
-    if(Y.local)showToast('Локальный режим: SDK Яндекс Игр не найден');
-  }
-  boot();
-})();
+  async function renderRating(){
+    currentPage='rating';setActiveNav('rating');
+    screen.innerHTML=`<div class="page-head"><div><h1>Рейтинг игроков</h1><p>Глобальный лидерборд Яндекс Игр · техническое имя global_score</p></div></div><div class="league-banner"><div class="league-icon">♛</div><div><h3>${leagueName(ratingScore())}</h3><p>Твой рейтинг-счёт: ${fmt(ratingScore())}</p></div>${Y.isAuthorized()?'':'<button class="primary" data-auth style="margin-left:auto">Войти</button>'}</div><div class="content-card" id="leaderWrap"><div class="empty">Загружаем таблицу лидеров…</div></div>`;
+    const lb=await Y.getLeaderboard();if(currentPage!=='rating')return;
+    const wrap=$('#leaderWrap');
