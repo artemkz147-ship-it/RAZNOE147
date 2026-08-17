@@ -210,6 +210,8 @@ class Game {
 
   attachSword(characterRoot) {
     const sword = this.prepareAttachment(this.assets.sword, .92);
+    if (sword.children[0]) sword.children[0].position.set(0,0,0);
+    characterRoot.add(sword); sword.position.set(-.62,1.08,.08); sword.rotation.set(0,0,Math.PI); sword.scale.setScalar(1.05); characterRoot.userData.weapon=sword; return sword;
     let right = null, fallback = null;
     characterRoot.traverse(o => {
       if (!o.isBone) return;
@@ -281,7 +283,7 @@ class Game {
       damageTaken:Math.max(.68,1-m.ward*.02),crit:.06,dashCooldown:2.1,dashTimer:0,dashTime:0,invuln:0,facing:new THREE.Vector3(0,0,1),
       pickupRadius:4.1,regen:0,boltRank:0,boltDamage:18,boltDelay:1.75,orbitRank:0,soulGain:1,attackAnimUntil:0
     };
-    this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12); if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);} if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);}
+    this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12); if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);} if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);} if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);}
     this.updateHud();
   }
 
@@ -432,7 +434,7 @@ class Game {
 
   autoAttack(){
     if(this.elapsed-this.lastAttack<this.player.attackDelay)return;const p=this.player,targets=this.enemies.filter(e=>!e.dead).map(e=>({e,d:e.pos.distanceToSquared(p.pos)})).filter(x=>x.d<=p.attackRange*p.attackRange).sort((a,b)=>a.d-b.d).slice(0,p.cleave);if(!targets.length)return;
-    this.lastAttack=this.elapsed;const aim=targets[0].e.pos.clone().sub(p.pos);aim.y=0;if(aim.lengthSq()>.01){aim.normalize();p.facing.copy(aim);p.root.rotation.y=Math.atan2(aim.x,aim.z);}p.attackAnimUntil=this.elapsed+Math.min(.44,p.attackDelay*.72);this.playPlayerAnim('attack',false,.05);this.audio.attack();
+    this.lastAttack=this.elapsed;const aim=targets[0].e.pos.clone().sub(p.pos);aim.y=0;if(aim.lengthSq()>.01){aim.normalize();p.facing.copy(aim);p.root.rotation.y=Math.atan2(aim.x,aim.z);}p.attackAnimUntil=this.elapsed+Math.min(.44,p.attackDelay*.72);this.playPlayerAnim('attack',false,.05);this.audio.attack();const weapon=p.root.userData.weapon;if(weapon){weapon.rotation.z=2.2;clearTimeout(p.weaponTimer);p.weaponTimer=setTimeout(()=>{if(weapon.parent)weapon.rotation.z=Math.PI;},Math.min(260,p.attackDelay*390));}
     for(const {e} of targets)this.damageEnemy(e,p.damage*(Math.random()<p.crit?2:1));
   }
 
