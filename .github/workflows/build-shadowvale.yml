@@ -26,13 +26,14 @@ jobs:
           from pathlib import Path
           p=Path('src/main.js')
           s=p.read_text(encoding='utf-8')
-          old="""      if (!fallback && n.includes('hand')) fallback = o;
-      if (!right && n.includes('hand') && (n.includes('right') || n.includes('.r') || n.includes('_r') || n.endsWith('r'))) right = o;"""
-          new="""      if (!right && (n.includes('palm.r') || n.includes('palm_r') || n.includes('palm r'))) right = o;
-      if (!fallback && (n.includes('hand') || n.includes('palm'))) fallback = o;
-      if (!right && (n.includes('hand') || n.includes('palm')) && (n.includes('right') || n.includes('.r') || n.includes('_r') || n.endsWith('r'))) right = o;"""
-          if old in s:
-              s=s.replace(old,new)
+          first="      if (!fallback && n.includes('hand')) fallback = o;"
+          first_new="      if (!right && (n.includes('palm.r') || n.includes('palm_r') || n.includes('palm r'))) right = o;\n      if (!fallback && (n.includes('hand') || n.includes('palm'))) fallback = o;"
+          second="      if (!right && n.includes('hand') && (n.includes('right') || n.includes('.r') || n.includes('_r') || n.endsWith('r'))) right = o;"
+          second_new="      if (!right && (n.includes('hand') || n.includes('palm')) && (n.includes('right') || n.includes('.r') || n.includes('_r') || n.endsWith('r'))) right = o;"
+          if first in s:
+              s=s.replace(first,first_new)
+          if second in s:
+              s=s.replace(second,second_new)
           if "n.includes('palm.r')" not in s:
               raise SystemExit('Knight Palm.R attachment polish missing')
           p.write_text(s,encoding='utf-8')
