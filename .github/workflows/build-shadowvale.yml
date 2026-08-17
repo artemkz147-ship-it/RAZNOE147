@@ -38,6 +38,9 @@ jobs:
           sword_old="      bone.add(sword); sword.position.set(.03,.02,-.03); sword.rotation.set(Math.PI/2,0,0); sword.scale.setScalar(.88);"
           sword_new="      if (sword.children[0]) sword.children[0].position.set(0,0,0);\n      bone.add(sword); sword.position.set(0,0,0); sword.rotation.set(0,0,0); sword.scale.setScalar(.82);"
           if sword_old in s: s=s.replace(sword_old,sword_new)
+          fixed_anchor="    const sword = this.prepareAttachment(this.assets.sword, .92);"
+          fixed_code="    const sword = this.prepareAttachment(this.assets.sword, .92);\n    if (sword.children[0]) sword.children[0].position.set(0,0,0);\n    characterRoot.add(sword); sword.position.set(-.62,1.08,.08); sword.rotation.set(0,0,Math.PI); sword.scale.setScalar(1.05); characterRoot.userData.weapon=sword; return sword;"
+          if fixed_anchor in s and "characterRoot.userData.weapon=sword; return sword;" not in s: s=s.replace(fixed_anchor,fixed_code)
           menu_old="this.menuHero.action=this.menuHero.mixer.clipAction(idle);this.menuHero.action.play();}"
           menu_new="this.menuHero.action=this.menuHero.mixer.clipAction(idle);this.menuHero.action.play();this.menuHero.action.time=.55;this.menuHero.mixer.update(0);}"
           if menu_old in s: s=s.replace(menu_old,menu_new)
@@ -47,9 +50,12 @@ jobs:
           ground_old="    const b = new THREE.Box3().setFromObject(model); model.position.y -= b.min.y;\n    model.traverse(o => { if(o.isMesh){o.receiveShadow=true;o.castShadow=false;} });"
           ground_new="    const b = new THREE.Box3().setFromObject(model); model.position.y -= b.max.y;\n    model.traverse(o => { if(o.isMesh){o.receiveShadow=true;o.castShadow=false;} });"
           if ground_old in s: s=s.replace(ground_old,ground_new)
-          required=["n.includes('palm.r')","m.color.setHex(0x60747d)","sword.children[0].position.set(0,0,0)","this.player.action.time=.55","model.position.y -= b.max.y"]
+          attack_anchor="this.playPlayerAnim('attack',false,.05);this.audio.attack();"
+          attack_code="this.playPlayerAnim('attack',false,.05);this.audio.attack();const weapon=p.root.userData.weapon;if(weapon){weapon.rotation.z=2.2;clearTimeout(p.weaponTimer);p.weaponTimer=setTimeout(()=>{if(weapon.parent)weapon.rotation.z=Math.PI;},Math.min(260,p.attackDelay*390));}"
+          if attack_anchor in s and "const weapon=p.root.userData.weapon" not in s: s=s.replace(attack_anchor,attack_code)
+          required=["m.color.setHex(0x60747d)","characterRoot.userData.weapon=sword; return sword;","this.player.action.time=.55","model.position.y -= b.max.y","const weapon=p.root.userData.weapon"]
           missing=[x for x in required if x not in s]
-          if missing: raise SystemExit('Final character/ground polish missing: '+', '.join(missing))
+          if missing: raise SystemExit('Final visual polish missing: '+', '.join(missing))
           p.write_text(s,encoding='utf-8')
           PY
           node --check src/main.js
@@ -107,7 +113,7 @@ jobs:
             git config user.name 'Shadowvale Release Bot'
             git config user.email 'actions@users.noreply.github.com'
             git add src/main.js
-            git commit -m 'Align arena floor and polish final Knight visuals'
+            git commit -m 'Make imported sword readable and animated in combat'
             git push origin HEAD:yandex-3d-survival-fantasy
           fi
 
