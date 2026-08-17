@@ -1,0 +1,39 @@
+name: Assemble Yandex Mega Quiz
+
+on:
+  push:
+    branches: [yandex-mega-quiz]
+    paths:
+      - 'yandex-mega-quiz/*.jsfrag'
+      - '.github/workflows/assemble-yandex-mega-quiz.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: yandex-mega-quiz
+          fetch-depth: 0
+
+      - name: Assemble runtime files
+        shell: bash
+        run: |
+          cat yandex-mega-quiz/questions.part1.jsfrag yandex-mega-quiz/questions.part2.jsfrag yandex-mega-quiz/questions.part3.jsfrag yandex-mega-quiz/questions.part4.jsfrag > yandex-mega-quiz/questions.js
+          cat yandex-mega-quiz/game.part1.jsfrag yandex-mega-quiz/game.part2.jsfrag yandex-mega-quiz/game.part3.jsfrag yandex-mega-quiz/game.part4.jsfrag > yandex-mega-quiz/game.js
+          node --check yandex-mega-quiz/questions.js
+          node --check yandex-mega-quiz/game.js
+
+      - name: Commit assembled files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add yandex-mega-quiz/questions.js yandex-mega-quiz/game.js
+          git diff --cached --quiet && exit 0
+          git commit -m "Assemble Umniversum runtime files"
+          git push origin yandex-mega-quiz
