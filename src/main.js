@@ -212,8 +212,9 @@ class Game {
     characterRoot.traverse(o => {
       if (!o.isBone) return;
       const n = o.name.toLowerCase();
-      if (!fallback && n.includes('hand')) fallback = o;
-      if (!right && n.includes('hand') && (n.includes('right') || n.includes('.r') || n.includes('_r') || n.endsWith('r'))) right = o;
+      if (!right && (n.includes('palm.r') || n.includes('palm_r') || n.includes('palm r'))) right = o;
+      if (!fallback && (n.includes('hand') || n.includes('palm'))) fallback = o;
+      if (!right && (n.includes('hand') || n.includes('palm')) && (n.includes('right') || n.includes('.r') || n.includes('_r') || n.endsWith('r'))) right = o;
     });
     const bone = right || fallback;
     if (bone) {
