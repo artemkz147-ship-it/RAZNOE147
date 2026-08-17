@@ -44,9 +44,12 @@ jobs:
           player_old="this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12);"
           player_new="this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12); if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);}"
           if player_old in s: s=s.replace(player_old,player_new)
-          required=["n.includes('palm.r')","m.color.setHex(0x60747d)","sword.children[0].position.set(0,0,0)","this.player.action.time=.55"]
+          ground_old="    const b = new THREE.Box3().setFromObject(model); model.position.y -= b.min.y;\n    model.traverse(o => { if(o.isMesh){o.receiveShadow=true;o.castShadow=false;} });"
+          ground_new="    const b = new THREE.Box3().setFromObject(model); model.position.y -= b.max.y;\n    model.traverse(o => { if(o.isMesh){o.receiveShadow=true;o.castShadow=false;} });"
+          if ground_old in s: s=s.replace(ground_old,ground_new)
+          required=["n.includes('palm.r')","m.color.setHex(0x60747d)","sword.children[0].position.set(0,0,0)","this.player.action.time=.55","model.position.y -= b.max.y"]
           missing=[x for x in required if x not in s]
-          if missing: raise SystemExit('Final character polish missing: '+', '.join(missing))
+          if missing: raise SystemExit('Final character/ground polish missing: '+', '.join(missing))
           p.write_text(s,encoding='utf-8')
           PY
           node --check src/main.js
@@ -104,7 +107,7 @@ jobs:
             git config user.name 'Shadowvale Release Bot'
             git config user.email 'actions@users.noreply.github.com'
             git add src/main.js
-            git commit -m 'Polish final Knight silhouette and weapon rig'
+            git commit -m 'Align arena floor and polish final Knight visuals'
             git push origin HEAD:yandex-3d-survival-fantasy
           fi
 
