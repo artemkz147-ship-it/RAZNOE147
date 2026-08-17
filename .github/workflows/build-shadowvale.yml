@@ -75,7 +75,7 @@ jobs:
           done
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           TEST_URL='http://127.0.0.1:4173/?autostart=1&debug-fast=1'
-          CHROME_FLAGS='--headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --enable-unsafe-swiftshader --use-angle=swiftshader'
+          CHROME_FLAGS='--headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required'
           "$CHROME" $CHROME_FLAGS --window-size=1280,720 --virtual-time-budget=8000 --dump-dom "$TEST_URL" > /tmp/shadowvale-dom.html || true
           echo '--- GAME STATE ---'
           grep -o 'data-game-ready="[^"]*"' /tmp/shadowvale-dom.html | head -1 || true
