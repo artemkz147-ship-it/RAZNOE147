@@ -211,7 +211,7 @@ class Game {
   attachSword(characterRoot) {
     const sword = this.prepareAttachment(this.assets.sword, .92);
     if (sword.children[0]) sword.children[0].position.set(0,0,0);
-    characterRoot.add(sword); sword.position.set(-.62,1.08,.08); sword.rotation.set(0,0,Math.PI); sword.scale.setScalar(1.05); characterRoot.userData.weapon=sword; return sword;
+    characterRoot.add(sword); sword.position.set(-.40,.95,.43); sword.rotation.set(0,0,Math.PI); sword.scale.setScalar(1.05); characterRoot.userData.weapon=sword; return sword;
     let right = null, fallback = null;
     characterRoot.traverse(o => {
       if (!o.isBone) return;
@@ -253,7 +253,7 @@ class Game {
 
     this.menuHero = { root:this.prepareVisual(this.assets.hero,2.35), mixer:null, action:null };
     this.menuHero.root.position.set(0,0,2.2); this.menuHero.root.rotation.y=-.45; this.scene.add(this.menuHero.root); this.attachSword(this.menuHero.root);
-    this.menuHero.mixer = new THREE.AnimationMixer(this.menuHero.root); const idle=this.findClip(this.assets.hero,['idle']); if(idle){this.menuHero.action=this.menuHero.mixer.clipAction(idle);this.menuHero.action.play();this.menuHero.action.time=.55;this.menuHero.mixer.update(0);}
+    this.menuHero.mixer = new THREE.AnimationMixer(this.menuHero.root); const idle=this.findClip(this.assets.hero,['idle_weaponright','idle']); if(idle){this.menuHero.action=this.menuHero.mixer.clipAction(idle);this.menuHero.action.play();this.menuHero.action.time=.55;this.menuHero.mixer.update(0);}
   }
 
   findClip(gltf, words) {
@@ -263,7 +263,7 @@ class Game {
   }
 
   playPlayerAnim(kind, loop=true, fade=.1) {
-    const map={ idle:['idle'], run:['run_swordright','run','walk'], attack:['swordattack','attack','slash','hit'], death:['death','die'] };
+    const map={ idle:['idle_weaponright','idle'], run:['run_weaponright','run','walk'], attack:['run_swordattack','swordattackjump','attack','hit'], death:['death','die'] };
     const clip=this.findClip(this.assets.hero,map[kind]||[kind]); if(!clip)return;
     const next=this.player.mixer.clipAction(clip); if(this.player.action===next&&next.isRunning())return;
     next.reset().setLoop(loop?THREE.LoopRepeat:THREE.LoopOnce,loop?Infinity:1); next.clampWhenFinished=!loop;
@@ -283,7 +283,7 @@ class Game {
       damageTaken:Math.max(.68,1-m.ward*.02),crit:.06,dashCooldown:2.1,dashTimer:0,dashTime:0,invuln:0,facing:new THREE.Vector3(0,0,1),
       pickupRadius:4.1,regen:0,boltRank:0,boltDamage:18,boltDelay:1.75,orbitRank:0,soulGain:1,attackAnimUntil:0
     };
-    this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12); if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);} if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);} if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);}
+    this.scene.add(this.player.root); this.attachSword(this.player.root); this.player.mixer=new THREE.AnimationMixer(this.player.root); this.playPlayerAnim('idle',true,.12); if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);} if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);} if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);} if(this.player.action){this.player.action.time=.55;this.player.mixer.update(0);}
     this.updateHud();
   }
 
