@@ -23,6 +23,10 @@
     gameplayStart(){try{this.ysdk?.features?.GameplayAPI?.start?.();}catch(e){console.warn(e)}}
     gameplayStop(){try{this.ysdk?.features?.GameplayAPI?.stop?.();}catch(e){console.warn(e)}}
     serverTime(){try{return this.ysdk?.serverTime?.() ?? Date.now();}catch{return Date.now()}}
+    async getFlags(defaultFlags={}){
+      if(!this.ysdk?.getFlags)return {...defaultFlags};
+      try{return await this.ysdk.getFlags({defaultFlags})}catch(e){console.warn('Remote config failed',e);return {...defaultFlags}}
+    }
     isAuthorized(){try{return !!this.player?.isAuthorized?.()}catch{return false}}
     async authorize(){
       if(this.local)return false;
@@ -56,6 +60,25 @@
         const res=await this.ysdk.leaderboards.getEntries('global_score',{quantityTop:10,includeUser:this.isAuthorized(),quantityAround:2});
         return res;
       }catch(e){console.warn('Leaderboard read failed',e);return null}
+    }
+    async setDailyScore(epochDay,score){
+      if(!this.ysdk?.leaderboards || !this.isAuthorized())return false;
+      try{
+        const available=await this.ysdk.isAvailableMethod?.('leaderboards.setScore');
+        if(available===false)return false;
+        const encoded=Math.max(0,Math.floor(epochDay))*1000000+Math.max(0,Math.min(999999,Math.floor(score)));
+        await this.ysdk.leaderboards.setScore('daily_score',encoded);
+        return true;
+      }catch(e){console.warn('Daily leaderboard score failed',e);return false}
+    }
+    async getDailyLeaderboard(epochDay){
+      if(!this.ysdk?.leaderboards)return null;
+      try{
+        const res=await this.ysdk.leaderboards.getEntries('daily_score',{quantityTop:20,includeUser:this.isAuthorized(),quantityAround:2});
+        const prefix=Math.max(0,Math.floor(epochDay))*1000000;
+        res.entries=(res.entries||[]).filter(e=>Math.floor((e.score||0)/1000000)===Math.floor(epochDay)).map(e=>({...e,dayScore:(e.score||0)-prefix}));
+        return res;
+      }catch(e){console.warn('Daily leaderboard read failed',e);return null}
     }
     async fullscreenAd(){
       if(!this.ysdk?.adv?.showFullscreenAdv)return false;
