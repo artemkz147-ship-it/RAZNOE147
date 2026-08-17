@@ -52,15 +52,13 @@ jobs:
           done
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           TEST_URL='http://127.0.0.1:4173/?autostart=1&debug-fast=1'
-          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --use-angle=swiftshader \
-            --window-size=1280,720 --virtual-time-budget=6000 --dump-dom "$TEST_URL" > /tmp/shadowvale-dom.html
+          CHROME_FLAGS='--headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --enable-unsafe-swiftshader --use-angle=swiftshader'
+          "$CHROME" $CHROME_FLAGS --window-size=1280,720 --virtual-time-budget=6000 --dump-dom "$TEST_URL" > /tmp/shadowvale-dom.html
           grep -q 'data-game-ready="true"' /tmp/shadowvale-dom.html
           grep -Eq 'data-game-state="(playing|upgrade|gameover|victory)"' /tmp/shadowvale-dom.html
           grep -q 'id="boss-bar-wrap" class="boss-bar-wrap"' /tmp/shadowvale-dom.html
-          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --use-angle=swiftshader \
-            --window-size=1280,720 --virtual-time-budget=3500 --screenshot=smoke-desktop.png "$TEST_URL"
-          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --use-angle=swiftshader \
-            --window-size=412,915 --virtual-time-budget=3500 --screenshot=smoke-mobile.png \
+          "$CHROME" $CHROME_FLAGS --window-size=1280,720 --virtual-time-budget=3500 --screenshot=smoke-desktop.png "$TEST_URL"
+          "$CHROME" $CHROME_FLAGS --window-size=412,915 --virtual-time-budget=3500 --screenshot=smoke-mobile.png \
             --user-agent='Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36' "$TEST_URL"
           test -s smoke-desktop.png
           test -s smoke-mobile.png
