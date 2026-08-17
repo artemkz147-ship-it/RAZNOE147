@@ -1,0 +1,66 @@
+    {id:'explorer',icon:'🌍',name:'Энциклопедист',desc:'Сыграть в 10 темах',test:()=>Object.keys(state.categoryStats).length>=10},
+    {id:'streak7',icon:'☀',name:'Неделя знаний',desc:'Серия входов 7 дней',test:()=>state.streak>=7},
+    {id:'daily',icon:'📅',name:'Испытатель',desc:'Пройти испытание дня',test:()=>!!state.dailyPlayed}
+  ];
+  function checkAchievements(){
+    const unlocked=[];for(const a of ACHIEVEMENTS){if(!state.achievements.includes(a.id)&&a.test()){state.achievements.push(a.id);state.coins+=75;unlocked.push(a)}}
+    if(unlocked.length)showToast(`Достижение: ${unlocked[0].name} · +75`);
+  }
+
+  function renderHome(){
+    currentPage='home';setActiveNav('home');syncHeader();resetDailyIfNeeded();
+    const acc=state.totalAnswers?Math.round(state.correctAnswers/state.totalAnswers*100):0;
+    screen.innerHTML=`
+      <section class="hero">
+        <div class="hero-card">
+          <div class="eyebrow">${fmt(QUESTIONS.length)} вопросов · 19 тем</div>
+          <h1>Проверь, насколько широк твой кругозор</h1>
+          <p>Быстрые раунды, выживание, лестница сложности, тематические испытания, ежедневные задания и общий рейтинг игроков.</p>
+          <div class="hero-actions"><button class="primary" data-mode="classic">Играть сейчас</button><button class="secondary" data-action="modes">Все режимы</button></div>
+        </div>
+        <div class="daily-preview">
+          <div class="day-orb">☀</div><div class="eyebrow">Испытание дня</div><h3>${state.dailyPlayed===dayKey()?'Сегодня пройдено':'12 вопросов для всех'}</h3>
+          <p>${state.dailyPlayed===dayKey()?'Можно переиграть ради результата, но награда дня уже засчитана.':'Набор меняется каждые сутки по серверному времени.'}</p>
+          <button class="primary" data-mode="daily">${state.dailyPlayed===dayKey()?'Переиграть':'Начать испытание'}</button>
+        </div>
+      </section>
+      <div class="section-head"><div><h2>Популярные режимы</h2><p>Меняй темп и правила игры</p></div><button data-action="modes">Показать все</button></div>
+      <section class="mode-grid">${['classic','blitz','survival','ladder'].map(modeCard).join('')}</section>
+      <div class="section-head"><div><h2>Твоя статистика</h2><p>Прогресс сохраняется автоматически</p></div></div>
+      <section class="stat-grid">
+        <div class="metric"><small>Лучший результат</small><b>${fmt(state.bestScore)}</b><div class="trend">★ личный рекорд</div></div>
+        <div class="metric"><small>Точность</small><b>${acc}%</b><div class="trend">${fmt(state.correctAnswers)} верных</div></div>
+        <div class="metric"><small>Раундов</small><b>${fmt(state.gamesPlayed)}</b><div class="trend">${fmt(state.totalAnswers)} ответов</div></div>
+        <div class="metric"><small>Рейтинг-очки</small><b>${fmt(ratingScore())}</b><div class="trend">глобальный счёт</div></div>
+      </section>
+      <div class="section-head"><div><h2>Темы</h2><p>От науки и истории до кино и логики</p></div><button data-action="categories">Все темы</button></div>
+      <section class="category-grid">${Object.entries(CATEGORIES).slice(0,10).map(([id,c])=>categoryCard(id,c)).join('')}</section>`;
+  }
+  function modeCard(id){const m=MODES[id];return `<button class="mode-card" data-mode="${id}"><span class="mode-icon">${m.icon}</span><h3>${m.name}</h3><p>${m.desc}</p><span class="mode-tag">${m.tag}</span></button>`}
+  function categoryCard(id,c){const count=QUESTIONS.filter(q=>q.category===id).length;return `<button class="category-card" data-category="${id}"><span class="cat-emoji">${c.emoji}</span><b>${c.name}</b><small>${count} вопросов</small></button>`}
+
+  function renderModes(){
+    currentPage='modes';setActiveNav('modes');
+    screen.innerHTML=`<div class="page-head"><div><h1>Режимы игры</h1><p>Каждый режим меняет темп, риск и награды.</p></div></div><section class="mode-grid">${Object.keys(MODES).map(modeCard).join('')}</section><div class="section-head"><div><h2>Тематические раунды</h2><p>Выбери одну область знаний</p></div></div><section class="category-grid">${Object.entries(CATEGORIES).map(([id,c])=>categoryCard(id,c)).join('')}</section>`;
+  }
+  function renderCategories(){currentPage='categories';setActiveNav('modes');screen.innerHTML=`<div class="page-head"><div><h1>Все темы</h1><p>${Object.keys(CATEGORIES).length} направлений знаний</p></div></div><section class="category-grid">${Object.entries(CATEGORIES).map(([id,c])=>categoryCard(id,c)).join('')}</section>`}
+
+  function renderDaily(){
+    currentPage='daily';setActiveNav('daily');resetDailyIfNeeded();const qs=dailyQuests();const allClaimed=qs.every(q=>state.dailyClaimed.includes(q.id));
+    screen.innerHTML=`<div class="page-head"><div><h1>Ежедневные задания</h1><p>Сброс в новые календарные сутки по серверному времени.</p></div><button class="primary" data-mode="daily">Испытание дня</button></div>
+      <div class="content-card"><div class="quest-list">${qs.map(q=>{const val=Math.min(q.value(),q.target),done=val>=q.target,claimed=state.dailyClaimed.includes(q.id);return `<div class="quest"><div class="quest-icon">${q.icon}</div><div><h4>${q.title}</h4><p>${q.text}</p><div class="progress"><i style="width:${clamp(val/q.target*100,0,100)}%"></i></div></div><div class="quest-reward"><b>+${q.reward} ●</b><button class="${claimed?'ghost':done?'primary':'secondary'}" data-claim="${q.id}" ${!done||claimed?'disabled':''}>${claimed?'Получено':done?'Забрать':`${val}/${q.target}`}</button></div></div>`}).join('')}</div></div>
+      <div class="section-head"><div><h2>Сундук дня</h2><p>Открой после получения всех трёх наград</p></div></div>
+      <div class="league-banner"><div class="league-icon">🎁</div><div><h3>${state.dailyChest?'Сундук открыт':'+350 монет и +500 XP'}</h3><p>${state.dailyChest?'Возвращайся завтра за новой серией заданий.':allClaimed?'Все задания закрыты — награда готова.':'Выполни три задания и забери общий бонус.'}</p></div><button class="primary" style="margin-left:auto" data-chest ${!allClaimed||state.dailyChest?'disabled':''}>${state.dailyChest?'Получено':'Открыть'}</button></div>`;
+  }
+
+  async function renderRating(){
+    currentPage='rating';setActiveNav('rating');
+    screen.innerHTML=`<div class="page-head"><div><h1>Рейтинг игроков</h1><p>Глобальный лидерборд Яндекс Игр · техническое имя global_score</p></div></div><div class="league-banner"><div class="league-icon">♛</div><div><h3>${leagueName(ratingScore())}</h3><p>Твой рейтинг-счёт: ${fmt(ratingScore())}</p></div>${Y.isAuthorized()?'':'<button class="primary" data-auth style="margin-left:auto">Войти</button>'}</div><div class="content-card" id="leaderWrap"><div class="empty">Загружаем таблицу лидеров…</div></div>`;
+    const lb=await Y.getLeaderboard();if(currentPage!=='rating')return;
+    const wrap=$('#leaderWrap');
+    if(!lb?.entries?.length){wrap.innerHTML=`<div class="empty">${Y.local?'В локальном запуске глобальный рейтинг недоступен. После загрузки в Яндекс Игры здесь появятся реальные игроки.':'Лидерборд пока пуст или ещё не создан в Консоли Яндекс Игр.'}</div>`;return}
+    wrap.innerHTML=`<div class="leaderboard">${lb.entries.map(e=>`<div class="leader-row ${e.player?.uniqueID===Y.player?.getUniqueID?.()?'me':''}"><div class="leader-rank">${e.rank}</div><div class="leader-name"><b>${esc(e.player?.publicName||'Игрок')}</b><small>${leagueName(e.score)}</small></div><div class="leader-score">${fmt(e.score)}</div></div>`).join('')}</div>`;
+  }
+  function leagueName(score){if(score>=60000)return 'Лига Гениев';if(score>=25000)return 'Алмазная лига';if(score>=10000)return 'Золотая лига';if(score>=4000)return 'Серебряная лига';return 'Бронзовая лига'}
+
+  function renderProfile(){
