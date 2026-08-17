@@ -36,19 +36,24 @@ pick() {
   printf '%s' "$candidate"
 }
 
-HERO="$(pick "$ROOT/knight" Knight knight Character)"
-ORC="$(pick "$ROOT/monsters" Skeleton skeleton Orc orc Slime slime)"
-DEMON="$(pick "$ROOT/monsters" Dragon dragon Demon demon Bat bat)"
-TREE="$(pick "$ROOT/nature" Pine pine Tree tree)"
-ROCK="$(pick "$ROOT/nature" Rock rock Stone stone)"
-GEM="$(pick "$ROOT/rpg" Gem gem Crystal crystal)"
-ARENA="$(pick "$ROOT/dungeon" Floor floor Ground ground Tile tile)"
+HERO="$(pick "$ROOT/knight" KnightCharacter Character Knight)"
+ORC="$(pick "$ROOT/monsters" Skeleton skeleton Slime slime)"
+DEMON="$(pick "$ROOT/monsters" Dragon dragon Bat bat)"
+TREE="$(pick "$ROOT/nature" PineTree_1 Pine tree)"
+ROCK="$(pick "$ROOT/nature" Rock_1 Rock rock)"
+GEM="$(pick "$ROOT/rpg" Gems Gem Crystal)"
+ARENA="$(pick "$ROOT/dungeon" Floor_Modular Floor_BricksSeparate Floor)"
 
 printf '\nSELECTED ASSETS\nhero=%s\norc=%s\ndemon=%s\ntree=%s\nrock=%s\ngem=%s\narena=%s\n' "$HERO" "$ORC" "$DEMON" "$TREE" "$ROCK" "$GEM" "$ARENA"
 
 convert() {
   local src="$1" out="$2" mode="${3:-animated}"
+  rm -f "$OUT/$out"
   blender -b --factory-startup --python tools/convert_asset.py -- "$src" "$OUT/$out" "$mode"
+  if [[ ! -s "$OUT/$out" ]]; then
+    echo "::error::Asset conversion failed: $src -> $OUT/$out"
+    exit 1
+  fi
 }
 
 convert "$HERO" hero.glb animated
