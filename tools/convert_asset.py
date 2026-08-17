@@ -24,6 +24,16 @@ elif ext == '.obj':
 else:
     raise RuntimeError(f'Unsupported asset format: {ext}')
 
+# The Knight pack contains idle/roll/run clips whose names also include "sword".
+# The runtime uses semantic name matching, so keep "sword" only on actual attack
+# actions. This prevents Idle_swordRight / Roll_sword from being selected as an
+# attack while preserving the original animation data.
+if os.path.basename(source).lower() == 'knightcharacter.fbx':
+    for action in bpy.data.actions:
+        lower_name = action.name.lower()
+        if 'sword' in lower_name and 'attack' not in lower_name:
+            action.name = action.name.replace('sword', 'weapon').replace('Sword', 'Weapon')
+
 for obj in bpy.context.scene.objects:
     if hasattr(obj, 'hide_render'):
         obj.hide_render = False
