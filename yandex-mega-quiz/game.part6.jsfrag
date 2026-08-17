@@ -1,0 +1,81 @@
+    const bar=$('#timerBar');if(!bar||!session)return;const total=session.modeId==='blitz'?session.mode.totalTime:session.mode.perQuestion;if(!total)return;const pct=clamp(session.remaining/total*100,0,100);bar.style.width=pct+'%';bar.classList.toggle('danger',pct<28)
+  }
+  function trackAnswer(q,ok){
+    const dp=state.dailyProgress,wp=state.weeklyProgress;
+    state.totalAnswers++;dp.answers++;wp.answers++;
+    const cat=state.categoryStats[q.category]||(state.categoryStats[q.category]={answers:0,correct:0});cat.answers++;
+    if(!dp.categories.includes(q.category))dp.categories.push(q.category);
+    if(!wp.categories.includes(q.category))wp.categories.push(q.category);
+    if(ok){
+      state.correctAnswers++;dp.correct++;wp.correct++;cat.correct++;
+      dp.categoryCorrect[q.category]=(dp.categoryCorrect[q.category]||0)+1;
+      if(q.difficulty==='hard')dp.hardCorrect++;
+      if(Date.now()-session.questionStarted<=5000)dp.fastCorrect++;
+    }
+  }
+  function answerQuestion(idx){
+    if(!session||session.answered)return;const q=currentQuestion();session.answered=true;const buttons=[...document.querySelectorAll('.answer')];buttons.forEach(b=>b.disabled=true);const ok=idx===q.correct;
+    buttons[q.correct]?.classList.add('correct');if(!ok)buttons[idx]?.classList.add('wrong');
+    const timeBonus=Math.floor((session.remaining||0)*8),diff=q.difficulty==='hard'?1.5:q.difficulty==='medium'?1.2:1;
+    const base=Math.floor((100+timeBonus)*diff*(session.mode.multiplier||1)*questionEventMultiplier(q,session));
+    trackAnswer(q,ok);
+    if(ok){session.correct++;session.combo++;session.maxCombo=Math.max(session.maxCombo,session.combo);const comboBonus=Math.floor(Math.min(200,(session.combo-1)*15)*(eventOfDay().comboMultiplier||1));session.score+=base+comboBonus;showToast(session.combo>=3?`Верно! Серия ×${session.combo}`:'Верно!')}
+    else{session.wrong++;session.combo=0;if(session.hearts!==null){session.hearts--;if(session.hearts<=0){showToast('Жизни закончились');setTimeout(finishSession,700);return}}showToast('Неверно')}
+    state.dailyProgress.bestCombo=Math.max(state.dailyProgress.bestCombo,session.maxCombo);$('#quizScore').textContent=fmt(session.score);queueSave();
+    setTimeout(()=>{if(!session)return;session.index++;if(session.modeId==='blitz'&&session.remaining<=0)finishSession();else renderQuestion()},720);
+  }
+  function timeOut(){
+    if(!session||session.answered)return;session.answered=true;const q=currentQuestion();trackAnswer(q,false);session.wrong++;session.combo=0;if(session.hearts!==null)session.hearts--;document.querySelectorAll('.answer').forEach((b,i)=>{b.disabled=true;if(i===q.correct)b.classList.add('correct')});showToast('Время вышло');
+    if(session.hearts!==null&&session.hearts<=0){setTimeout(finishSession,700);return}setTimeout(()=>{if(session){session.index++;renderQuestion()}},720)
+  }
+  function useLifeLine(){
+    if(!session||!session.lifeline||session.answered)return;const q=currentQuestion();const wrong=[...document.querySelectorAll('.answer')].filter((_,i)=>i!==q.correct);shuffle(wrong,Math.random).slice(0,Math.max(1,wrong.length-1)).forEach(b=>{b.disabled=true;b.style.visibility='hidden'});session.lifeline=false;const btn=$('[data-life]');if(btn)btn.disabled=true;showToast('Убраны лишние варианты')
+  }
+  function useSkip(){
+    if(!session||session.answered||state.coins<50)return;state.coins-=50;session.skipUsed++;session.index++;queueSave();syncHeader();showToast('Вопрос пропущен');renderQuestion()
+  }
+  async function reviveByAd(){
+    if(!session||session.modeId!=='survival'||session.hearts>=3)return;session.paused=true;const ok=await Y.rewardedAd();if(!session)return;session.paused=false;Y.gameplayStart();if(ok){session.hearts++;showToast('+1 жизнь');renderQuestion()}else showToast('Награда не получена')
+  }
+
+  async function finishSession(){
+    if(!session)return;stopTick();Y.gameplayStop();const s=session;session=null;document.querySelector('#bottomNav').style.display='grid';
+    const answered=s.correct+s.wrong,accuracy=answered?Math.round(s.correct/answered*100):0;
+    const xp=Math.floor((s.score*.18+s.correct*18)*sessionEventMultiplier(s,'xp'));
+    const coins=Math.max(10,Math.floor(s.score/70*sessionEventMultiplier(s,'coins')));
+    state.gamesPlayed++;state.xp+=xp;state.coins+=coins;state.ratingPoints+=s.score;state.bestScore=Math.max(state.bestScore,s.score);
+    state.dailyProgress.games++;state.dailyProgress.score+=s.score;state.dailyProgress.bestCombo=Math.max(state.dailyProgress.bestCombo,s.maxCombo);
+    state.weeklyProgress.games++;state.weeklyProgress.score+=s.score;
+    if(!state.dailyProgress.modes.includes(s.modeId))state.dailyProgress.modes.push(s.modeId);
+    if(!state.weeklyProgress.modes.includes(s.modeId))state.weeklyProgress.modes.push(s.modeId);
+    if(s.lifeline&&s.skipUsed===0)state.dailyProgress.noHintGames++;
+    if(answered>0&&accuracy===100)state.weeklyProgress.perfectGames++;
+    const ms=state.modeStats[s.modeId]||(state.modeStats[s.modeId]={games:0,best:0,bestCombo:0});ms.games++;ms.best=Math.max(ms.best,s.score);ms.bestCombo=Math.max(ms.bestCombo,s.maxCombo);
+    if(s.mode.daily){
+      const firstToday=state.dailyPlayed!==dayKey();
+      state.dailyPlayed=dayKey();state.dailyProgress.bestDailyScore=Math.max(state.dailyProgress.bestDailyScore||0,s.score);
+      if(firstToday)state.weeklyProgress.dailyChallengeDays++;
+      if(flagBool('daily_lb_enabled',true))Y.setDailyScore(epochDay(),state.dailyProgress.bestDailyScore);
+    }
+    checkAchievements();queueSave(true);syncHeader();Y.setScore(ratingScore());
+    state.adCounter=(state.adCounter||0)+1;queueSave();
+    renderResult(s,{answered,accuracy,xp,coins});
+    if(state.adCounter%3===0)setTimeout(()=>Y.fullscreenAd(),250);
+  }
+  function renderResult(s,r){
+    currentPage='result';setActiveNav('');screen.innerHTML=`<div class="content-card result-card"><div class="result-orb">${r.accuracy>=90?'🏆':r.accuracy>=70?'🌟':'🧠'}</div><div class="eyebrow">${esc(s.mode.name)} завершён</div><h1>${fmt(s.score)} очков</h1><p>${resultPhrase(r.accuracy)}</p><div class="result-stats"><div class="metric"><small>Верно</small><b>${s.correct}</b></div><div class="metric"><small>Точность</small><b>${r.accuracy}%</b></div><div class="metric"><small>Серия</small><b>×${s.maxCombo}</b></div><div class="metric"><small>Награда</small><b>+${r.coins} ●</b></div></div><p>Получено <b>+${r.xp} XP</b>. Рейтинг-счёт: <b>${fmt(ratingScore())}</b>.</p><div class="action-row"><button class="primary" data-replay="${s.modeId}" data-cat="${s.category||''}">Ещё раз</button><button class="secondary" data-double="${r.coins}">×2 монеты · реклама</button><button class="ghost" data-action="home">На главную</button></div></div>`;
+  }
+  function resultPhrase(a){if(a===100)return 'Идеальный раунд. Ни одной ошибки!';if(a>=90)return 'Очень сильный результат.';if(a>=75)return 'Отличный кругозор — ещё немного до идеала.';if(a>=55)return 'Хорошая база. Следующий раунд будет ещё лучше.';return 'Каждый вопрос прокачивает знания. Попробуй другой режим.'}
+  async function doubleReward(amount,button){
+    if(button.disabled)return;button.disabled=true;const ok=await Y.rewardedAd();if(ok){state.coins+=Number(amount)||0;queueSave(true);syncHeader();showToast(`Ещё +${amount} монет`);button.textContent='Награда получена'}else{button.disabled=false;showToast('Видео не завершено')}
+  }
+
+  async function authorizeAndRefresh(){
+    const ok=await Y.authorize();if(ok){const cloud=await Y.loadSave();if(cloud){state=mergeState(state,cloud);saveLocal()}syncHeader();showToast('Вход выполнен');if(currentPage==='rating')renderRating();else renderProfile()}else showToast('Не удалось войти')
+  }
+
+  document.addEventListener('click',e=>{
+    const t=e.target.closest('button');if(!t)return;
+    if(t.dataset.answer!==undefined){answerQuestion(Number(t.dataset.answer));return}
+    if(t.dataset.mode){startMode(t.dataset.mode);return}
+    if(t.dataset.category){startMode('classic',t.dataset.category);return}
