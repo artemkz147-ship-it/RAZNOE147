@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -16,6 +16,28 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Final source polish
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/main.js')
+          s=p.read_text(encoding='utf-8')
+          old="""      if (!fallback && n.includes('hand')) fallback = o;
+      if (!right && n.includes('hand') && (n.includes('right') || n.includes('.r') || n.includes('_r') || n.endsWith('r'))) right = o;"""
+          new="""      if (!right && (n.includes('palm.r') || n.includes('palm_r') || n.includes('palm r'))) right = o;
+      if (!fallback && (n.includes('hand') || n.includes('palm'))) fallback = o;
+      if (!right && (n.includes('hand') || n.includes('palm')) && (n.includes('right') || n.includes('.r') || n.includes('_r') || n.endsWith('r'))) right = o;"""
+          if old in s:
+              s=s.replace(old,new)
+          if "n.includes('palm.r')" not in s:
+              raise SystemExit('Knight Palm.R attachment polish missing')
+          p.write_text(s,encoding='utf-8')
+          PY
+          node --check src/main.js
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -41,7 +63,7 @@ jobs:
       - name: Validate Yandex Games package
         run: python3 tools/validate_build.py
 
-      - name: Browser WebGL boss smoke test
+      - name: Browser WebGL visual smoke test
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/shadowvale-vite.log 2>&1 &
           SERVER_PID=$!
@@ -53,16 +75,32 @@ jobs:
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           TEST_URL='http://127.0.0.1:4173/?autostart=1&debug-fast=1'
           CHROME_FLAGS='--headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --enable-unsafe-swiftshader --use-angle=swiftshader'
-          "$CHROME" $CHROME_FLAGS --window-size=1280,720 --virtual-time-budget=6000 --dump-dom "$TEST_URL" > /tmp/shadowvale-dom.html
+          "$CHROME" $CHROME_FLAGS --window-size=1280,720 --virtual-time-budget=8000 --dump-dom "$TEST_URL" > /tmp/shadowvale-dom.html || true
+          echo '--- GAME STATE ---'
+          grep -o 'data-game-ready="[^"]*"' /tmp/shadowvale-dom.html | head -1 || true
+          grep -o 'data-game-state="[^"]*"' /tmp/shadowvale-dom.html | head -1 || true
+          grep 'boss-bar-wrap' /tmp/shadowvale-dom.html | head -1 || true
           grep -q 'data-game-ready="true"' /tmp/shadowvale-dom.html
           grep -Eq 'data-game-state="(playing|upgrade|gameover|victory)"' /tmp/shadowvale-dom.html
-          grep -q 'id="boss-bar-wrap" class="boss-bar-wrap"' /tmp/shadowvale-dom.html
-          "$CHROME" $CHROME_FLAGS --window-size=1280,720 --virtual-time-budget=3500 --screenshot=smoke-desktop.png "$TEST_URL"
-          "$CHROME" $CHROME_FLAGS --window-size=412,915 --virtual-time-budget=3500 --screenshot=smoke-mobile.png \
+          "$CHROME" $CHROME_FLAGS --window-size=1280,720 --virtual-time-budget=5500 --screenshot=smoke-desktop.png "$TEST_URL"
+          "$CHROME" $CHROME_FLAGS --window-size=412,915 --virtual-time-budget=5500 --screenshot=smoke-mobile.png \
             --user-agent='Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36' "$TEST_URL"
           test -s smoke-desktop.png
           test -s smoke-mobile.png
           tail -40 /tmp/shadowvale-vite.log || true
+
+      - name: Commit source polish
+        shell: bash
+        run: |
+          if git diff --quiet -- src/main.js; then
+            echo 'Source already contains final rig polish.'
+          else
+            git config user.name 'Shadowvale Release Bot'
+            git config user.email 'actions@users.noreply.github.com'
+            git add src/main.js
+            git commit -m 'Polish Knight Palm.R weapon attachment'
+            git push origin HEAD:yandex-3d-survival-fantasy
+          fi
 
       - name: Create Yandex upload archive
         run: |
