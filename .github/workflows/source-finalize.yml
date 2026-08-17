@@ -1,0 +1,84 @@
+name: Finalize Shadowvale Source
+
+on:
+  push:
+    branches:
+      - yandex-3d-survival-fantasy
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.event.head_commit.message != 'Finalize Shadowvale v1.0 runtime source'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply release source fixes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/main.js')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace(
+              "this.reviveUsed=false;this.doubleUsedRun=false;this.runWon=false;this.runSoulsRaw=0;this.rewardGranted=0;this.runRewardTarget=0;this.upgradeRanks={};",
+              "this.reviveUsed=false;this.doubleUsedRun=false;this.runWon=false;this.bossEnraged=false;this.runSoulsRaw=0;this.rewardGranted=0;this.runRewardTarget=0;this.upgradeRanks={};"
+          )
+          s = s.replace(
+              "if(boss)type='boss'; const d=ENEMY_DEFS[type],angle=Math.random()*TAU,radius=at?0:25+Math.random()*3;",
+              "const isBoss=boss||type==='boss';if(isBoss)type='boss';const d=ENEMY_DEFS[type],angle=Math.random()*TAU,radius=at?0:25+Math.random()*3;"
+          )
+          s = s.replace(
+              "root=this.prepareVisual(this.assets[d.asset],boss?d.height:d.height*(elite?1.24:1));",
+              "root=this.prepareVisual(this.assets[d.asset],isBoss?d.height:d.height*(elite?1.24:1));"
+          )
+          s = s.replace(
+              "id:crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`,root,pos,mixer,action,type,elite,boss,hp:",
+              "id:globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random()}`,root,pos,mixer,action,type,elite,boss:isBoss,hp:"
+          )
+          s = s.replace(
+              "if(boss){e.hp=d.hp*(1+this.elapsed/1400);e.maxHp=e.hp;this.boss=e;this.bossStage=3;this.audio.boss();this.vibrate([80,60,80]);}",
+              "if(isBoss){e.hp=d.hp*(1+this.elapsed/1400);e.maxHp=e.hp;this.boss=e;this.bossStage=3;this.audio.boss();this.vibrate([80,60,80]);}"
+          )
+          marker = "  leaveToMenu(){\n"
+          cleanup = "  clearRunVisuals(){\n    if(this.player?.root){this.scene.remove(this.player.root);this.player=null;}\n    for(const arr of [this.enemies,this.pickups,this.projectiles,this.orbitBlades]){for(const o of arr)this.scene.remove(o.root);arr.length=0;}\n    this.boss=null;\n  }\n\n"
+          if '  clearRunVisuals(){' not in s:
+              s = s.replace(marker, cleanup + marker)
+          s = s.replace(
+              "this.bridge.stopGameplay(); this.state='menu';",
+              "this.bridge.stopGameplay(); this.clearRunVisuals(); this.state='menu';"
+          )
+          required = ["const isBoss=boss||type==='boss'", "boss:isBoss", "this.bossEnraged=false", "clearRunVisuals(){", "globalThis.crypto?.randomUUID?.()"]
+          missing = [x for x in required if x not in s]
+          if missing:
+              raise SystemExit('Source finalization failed: ' + ', '.join(missing))
+          p.write_text(s, encoding='utf-8')
+
+          idx = Path('index.html')
+          html = idx.read_text(encoding='utf-8').replace('<script async src="/sdk.js"></script>', '<script src="/sdk.js"></script>')
+          if '<script async src="/sdk.js"></script>' in html:
+              raise SystemExit('Yandex SDK must not race module boot')
+          idx.write_text(html, encoding='utf-8')
+          PY
+          node --check src/main.js
+          grep -q "const isBoss=boss||type==='boss'" src/main.js
+          grep -q '<script src="/sdk.js"></script>' index.html
+
+      - name: Commit finalized source
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'Source already finalized.'
+            exit 0
+          fi
+          git config user.name 'Shadowvale Release Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/main.js index.html
+          git commit -m 'Finalize Shadowvale v1.0 runtime source'
+          git push origin HEAD:yandex-3d-survival-fantasy

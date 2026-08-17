@@ -1,19 +1,14 @@
 from pathlib import Path
 import re
-import sys
 
 root = Path('dist')
-required = [
-    root / 'index.html',
-    root / 'assets' / 'hero.glb',
-    root / 'assets' / 'orc.glb',
-    root / 'assets' / 'demon.glb',
-    root / 'assets' / 'tree.glb',
-    root / 'assets' / 'rock.glb',
-    root / 'assets' / 'gem.glb',
-    root / 'assets' / 'arena.glb',
+asset_names = [
+    'hero.glb','sword.glb','skeleton.glb','slime.glb','bat.glb','dragon.glb',
+    'tree.glb','dead-tree.glb','bush.glb','rock.glb','gem.glb','floor.glb',
+    'arch.glb','column.glb','chest.glb','torch.glb','fire.glb'
 ]
-missing = [str(p) for p in required if not p.is_file()]
+required = [root / 'index.html', *[root / 'assets' / n for n in asset_names]]
+missing = [str(p) for p in required if not p.is_file() or p.stat().st_size == 0]
 if missing:
     raise SystemExit('Missing required build files: ' + ', '.join(missing))
 
@@ -34,7 +29,14 @@ if bad:
     raise SystemExit('Unsupported filename(s): ' + ', '.join(bad))
 
 html = (root / 'index.html').read_text(encoding='utf-8')
-if '/sdk.js' not in html:
-    raise SystemExit('Yandex SDK script is not present in index.html')
+for needle in ['/sdk.js','type="module"']:
+    if needle not in html:
+        raise SystemExit(f'Required index.html marker missing: {needle}')
 
+source = Path('src/main.js').read_text(encoding='utf-8')
+for forbidden in ['BoxGeometry(', 'SphereGeometry(', 'PlaneGeometry(', 'CylinderGeometry(', 'ConeGeometry(']:
+    if forbidden in source:
+        raise SystemExit(f'Procedural visible geometry is forbidden in gameplay source: {forbidden}')
+
+print(f'Validated {len(asset_names)} GLB art assets.')
 print('Build validation passed.')

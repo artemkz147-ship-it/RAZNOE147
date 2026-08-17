@@ -12,7 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
@@ -41,17 +41,54 @@ jobs:
       - name: Validate Yandex Games package
         run: python3 tools/validate_build.py
 
+      - name: Browser WebGL smoke test
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/shadowvale-vite.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && break
+            sleep 1
+          done
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --use-angle=swiftshader \
+            --window-size=1280,720 --virtual-time-budget=10000 --dump-dom \
+            'http://127.0.0.1:4173/?autostart=1' > /tmp/shadowvale-dom.html
+          grep -q 'data-game-ready="true"' /tmp/shadowvale-dom.html
+          grep -Eq 'data-game-state="(playing|upgrade)"' /tmp/shadowvale-dom.html
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --use-angle=swiftshader \
+            --window-size=1280,720 --virtual-time-budget=8000 --screenshot=smoke-desktop.png \
+            'http://127.0.0.1:4173/?autostart=1'
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --use-angle=swiftshader \
+            --window-size=412,915 --virtual-time-budget=8000 --screenshot=smoke-mobile.png \
+            --user-agent='Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36' \
+            'http://127.0.0.1:4173/?autostart=1'
+          test -s smoke-desktop.png
+          test -s smoke-mobile.png
+          tail -40 /tmp/shadowvale-vite.log || true
+
       - name: Create Yandex upload archive
         run: |
           cd dist
-          zip -9 -r ../shadowvale-survivor-yandex.zip .
+          zip -9 -r ../shadowvale-survivor-yandex-v1.0.0.zip .
           cd ..
-          ls -lh shadowvale-survivor-yandex.zip
+          unzip -t shadowvale-survivor-yandex-v1.0.0.zip
+          ls -lh shadowvale-survivor-yandex-v1.0.0.zip
 
       - name: Upload production build
         uses: actions/upload-artifact@v4
         with:
-          name: shadowvale-survivor-yandex
-          path: shadowvale-survivor-yandex.zip
+          name: shadowvale-survivor-yandex-v1.0.0
+          path: shadowvale-survivor-yandex-v1.0.0.zip
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload smoke screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadowvale-smoke-screens
+          path: |
+            smoke-desktop.png
+            smoke-mobile.png
+          if-no-files-found: error
+          retention-days: 14

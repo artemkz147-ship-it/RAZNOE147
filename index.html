@@ -5,34 +5,45 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#0c1013" />
+  <meta name="theme-color" content="#0b1114" />
+  <meta name="description" content="Shadowvale Survivor — 3D survival roguelike" />
   <title>Shadowvale Survivor</title>
-  <script src="/sdk.js"></script>
+  <script async src="/sdk.js"></script>
 </head>
 <body>
   <div id="app">
     <canvas id="game"></canvas>
+    <div id="damage-flash"></div>
 
-    <div id="loading" class="screen screen--visible">
-      <div class="brand-mark">SV</div>
+    <div id="loading" class="screen screen--visible loading-screen">
+      <div class="brand-mark"><span>SV</span></div>
       <div class="loading-title" data-i18n="loadingTitle">ПРОБУЖДЕНИЕ ДОЛИНЫ</div>
       <div class="loading-bar"><div id="loading-fill"></div></div>
       <div id="loading-text" class="loading-text">0%</div>
     </div>
 
-    <div id="menu" class="screen">
-      <div class="menu-card">
+    <div id="menu" class="screen menu-screen">
+      <section class="menu-card">
         <div class="eyebrow">3D SURVIVAL ROGUELIKE</div>
         <h1>SHADOWVALE<br><span>SURVIVOR</span></h1>
-        <p data-i18n="subtitle">Продержись 12 минут. Усиливай героя. Сломи Владыку Тумана.</p>
-        <div class="record-row">
-          <span data-i18n="best">Лучший забег</span>
-          <strong id="best-time">00:00</strong>
+        <p data-i18n="subtitle">Прорвись через туман, усиливай рыцаря и уничтожь Владыку Долины.</p>
+        <div class="record-grid">
+          <div><span data-i18n="best">Лучшее время</span><strong id="best-time">00:00</strong></div>
+          <div><span data-i18n="bestKills">Рекорд убийств</span><strong id="best-kills">0</strong></div>
+          <div><span data-i18n="souls">Осколки душ</span><strong id="menu-souls">0</strong></div>
         </div>
         <button id="start-btn" class="primary" data-i18n="start">НАЧАТЬ ЗАБЕГ</button>
-        <button id="how-btn" class="secondary" data-i18n="controls">УПРАВЛЕНИЕ</button>
-        <div class="menu-note" data-i18n="menuNote">WASD / стрелки · рывок Space · на телефоне — виртуальный джойстик</div>
-      </div>
+        <div class="menu-actions">
+          <button id="altar-btn" class="secondary" data-i18n="altar">АЛТАРЬ СИЛЫ</button>
+          <button id="settings-btn" class="secondary" data-i18n="settings">НАСТРОЙКИ</button>
+        </div>
+        <div class="menu-actions compact">
+          <button id="how-btn" class="ghost" data-i18n="controls">УПРАВЛЕНИЕ</button>
+          <button id="review-btn" class="ghost hidden" data-i18n="review">ОЦЕНИТЬ ИГРУ</button>
+        </div>
+        <div class="menu-note" data-i18n="menuNote">WASD / стрелки · Space — рывок · на телефоне — виртуальный джойстик</div>
+        <div class="version">v1.0</div>
+      </section>
     </div>
 
     <div id="hud" class="hud hidden">
@@ -41,11 +52,15 @@
         <div class="stat-pill"><span data-i18n="level">Ур.</span><b id="level">1</b></div>
         <div class="stat-pill"><span data-i18n="kills">Враги</span><b id="kills">0</b></div>
       </div>
+      <button id="pause-btn" class="pause-btn" aria-label="Pause">Ⅱ</button>
+      <div id="boss-bar-wrap" class="boss-bar-wrap hidden">
+        <span data-i18n="boss">ВЛАДЫКА ТУМАНА</span><div class="boss-bar"><div id="boss-fill"></div></div>
+      </div>
       <div class="bars">
         <div class="bar hp"><div id="hp-fill"></div><span id="hp-text">100 / 100</span></div>
         <div class="bar xp"><div id="xp-fill"></div></div>
       </div>
-      <div id="boss-warning" class="boss-warning hidden" data-i18n="bossIncoming">ВЛАДЫКА ТУМАНА ПРИБЛИЖАЕТСЯ</div>
+      <div id="boss-warning" class="boss-warning hidden" data-i18n="bossIncoming">ВЛАДЫКА ТУМАНА ВХОДИТ В ДОЛИНУ</div>
     </div>
 
     <div id="upgrade" class="screen modal-screen">
@@ -53,29 +68,70 @@
         <div class="eyebrow" data-i18n="choosePower">ВЫБЕРИ СИЛУ</div>
         <h2 data-i18n="levelUp">НОВЫЙ УРОВЕНЬ</h2>
         <div id="upgrade-cards" class="upgrade-cards"></div>
-        <button id="reroll-btn" class="secondary ad-button"><span data-i18n="reroll">Обновить выбор</span> · ▶</button>
+        <button id="reroll-btn" class="secondary ad-button"><span data-i18n="reroll">Обновить выбор</span><b>▶</b></button>
       </div>
     </div>
 
     <div id="gameover" class="screen modal-screen">
       <div class="gameover-card">
-        <div class="eyebrow" id="result-kicker">RUN ENDED</div>
+        <div class="eyebrow" id="result-kicker">ЗАБЕГ ОКОНЧЕН</div>
         <h2 id="result-title" data-i18n="fallen">ГЕРОЙ ПАЛ</h2>
         <div class="result-grid">
           <div><span data-i18n="time">Время</span><b id="result-time">00:00</b></div>
           <div><span data-i18n="kills">Враги</span><b id="result-kills">0</b></div>
           <div><span data-i18n="level">Ур.</span><b id="result-level">1</b></div>
+          <div class="souls-result"><span data-i18n="soulsEarned">Души за забег</span><b id="result-souls">+0</b></div>
         </div>
-        <button id="revive-btn" class="primary ad-button"><span data-i18n="revive">ВОЗРОДИТЬСЯ</span> · ▶</button>
-        <button id="restart-btn" class="secondary" data-i18n="again">ЕЩЁ РАЗ</button>
+        <div class="reward-actions">
+          <button id="revive-btn" class="primary ad-button"><span data-i18n="revive">ВОЗРОДИТЬСЯ</span><b>▶</b></button>
+          <button id="double-btn" class="secondary ad-button"><span data-i18n="doubleSouls">УДВОИТЬ ДУШИ</span><b>▶</b></button>
+        </div>
+        <button id="restart-btn" class="secondary" data-i18n="again">НОВЫЙ ЗАБЕГ</button>
+        <button id="result-menu-btn" class="ghost wide" data-i18n="toMenu">ГЛАВНОЕ МЕНЮ</button>
       </div>
     </div>
 
-    <div id="controls-panel" class="screen modal-screen">
+    <div id="pause-panel" class="screen modal-screen">
+      <div class="pause-card">
+        <div class="eyebrow" data-i18n="pause">ПАУЗА</div>
+        <h2>SHADOWVALE</h2>
+        <button id="resume-btn" class="primary" data-i18n="resume">ПРОДОЛЖИТЬ</button>
+        <button id="pause-settings-btn" class="secondary" data-i18n="settings">НАСТРОЙКИ</button>
+        <button id="quit-btn" class="ghost wide" data-i18n="quit">В ГЛАВНОЕ МЕНЮ</button>
+      </div>
+    </div>
+
+    <div id="controls-panel" class="screen modal-screen overlay-panel">
       <div class="info-card">
         <button id="close-controls" class="close">×</button>
-        <h2 data-i18n="controls">УПРАВЛЕНИЕ</h2>
-        <p data-i18n="controlsText">Двигайся WASD или стрелками. Герой атакует ближайшего врага автоматически. Space — рывок с короткой неуязвимостью. На телефоне используй джойстик слева и кнопку рывка справа.</p>
+        <div class="eyebrow" data-i18n="controls">УПРАВЛЕНИЕ</div>
+        <h2>MOVE · DASH · SURVIVE</h2>
+        <p data-i18n="controlsText">Двигайся WASD или стрелками. Рыцарь автоматически атакует ближайших врагов. Space — быстрый рывок с короткой неуязвимостью. На телефоне используй джойстик слева и кнопку рывка справа.</p>
+        <div class="control-chips"><span>WASD</span><span>ARROWS</span><span>SPACE</span><span>TOUCH</span></div>
+      </div>
+    </div>
+
+    <div id="settings-panel" class="screen modal-screen overlay-panel">
+      <div class="settings-card">
+        <button id="close-settings" class="close">×</button>
+        <div class="eyebrow" data-i18n="settings">НАСТРОЙКИ</div>
+        <h2>GAME SETTINGS</h2>
+        <button id="setting-music" class="setting-row"><span data-i18n="music">Музыка</span><b id="music-value">ON</b></button>
+        <button id="setting-sfx" class="setting-row"><span data-i18n="sfx">Эффекты</span><b id="sfx-value">ON</b></button>
+        <button id="setting-vibration" class="setting-row"><span data-i18n="vibration">Вибрация</span><b id="vibration-value">ON</b></button>
+        <button id="setting-quality" class="setting-row"><span data-i18n="quality">Качество</span><b id="quality-value">Авто</b></button>
+        <button id="fullscreen-btn" class="secondary" data-i18n="fullscreen">НА ВЕСЬ ЭКРАН</button>
+      </div>
+    </div>
+
+    <div id="altar-panel" class="screen modal-screen overlay-panel">
+      <div class="altar-card">
+        <button id="close-altar" class="close">×</button>
+        <div class="altar-head">
+          <div><div class="eyebrow" data-i18n="altarTitle">АЛТАРЬ СИЛЫ</div><h2>PERMANENT POWER</h2><p data-i18n="altarHint">Постоянные улучшения сохраняются между забегами.</p></div>
+          <div class="soul-bank"><span data-i18n="souls">Осколки душ</span><b id="altar-souls">0</b></div>
+        </div>
+        <div id="meta-cards" class="meta-cards"></div>
       </div>
     </div>
 
