@@ -78,3 +78,4 @@ convert "$FIRE" fire.glb static
 
 echo '--- Built GLB assets ---'
 ls -lh "$OUT"
+python3 tools/check_glb_animations.py
