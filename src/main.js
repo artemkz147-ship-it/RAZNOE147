@@ -269,7 +269,7 @@ class Game {
     [...this.enemies,...this.pickups,...this.projectiles,...this.orbitBlades].forEach(o=>this.scene.remove(o.root));
     this.enemies=[];this.pickups=[];this.projectiles=[];this.orbitBlades=[];
     this.elapsed=0;this.kills=0;this.level=1;this.xp=0;this.nextXp=7;this.spawnClock=.25;this.lastAttack=0;this.lastBolt=0;this.bossStage=0;this.boss=null;
-    this.reviveUsed=false;this.doubleUsedRun=false;this.runWon=false;this.runSoulsRaw=0;this.rewardGranted=0;this.runRewardTarget=0;this.upgradeRanks={};
+    this.reviveUsed=false;this.doubleUsedRun=false;this.runWon=false;this.bossEnraged=false;this.runSoulsRaw=0;this.rewardGranted=0;this.runRewardTarget=0;this.upgradeRanks={};
     const m=this.progress.meta;
     this.player={
       root:this.prepareVisual(this.assets.hero,1.86),mixer:null,action:null,pos:new THREE.Vector3(),
@@ -298,8 +298,14 @@ class Game {
   pauseExternal(){ this.audio.suspend(); if(this.state==='playing'){this.state='paused-external';this.bridge.stopGameplay();this.showMobileControls(false);} }
   resumeExternal(){ this.audio.resume(); if(this.state==='paused-external'){this.state='playing';this.clock.getDelta();this.bridge.startGameplay();this.showMobileControls(true);} }
 
+  clearRunVisuals(){
+    if(this.player?.root){this.scene.remove(this.player.root);this.player=null;}
+    for(const arr of [this.enemies,this.pickups,this.projectiles,this.orbitBlades]){for(const o of arr)this.scene.remove(o.root);arr.length=0;}
+    this.boss=null;
+  }
+
   leaveToMenu(){
-    this.bridge.stopGameplay(); this.state='menu';document.body.dataset.gameState='menu'; $('#hud').classList.add('hidden');this.showMobileControls(false);$('#gameover').classList.remove('active');$('#pause-panel').classList.remove('active');$('#upgrade').classList.remove('active');
+    this.bridge.stopGameplay(); this.clearRunVisuals(); this.state='menu';document.body.dataset.gameState='menu'; $('#hud').classList.add('hidden');this.showMobileControls(false);$('#gameover').classList.remove('active');$('#pause-panel').classList.remove('active');$('#upgrade').classList.remove('active');
     $('#menu').classList.add('active'); if(this.menuHero)this.menuHero.root.visible=true; this.updateMenuStats(); this.checkReview();
   }
 
@@ -356,12 +362,12 @@ class Game {
   enemyScale(){ return 1 + this.elapsed/620; }
 
   spawnEnemy(type='skeleton', elite=false, boss=false, at=null) {
-    if(boss)type='boss'; const d=ENEMY_DEFS[type],angle=Math.random()*TAU,radius=at?0:25+Math.random()*3;
-    const pos=at?at.clone():new THREE.Vector3(Math.sin(angle)*radius,0,Math.cos(angle)*radius),root=this.prepareVisual(this.assets[d.asset],boss?d.height:d.height*(elite?1.24:1));
+    const isBoss=boss||type==='boss';if(isBoss)type='boss';const d=ENEMY_DEFS[type],angle=Math.random()*TAU,radius=at?0:25+Math.random()*3;
+    const pos=at?at.clone():new THREE.Vector3(Math.sin(angle)*radius,0,Math.cos(angle)*radius),root=this.prepareVisual(this.assets[d.asset],isBoss?d.height:d.height*(elite?1.24:1));
     pos.y=d.float||0;root.position.copy(pos);this.scene.add(root);
     const mixer=new THREE.AnimationMixer(root),clip=this.findClip(this.assets[d.asset],['running','run','walk','idle']),action=clip?mixer.clipAction(clip):null;action?.play();
-    const sc=this.enemyScale(),e={id:crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`,root,pos,mixer,action,type,elite,boss,hp:d.hp*sc*(elite?2.25:1),maxHp:d.hp*sc*(elite?2.25:1),speed:d.speed*(1+this.elapsed/1900)*(elite?1.08:1),damage:d.damage*(1+this.elapsed/900)*(elite?1.25:1),attackTimer:.4,shootTimer:1.2,summonTimer:5.5,dead:false,def:d,baseGltf:this.assets[d.asset],lastOrbitHit:-9};
-    if(boss){e.hp=d.hp*(1+this.elapsed/1400);e.maxHp=e.hp;this.boss=e;this.bossStage=3;this.audio.boss();this.vibrate([80,60,80]);}
+    const sc=this.enemyScale(),e={id:globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random()}`,root,pos,mixer,action,type,elite,boss:isBoss,hp:d.hp*sc*(elite?2.25:1),maxHp:d.hp*sc*(elite?2.25:1),speed:d.speed*(1+this.elapsed/1900)*(elite?1.08:1),damage:d.damage*(1+this.elapsed/900)*(elite?1.25:1),attackTimer:.4,shootTimer:1.2,summonTimer:5.5,dead:false,def:d,baseGltf:this.assets[d.asset],lastOrbitHit:-9};
+    if(isBoss){e.hp=d.hp*(1+this.elapsed/1400);e.maxHp=e.hp;this.boss=e;this.bossStage=3;this.audio.boss();this.vibrate([80,60,80]);}
     this.enemies.push(e); return e;
   }
 
