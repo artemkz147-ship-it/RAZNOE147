@@ -19,10 +19,22 @@
   };
 
   const DEFAULT={
-    v:1,xp:0,coins:120,bestScore:0,ratingPoints:0,totalAnswers:0,correctAnswers:0,gamesPlayed:0,level:1,
-    streak:0,lastPlayDate:'',dailyDate:'',dailyProgress:{answers:0,correct:0,games:0,bestCombo:0,score:0,categories:[]},dailyClaimed:[],dailyChest:false,dailyPlayed:'',
+    v:2,xp:0,coins:120,bestScore:0,ratingPoints:0,totalAnswers:0,correctAnswers:0,gamesPlayed:0,level:1,
+    streak:0,lastPlayDate:'',dailyDate:'',
+    dailyProgress:{answers:0,correct:0,games:0,bestCombo:0,score:0,categories:[],hardCorrect:0,fastCorrect:0,modes:[],noHintGames:0,categoryCorrect:{},bestDailyScore:0},
+    dailyClaimed:[],dailyChest:false,dailyPlayed:'',
+    weekKey:'',weeklyProgress:{answers:0,correct:0,games:0,score:0,categories:[],modes:[],daysCompleted:0,dailyChallengeDays:0,perfectGames:0},
+    weeklyClaimed:[],weeklyChest:false,
+    calendarIndex:0,calendarLastClaimedDate:'',
     categoryStats:{},modeStats:{},achievements:[],adCounter:0,settings:{reducedMotion:false}
   };
+  const DEFAULT_FLAGS={
+    daily_quest_count:'6',daily_chest_coins:'500',daily_chest_xp:'750',
+    weekly_enabled:'true',weekly_chest_coins:'1200',weekly_chest_xp:'1800',
+    calendar_enabled:'true',daily_lb_enabled:'true',
+    special_event_enabled:'false',special_event_title:'',special_event_category:'',special_event_multiplier:'1.5'
+  };
+  let flags={...DEFAULT_FLAGS};
   let state=structuredClone(DEFAULT);
   let session=null;
   let saveTimer=null;
@@ -34,6 +46,12 @@
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const fmt=n=>new Intl.NumberFormat('ru-RU').format(Math.floor(n||0));
   const dayKey=()=>new Date(Y.serverTime()).toISOString().slice(0,10);
+  const epochDay=()=>Math.floor(Date.parse(dayKey()+'T00:00:00Z')/86400000);
+  const weekKey=()=>{
+    const d=new Date(dayKey()+'T00:00:00Z'),n=d.getUTCDay()||7;
+    d.setUTCDate(d.getUTCDate()-n+1);
+    return d.toISOString().slice(0,10);
+  };
   const levelOf=xp=>Math.floor(Math.sqrt((xp||0)/260))+1;
   const levelBase=l=>Math.pow(Math.max(0,l-1),2)*260;
   const levelNext=l=>Math.pow(l,2)*260;
@@ -44,10 +62,18 @@
     const next={...base,...incoming};
     next.settings={...base.settings,...incoming.settings};
     next.dailyProgress={...base.dailyProgress,...incoming.dailyProgress};
+    next.dailyProgress.categories=Array.isArray(incoming.dailyProgress?.categories)?incoming.dailyProgress.categories:[];
+    next.dailyProgress.modes=Array.isArray(incoming.dailyProgress?.modes)?incoming.dailyProgress.modes:[];
+    next.dailyProgress.categoryCorrect={...base.dailyProgress.categoryCorrect,...incoming.dailyProgress?.categoryCorrect};
+    next.weeklyProgress={...base.weeklyProgress,...incoming.weeklyProgress};
+    next.weeklyProgress.categories=Array.isArray(incoming.weeklyProgress?.categories)?incoming.weeklyProgress.categories:[];
+    next.weeklyProgress.modes=Array.isArray(incoming.weeklyProgress?.modes)?incoming.weeklyProgress.modes:[];
     next.categoryStats={...base.categoryStats,...incoming.categoryStats};
     next.modeStats={...base.modeStats,...incoming.modeStats};
     next.achievements=Array.isArray(incoming.achievements)?incoming.achievements:[];
     next.dailyClaimed=Array.isArray(incoming.dailyClaimed)?incoming.dailyClaimed:[];
+    next.weeklyClaimed=Array.isArray(incoming.weeklyClaimed)?incoming.weeklyClaimed:[];
+    next.v=2;
     return next;
   }
   function loadLocal(){try{const raw=localStorage.getItem('umniversum-save-v1');if(raw)state=mergeState(structuredClone(DEFAULT),JSON.parse(raw))}catch(e){console.warn(e)}}
@@ -68,10 +94,26 @@
   }
   function closeModal(){modalRoot.innerHTML=''}
 
+  const flagBool=(name,fallback=true)=>String(flags[name]??fallback).toLowerCase()!=='false';
+  const flagNum=(name,fallback)=>{const n=Number(flags[name]);return Number.isFinite(n)?n:fallback};
+
+  function resetWeeklyIfNeeded(){
+    const wk=weekKey();
+    if(state.weekKey!==wk){
+      state.weekKey=wk;
+      state.weeklyProgress={answers:0,correct:0,games:0,score:0,categories:[],modes:[],daysCompleted:0,dailyChallengeDays:0,perfectGames:0};
+      state.weeklyClaimed=[];state.weeklyChest=false;
+      queueSave();
+    }
+  }
   function resetDailyIfNeeded(){
+    resetWeeklyIfNeeded();
     const d=dayKey();
     if(state.dailyDate!==d){
-      state.dailyDate=d;state.dailyProgress={answers:0,correct:0,games:0,bestCombo:0,score:0,categories:[]};state.dailyClaimed=[];state.dailyChest=false;queueSave();
+      state.dailyDate=d;
+      state.dailyProgress={answers:0,correct:0,games:0,bestCombo:0,score:0,categories:[],hardCorrect:0,fastCorrect:0,modes:[],noHintGames:0,categoryCorrect:{},bestDailyScore:0};
+      state.dailyClaimed=[];state.dailyChest=false;
+      queueSave();
     }
   }
   function updateStreak(){
@@ -80,35 +122,9 @@
     state.streak=state.lastPlayDate===yesterday?state.streak+1:1;state.lastPlayDate=today;
   }
 
-  function dailyQuests(){
-    resetDailyIfNeeded();
-    const seed=Number(dayKey().replaceAll('-',''));const rng=mulberry32(seed);
-    const pool=[
-      {id:'answers',icon:'❓',title:'Разминка',text:'Ответить на 20 вопросов',target:20,value:()=>state.dailyProgress.answers,reward:90},
-      {id:'correct',icon:'✓',title:'Точный ум',text:'Дать 15 верных ответов',target:15,value:()=>state.dailyProgress.correct,reward:110},
-      {id:'games',icon:'◆',title:'В движении',text:'Завершить 2 игровых раунда',target:2,value:()=>state.dailyProgress.games,reward:100},
-      {id:'combo',icon:'🔥',title:'Серия',text:'Сделать серию из 6 верных ответов',target:6,value:()=>state.dailyProgress.bestCombo,reward:120},
-      {id:'score',icon:'★',title:'Охота за очками',text:'Набрать 2500 очков за день',target:2500,value:()=>state.dailyProgress.score,reward:120},
-      {id:'categories',icon:'◎',title:'Кругозор',text:'Ответить в 5 разных темах',target:5,value:()=>state.dailyProgress.categories.length,reward:100}
-    ];
-    return shuffle(pool,rng).slice(0,3);
-  }
-  function claimQuest(id){
-    const q=dailyQuests().find(x=>x.id===id);if(!q)return;
-    if(q.value()<q.target){showToast('Задание ещё не выполнено');return}
-    if(state.dailyClaimed.includes(id)){showToast('Награда уже получена');return}
-    state.dailyClaimed.push(id);state.coins+=q.reward;state.xp+=q.reward*2;showToast(`+${q.reward} монет`);checkAchievements();queueSave();syncHeader();renderDaily();
-  }
-  function claimDailyChest(){
-    const qs=dailyQuests();if(state.dailyChest)return;
-    if(!qs.every(q=>state.dailyClaimed.includes(q.id))){showToast('Сначала забери все 3 награды');return}
-    state.dailyChest=true;state.coins+=350;state.xp+=500;showToast('Сундук дня: +350 монет, +500 XP');queueSave();syncHeader();renderDaily();
-  }
-
-  const ACHIEVEMENTS=[
-    {id:'first',icon:'🌱',name:'Первый шаг',desc:'Завершить первый раунд',test:()=>state.gamesPlayed>=1},
-    {id:'q100',icon:'🧠',name:'Сотня',desc:'Ответить на 100 вопросов',test:()=>state.totalAnswers>=100},
-    {id:'correct100',icon:'🎯',name:'Знаток',desc:'100 верных ответов',test:()=>state.correctAnswers>=100},
-    {id:'combo10',icon:'🔥',name:'Без ошибки',desc:'Серия из 10 верных',test:()=>Object.values(state.modeStats).some(x=>(x.bestCombo||0)>=10)},
-    {id:'games10',icon:'🏁',name:'Постоянный игрок',desc:'Завершить 10 раундов',test:()=>state.gamesPlayed>=10},
-    {id:'score5k',icon:'💎',name:'Пять тысяч',desc:'Набрать 5000 очков за раунд',test:()=>state.bestScore>=5000},
+  function eventOfDay(){
+    const seed=Number(dayKey().replaceAll('-',''));const rng=mulberry32(seed+991);
+    const catIds=Object.keys(CATEGORIES);
+    if(flagBool('special_event_enabled',false)){
+      const cat=String(flags.special_event_category||'').trim();
+      const mult=clamp(flagNum('special_event_multiplier',1.5),1,3);
