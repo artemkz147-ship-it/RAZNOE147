@@ -12,7 +12,7 @@ jobs:
   build:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,13 +25,14 @@ jobs:
           echo materialize > /tmp/merry-stage
           set -euo pipefail
           cat .build/payload.part* | tr -d '\r\n' | base64 -d > /tmp/merry-payload.tgz
-          tar -tzf /tmp/merry-payload.tgz
+          tar -tzf /tmp/merry-payload.tgz >/dev/null
           tar -xzf /tmp/merry-payload.tgz
           chmod +x tools/build_assets.sh
           python3 tools/post_materialize_fixes.py
           python3 tools/fix_animation_checker.py
           python3 tools/expand_progression.py
           python3 tools/visual_polish.py
+          python3 tools/terrain_polish.py
           node --check src/content.js
           node --check src/main.js
           node --check src/yandex.js
@@ -39,7 +40,7 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git add src/content.js src/main.js src/style.css src/yandex.js tools/build_assets.sh tools/check_glb_animations.py tools/validate_build.py
           if ! git diff --cached --quiet; then
-            git commit -m 'Materialize full Merry Mayhem 3D gameplay'
+            git commit -m 'Materialize final Merry Mayhem 3D gameplay'
             git push origin HEAD:yandex-3d-merry-mayhem
           fi
 
@@ -75,8 +76,15 @@ jobs:
         run: |
           echo validate > /tmp/merry-stage
           python3 tools/validate_build.py
+          test "$(find dist/assets -name '*.glb' | wc -l)" -ge 65
+          grep -q "const DEBUG_MAP" src/main.js
+          grep -q "const DEBUG_HERO" src/main.js
+          grep -q "grassShort" src/content.js
+          grep -q "pineSnow" src/content.js
+          grep -q "cactus" src/content.js
+          grep -q "willow" src/content.js
 
-      - name: WebGL QA on desktop and mobile
+      - name: WebGL QA across contrasting maps
         shell: bash
         run: |
           echo webgl > /tmp/merry-stage
@@ -85,15 +93,18 @@ jobs:
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           for i in $(seq 1 45); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
-          URL='http://127.0.0.1:4173/?autostart=1&debug-fast=1'
           FLAGS='--headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required'
-          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=11000 --dump-dom "$URL" >/tmp/merry-dom.html || true
+          BASE='http://127.0.0.1:4173/?autostart=1&debug-fast=1'
+          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=12000 --dump-dom "$BASE&map=sunny_meadow&hero=donut_knight" >/tmp/merry-dom.html || true
           grep -q 'data-game-ready="true"' /tmp/merry-dom.html
           grep -Eq 'data-game-state="(playing|upgrade|gameover|victory)"' /tmp/merry-dom.html
-          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8000 --screenshot=smoke-desktop.png "$URL"
-          "$CHROME" $FLAGS --window-size=412,915 --virtual-time-budget=8000 --screenshot=smoke-mobile.png --user-agent='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36' "$URL"
-          test -s smoke-desktop.png
-          test -s smoke-mobile.png
+          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot=qa-sunny-meadow.png "$BASE&map=sunny_meadow&hero=donut_knight"
+          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot=qa-candy-park.png "$BASE&map=candy_park&hero=candy_witch"
+          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot=qa-snow-festival.png "$BASE&map=snow_festival&hero=snow_penguin"
+          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot=qa-rainbow-canyon.png "$BASE&map=rainbow_canyon&hero=fox_archer"
+          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot=qa-firefly-swamp.png "$BASE&map=firefly_swamp&hero=lightning_bee"
+          "$CHROME" $FLAGS --window-size=412,915 --virtual-time-budget=8500 --screenshot=qa-mobile-festival.png --user-agent='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36' "$BASE&map=festival_finale&hero=pumpkin_jester"
+          test -s qa-sunny-meadow.png && test -s qa-candy-park.png && test -s qa-snow-festival.png && test -s qa-rainbow-canyon.png && test -s qa-firefly-swamp.png && test -s qa-mobile-festival.png
 
       - name: Package releases
         shell: bash
@@ -102,9 +113,45 @@ jobs:
           cd dist
           zip -9 -r ../vesely-natisk-3d-yandex-v2.0.0.zip .
           cd ..
-          unzip -t vesely-natisk-3d-yandex-v2.0.0.zip
-          zip -9 -r vesely-natisk-3d-full-project-v2.0.0.zip index.html package.json vite.config.js README.md src tools public .github -x '*.DS_Store'
-          unzip -t vesely-natisk-3d-full-project-v2.0.0.zip
+          unzip -t vesely-natisk-3d-yandex-v2.0.0.zip >/dev/null
+          zip -9 -r vesely-natisk-3d-full-project-v2.0.0.zip index.html package.json vite.config.js README.md src tools public .github/workflows/build-merry-mayhem.yml -x '*.DS_Store'
+          unzip -t vesely-natisk-3d-full-project-v2.0.0.zip >/dev/null
+          rm -rf local-test && mkdir local-test
+          cp -a dist/. local-test/
+          cat > local-test/START_LOCAL.ps1 <<'POWERSHELL'
+          $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+          $port = 8765
+          $listener = [System.Net.HttpListener]::new()
+          $listener.Prefixes.Add("http://127.0.0.1:$port/")
+          $listener.Start()
+          Start-Process "http://127.0.0.1:$port/"
+          Write-Host "Весёлый Натиск 3D: http://127.0.0.1:$port/"
+          Write-Host "Для остановки закройте это окно."
+          $mime = @{'.html'='text/html; charset=utf-8';'.js'='text/javascript; charset=utf-8';'.css'='text/css; charset=utf-8';'.glb'='model/gltf-binary';'.json'='application/json';'.png'='image/png';'.jpg'='image/jpeg';'.svg'='image/svg+xml'}
+          while ($listener.IsListening) {
+            $ctx = $listener.GetContext(); $rel = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath.TrimStart('/'))
+            if ([string]::IsNullOrWhiteSpace($rel)) {$rel='index.html'}
+            $path = Join-Path $root $rel
+            if (-not (Test-Path $path -PathType Leaf)) {$ctx.Response.StatusCode=404; $ctx.Response.Close(); continue}
+            $ext=[IO.Path]::GetExtension($path).ToLower(); if($mime.ContainsKey($ext)){$ctx.Response.ContentType=$mime[$ext]}
+            $bytes=[IO.File]::ReadAllBytes($path); $ctx.Response.ContentLength64=$bytes.Length; $ctx.Response.OutputStream.Write($bytes,0,$bytes.Length); $ctx.Response.Close()
+          }
+          POWERSHELL
+          cat > local-test/START_LOCAL.bat <<'BAT'
+          @echo off
+          cd /d "%~dp0"
+          powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0START_LOCAL.ps1"
+          BAT
+          cat > local-test/README_LOCAL.txt <<'TXT'
+          ЛОКАЛЬНЫЙ ЗАПУСК
+          1. Распакуйте архив полностью.
+          2. Запустите START_LOCAL.bat.
+          3. Игра откроется в браузере автоматически.
+          Не открывайте index.html двойным кликом: WebGL-модули и ассеты должны загружаться через локальный HTTP-сервер.
+          TXT
+          cd local-test && zip -9 -r ../vesely-natisk-3d-local-test-v2.0.0.zip . && cd ..
+          unzip -t vesely-natisk-3d-local-test-v2.0.0.zip >/dev/null
+          test "$(unzip -Z1 vesely-natisk-3d-yandex-v2.0.0.zip | head -1)" = "index.html"
           ls -lh vesely-natisk-3d-*.zip
 
       - name: Upload Yandex build
@@ -123,15 +170,27 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Upload local tester
+        uses: actions/upload-artifact@v4
+        with:
+          name: vesely-natisk-3d-local-test-v2.0.0
+          path: vesely-natisk-3d-local-test-v2.0.0.zip
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload QA screenshots
         uses: actions/upload-artifact@v4
         with:
-          name: merry-mayhem-3d-qa
+          name: merry-mayhem-3d-qa-final
           path: |
-            smoke-desktop.png
-            smoke-mobile.png
+            qa-sunny-meadow.png
+            qa-candy-park.png
+            qa-snow-festival.png
+            qa-rainbow-canyon.png
+            qa-firefly-swamp.png
+            qa-mobile-festival.png
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
 
       - name: Record observable build result
         if: always()
