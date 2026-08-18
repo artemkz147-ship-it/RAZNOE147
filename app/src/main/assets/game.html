@@ -5,14 +5,50 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#000000">
   <style>
-    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:Inter,Roboto,system-ui,sans-serif}
     #game{position:fixed;inset:0;width:100%;height:100%;background:#000;outline:0}
     #game canvas{max-width:100%;max-height:100%;background:#000}
     body.hide-touch .ejs_virtualGamepad_parent{display:none!important}
     body.stretch #game canvas{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important}
-    .ejs_menu_bar,.ejs_context_menu,.ejs_settings_parent,.ejs_setting_menu,.ejs_virtualGamepad_open{display:none!important;visibility:hidden!important;pointer-events:none!important}
-    .b_speed_fast,.b_speed_slow,.b_speed_rewind{display:none!important}
-    .ejs_message{display:none!important}
+
+    .ejs_menu_bar,.ejs_context_menu,.ejs_settings_parent,.ejs_setting_menu,.ejs_virtualGamepad_open,
+    .b_speed_fast,.b_speed_slow,.b_speed_rewind,.ejs_message{display:none!important;visibility:hidden!important;pointer-events:none!important}
+    body:not(.controls-open) .ejs_popup_container{display:none!important}
+
+    body.dir-dpad .b_retro_stick{display:none!important}
+    body.dir-stick .b_retro_dpad{display:none!important}
+    body.dir-both .b_retro_dpad,body.dir-both .b_retro_stick{display:block}
+
+    body.controls-open .ejs_popup_container{
+      z-index:999999!important;background:rgba(4,5,8,.92)!important;color:#f4f5f7!important;
+      backdrop-filter:blur(10px)
+    }
+    body.controls-open .ejs_control_body{
+      width:min(760px,92vw)!important;max-height:78vh!important;overflow:auto!important;
+      background:#12161e!important;border:1px solid #343c49!important;border-radius:16px!important;
+      padding:12px!important;color:#f4f5f7!important
+    }
+    body.controls-open .ejs_popup_container>h4{
+      color:#fff!important;font:900 19px/1.2 system-ui,sans-serif!important;margin:12px 0!important
+    }
+    body.controls-open .ejs_control_player_bar{margin:0 0 8px!important;padding:0!important;display:flex!important;gap:6px!important;list-style:none!important}
+    body.controls-open .ejs_control_player_bar li{border-radius:7px!important;background:#202630!important}
+    body.controls-open .ejs_control_player_bar a{display:block!important;padding:7px 10px!important;color:#dce2ec!important;font:800 10px system-ui,sans-serif!important;text-decoration:none!important}
+    body.controls-open .ejs_control_selected{background:#ffe45c!important}
+    body.controls-open .ejs_control_selected a{color:#111!important}
+    body.controls-open .ejs_control_bar{margin:0!important;padding:7px 2px!important;border-top:1px solid #282f3a!important;min-height:42px!important}
+    body.controls-open .ejs_control_bar label{color:#e6eaf0!important;font:800 10px system-ui,sans-serif!important}
+    body.controls-open .ejs_control_bar input{background:#0b0e13!important;border:1px solid #333b48!important;border-radius:6px!important;color:#b8c1cf!important}
+    body.controls-open .ejs_control_set_button,body.controls-open .ejs_button{
+      display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:32px!important;
+      padding:0 11px!important;margin:4px!important;border-radius:8px!important;border:1px solid #343c49!important;
+      background:#232a35!important;color:#fff!important;text-decoration:none!important;font:800 10px system-ui,sans-serif!important
+    }
+    body.controls-open .ejs_control_bar[data-id="26"],
+    body.controls-open .ejs_control_bar[data-id="27"],
+    body.controls-open .ejs_control_bar[data-id="28"],
+    body.controls-open .ejs_control_bar[data-id="29"]{display:none!important}
+    body.controls-open .ejs_popup_box{background:#151a22!important;border:1px solid #39414e!important;border-radius:12px!important;color:#fff!important}
   </style>
 </head>
 <body>
@@ -24,6 +60,10 @@
     let started = false;
     let startConfirmed = false;
     let watchdog = 0;
+    let currentCore = '';
+    let currentSettings = {};
+    let controlObserver = null;
+    let controlsOpen = false;
 
     function send(type, extra = {}) {
       try { parent.postMessage({ type, ...extra }, PARENT_ORIGIN); } catch (_) {}
@@ -42,9 +82,9 @@
     }
 
     function expectedExtensions(core) {
-      if (core === 'nes') return ['nes','fds','zip','7z'];
-      if (core === 'segaMD') return ['md','smd','gen','bin','zip','7z'];
-      if (core === 'psx') return ['chd','pbp','bin','iso','img','zip','7z'];
+      if (core === 'nes') return ['nes','unif','unf','zip','7z','rar'];
+      if (core === 'segaMD') return ['md','smd','gen','bin','mdx','68k','sgd','sms','gg','sg','bms','zip','7z','rar'];
+      if (core === 'psx') return ['chd','pbp','bin','iso','img','exe','zip','7z','rar'];
       return [];
     }
 
@@ -58,14 +98,181 @@
       if (config.biosUrl && (typeof config.biosUrl !== 'string' || !config.biosUrl.startsWith('blob:'))) throw new Error('Не удалось подготовить BIOS.');
     }
 
-    function hideTechnicalUi() {
-      const style = document.createElement('style');
-      style.textContent = `
-        .ejs_menu_bar,.ejs_context_menu,.ejs_settings_parent,.ejs_setting_menu,.ejs_virtualGamepad_open{display:none!important;visibility:hidden!important;pointer-events:none!important}
-        .b_speed_fast,.b_speed_slow,.b_speed_rewind{display:none!important}
-        .ejs_message{display:none!important}
-      `;
-      document.head.appendChild(style);
+    function virtualGamepad(core) {
+      const dpad = {type:'dpad',id:'retro_dpad',location:'left',left:'50%',top:'50%',joystickInput:false,inputValues:[4,5,6,7]};
+      const digitalStick = {type:'zone',id:'retro_stick',location:'left',left:'50%',top:'50%',color:'#e8edf5',joystickInput:false,inputValues:[4,5,6,7]};
+
+      if (core === 'nes') {
+        return [
+          {type:'button',text:'B',id:'b',location:'right',right:75,top:70,bold:true,input_value:0},
+          {type:'button',text:'A',id:'a',location:'right',right:5,top:70,bold:true,input_value:8},
+          dpad,digitalStick,
+          {type:'button',text:'Start',id:'start',location:'center',left:60,fontSize:14,block:true,input_value:3},
+          {type:'button',text:'Select',id:'select',location:'center',left:-5,fontSize:14,block:true,input_value:2}
+        ];
+      }
+
+      if (core === 'segaMD') {
+        return [
+          {type:'button',text:'A',id:'a',location:'right',right:145,top:70,bold:true,input_value:1},
+          {type:'button',text:'B',id:'b',location:'right',right:75,top:70,bold:true,input_value:0},
+          {type:'button',text:'C',id:'c',location:'right',right:5,top:70,bold:true,input_value:8},
+          {type:'button',text:'X',id:'x',location:'right',right:145,top:0,bold:true,input_value:10},
+          {type:'button',text:'Y',id:'y',location:'right',right:75,top:0,bold:true,input_value:9},
+          {type:'button',text:'Z',id:'z',location:'right',right:5,top:0,bold:true,input_value:11},
+          dpad,digitalStick,
+          {type:'button',text:'Mode',id:'mode',location:'center',left:-5,fontSize:14,block:true,input_value:2},
+          {type:'button',text:'Start',id:'start',location:'center',left:60,fontSize:14,block:true,input_value:3}
+        ];
+      }
+
+      return [
+        {type:'button',text:'□',id:'square',location:'right',right:145,top:50,bold:true,input_value:1},
+        {type:'button',text:'×',id:'cross',location:'right',right:75,top:90,bold:true,input_value:0},
+        {type:'button',text:'○',id:'circle',location:'right',right:5,top:50,bold:true,input_value:8},
+        {type:'button',text:'△',id:'triangle',location:'right',right:75,top:10,bold:true,input_value:9},
+        {type:'dpad',id:'retro_dpad',location:'left',left:'50%',top:'0%',joystickInput:false,inputValues:[4,5,6,7]},
+        {type:'zone',id:'retro_stick',location:'left',left:'50%',top:'100%',color:'#e8edf5',joystickInput:true,inputValues:[16,17,18,19]},
+        {type:'button',text:'L1',id:'l1',location:'top',left:10,top:-38,bold:true,block:true,input_value:10},
+        {type:'button',text:'R1',id:'r1',location:'top',right:10,top:-38,bold:true,block:true,input_value:11},
+        {type:'button',text:'L2',id:'l2',location:'top',left:75,top:-38,bold:true,block:true,input_value:12},
+        {type:'button',text:'R2',id:'r2',location:'top',right:75,top:-38,bold:true,block:true,input_value:13},
+        {type:'button',text:'Start',id:'start',location:'center',left:60,fontSize:14,block:true,input_value:3},
+        {type:'button',text:'Select',id:'select',location:'center',left:-5,fontSize:14,block:true,input_value:2}
+      ];
+    }
+
+    function directionMode(settings = currentSettings) {
+      if (currentCore === 'psx') return settings.virtualPs || 'both';
+      return settings.virtual8 || 'dpad';
+    }
+
+    function applyDirection(settings = currentSettings) {
+      document.body.classList.remove('dir-dpad','dir-stick','dir-both');
+      const mode = directionMode(settings);
+      document.body.classList.add(`dir-${['dpad','stick','both'].includes(mode) ? mode : 'dpad'}`);
+    }
+
+    function applySettings(settings = {}) {
+      currentSettings = { ...currentSettings, ...settings };
+      document.body.classList.toggle('hide-touch', !currentSettings.touchControls);
+      document.body.classList.toggle('stretch', !!currentSettings.stretch);
+      applyDirection(currentSettings);
+
+      const emu = window.EJS_emulator;
+      if (!emu) return;
+      try {
+        const volume = Math.max(0, Math.min(1, Number(currentSettings.volume ?? 80) / 100));
+        emu.volume = volume;
+        emu.setVolume?.(volume);
+      } catch (_) {}
+      try { emu.toggleVirtualGamepad?.(!!currentSettings.touchControls); } catch (_) {}
+      try {
+        const slot = String(Math.max(1, Math.min(9, Number(currentSettings.quickSlot || 1))));
+        emu.changeSettingOption?.('save-state-slot', slot);
+      } catch (_) {}
+    }
+
+    function rowLabel(id) {
+      const common = {
+        2:'SELECT',3:'START',4:'ВВЕРХ',5:'ВНИЗ',6:'ВЛЕВО',7:'ВПРАВО',
+        24:'БЫСТРОЕ СОХРАНЕНИЕ',25:'БЫСТРАЯ ЗАГРУЗКА'
+      };
+      if (id in common) return common[id];
+      if (currentCore === 'nes') return ({0:'B',8:'A',10:'СМЕНА ДИСКА',11:'ВСТАВИТЬ / ИЗВЛЕЧЬ ДИСК'})[id] || null;
+      if (currentCore === 'segaMD') return ({0:'B',1:'A',8:'C',9:'Y',10:'X',11:'Z'})[id] || null;
+      if (currentCore === 'psx') return ({
+        0:'×',1:'□',8:'○',9:'△',10:'L1',11:'R1',12:'L2',13:'R2',14:'L3',15:'R3',
+        19:'ЛЕВЫЙ СТИК ↑',18:'ЛЕВЫЙ СТИК ↓',17:'ЛЕВЫЙ СТИК ←',16:'ЛЕВЫЙ СТИК →',
+        23:'ПРАВЫЙ СТИК ↑',22:'ПРАВЫЙ СТИК ↓',21:'ПРАВЫЙ СТИК ←',20:'ПРАВЫЙ СТИК →'
+      })[id] || null;
+      return null;
+    }
+
+    function allowedControlId(id) {
+      if ([24,25].includes(id)) return true;
+      if (currentCore === 'nes') return [0,2,3,4,5,6,7,8].includes(id);
+      if (currentCore === 'segaMD') return [0,1,2,3,4,5,6,7,8,9,10,11].includes(id);
+      if (currentCore === 'psx') return id >= 0 && id <= 25 && ![24,25].includes(id);
+      return false;
+    }
+
+    function simplifyControls() {
+      const emu = window.EJS_emulator;
+      const menu = emu?.controlMenu;
+      if (!menu) return false;
+
+      const title = menu.querySelector(':scope > h4');
+      if (title) title.textContent = 'Клавиши и хоткеи';
+
+      const buttons = [...menu.querySelectorAll(':scope > .ejs_button')];
+      if (buttons[0]) buttons[0].textContent = 'Сбросить';
+      if (buttons[1]) buttons[1].textContent = 'Очистить';
+      if (buttons[2]) buttons[2].textContent = 'Готово';
+
+      menu.querySelectorAll('.ejs_control_bar').forEach(row => {
+        const id = Number(row.dataset.id);
+        row.style.display = allowedControlId(id) ? '' : 'none';
+        const label = rowLabel(id);
+        if (label) {
+          const el = row.querySelector('label');
+          if (el) el.textContent = `${label}:`;
+        }
+      });
+      return true;
+    }
+
+    function finishControls() {
+      if (!controlsOpen) return;
+      controlsOpen = false;
+      document.body.classList.remove('controls-open');
+      if (controlObserver) { controlObserver.disconnect(); controlObserver = null; }
+      const emu = window.EJS_emulator;
+      try { emu?.play?.(); } catch (_) {}
+      send('retro-controls-closed', { controls: emu?.controls || null });
+    }
+
+    function openControls() {
+      const emu = window.EJS_emulator;
+      if (!emu?.controlMenu) {
+        send('retro-quick-result', { ok:false, message:'Настройка клавиш пока недоступна.' });
+        return;
+      }
+      try { emu.pause?.(); } catch (_) {}
+      controlsOpen = true;
+      document.body.classList.add('controls-open');
+      simplifyControls();
+      emu.controlMenu.style.display = 'flex';
+
+      if (controlObserver) controlObserver.disconnect();
+      controlObserver = new MutationObserver(() => {
+        if (controlsOpen && emu.controlMenu.style.display === 'none') finishControls();
+      });
+      controlObserver.observe(emu.controlMenu, { attributes:true, attributeFilter:['style'] });
+    }
+
+    function quickSave(slot) {
+      const emu = window.EJS_emulator;
+      try {
+        const s = String(Math.max(1, Math.min(9, Number(slot || 1))));
+        emu?.changeSettingOption?.('save-state-slot', s);
+        const ok = !!emu?.gameManager?.quickSave?.(s);
+        send('retro-quick-result', { ok, message: ok ? `Сохранено в слот ${s}` : 'Не удалось быстро сохранить.' });
+      } catch (error) {
+        send('retro-quick-result', { ok:false, message:safeMessage(error) });
+      }
+    }
+
+    function quickLoad(slot) {
+      const emu = window.EJS_emulator;
+      try {
+        const s = String(Math.max(1, Math.min(9, Number(slot || 1))));
+        emu?.changeSettingOption?.('save-state-slot', s);
+        emu?.gameManager?.quickLoad?.(s);
+        send('retro-quick-result', { ok:true, message:`Загружен слот ${s}` });
+      } catch (error) {
+        send('retro-quick-result', { ok:false, message:safeMessage(error) });
+      }
     }
 
     function start(config) {
@@ -73,10 +280,11 @@
       started = true;
       try {
         verifyConfig(config);
-        const settings = config.settings || {};
-        if (!settings.touchControls) document.body.classList.add('hide-touch');
-        if (settings.stretch) document.body.classList.add('stretch');
-        hideTechnicalUi();
+        currentCore = config.core;
+        currentSettings = { ...(config.settings || {}) };
+        applyDirection(currentSettings);
+        document.body.classList.toggle('hide-touch', !currentSettings.touchControls);
+        document.body.classList.toggle('stretch', !!currentSettings.stretch);
 
         window.EJS_player = '#game';
         window.EJS_core = config.core;
@@ -87,76 +295,71 @@
         window.EJS_pathtodata = 'data/';
         window.EJS_language = 'ru-RU';
         window.EJS_disableAutoLang = true;
-        window.EJS_volume = Math.max(0, Math.min(1, Number(settings.volume ?? 80) / 100));
+        window.EJS_volume = Math.max(0, Math.min(1, Number(currentSettings.volume ?? 80) / 100));
         window.EJS_startOnLoaded = true;
         window.EJS_fullscreenOnLoaded = false;
         window.EJS_askBeforeExit = false;
         window.EJS_browserMode = 'mobile';
         window.EJS_noAutoFocus = false;
+        window.EJS_VirtualGamepadSettings = virtualGamepad(config.core);
+        if (config.controlProfile && typeof config.controlProfile === 'object') {
+          window.EJS_defaultControls = config.controlProfile;
+        }
         window.EJS_defaultOptions = {
           'save-state-location': 'browser',
+          'save-state-slot': String(Math.max(1, Math.min(9, Number(currentSettings.quickSlot || 1)))),
           'menu-bar-button': 'hidden',
           'rewindEnabled': 'disabled',
           'fastForward': 'disabled',
           'slowMotion': 'disabled'
         };
         window.EJS_Buttons = {
-          restart: false,
-          pause: false,
-          play: false,
-          mute: false,
-          settings: false,
-          enterFullscreen: false,
-          exitFullscreen: false,
-          saveState: false,
-          loadState: false,
-          screenRecord: false,
-          gamepad: false,
-          cheat: false,
-          volume: false,
-          saveSavFiles: false,
-          loadSavFiles: false,
-          quickSave: false,
-          quickLoad: false,
-          screenshot: false,
-          cacheManager: false,
-          exitEmulation: false
+          restart:false,pause:false,play:false,mute:false,settings:false,
+          enterFullscreen:false,exitFullscreen:false,saveState:false,loadState:false,
+          screenRecord:false,gamepad:false,cheat:false,volume:false,
+          saveSavFiles:false,loadSavFiles:false,quickSave:false,quickLoad:false,
+          screenshot:false,cacheManager:false,exitEmulation:false
         };
 
         window.EJS_ready = () => {
-          hideTechnicalUi();
+          simplifyControls();
+          applySettings(currentSettings);
           send('retro-emulator-ready');
         };
+
         window.EJS_onGameStart = () => {
           clearTimeout(watchdog);
           watchdog = setTimeout(() => {
             const emu = window.EJS_emulator;
             const fileName = emu?.fileName;
             if (!emu?.started || !fileName) {
-              send('retro-error', { message: 'Ядро запустилось, но не смогло открыть выбранный ROM.' });
+              send('retro-error', { message:'Ядро запустилось, но не смогло открыть выбранный ROM.' });
               return;
             }
             startConfirmed = true;
+            simplifyControls();
+            applySettings(currentSettings);
             try { document.querySelector('#game')?.focus?.(); } catch (_) {}
-            send('retro-game-start', { fileName: String(fileName) });
+            send('retro-game-start', { fileName:String(fileName) });
           }, 900);
         };
+
         window.EJS_onExit = () => {
-          if (!startConfirmed) send('retro-error', { message: 'Эмулятор завершил запуск до открытия игры.' });
+          if (!startConfirmed) send('retro-error', { message:'Эмулятор завершил запуск до открытия игры.' });
           else send('retro-exit');
         };
 
         const loader = document.createElement('script');
         loader.src = 'data/loader.js';
         loader.async = false;
-        loader.onerror = () => send('retro-error', { message: 'Не удалось загрузить встроенный модуль эмулятора.' });
+        loader.onerror = () => send('retro-error', { message:'Не удалось загрузить встроенный модуль эмулятора.' });
         document.body.appendChild(loader);
 
         watchdog = setTimeout(() => {
-          if (!startConfirmed) send('retro-error', { message: 'Эмулятор не подтвердил запуск игры.' });
-        }, 32000);
+          if (!startConfirmed) send('retro-error', { message:'Эмулятор не подтвердил запуск игры.' });
+        }, 37000);
       } catch (error) {
-        send('retro-error', { message: safeMessage(error) });
+        send('retro-error', { message:safeMessage(error) });
       }
     }
 
@@ -168,15 +371,25 @@
         clearTimeout(watchdog);
         try { window.EJS_emulator?.gameManager?.exit?.(); } catch (_) {}
       }
+      else if (data.type === 'retro-pause') {
+        try { window.EJS_emulator?.pause?.(); } catch (_) {}
+      }
+      else if (data.type === 'retro-resume') {
+        if (!controlsOpen) try { window.EJS_emulator?.play?.(); } catch (_) {}
+      }
+      else if (data.type === 'retro-apply-settings') applySettings(data.settings || {});
+      else if (data.type === 'retro-quick-save') quickSave(data.slot);
+      else if (data.type === 'retro-quick-load') quickLoad(data.slot);
+      else if (data.type === 'retro-open-controls') openControls();
     });
 
     window.addEventListener('error', event => {
       if (!started || startConfirmed) return;
-      send('retro-error', { message: event.message || 'Ошибка запуска игры.' });
+      send('retro-error', { message:event.message || 'Ошибка запуска игры.' });
     });
     window.addEventListener('unhandledrejection', event => {
       if (!started || startConfirmed) return;
-      send('retro-error', { message: safeMessage(event.reason) });
+      send('retro-error', { message:safeMessage(event.reason) });
     });
 
     send('retro-ready');
