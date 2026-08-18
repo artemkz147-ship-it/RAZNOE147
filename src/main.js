@@ -16,6 +16,8 @@ const TAU = Math.PI * 2;
 const qs = new URLSearchParams(location.search);
 const AUTO_START = qs.get('autostart') === '1';
 const DEBUG_FAST = qs.get('debug-fast') === '1';
+const DEBUG_MAP = qs.get('map');
+const DEBUG_HERO = qs.get('hero');
 
 const shuffle = a => {
   const b=[...a];
@@ -133,6 +135,8 @@ class MerryMayhem3D {
     this.selectedHero=HEROES.some(h=>h.id===this.progress.selectedHero)?this.progress.selectedHero:HEROES[0].id;
     this.selectedMap=MAPS.some(m=>m.id===this.progress.selectedMap)?this.progress.selectedMap:MAPS[0].id;
     this.selectedMode=MODES.some(m=>m.id===this.progress.selectedMode)?this.progress.selectedMode:MODES[0].id;
+    if(AUTO_START&&DEBUG_MAP&&MAPS.some(x=>x.id===DEBUG_MAP))this.selectedMap=DEBUG_MAP;
+    if(AUTO_START&&DEBUG_HERO&&HEROES.some(x=>x.id===DEBUG_HERO))this.selectedHero=DEBUG_HERO;
     this.applyQuality();this.updateSettingsUI();this.updateMenu();
     const entries=Object.entries(ASSET_URLS); let done=0;
     for(const [key,url] of entries){
@@ -270,8 +274,8 @@ class MerryMayhem3D {
   buildEnvironment(map){
     this.environment=new THREE.Group();this.scene.add(this.environment);
     this.scene.background=new THREE.Color(map.sky);this.scene.fog=new THREE.FogExp2(map.sky,this.lowPower?.0085:.0068);this.hemi.color.set(map.sky);this.hemi.groundColor.set(map.ground);
-    const tileSize=8,cols=Math.ceil((map.width+32)/tileSize),rows=Math.ceil((map.height+32)/tileSize),base=this.prepareGround(this.assets.floor,tileSize,map.ground);
-    for(let ix=-Math.ceil(cols/2);ix<=Math.ceil(cols/2);ix++)for(let iz=-Math.ceil(rows/2);iz<=Math.ceil(rows/2);iz++){const t=base.clone(true);t.position.set(ix*tileSize,0,iz*tileSize);t.rotation.y=((ix+iz)&1)?Math.PI/2:0;this.environment.add(t);}
+    const indoor=['castle','clock','sky','rooftop'].includes(map.layout),tileSize=indoor?12:22,cols=Math.ceil((map.width+36)/tileSize),rows=Math.ceil((map.height+36)/tileSize),base=this.prepareGround(this.assets.floor,tileSize,map.ground);
+    for(let ix=-Math.ceil(cols/2);ix<=Math.ceil(cols/2);ix++)for(let iz=-Math.ceil(rows/2);iz<=Math.ceil(rows/2);iz++){const t=base.clone(true);t.position.set(ix*tileSize,-.035,iz*tileSize);t.rotation.y=((ix*5+iz*3)&3)*Math.PI/2;t.scale.setScalar(1.035);this.environment.add(t);}
     for(const [asset,x,z,height] of map.landmarks){const r=this.cloneVisual(this.assets[asset]||this.assets.rock,height,{tint:map.accent});r.position.set(x,0,z);r.rotation.y=(x*19+z*13)%TAU;this.environment.add(r);this.obstacles.push({x,z,radius:Math.max(.8,height*.24)});}
     this.buildBoundary(map);
     if(map.hazard)this.buildHazard(map,map.hazard);
@@ -280,17 +284,50 @@ class MerryMayhem3D {
 
   populateMapDecor(map){
     const themes={
-      forest:['bush','flower','rock','tree'],park:['bush','flower','food_donut','food_cookie'],village:['food_pumpkin','bush','deadTree','rock'],snow:['snow','rock','tree','gem'],castle:['column','chest','torch','arch'],beach:['rock','food_watermelon','bush','tree'],moon:['rock','gem','star','rock'],clock:['column','gem','torch','arch'],canyon:['rock','deadTree','rock','gem'],cave:['gem','rock','gem','rock'],sky:['arch','column','gem','star'],desert:['rock','deadTree','food_cookie','rock'],swamp:['bush','tree','torch','rock'],fair:['food_donut','food_cookie','torch','flower'],crystal:['gem','rock','gem','star'],rooftop:['column','torch','chest','arch'],festival:['flower','food_donut','gem','torch']
+      forest:{cover:['grass','grassShort','flower'],props:['birch','tree','mossRock','bush']},
+      park:{cover:['grassShort','flower','grass'],props:['birch','food_donut','food_cookie','bush']},
+      village:{cover:['grassShort','flower','grass'],props:['birchAutumn','deadTree','food_pumpkin','rock']},
+      snow:{cover:['snowRock','grassShort','snowRock'],props:['pineSnow','snowRock','gem','pineSnow']},
+      castle:{cover:['rock','chest','torch'],props:['column','arch','chest','torch']},
+      beach:{cover:['grassShort','rock','flower'],props:['palm','food_watermelon','rock','palm']},
+      moon:{cover:['rock','gem','rock'],props:['rock','gem','star','rock']},
+      clock:{cover:['gem','torch','rock'],props:['column','arch','chest','gem']},
+      canyon:{cover:['rock','cactus','rock'],props:['cactus','deadTree','rock','mossRock']},
+      cave:{cover:['gem','rock','gem'],props:['mossRock','gem','rock','gem']},
+      sky:{cover:['gem','star','flower'],props:['arch','column','gem','arch']},
+      desert:{cover:['cactus','rock','grassShort'],props:['cactus','palm','deadTree','rock']},
+      swamp:{cover:['grass','grassShort','mossRock'],props:['willow','bush','mossRock','willow']},
+      fair:{cover:['flower','grassShort','food_cookie'],props:['arch','food_donut','torch','birch']},
+      crystal:{cover:['gem','rock','gem'],props:['gem','mossRock','star','gem']},
+      rooftop:{cover:['torch','chest','rock'],props:['column','arch','torch','chest']},
+      festival:{cover:['flower','grassShort','food_donut'],props:['arch','birch','gem','torch']}
     };
-    const points=[[-.39,-.34],[-.28,-.31],[-.15,-.36],[.12,-.34],[.27,-.30],[.39,-.34],[-.43,-.16],[-.31,-.12],[-.18,-.17],[.18,-.15],[.31,-.12],[.43,-.17],[-.42,.02],[-.30,.08],[-.18,.12],[.19,.10],[.31,.07],[.43,.01],[-.40,.20],[-.28,.24],[-.13,.20],[.14,.23],[.28,.25],[.40,.20],[-.34,.35],[-.20,.34],[.20,.34],[.35,.35],[-.07,-.25],[.08,-.22],[-.08,.27],[.09,.29]];
-    const list=themes[map.layout]||themes.forest,hx=map.width*.5,hz=map.height*.5;
-    for(let i=0;i<points.length;i++){
-      const [nx,nz]=points[i],x=nx*map.width,z=nz*map.height;if(Math.hypot(x,z)<9)continue;
-      if(map.hazard){const c=map.hazard.axis==='x'?x:z;if(Math.abs(c-map.hazard.at)<map.hazard.width*.72)continue;}
-      const key=list[(i+map.enemyTier)%list.length],large=['tree','deadTree','column','arch'].includes(key),solid=['rock','column','arch','tree','deadTree'].includes(key);
-      const height=large?2.7+(i%4)*.32:.62+(i%5)*.11,root=this.cloneVisual(this.assets[key]||this.assets.bush,height,{tint:map.accent});
-      root.position.set(x,0,z);root.rotation.y=((i*1.77+map.enemyTier*.61)%TAU);this.environment.add(root);
-      if(solid)this.obstacles.push({x,z,radius:large?.72:.48});
+    const theme=themes[map.layout]||themes.forest,hx=map.width*.5,hz=map.height*.5;
+    // Ground cover is dense but non-colliding and deterministic: it masks the
+    // modular base surface while leaving readable lanes for combat.
+    if(!['castle','clock','sky','rooftop'].includes(map.layout)){
+      const coverCount=this.lowPower?44:78;
+      for(let i=0;i<coverCount;i++){
+        const a=i*2.3999632297+map.enemyTier*.47,rad=.13+((i*37)%100)/100*.73;
+        let x=Math.cos(a)*hx*rad*.93,z=Math.sin(a)*hz*rad*.93;
+        x+=Math.sin(i*5.17+map.enemyTier)*2.8;z+=Math.cos(i*4.31-map.enemyTier)*2.4;
+        if(Math.hypot(x,z)<7.5||Math.abs(x)>hx-4||Math.abs(z)>hz-4)continue;
+        if(map.hazard){const coord=map.hazard.axis==='x'?x:z;if(Math.abs(coord-map.hazard.at)<map.hazard.width*.72)continue;}
+        const key=theme.cover[i%theme.cover.length],h=key.includes('grass')||key==='flower'?.34+(i%4)*.08:.48+(i%5)*.09;
+        const root=this.cloneVisual(this.assets[key]||this.assets.bush,h,{shadow:false,tint:map.accent});root.position.set(x,.01,z);root.rotation.y=(i*.91)%TAU;root.scale.multiplyScalar(.78+((i*13)%29)/100);this.environment.add(root);
+      }
+    }
+    const propCount=this.lowPower?24:42;
+    for(let i=0;i<propCount;i++){
+      const ring=.25+((i*29)%70)/100*.65,a=i*2.117+map.enemyTier*.71;
+      let x=Math.cos(a)*hx*ring*.91,z=Math.sin(a)*hz*ring*.91;
+      x+=Math.sin(i*1.91)*3.2;z+=Math.cos(i*2.23)*2.7;
+      if(Math.hypot(x,z)<9||Math.abs(x)>hx-5||Math.abs(z)>hz-5)continue;
+      if(map.hazard){const coord=map.hazard.axis==='x'?x:z;if(Math.abs(coord-map.hazard.at)<map.hazard.width*.8)continue;}
+      const key=theme.props[(i+map.enemyTier)%theme.props.length],large=['tree','deadTree','pineSnow','birch','birchAutumn','willow','palm','column','arch'].includes(key);
+      const height=large?2.7+(i%5)*.31:.68+(i%5)*.12,root=this.cloneVisual(this.assets[key]||this.assets.rock,height,{tint:map.accent});
+      root.position.set(x,0,z);root.rotation.y=(i*1.43+map.enemyTier*.33)%TAU;this.environment.add(root);
+      if(large||['rock','mossRock','cactus'].includes(key))this.obstacles.push({x,z,radius:large?.7:.48});
     }
   }
 

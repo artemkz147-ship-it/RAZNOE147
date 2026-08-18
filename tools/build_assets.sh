@@ -76,8 +76,18 @@ TREE="$(pick "$ROOT/nature" 'PineTree_1' 'PineTree' 'Tree')"
 DEAD_TREE="$(pick "$ROOT/nature" 'Dead' 'DryTree' 'Tree')"
 BUSH="$(pick "$ROOT/nature" 'Bush_1' 'Bush')"
 ROCK="$(pick "$ROOT/nature" 'Rock_1' 'Rock')"
-FLOWER="$(pick "$ROOT/nature" 'Flower' 'Plant' 'Bush')"
-SNOW="$(pick "$ROOT/nature" 'Snow' 'Rock' 'Flower')"
+FLOWER="$(pick "$ROOT/nature" 'Flowers.fbx' 'Flower' 'Plant')"
+GRASS="$(pick "$ROOT/nature" 'Grass.fbx' 'Grass_2' 'Plant')"
+GRASS_SHORT="$(pick "$ROOT/nature" 'Grass_Short' 'Grass_2' 'Grass')"
+SNOW_ROCK="$(pick "$ROOT/nature" 'Rock_Snow_1' 'Rock_Snow' 'Snow')"
+PINE_SNOW="$(pick "$ROOT/nature" 'PineTree_Snow_1' 'PineTree_Snow' 'PineTree')"
+BIRCH="$(pick "$ROOT/nature" 'BirchTree_1' 'BirchTree')"
+BIRCH_AUTUMN="$(pick "$ROOT/nature" 'BirchTree_Autumn_1' 'Autumn')"
+WILLOW="$(pick "$ROOT/nature" 'Willow_1' 'Willow')"
+CACTUS="$(pick "$ROOT/nature" 'Cactus_1' 'Cactus')"
+PALM="$(pick "$ROOT/nature" 'PalmTree_1' 'PalmTree')"
+MOSS_ROCK="$(pick "$ROOT/nature" 'Rock_Moss_1' 'Rock_Moss' 'Rock')"
+SNOW="$SNOW_ROCK"
 GEM="$(pick "$ROOT/rpg" 'Gems' 'Gem' 'Crystal')"
 STAR="$(pick "$ROOT/rpg" 'Star' 'Gem' 'Crystal')"
 BOMB="$(pick "$ROOT/rpg" 'Bomb' 'Potion' 'Gem')"
@@ -102,6 +112,16 @@ convert "$DEAD_TREE" dead-tree.glb static
 convert "$BUSH" bush.glb static
 convert "$ROCK" rock.glb static
 convert "$FLOWER" flower.glb static
+convert "$GRASS" grass.glb static
+convert "$GRASS_SHORT" grass-short.glb static
+convert "$SNOW_ROCK" snow-rock.glb static
+convert "$PINE_SNOW" pine-snow.glb static
+convert "$BIRCH" birch.glb static
+convert "$BIRCH_AUTUMN" birch-autumn.glb static
+convert "$WILLOW" willow.glb static
+convert "$CACTUS" cactus.glb static
+convert "$PALM" palm.glb static
+convert "$MOSS_ROCK" moss-rock.glb static
 convert "$SNOW" snow.glb static
 convert "$GEM" gem.glb static
 convert "$STAR" star.glb static
