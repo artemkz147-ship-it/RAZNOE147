@@ -34,6 +34,7 @@ let game: DropGame3D;
 let currentLevel = 1;
 let pendingNextLevel = 1;
 let completionCount = 0;
+let launching = false;
 let progress: ParkourProgress = {
   unlockedLevel: 1,
   bestScores: {},
@@ -70,6 +71,16 @@ function medalClass(medal: Medal | undefined) {
   return medal ? ` medal-${medal}` : '';
 }
 
+function setLevelButtonsDisabled(value: boolean) {
+  for (const button of levelsHost.querySelectorAll<HTMLButtonElement>('.level-card')) {
+    if (value) button.disabled = true;
+    else {
+      const levelId = Number(button.dataset.levelId || 0);
+      button.disabled = levelId > progress.unlockedLevel;
+    }
+  }
+}
+
 function renderLevels() {
   levelsHost.innerHTML = '';
   for (const level of game.levels) {
@@ -80,6 +91,7 @@ function renderLevels() {
     const medal = progress.bestMedals[String(level.id)];
     const button = document.createElement('button');
     button.className = `level-card${complete ? ' complete' : ''}${medalClass(medal)}`;
+    button.dataset.levelId = String(level.id);
     button.disabled = !unlocked;
     const meta = !unlocked
       ? '<b>ЗАКРЫТО</b>'
@@ -99,14 +111,31 @@ function renderLevels() {
 }
 
 async function launch(levelId: number) {
+  if (launching) return;
+  launching = true;
   currentLevel = levelId;
-  show(menu, false);
   show(finish, false);
   show(pauseOverlay, false);
-  show(hud, true);
+  show(hud, false);
   chainEl.textContent = '';
-  await game.startLevel(levelId);
-  yandex.gameplayStart();
+  setLevelButtonsDisabled(true);
+  const loading = $('#loading');
+  const oldLoading = loading.textContent;
+  loading.textContent = `Загрузка спуска ${String(levelId).padStart(2, '0')}…`;
+  try {
+    await game.startLevel(levelId);
+    show(menu, false);
+    show(hud, true);
+    yandex.gameplayStart();
+  } catch (error) {
+    console.error('Drop Flow level load failed', error);
+    loading.textContent = 'Не удалось загрузить уровень. Попробуй ещё раз.';
+    setLevelButtonsDisabled(false);
+    throw error;
+  } finally {
+    launching = false;
+    if (!menu.classList.contains('visible')) loading.textContent = oldLoading;
+  }
 }
 
 async function bootstrap() {
