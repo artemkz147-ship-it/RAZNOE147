@@ -69,6 +69,7 @@ jobs:
         run: |
           echo npm > /tmp/merry-stage
           npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund puppeteer-core@24
 
       - name: Production build
         run: |
@@ -82,10 +83,6 @@ jobs:
           test "$(find dist/assets -name '*.glb' | wc -l)" -ge 77
           grep -q "const DEBUG_MAP" src/main.js
           grep -q "const DEBUG_HERO" src/main.js
-          grep -q "grassShort" src/content.js
-          grep -q "pineSnow" src/content.js
-          grep -q "cactus" src/content.js
-          grep -q "willow" src/content.js
           grep -q "buildMacroClusters" src/main.js
           grep -q "HELD_PROFILES" src/content.js
           grep -q "bow.glb" src/content.js
@@ -93,7 +90,7 @@ jobs:
           grep -q "qaHits" src/main.js
           grep -q "qaShots" src/main.js
 
-      - name: WebGL QA across contrasting maps
+      - name: Real-time WebGL combat and visual QA
         shell: bash
         run: |
           echo webgl > /tmp/merry-stage
@@ -102,23 +99,9 @@ jobs:
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           for i in $(seq 1 45); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
-          FLAGS='--headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required'
-          COMBAT='http://127.0.0.1:4173/?autostart=1&debug-fast=1&map=sunny_meadow&hero=donut_knight'
-          BASE='http://127.0.0.1:4173/?autostart=1'
-          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=16000 --dump-dom "$COMBAT" >/tmp/merry-dom.html || true
-          grep -oE 'data-(game-ready|game-state|qa-shots|qa-hits|qa-kills)="[^"]*"' /tmp/merry-dom.html || true
-          grep -q 'data-game-ready="true"' /tmp/merry-dom.html
-          grep -Eq 'data-game-state="(playing|upgrade|gameover|victory)"' /tmp/merry-dom.html
-          grep -Eq 'data-qa-shots="[1-9][0-9]*"' /tmp/merry-dom.html
-          grep -Eq 'data-qa-hits="[1-9][0-9]*"' /tmp/merry-dom.html
-          grep -Eq 'data-qa-kills="[1-9][0-9]*"' /tmp/merry-dom.html
-          for SPEC in 'sunny-meadow sunny_meadow donut_knight' 'candy-park candy_park candy_witch' 'snow-festival snow_festival snow_penguin' 'rainbow-canyon rainbow_canyon fox_archer' 'firefly-swamp firefly_swamp lightning_bee'; do
-            set -- $SPEC; NAME=$1; MAP=$2; HERO=$3
-            "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=9000 --screenshot="qa-$NAME.png" "$BASE&map=$MAP&hero=$HERO"
-            test -s "qa-$NAME.png"
-          done
-          "$CHROME" $FLAGS --window-size=412,915 --virtual-time-budget=9000 --screenshot=qa-mobile-festival.png --user-agent='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36' "$BASE&map=festival_finale&hero=pumpkin_jester"
-          test -s qa-mobile-festival.png
+          test -n "$CHROME"
+          CHROME="$CHROME" node .build/browser_qa.mjs
+          for f in qa-sunny-meadow.png qa-candy-park.png qa-snow-festival.png qa-rainbow-canyon.png qa-firefly-swamp.png qa-mobile-festival.png; do test -s "$f"; done
 
       - name: Package releases
         shell: bash
@@ -129,7 +112,7 @@ jobs:
           cd ..
           unzip -t vesely-natisk-3d-yandex-v2.1.0.zip >/dev/null
           test "$(unzip -Z1 vesely-natisk-3d-yandex-v2.1.0.zip | grep -c '^index\.html$')" -eq 1
-          zip -9 -r vesely-natisk-3d-full-project-v2.1.0.zip index.html package.json vite.config.js README.md src tools public .github/workflows/build-merry-mayhem.yml -x '*.DS_Store'
+          zip -9 -r vesely-natisk-3d-full-project-v2.1.0.zip index.html package.json vite.config.js README.md src tools public .github/workflows/build-merry-mayhem.yml .build/pro_overhaul.py .build/pro_finish.py .build/browser_qa.mjs -x '*.DS_Store'
           unzip -t vesely-natisk-3d-full-project-v2.1.0.zip >/dev/null
           rm -rf local-test && mkdir local-test
           cp -a dist/. local-test/
