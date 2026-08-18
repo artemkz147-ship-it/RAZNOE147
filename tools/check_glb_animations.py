@@ -10,7 +10,7 @@ def animation_names(path):
     while off<total:
         length,kind=struct.unpack_from('<II',data,off);off+=8;chunk=data[off:off+length];off+=length
         if kind==0x4E4F534A:
-            payload=json.loads(chunk.decode('utf-8').rstrip('\\x00 '));break
+            payload=json.loads(chunk.decode('utf-8').rstrip('\x00 '));break
     if payload is None: raise SystemExit(f'No JSON chunk: {path}')
     return [str(a.get('name','')).lower() for a in payload.get('animations',[])]
 
