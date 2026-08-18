@@ -3,6 +3,7 @@ import { Game3D } from './game3d/Game3D';
 import { yandex, type ParkourProgress } from './platform/yandex';
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector(selector) as T;
+const MAX_LEVEL = 12;
 
 const gameHost = $('#game');
 const menu = $('#menu');
@@ -84,7 +85,7 @@ async function bootstrap() {
   game = new Game3D(gameHost, {
     onReady: () => {
       renderLevels();
-      $('#loading').textContent = 'Выбери маршрут. Сложность растёт от широких крыш к точным опорам.';
+      $('#loading').textContent = 'Выбери маршрут. Сложность растёт от широких крыш к точным опорам и финальному шпилю.';
       yandex.ready();
     },
     onHud: ({ level, time, speed, checkpoint, checkpointCount, wallRun, breaks }) => {
@@ -112,14 +113,14 @@ async function bootstrap() {
       const previous = progress.bestTimes[key];
       if (!previous || time < previous) progress.bestTimes[key] = time;
       if (!progress.completedLevels.includes(level.id)) progress.completedLevels.push(level.id);
-      progress.unlockedLevel = Math.max(progress.unlockedLevel, Math.min(8, level.id + 1));
+      progress.unlockedLevel = Math.max(progress.unlockedLevel, Math.min(MAX_LEVEL, level.id + 1));
       progress.tokens += reward;
       await yandex.saveProgress(progress);
 
-      pendingNextLevel = Math.min(8, level.id + 1);
+      pendingNextLevel = Math.min(MAX_LEVEL, level.id + 1);
       finishTitle.textContent = `${level.name} пройден`;
       finishStats.innerHTML = `<b>${formatTime(time)}</b><span>падения: ${stats.falls}</span><span>разрушено: ${stats.breaks}</span><span>награда: +${reward} ◆</span>`;
-      nextButton.hidden = level.id >= 8;
+      nextButton.hidden = level.id >= MAX_LEVEL;
       show(hud, false);
       show(finish, true);
       renderLevels();
