@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0d1020" />
+    <title>Rooftop Flow</title>
+    <script src="/sdk.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <div id="game"></div>
+      <div id="hud">
+        <div class="hud-card"><span>ДИСТАНЦИЯ</span><b id="distance">0 м</b></div>
+        <div class="hud-card combo"><span>FLOW</span><b id="combo">x1.0</b></div>
+        <button id="pause" aria-label="Пауза">Ⅱ</button>
+      </div>
+      <div id="touch-controls">
+        <button data-action="slide" class="touch-btn slide">ПОДКАТ</button>
+        <button data-action="jump" class="touch-btn jump">ПРЫЖОК</button>
+      </div>
+      <div id="menu" class="overlay visible">
+        <div class="panel">
+          <p class="eyebrow">URBAN PARKOUR</p>
+          <h1>ROOFTOP<br/>FLOW</h1>
+          <p>Держи скорость. Соединяй трюки. Не теряй ритм.</p>
+          <button id="play" class="primary">БЕЖАТЬ</button>
+          <div class="controls-hint">ПК: Space / ↑ — прыжок · ↓ / S — подкат · A/D — коррекция</div>
+        </div>
+      </div>
+      <div id="gameover" class="overlay">
+        <div class="panel compact">
+          <p class="eyebrow">ЗАБЕГ ОКОНЧЕН</p>
+          <h2 id="scoreTitle">0 м</h2>
+          <p id="bestTitle">Рекорд: 0 м</p>
+          <div class="actions">
+            <button id="retry" class="primary">ЕЩЁ РАЗ</button>
+            <button id="reward" class="secondary">СПАСТИ ЗА РЕКЛАМУ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
