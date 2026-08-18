@@ -27,7 +27,7 @@ export type DropCallbacks = {
   onReady: () => void;
 };
 
-const GRAVITY = 18.8;
+const GRAVITY = 9.81;
 const TWO_PI = Math.PI * 2;
 const TRICKS: Record<TrickKind, { label: string; points: number }> = {
   front: { label: 'FRONTFLIP', points: 160 },
@@ -60,8 +60,6 @@ export class DropGame3D {
   private targetIndex = 0;
   private standingSurface = -1;
   private stateTimer = 0;
-  private flightElapsed = 0;
-  private expectedFlight = 1;
   private stageStartY = 0;
   private landingPrepUntil = -1;
   private score = 0;
@@ -118,7 +116,6 @@ export class DropGame3D {
     this.targetIndex = 0;
     this.standingSurface = -1;
     this.stateTimer = 0;
-    this.flightElapsed = 0;
     this.score = 0;
     this.combo = 1;
     this.chain = [];
@@ -188,7 +185,6 @@ export class DropGame3D {
     }
 
     if (this.state === 'air') {
-      this.flightElapsed += dt;
       for (const trick of this.input.consumeTricks()) this.queueTrick(trick);
       if (this.input.consumeLand()) this.landingPrepUntil = this.simTime + 0.95;
 
@@ -252,8 +248,6 @@ export class DropGame3D {
     const duration = Math.max(1.0, Math.min(3.35, 0.82 + Math.sqrt(drop / 8.5) * 0.9 + horizontal * 0.025));
     const vy = (target.y - this.playerPos.y + 0.5 * GRAVITY * duration * duration) / duration;
     this.velocity.set(dx / duration, vy, dz / duration);
-    this.expectedFlight = duration;
-    this.flightElapsed = 0;
     this.stageStartY = this.playerPos.y;
     this.landingPrepUntil = -1;
     this.state = 'jump';
@@ -287,7 +281,7 @@ export class DropGame3D {
 
   private updateTrickRotation(dt: number) {
     const prep = this.state === 'air' && this.simTime <= this.landingPrepUntil;
-    const speed = prep ? 17.5 : 10.4;
+    const speed = prep ? 18.0 : 12.2;
     const maxStep = speed * dt;
     this.trickRotation.x = this.approach(this.trickRotation.x, this.trickTarget.x, maxStep);
     this.trickRotation.y = this.approach(this.trickRotation.y, this.trickTarget.y, maxStep);
