@@ -3,61 +3,68 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
-    <meta name="theme-color" content="#111521" />
-    <title>Vertical — 3D Parkour</title>
+    <meta name="theme-color" content="#0d1320" />
+    <title>Drop Flow — Акробатический паркур</title>
     <script src="/sdk.js"></script>
   </head>
   <body>
     <div id="game"></div>
-    <div id="touchSurface" aria-hidden="true"></div>
 
     <div id="hud">
       <div class="hud-left">
-        <span id="objective">01 · Первые крыши</span>
-        <b id="time">0.00 с</b>
+        <span id="objective">01 · Первый спуск</span>
+        <b id="score">0</b>
+        <small>ОЧКОВ</small>
       </div>
       <div id="toast"></div>
+      <div id="chain"></div>
       <div class="hud-right">
-        <div><small>СКОРОСТЬ</small><b id="speed">0 км/ч</b></div>
-        <div><small>ЧЕКПОИНТ</small><b id="checkpoint">—</b></div>
-        <div><small>СОСТОЯНИЕ</small><b id="state">FLOW</b></div>
+        <div><small>ПРЫЖОК</small><b id="stage">1/1</b></div>
+        <div><small>ДО ЦЕЛИ ВНИЗ</small><b id="drop">0 м</b></div>
+        <div><small>КОМБО</small><b id="combo">×1</b></div>
+        <div class="state-box"><small>СОСТОЯНИЕ</small><b id="state">ГОТОВ</b><em id="target">ЦЕЛЬ</em></div>
         <button id="pause" aria-label="Пауза">Ⅱ</button>
       </div>
-      <div class="crosshair"><i></i><i></i><i></i><i></i></div>
     </div>
 
     <div id="touchControls">
-      <div class="touch-help">ЛЕВАЯ ЗОНА — ДВИЖЕНИЕ · ПРАВАЯ — КАМЕРА</div>
-      <button id="touchSprint">БЕГ</button>
-      <button id="touchCrouch">ПОДКАТ</button>
+      <div id="touchSteer"><span>КОРРЕКЦИЯ<br/>В ПОЛЁТЕ</span></div>
+      <button id="trickFront" class="trick t1">ФРОНТ</button>
+      <button id="trickBack" class="trick t2">БЭК</button>
+      <button id="trickSide" class="trick t3">БОК</button>
+      <button id="trickTwist" class="trick t4">360°</button>
+      <button id="touchLand" class="land">ПОСАДКА</button>
       <button id="touchJump" class="jump">ПРЫЖОК</button>
     </div>
 
     <section id="menu" class="screen visible">
       <div class="menu-shell">
         <header class="brand">
-          <p>PRECISION ROOFTOP PARKOUR</p>
-          <h1>VERTICAL</h1>
-          <div class="brand-line"><span>3D PARKOUR</span><b id="tokens">◆ 0</b></div>
+          <p>TOP → DOWN ACROBATIC PARKOUR</p>
+          <h1>DROP<br/>FLOW</h1>
+          <div class="brand-line"><span>САЛЬТО · ТОЧНОСТЬ · ВЫСОТА</span><b id="tokens">◆ 0</b></div>
         </header>
-        <p class="intro">Не раннер. Ты стоишь на крыше и сам строишь линию: разбег, точный прыжок, vault через парапет, хват и подтягивание за край, wall-run, wall-kick, подкат под низкими конструкциями и контролируемая посадка. На поздних маршрутах появляются столбы, антенны, движущиеся балки и хрупкие секции крыши, которые можно разрушить слишком жёстким приземлением.</p>
+        <p class="intro">Ты всегда начинаешь <b>наверху</b>. Внизу — следующая точка посадки. Прыгай с крыши на крышу, на техплощадки, балки и верхушки опор; в полёте собирай фронтфлипы, бэкфлипы, боковые сальто и твисты. Чем глубже кампания, тем выше перепад, меньше площадка и длиннее цепочка точных посадок.</p>
+        <div class="score-rules">
+          <span><b>500</b> центр мишени</span><span><b>250</b> среднее кольцо</span><span><b>100</b> внешнее кольцо</span><span><b>×COMBO</b> серия без ошибок</span>
+        </div>
         <div id="levels" class="levels"></div>
         <div class="controls-copy">
           <b>УПРАВЛЕНИЕ</b>
-          <span>WASD — движение · мышь — обзор · Space — прыжок / vault / хват за край / wall-kick · Shift — разбег · Ctrl/C — подкат и перекат при посадке · V — камера от 3-го / 1-го лица</span>
+          <span>Space — прыгнуть к нижней точке · WASD — небольшая коррекция в воздухе · 1/Q — фронтфлип · 2/E — бэкфлип · 3/Z — боковое сальто · 4/X — твист 360° · C/Ctrl перед касанием — сгруппироваться и уйти в перекат.</span>
         </div>
-        <div id="loading">Загрузка 3D-физики, персонажа, анимаций и локаций…</div>
+        <div id="loading">Загрузка персонажа, акробатических анимаций и вертикальных уровней…</div>
       </div>
     </section>
 
     <section id="finish" class="screen modal-screen">
       <div class="finish-card">
-        <p>МАРШРУТ ЗАВЕРШЁН</p>
+        <p>ВЕРТИКАЛЬНАЯ ЛИНИЯ ЗАКРЫТА</p>
         <h2 id="finishTitle">Уровень пройден</h2>
         <div id="finishStats" class="finish-stats"></div>
         <div class="finish-actions">
-          <button id="next" class="primary">СЛЕДУЮЩИЙ УРОВЕНЬ</button>
-          <button id="retry">ПОВТОРИТЬ</button>
+          <button id="next" class="primary">СЛЕДУЮЩИЙ СПУСК</button>
+          <button id="retry">ПЕРЕИГРАТЬ НА БОЛЬШЕ ОЧКОВ</button>
           <button id="levelMenu">ВЫБОР УРОВНЯ</button>
         </div>
       </div>
@@ -66,7 +73,7 @@
     <section id="pauseOverlay" class="screen modal-screen">
       <div class="pause-card">
         <p>ПАУЗА</p>
-        <h2>Маршрут ждёт</h2>
+        <h2>Высота никуда не делась</h2>
         <button id="resume" class="primary">ПРОДОЛЖИТЬ</button>
       </div>
     </section>
