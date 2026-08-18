@@ -192,7 +192,7 @@ export class PlayerController {
       const normal = new THREE.Vector3(hit.normal1.x, hit.normal1.y, hit.normal1.z);
       if (Math.abs(normal.y) < 0.35) horizontalWall = normal;
       const impact = normal.y > 0.55 ? Math.hypot(this.speed, downwardSpeedBeforeMove) : Math.hypot(this.speed, this.verticalVelocity);
-      this.onHit(hit.collider, impact, normal);
+      if (hit.collider) this.onHit(hit.collider, impact, normal);
     }
 
     if (!this.grounded && horizontalWall && input.moveZ > 0.22 && this.speed > 4.7 && this.wallCooldown <= 0 && this.wallRunBudget > 0) {
