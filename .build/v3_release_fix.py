@@ -23,12 +23,9 @@ if "RPG%20Pack.zip' rpg_old" not in b:
     b=b.replace("fetch_zip 'https://opengameart.org/sites/default/files/ultimate_rpg_items_pack_by_quaternius_0.zip' rpg\n",
                 "fetch_zip 'https://opengameart.org/sites/default/files/ultimate_rpg_items_pack_by_quaternius_0.zip' rpg\nfetch_zip 'https://opengameart.org/sites/default/files/RPG%20Pack.zip' rpg_old\n")
 
-# A strict picker: if an intended category is absent, CI must fail instead of
-# silently substituting armour or an unrelated model.
 if 'pick_match(){' not in b:
     marker="pick_unique(){\n"
     idx=b.index(marker)
-    # insert helper before pick_unique
     helper="""pick_match(){
   local dir="$1"; shift; local kw f
   for kw in "$@"; do
@@ -69,10 +66,6 @@ done
 '''
 b=b[:start]+weapon_block+b[end:]
 
-# -------------------------------------------------------------------------
-# HERO NAMES: match the actual 15 character models selected by the source pack
-# so cards/portraits never promise a robot/princess while showing a soldier.
-# -------------------------------------------------------------------------
 hero_names={
     'donut_knight':('Золотая Рыцарка','Бронированный герой: высокий запас здоровья и защита.'),
     'dew_fairy':('Лесная Эльфийка','Быстрый герой: быстрее набирает уровни и притягивает опыт.'),
@@ -117,11 +110,6 @@ for wid,(name,evo) in weapon_names.items():
     c,n=re.subn(pat,lambda x:x.group(1)+repr(name)+x.group(2)+repr(evo),c,count=1)
     if n!=1: raise SystemExit(f'weapon rename failed: {wid}')
 
-# The generic level text was already baked when module data is constructed; it
-# references current weapon names at runtime, so no duplicate text patch needed.
-
-# Slight additional polish: enemies are no longer heavily colour-washed; keep
-# their authored palette and only add a subtle class accent.
 m=m.replace("const root=this.cloneVisual(this.assets[def.asset],def.scale*(elite?1.45:1),{tint:def.color});",
             "const root=this.cloneVisual(this.assets[def.asset],def.scale*(elite?1.45:1),{tint:elite?0xffd76a:null});")
 
@@ -129,3 +117,9 @@ bp.write_text(b,encoding='utf-8')
 cp.write_text(c,encoding='utf-8')
 mp.write_text(m,encoding='utf-8')
 print('v3 release art fixes applied: EGL portraits, strict thematic weapons, coherent hero cards')
+
+# Final professional quality layer. It intentionally runs last because the
+# materialization pipeline above recreates src/ on every CI build.
+quality=Path('.build/v3_1_quality_pass.py')
+if not quality.exists(): raise SystemExit('missing .build/v3_1_quality_pass.py')
+exec(compile(quality.read_text(encoding='utf-8'),str(quality),'exec'),{'__name__':'__main__'})
