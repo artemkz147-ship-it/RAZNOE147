@@ -70,10 +70,10 @@ export class DropLevelManager {
     this.clear();
     this.time = 0;
     const specs = [level.start, ...level.targets];
-    for (let index = 0; index < specs.length; index += 1) {
-      const visual = await this.createSurface(level.id, specs[index], index);
-      if (visual) this.surfaces.push(visual);
-    }
+    const visuals = await Promise.all(
+      specs.map((spec, index) => this.createSurface(level.id, spec, index))
+    );
+    this.surfaces = visuals.filter((visual): visual is SurfaceVisual => visual !== null);
     await this.createBackground(level);
     if (this.skyTexture) {
       this.scene.background = this.skyTexture;
@@ -235,29 +235,33 @@ export class DropLevelManager {
     const centerX = (level.start.p[0] + end[0]) * 0.5;
     const centerZ = (level.start.p[2] + end[2]) * 0.5;
     const top = level.start.p[1];
-    for (let index = 0; index < Math.min(16, this.cityAssets.length); index += 1) {
-      const asset = this.cityAssets[(level.id * 5 + index * 3) % this.cityAssets.length];
-      const root = await this.clone(asset);
-      const size = this.measure(root);
-      if (size.x <= 0.001 || size.y <= 0.001 || size.z <= 0.001) continue;
-      const width = 7 + (index % 5) * 2.5;
-      const scale = width / Math.max(size.x, size.z);
-      root.scale.setScalar(scale);
-      const box = new THREE.Box3().setFromObject(root);
-      const center = box.getCenter(new THREE.Vector3());
-      const side = index % 2 === 0 ? -1 : 1;
-      const lane = Math.floor(index / 2);
-      const x = centerX - 35 + lane * 10.5 + ((level.id + index) % 3) * 2.4;
-      const z = centerZ + side * (18 + (index % 4) * 6.2);
-      const roofY = Math.max(-8, top - 15 - (index % 6) * 5.1);
-      root.position.x += x - center.x;
-      root.position.z += z - center.z;
-      root.position.y += roofY - box.max.y;
-      root.rotation.y = side > 0 ? Math.PI : 0;
-      this.decorate(root, level.id * 11 + index, false);
-      this.scene.add(root);
-      this.background.push(root);
-    }
+    const count = Math.min(12, this.cityAssets.length);
+    const roots = await Promise.all(
+      Array.from({ length: count }, async (_, index) => {
+        const asset = this.cityAssets[(level.id * 5 + index * 3) % this.cityAssets.length];
+        const root = await this.clone(asset);
+        const size = this.measure(root);
+        if (size.x <= 0.001 || size.y <= 0.001 || size.z <= 0.001) return null;
+        const width = 7 + (index % 5) * 2.5;
+        const scale = width / Math.max(size.x, size.z);
+        root.scale.setScalar(scale);
+        const box = new THREE.Box3().setFromObject(root);
+        const center = box.getCenter(new THREE.Vector3());
+        const side = index % 2 === 0 ? -1 : 1;
+        const lane = Math.floor(index / 2);
+        const x = centerX - 30 + lane * 11 + ((level.id + index) % 3) * 2.4;
+        const z = centerZ + side * (18 + (index % 4) * 6.2);
+        const roofY = Math.max(-8, top - 15 - (index % 6) * 5.1);
+        root.position.x += x - center.x;
+        root.position.z += z - center.z;
+        root.position.y += roofY - box.max.y;
+        root.rotation.y = side > 0 ? Math.PI : 0;
+        this.decorate(root, level.id * 11 + index, false);
+        this.scene.add(root);
+        return root;
+      })
+    );
+    this.background = roots.filter((root): root is THREE.Object3D => root !== null);
   }
 
   private assetFor(levelId: number, kind: SurfaceKind, index: number) {
