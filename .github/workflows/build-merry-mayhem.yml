@@ -83,24 +83,40 @@ jobs:
           npm run build
 
       - name: Validate content and Yandex package
+        shell: bash
         run: |
           echo validate > /tmp/merry-stage
+          set -euo pipefail
           python3 tools/validate_build.py
-          test "$(find dist/assets -name '*.glb' | wc -l)" -ge 90
-          test "$(find dist/portraits -name '*.png' | wc -l)" -eq 30
-          grep -q "const DEBUG_MAP" src/main.js
-          grep -q "const DEBUG_HERO" src/main.js
-          grep -q "buildV3SetPieces" src/main.js
-          grep -q "heroPortrait" src/main.js
-          grep -q "HELD_PROFILES" src/content.js
-          grep -q "weapon09" src/content.js
-          grep -q "qaKills" src/main.js
-          grep -q "qaHits" src/main.js
-          grep -q "qaShots" src/main.js
-          grep -q "RPG%20Pack.zip" tools/build_assets.sh
-          grep -q "xvfb-run -a blender" tools/build_assets.sh
-          ! grep -q "ultimate_gun_pack" tools/build_assets.sh
-          ! grep -q "ROOT/guns" tools/build_assets.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          main=Path('src/main.js').read_text(encoding='utf-8')
+          content=Path('src/content.js').read_text(encoding='utf-8')
+          build=Path('tools/build_assets.sh').read_text(encoding='utf-8')
+          checks={
+            'debug map selector':'const DEBUG_MAP' in main,
+            'debug hero selector':'const DEBUG_HERO' in main,
+            'v3 authored set pieces':'buildV3SetPieces' in main,
+            'hero portrait UI':'heroPortrait' in main,
+            'weapon portrait UI':'weaponPortrait' in main,
+            'held weapon profiles':'HELD_PROFILES' in content,
+            'thematic bow weapon':"model:'weapon09'" in content,
+            'real shots telemetry':'qaShots' in main,
+            'real hits telemetry':'qaHits' in main,
+            'real kills telemetry':'qaKills' in main,
+            'legacy CC0 RPG staff pack':'RPG%20Pack.zip' in build,
+            'headless portrait render':'xvfb-run -a blender' in build,
+            'no modern gun download':'ultimate_gun_pack' not in build and '$ROOT/guns' not in build,
+          }
+          failed=[name for name,ok in checks.items() if not ok]
+          if failed: raise SystemExit('V3 source contract failed: '+', '.join(failed))
+          glb=list(Path('dist/assets').glob('*.glb'))
+          hp=list(Path('dist/portraits').glob('hero-*.png'))
+          wp=list(Path('dist/portraits').glob('weapon-*.png'))
+          if len(glb)<90: raise SystemExit(f'Expected >=90 GLB, got {len(glb)}')
+          if len(hp)!=15 or len(wp)!=15: raise SystemExit(f'Portrait count wrong: heroes={len(hp)} weapons={len(wp)}')
+          print(f'V3 release contract passed: {len(glb)} GLB, {len(hp)} hero portraits, {len(wp)} weapon portraits')
+          PY
 
       - name: Real-time WebGL combat and visual QA
         shell: bash
