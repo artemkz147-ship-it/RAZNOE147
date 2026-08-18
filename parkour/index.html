@@ -15,6 +15,7 @@
         <div class="hud-cluster">
           <div class="hud-card"><span>ДИСТАНЦИЯ</span><b id="distance">0 м</b></div>
           <div class="hud-card combo"><span>FLOW</span><b id="combo">x1.0</b></div>
+          <div class="hud-card token-card"><span>МОНЕТЫ</span><b id="tokens">◆ 0</b></div>
           <div class="hud-card speed-card"><span>СКОРОСТЬ</span><b id="speed">43 км/ч</b></div>
         </div>
         <div id="trick" aria-live="polite"></div>
@@ -31,6 +32,22 @@
           <p class="eyebrow">URBAN PARKOUR · FLOW RUN</p>
           <h1>ROOFTOP<br/><em>FLOW</em></h1>
           <p class="lead">Держи скорость, перелетай разрывы, проскальзывай под вывесками и забирайся на стены одним непрерывным комбо.</p>
+
+          <div class="profile-strip">
+            <div><span>РАНГ</span><b id="rank">Новичок</b></div>
+            <div><span>БАЛАНС</span><b id="coins">◆ 0</b></div>
+            <div><span>РЕКОРД</span><b id="menuBest">0 м</b></div>
+          </div>
+
+          <div id="dailyCard" class="daily-card">
+            <div class="daily-copy">
+              <span>ЗАДАНИЕ ДНЯ · <strong id="dailyReward">+50 ◆</strong></span>
+              <b id="dailyTitle">Пробеги 600 м</b>
+            </div>
+            <div class="daily-progress"><i id="dailyBar"></i></div>
+            <small id="dailyProgress">0 / 600 м</small>
+          </div>
+
           <button id="play" class="primary" disabled>БЕЖАТЬ</button>
           <div class="controls-hint">ПК: Space / ↑ — прыжок · ↓ / S — подкат · A/D — коррекция</div>
         </div>
@@ -49,6 +66,8 @@
           <p class="eyebrow">ЗАБЕГ ОКОНЧЕН</p>
           <h2 id="scoreTitle">0 м</h2>
           <p id="bestTitle">Рекорд: 0 м</p>
+          <p id="runStats" class="run-stats">◆ +0 · 0 трюков</p>
+          <div id="missionReward" class="mission-reward" hidden>ЗАДАНИЕ ВЫПОЛНЕНО · +50 ◆</div>
           <div class="actions">
             <button id="retry" class="primary">ЕЩЁ РАЗ</button>
             <button id="reward" class="secondary">СПАСТИ ЗА РЕКЛАМУ</button>
