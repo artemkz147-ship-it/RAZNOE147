@@ -6,44 +6,20 @@ declare global {
   }
 }
 
-export type DailyProgress = {
-  date: string;
-  distance: number;
+export type ParkourProgress = {
+  unlockedLevel: number;
+  bestTimes: Record<string, number>;
+  completedLevels: number[];
   tokens: number;
-  tricks: number;
-  claimed: boolean;
+  totalFalls: number;
 };
 
-export type PlayerProfile = {
-  bestDistance: number;
-  coins: number;
-  lifetimeDistance: number;
-  runs: number;
-  daily: DailyProgress;
-};
-
-const todayKey = () => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
-const freshDaily = (): DailyProgress => ({
-  date: todayKey(),
-  distance: 0,
+const freshProgress = (): ParkourProgress => ({
+  unlockedLevel: 1,
+  bestTimes: {},
+  completedLevels: [],
   tokens: 0,
-  tricks: 0,
-  claimed: false
-});
-
-const freshProfile = (): PlayerProfile => ({
-  bestDistance: 0,
-  coins: 0,
-  lifetimeDistance: 0,
-  runs: 0,
-  daily: freshDaily()
+  totalFalls: 0
 });
 
 class YandexBridge {
@@ -78,43 +54,24 @@ class YandexBridge {
     this.ysdk?.features?.GameplayAPI?.stop();
   }
 
-  async loadProfile(): Promise<PlayerProfile> {
-    const fallback = this.loadLocalProfile();
+  async loadProgress(): Promise<ParkourProgress> {
+    const local = this.loadLocal();
     try {
       if (this.player) {
-        const data = await this.player.getData(['profileV2', 'bestDistance']);
-        const cloud = data.profileV2 as Partial<PlayerProfile> | undefined;
-        const merged = this.normalizeProfile({
-          ...fallback,
-          ...cloud,
-          bestDistance: Math.max(Number(data.bestDistance || 0), Number(cloud?.bestDistance || 0), fallback.bestDistance)
-        });
-        this.saveLocalProfile(merged);
+        const data = await this.player.getData(['parkour3d']);
+        const cloud = data.parkour3d as Partial<ParkourProgress> | undefined;
+        const merged = this.normalize({ ...local, ...cloud });
+        this.saveLocal(merged);
         return merged;
       }
     } catch {}
-    return fallback;
+    return local;
   }
 
-  async saveProfile(profile: PlayerProfile) {
-    const normalized = this.normalizeProfile(profile);
-    this.saveLocalProfile(normalized);
-    try {
-      await this.player?.setData({
-        bestDistance: normalized.bestDistance,
-        profileV2: normalized
-      }, true);
-    } catch {}
-  }
-
-  async loadBest(): Promise<number> {
-    return (await this.loadProfile()).bestDistance;
-  }
-
-  async saveBest(value: number) {
-    const profile = await this.loadProfile();
-    profile.bestDistance = Math.max(profile.bestDistance, Math.max(0, Math.floor(value)));
-    await this.saveProfile(profile);
+  async saveProgress(progress: ParkourProgress) {
+    const normalized = this.normalize(progress);
+    this.saveLocal(normalized);
+    try { await this.player?.setData({ parkour3d: normalized }, true); } catch {}
   }
 
   showInterstitial(): Promise<void> {
@@ -146,42 +103,28 @@ class YandexBridge {
     });
   }
 
-  private loadLocalProfile(): PlayerProfile {
+  private loadLocal(): ParkourProgress {
     try {
-      const raw = localStorage.getItem('rooftopFlow.profileV2');
-      if (raw) return this.normalizeProfile(JSON.parse(raw) as Partial<PlayerProfile>);
+      const raw = localStorage.getItem('vertical.parkour3d');
+      if (raw) return this.normalize(JSON.parse(raw) as Partial<ParkourProgress>);
     } catch {}
-
-    const legacyBest = Number(localStorage.getItem('rooftopFlow.bestDistance') || 0);
-    return this.normalizeProfile({ bestDistance: legacyBest });
+    return freshProgress();
   }
 
-  private saveLocalProfile(profile: PlayerProfile) {
-    try {
-      localStorage.setItem('rooftopFlow.profileV2', JSON.stringify(profile));
-      localStorage.setItem('rooftopFlow.bestDistance', String(profile.bestDistance));
-    } catch {}
+  private saveLocal(progress: ParkourProgress) {
+    try { localStorage.setItem('vertical.parkour3d', JSON.stringify(progress)); } catch {}
   }
 
-  private normalizeProfile(input: Partial<PlayerProfile>): PlayerProfile {
-    const base = freshProfile();
-    const dailyInput = input.daily;
-    const daily = dailyInput?.date === todayKey()
-      ? {
-          date: todayKey(),
-          distance: Math.max(0, Math.floor(Number(dailyInput.distance || 0))),
-          tokens: Math.max(0, Math.floor(Number(dailyInput.tokens || 0))),
-          tricks: Math.max(0, Math.floor(Number(dailyInput.tricks || 0))),
-          claimed: Boolean(dailyInput.claimed)
-        }
-      : freshDaily();
-
+  private normalize(input: Partial<ParkourProgress>): ParkourProgress {
+    const base = freshProgress();
     return {
-      bestDistance: Math.max(0, Math.floor(Number(input.bestDistance || base.bestDistance))),
-      coins: Math.max(0, Math.floor(Number(input.coins || base.coins))),
-      lifetimeDistance: Math.max(0, Math.floor(Number(input.lifetimeDistance || base.lifetimeDistance))),
-      runs: Math.max(0, Math.floor(Number(input.runs || base.runs))),
-      daily
+      unlockedLevel: Math.max(1, Math.min(8, Math.floor(Number(input.unlockedLevel || base.unlockedLevel)))),
+      bestTimes: typeof input.bestTimes === 'object' && input.bestTimes ? input.bestTimes : {},
+      completedLevels: Array.isArray(input.completedLevels)
+        ? [...new Set(input.completedLevels.map(Number).filter((value) => value >= 1 && value <= 8))]
+        : [],
+      tokens: Math.max(0, Math.floor(Number(input.tokens || 0))),
+      totalFalls: Math.max(0, Math.floor(Number(input.totalFalls || 0)))
     };
   }
 

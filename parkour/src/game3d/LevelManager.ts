@@ -75,7 +75,7 @@ export class LevelManager {
       mover.object.position.set(p.x, p.y, p.z);
       mover.object.quaternion.set(q.x, q.y, q.z, q.w);
     }
-    this.destruction.update(performance.now() / 1000);
+    this.destruction.update(time);
   }
 
   updateCheckpoints(playerFoot: THREE.Vector3) {

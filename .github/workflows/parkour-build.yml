@@ -1,4 +1,4 @@
-name: Build Rooftop Flow
+name: Build Vertical 3D Parkour
 
 on:
   push:
@@ -24,16 +24,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install 3D asset builder
+        run: python -m pip install -r requirements-assets.txt
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Type-check and build
+      - name: Type-check, bake GLB assets and build
         run: npm run build
       - name: Create Yandex Games ZIP
         run: |
           cd dist
-          zip -r ../rooftop-flow-yandex.zip .
+          zip -r ../vertical-3d-parkour-yandex.zip .
       - uses: actions/upload-artifact@v4
         with:
-          name: rooftop-flow-yandex
-          path: parkour/rooftop-flow-yandex.zip
+          name: vertical-3d-parkour-yandex
+          path: parkour/vertical-3d-parkour-yandex.zip
           if-no-files-found: error

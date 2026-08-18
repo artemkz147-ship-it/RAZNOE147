@@ -2,79 +2,75 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#0b1022" />
-    <title>Rooftop Flow</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+    <meta name="theme-color" content="#111521" />
+    <title>Vertical — 3D Parkour</title>
     <script src="/sdk.js"></script>
   </head>
   <body>
-    <div id="app">
-      <div id="game"></div>
+    <div id="game"></div>
+    <div id="touchSurface" aria-hidden="true"></div>
 
-      <div id="hud">
-        <div class="hud-cluster">
-          <div class="hud-card"><span>ДИСТАНЦИЯ</span><b id="distance">0 м</b></div>
-          <div class="hud-card combo"><span>FLOW</span><b id="combo">x1.0</b></div>
-          <div class="hud-card token-card"><span>МОНЕТЫ</span><b id="tokens">◆ 0</b></div>
-          <div class="hud-card speed-card"><span>СКОРОСТЬ</span><b id="speed">43 км/ч</b></div>
-        </div>
-        <div id="trick" aria-live="polite"></div>
-        <button id="pause" class="icon-btn" aria-label="Пауза">Ⅱ</button>
+    <div id="hud">
+      <div class="hud-left">
+        <span id="objective">01 · Первые крыши</span>
+        <b id="time">0.00 с</b>
       </div>
-
-      <div id="touch-controls">
-        <button data-action="slide" class="touch-btn slide"><span>СВАЙП</span>ПОДКАТ</button>
-        <button data-action="jump" class="touch-btn jump"><span>ТАП</span>ПРЫЖОК</button>
+      <div id="toast"></div>
+      <div class="hud-right">
+        <div><small>СКОРОСТЬ</small><b id="speed">0 км/ч</b></div>
+        <div><small>ЧЕКПОИНТ</small><b id="checkpoint">—</b></div>
+        <div><small>СОСТОЯНИЕ</small><b id="state">FLOW</b></div>
+        <button id="pause" aria-label="Пауза">Ⅱ</button>
       </div>
-
-      <div id="menu" class="overlay visible">
-        <div class="panel hero-panel">
-          <p class="eyebrow">URBAN PARKOUR · FLOW RUN</p>
-          <h1>ROOFTOP<br/><em>FLOW</em></h1>
-          <p class="lead">Держи скорость, перелетай разрывы, проскальзывай под вывесками и забирайся на стены одним непрерывным комбо.</p>
-
-          <div class="profile-strip">
-            <div><span>РАНГ</span><b id="rank">Новичок</b></div>
-            <div><span>БАЛАНС</span><b id="coins">◆ 0</b></div>
-            <div><span>РЕКОРД</span><b id="menuBest">0 м</b></div>
-          </div>
-
-          <div id="dailyCard" class="daily-card">
-            <div class="daily-copy">
-              <span>ЗАДАНИЕ ДНЯ · <strong id="dailyReward">+50 ◆</strong></span>
-              <b id="dailyTitle">Пробеги 600 м</b>
-            </div>
-            <div class="daily-progress"><i id="dailyBar"></i></div>
-            <small id="dailyProgress">0 / 600 м</small>
-          </div>
-
-          <button id="play" class="primary" disabled>БЕЖАТЬ</button>
-          <div class="controls-hint">ПК: Space / ↑ — прыжок · ↓ / S — подкат · A/D — коррекция</div>
-        </div>
-      </div>
-
-      <div id="pauseMenu" class="overlay soft">
-        <div class="panel compact">
-          <p class="eyebrow">ПАУЗА</p>
-          <h2>Не теряй ритм</h2>
-          <button id="resume" class="primary">ПРОДОЛЖИТЬ</button>
-        </div>
-      </div>
-
-      <div id="gameover" class="overlay soft">
-        <div class="panel compact">
-          <p class="eyebrow">ЗАБЕГ ОКОНЧЕН</p>
-          <h2 id="scoreTitle">0 м</h2>
-          <p id="bestTitle">Рекорд: 0 м</p>
-          <p id="runStats" class="run-stats">◆ +0 · 0 трюков</p>
-          <div id="missionReward" class="mission-reward" hidden>ЗАДАНИЕ ВЫПОЛНЕНО · +50 ◆</div>
-          <div class="actions">
-            <button id="retry" class="primary">ЕЩЁ РАЗ</button>
-            <button id="reward" class="secondary">СПАСТИ ЗА РЕКЛАМУ</button>
-          </div>
-        </div>
-      </div>
+      <div class="crosshair"><i></i><i></i><i></i><i></i></div>
     </div>
+
+    <div id="touchControls">
+      <div class="touch-help">ЛЕВАЯ ЗОНА — ДВИЖЕНИЕ · ПРАВАЯ — КАМЕРА</div>
+      <button id="touchSprint">БЕГ</button>
+      <button id="touchCrouch">ПОДКАТ</button>
+      <button id="touchJump" class="jump">ПРЫЖОК</button>
+    </div>
+
+    <section id="menu" class="screen visible">
+      <div class="menu-shell">
+        <header class="brand">
+          <p>PRECISION ROOFTOP PARKOUR</p>
+          <h1>VERTICAL</h1>
+          <div class="brand-line"><span>3D PARKOUR</span><b id="tokens">◆ 0</b></div>
+        </header>
+        <p class="intro">Не раннер. Ты стоишь на крыше и сам строишь движение: разбег, точный прыжок, приземление, карниз, балка, стена. На поздних уровнях — столбы, узкие опоры, краны и цепочки без права на ошибку.</p>
+        <div id="levels" class="levels"></div>
+        <div class="controls-copy">
+          <b>УПРАВЛЕНИЕ</b>
+          <span>WASD — движение · мышь — обзор · Space — прыжок / отталкивание от стены · Shift — разбег · Ctrl/C — подкат</span>
+        </div>
+        <div id="loading">Загрузка 3D-физики и локаций…</div>
+      </div>
+    </section>
+
+    <section id="finish" class="screen modal-screen">
+      <div class="finish-card">
+        <p>МАРШРУТ ЗАВЕРШЁН</p>
+        <h2 id="finishTitle">Уровень пройден</h2>
+        <div id="finishStats" class="finish-stats"></div>
+        <div class="finish-actions">
+          <button id="next" class="primary">СЛЕДУЮЩИЙ УРОВЕНЬ</button>
+          <button id="retry">ПОВТОРИТЬ</button>
+          <button id="levelMenu">ВЫБОР УРОВНЯ</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="pauseOverlay" class="screen modal-screen">
+      <div class="pause-card">
+        <p>ПАУЗА</p>
+        <h2>Маршрут ждёт</h2>
+        <button id="resume" class="primary">ПРОДОЛЖИТЬ</button>
+      </div>
+    </section>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
