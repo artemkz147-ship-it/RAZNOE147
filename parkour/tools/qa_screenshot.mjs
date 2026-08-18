@@ -1,8 +1,8 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 
-const ASSET_ROOT = '/assets3d_df5_20260818/';
-const BUILD_ID = 'DF5-20260818-1833';
+const ASSET_ROOT = '/assets3d_df6_20260818/';
+const BUILD_ID = 'DF6-20260818-1903';
 
 await fs.mkdir('qa', { recursive: true });
 
@@ -75,12 +75,13 @@ const versionedResources = resources.filter((url) => {
 });
 const required = ['parkour_performer.glb', 'parkour_locomotion.glb', 'rooftop_sunset_1k.hdr', 'landing-target.svg', 'kenney_city_'];
 for (const token of required) {
-  if (!versionedResources.some((url) => url.includes(token))) throw new Error(`Expected DF5 asset was not requested: ${token}`);
+  if (!versionedResources.some((url) => url.includes(token))) throw new Error(`Expected DF6 asset was not requested: ${token}`);
 }
 
-await page.screenshot({ path: 'qa/drop-flow-df5-level-01-ready.png' });
+await page.screenshot({ path: 'qa/drop-flow-df6-level-01-ready.png' });
 
-// Exercise the controls the player actually needs: orbit camera + walk before the drop.
+// Exercise orbit camera, zoom and real grounded walking. The player must remain on
+// the start roof instead of hovering or accidentally leaving the collider.
 const canvas = page.locator('#game canvas');
 const box = await canvas.boundingBox();
 if (!box) throw new Error('Gameplay canvas not found');
@@ -88,19 +89,21 @@ const startX = box.x + box.width * 0.62;
 const startY = box.y + box.height * 0.46;
 await page.mouse.move(startX, startY);
 await page.mouse.down({ button: 'left' });
-await page.mouse.move(startX - 190, startY + 75, { steps: 12 });
+await page.mouse.move(startX - 170, startY + 62, { steps: 12 });
 await page.mouse.up({ button: 'left' });
-await page.mouse.wheel(0, -260);
+await page.mouse.wheel(0, -220);
 await page.keyboard.down('KeyW');
-await page.waitForTimeout(700);
+await page.waitForTimeout(800);
 await page.keyboard.up('KeyW');
-await page.waitForTimeout(500);
-await page.screenshot({ path: 'qa/drop-flow-df5-level-01-camera-walk.png' });
+await page.waitForTimeout(450);
+await page.screenshot({ path: 'qa/drop-flow-df6-level-01-grounded-walk.png' });
 
 if (!(await page.locator('#state').textContent())?.includes('ГОТОВ К ПРЫЖКУ')) {
-  throw new Error('Camera/walk input unexpectedly changed gameplay state before jump');
+  throw new Error('Grounded walking left the roof or changed gameplay state before jump');
 }
 
+// A complete real physics cycle is now mandatory for release: takeoff -> air ->
+// frontflip -> physical contact with the target -> scored landing -> finish.
 await page.keyboard.press('Space');
 await page.waitForFunction(
   () => (document.querySelector('#state')?.textContent ?? '').includes('В ПОЛЁТЕ')
@@ -109,8 +112,20 @@ await page.waitForFunction(
   { timeout: 10_000 }
 );
 await page.keyboard.press('Digit1');
-await page.waitForTimeout(340);
-await page.screenshot({ path: 'qa/drop-flow-df5-level-01-air.png' });
+await page.waitForTimeout(330);
+await page.screenshot({ path: 'qa/drop-flow-df6-level-01-air.png' });
+
+await page.waitForFunction(
+  () => Number.parseInt(document.querySelector('#score')?.textContent ?? '0', 10) > 0,
+  undefined,
+  { timeout: 12_000 }
+);
+await page.screenshot({ path: 'qa/drop-flow-df6-level-01-contact.png' });
+await page.waitForFunction(
+  () => document.querySelector('#finish')?.classList.contains('visible'),
+  undefined,
+  { timeout: 5_000 }
+);
 
 await fs.writeFile('qa/browser-errors.txt', errors.join('\n'), 'utf8');
 if (errors.some((line) => /pageerror/i.test(line))) {
