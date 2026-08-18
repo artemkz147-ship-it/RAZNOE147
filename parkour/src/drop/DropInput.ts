@@ -12,6 +12,11 @@ export class DropInput {
   private touchOrigin = { x: 0, y: 0 };
   private touchX = 0;
   private touchZ = 0;
+  private cameraPointer: number | null = null;
+  private cameraLast = { x: 0, y: 0 };
+  private lookX = 0;
+  private lookY = 0;
+  private zoom = 0;
 
   constructor() {
     this.bindKeyboard();
@@ -23,6 +28,51 @@ export class DropInput {
     const keyZ = (this.keys.has('KeyW') ? 1 : 0) - (this.keys.has('KeyS') ? 1 : 0);
     this.moveX = Math.abs(keyX) > Math.abs(this.touchX) ? keyX : this.touchX;
     this.moveZ = Math.abs(keyZ) > Math.abs(this.touchZ) ? keyZ : this.touchZ;
+  }
+
+  attachCameraSurface(surface: HTMLElement) {
+    surface.style.touchAction = 'none';
+    surface.addEventListener('contextmenu', (event) => event.preventDefault());
+    surface.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      this.zoom += event.deltaY;
+    }, { passive: false });
+    surface.addEventListener('pointerdown', (event) => {
+      const mouseDrag = event.pointerType === 'mouse' && event.button === 0;
+      const touchDrag = event.pointerType !== 'mouse' && event.clientX >= innerWidth * 0.42;
+      if (!mouseDrag && !touchDrag) return;
+      if (this.cameraPointer !== null) return;
+      this.cameraPointer = event.pointerId;
+      this.cameraLast = { x: event.clientX, y: event.clientY };
+      surface.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    });
+    surface.addEventListener('pointermove', (event) => {
+      if (event.pointerId !== this.cameraPointer) return;
+      this.lookX += event.clientX - this.cameraLast.x;
+      this.lookY += event.clientY - this.cameraLast.y;
+      this.cameraLast = { x: event.clientX, y: event.clientY };
+      event.preventDefault();
+    });
+    const releaseCamera = (event: PointerEvent) => {
+      if (event.pointerId !== this.cameraPointer) return;
+      this.cameraPointer = null;
+    };
+    surface.addEventListener('pointerup', releaseCamera);
+    surface.addEventListener('pointercancel', releaseCamera);
+  }
+
+  consumeLook() {
+    const value = { x: this.lookX, y: this.lookY };
+    this.lookX = 0;
+    this.lookY = 0;
+    return value;
+  }
+
+  consumeZoom() {
+    const value = this.zoom;
+    this.zoom = 0;
+    return value;
   }
 
   consumeJump() {
@@ -63,6 +113,10 @@ export class DropInput {
       this.keys.clear();
       this.touchX = 0;
       this.touchZ = 0;
+      this.cameraPointer = null;
+      this.lookX = 0;
+      this.lookY = 0;
+      this.zoom = 0;
     });
   }
 
