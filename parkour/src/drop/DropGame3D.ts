@@ -59,6 +59,7 @@ export class DropGame3D {
   private playerPos = new THREE.Vector3();
   private velocity = new THREE.Vector3();
   private preStepVelocity = new THREE.Vector3();
+  private pendingLaunchVelocity = new THREE.Vector3();
   private facingYaw = 0;
   private cameraYaw = 0.12;
   private cameraPitch = 0.43;
@@ -143,6 +144,7 @@ export class DropGame3D {
     this.chain = [];
     this.trickRotation.set(0, 0, 0);
     this.trickTarget.set(0, 0, 0);
+    this.pendingLaunchVelocity.set(0, 0, 0);
     this.finishPending = false;
     this.footstepTimer = 0;
     this.stats = this.freshStats();
@@ -209,14 +211,16 @@ export class DropGame3D {
   private preparePhysics(dt: number) {
     if (this.state === 'ready') {
       this.updateGroundMovement(dt);
-      if (this.input.consumeJump()) this.launch();
+      if (this.input.consumeJump()) this.beginTakeoff();
       this.input.consumeTricks();
       this.input.consumeLand();
       return;
     }
 
     if (this.state === 'jump') {
-      this.physics.setHorizontalVelocity(this.velocity.x, this.velocity.z);
+      this.physics.setHorizontalVelocity(0, 0);
+      this.input.consumeTricks();
+      this.input.consumeLand();
       return;
     }
 
@@ -239,19 +243,25 @@ export class DropGame3D {
   private resolvePhysics(dt: number) {
     if (this.state === 'ready') {
       const expected = this.levelManager.getStandingPosition(this.standingSurface, this.tmpStanding);
-      const grounded = this.physics.isGroundedOn(this.standingSurface, 0.16);
+      const grounded = this.physics.isGroundedOn(this.standingSurface, 0.2);
       if (!grounded && this.velocity.y < -0.8 && this.playerPos.y < expected.y - 0.18) {
-        // Walking is for positioning before a deliberate drop. An accidental edge slip
-        // should not turn the player into a hovering/falling physics glitch.
         this.respawnStanding(false);
       }
       return;
     }
 
     if (this.state === 'jump') {
-      this.stageAirTime += dt;
       this.stateTimer -= dt;
-      if (this.stateTimer <= 0) this.state = 'air';
+      if (this.stateTimer <= 0) {
+        this.physics.setVelocity(
+          this.pendingLaunchVelocity.x,
+          this.pendingLaunchVelocity.y,
+          this.pendingLaunchVelocity.z
+        );
+        this.audio.jump();
+        this.state = 'air';
+        this.stageAirTime = 0;
+      }
       return;
     }
 
@@ -261,14 +271,15 @@ export class DropGame3D {
       const spec = this.levelManager.getTargetSpec(this.targetIndex);
       if (!spec) return;
 
-      if (this.physics.isGroundedOn(this.targetIndex, 0.2) && this.preStepVelocity.y <= 0.2) {
+      const groundedSurface = this.physics.groundedSurface(0.2);
+      if (groundedSurface === this.targetIndex && this.preStepVelocity.y <= 0.2) {
         const dx = this.playerPos.x - target.x;
         const dz = this.playerPos.z - target.z;
         this.land(target, Math.hypot(dx, dz), Math.abs(this.preStepVelocity.y));
         return;
       }
 
-      if (this.stageAirTime > 0.42 && this.physics.isGroundedOn(this.standingSurface, 0.18)) {
+      if (groundedSurface !== null && this.stageAirTime > 0.32) {
         this.miss();
         return;
       }
@@ -319,7 +330,7 @@ export class DropGame3D {
 
   private updateGroundMovement(dt: number) {
     const spec = this.currentStandingSpec();
-    if (!spec || !this.physics.isGroundedOn(this.standingSurface, 0.18)) {
+    if (!spec || !this.physics.isGroundedOn(this.standingSurface, 0.2)) {
       this.physics.setHorizontalVelocity(0, 0);
       return;
     }
@@ -391,7 +402,7 @@ export class DropGame3D {
     this.physics.setVelocity(vx, v.y, vz);
   }
 
-  private launch() {
+  private beginTakeoff() {
     const target = this.levelManager.getTargetPosition(this.targetIndex, this.tmpTarget);
     const dx = target.x - this.playerPos.x;
     const dz = target.z - this.playerPos.z;
@@ -405,17 +416,19 @@ export class DropGame3D {
     const flightTime = (jumpUp + Math.sqrt(jumpUp * jumpUp + 2 * GRAVITY * drop)) / GRAVITY;
     const desiredSpeed = THREE.MathUtils.clamp(horizontal / Math.max(0.65, flightTime) * 0.94, 2.3, 7.2);
     const current = this.physics.getVelocity(this.velocity);
-    const vx = direction.x * desiredSpeed + current.x * 0.18;
-    const vz = direction.z * desiredSpeed + current.z * 0.18;
+    this.pendingLaunchVelocity.set(
+      direction.x * desiredSpeed + current.x * 0.12,
+      jumpUp,
+      direction.z * desiredSpeed + current.z * 0.12
+    );
 
-    this.physics.setVelocity(vx, jumpUp, vz);
+    this.physics.setVelocity(0, 0, 0);
     this.facingYaw = Math.atan2(direction.x, direction.z);
     this.stageStartY = this.playerPos.y;
     this.stageAirTime = 0;
     this.landingPrepUntil = -1;
     this.state = 'jump';
-    this.stateTimer = 0.15;
-    this.audio.jump();
+    this.stateTimer = 0.13;
   }
 
   private queueTrick(kind: TrickKind) {
@@ -447,15 +460,15 @@ export class DropGame3D {
     const maxStep = speed * dt;
     this.trickRotation.x = this.approach(this.trickRotation.x, this.trickTarget.x, maxStep);
     this.trickRotation.y = this.approach(this.trickRotation.y, this.trickTarget.y, maxStep);
-    this.trickRotation.z = this.apach(this.trickRotation.z, this.trickTarget.z, maxStep);
+    this.trickRotation.z = this.approach(this.trickRotation.z, this.trickTarget.z, maxStep);
   }
 
   private land(target: THREE.Vector3, distance: number, impact: number) {
     const spec = this.levelManager.getTargetSpec(this.targetIndex);
     if (!spec) return;
-    const landingPoint = target.clone();
-    landingPoint.y += 0.035;
-    this.physics.teleportFoot(landingPoint);
+
+    // Keep the exact physical contact position. Do not snap/teleport to the target
+    // center: precision must be visible and the collision must feel like the cause.
     this.physics.getFootPosition(this.playerPos);
     this.physics.setVelocity(0, 0, 0);
 
@@ -624,7 +637,7 @@ export class DropGame3D {
     const stateLabel = this.state === 'ready'
       ? 'ГОТОВ К ПРЫЖКУ'
       : this.state === 'jump'
-        ? 'ТОЛЧОК'
+        ? 'ПОДГОТОВКА'
         : this.state === 'air'
           ? (this.simTime <= this.landingPrepUntil ? 'ГОТОВ К ПОСАДКЕ' : 'В ПОЛЁТЕ')
           : this.state === 'fail'
@@ -661,10 +674,6 @@ export class DropGame3D {
     if (current < target) return Math.min(target, current + step);
     if (current > target) return Math.max(target, current - step);
     return current;
-  }
-
-  private apach(current: number, target: number, step: number) {
-    return this.approach(current, target, step);
   }
 
   private freshStats(): DropRunStats {
