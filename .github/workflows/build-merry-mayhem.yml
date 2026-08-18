@@ -35,6 +35,7 @@ jobs:
           python3 tools/terrain_polish.py
           python3 tools/final_qa_fixes.py
           python3 .build/pro_overhaul.py
+          python3 .build/pro_finish.py
           node --check src/content.js
           node --check src/main.js
           node --check src/yandex.js
@@ -78,7 +79,7 @@ jobs:
         run: |
           echo validate > /tmp/merry-stage
           python3 tools/validate_build.py
-          test "$(find dist/assets -name '*.glb' | wc -l)" -ge 75
+          test "$(find dist/assets -name '*.glb' | wc -l)" -ge 77
           grep -q "const DEBUG_MAP" src/main.js
           grep -q "const DEBUG_HERO" src/main.js
           grep -q "grassShort" src/content.js
@@ -87,7 +88,10 @@ jobs:
           grep -q "willow" src/content.js
           grep -q "buildMacroClusters" src/main.js
           grep -q "HELD_PROFILES" src/content.js
+          grep -q "bow.glb" src/content.js
           grep -q "qaKills" src/main.js
+          grep -q "qaHits" src/main.js
+          grep -q "qaShots" src/main.js
 
       - name: WebGL QA across contrasting maps
         shell: bash
@@ -99,17 +103,21 @@ jobs:
           for i in $(seq 1 45); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           FLAGS='--headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required'
-          BASE='http://127.0.0.1:4173/?autostart=1&debug-fast=1'
-          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=20000 --dump-dom "$BASE&map=sunny_meadow&hero=donut_knight" >/tmp/merry-dom.html || true
+          COMBAT='http://127.0.0.1:4173/?autostart=1&debug-fast=1&map=sunny_meadow&hero=donut_knight'
+          BASE='http://127.0.0.1:4173/?autostart=1'
+          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=16000 --dump-dom "$COMBAT" >/tmp/merry-dom.html || true
+          grep -oE 'data-(game-ready|game-state|qa-shots|qa-hits|qa-kills)="[^"]*"' /tmp/merry-dom.html || true
           grep -q 'data-game-ready="true"' /tmp/merry-dom.html
           grep -Eq 'data-game-state="(playing|upgrade|gameover|victory)"' /tmp/merry-dom.html
+          grep -Eq 'data-qa-shots="[1-9][0-9]*"' /tmp/merry-dom.html
+          grep -Eq 'data-qa-hits="[1-9][0-9]*"' /tmp/merry-dom.html
           grep -Eq 'data-qa-kills="[1-9][0-9]*"' /tmp/merry-dom.html
           for SPEC in 'sunny-meadow sunny_meadow donut_knight' 'candy-park candy_park candy_witch' 'snow-festival snow_festival snow_penguin' 'rainbow-canyon rainbow_canyon fox_archer' 'firefly-swamp firefly_swamp lightning_bee'; do
             set -- $SPEC; NAME=$1; MAP=$2; HERO=$3
-            "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot="qa-$NAME.png" "$BASE&map=$MAP&hero=$HERO"
+            "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=9000 --screenshot="qa-$NAME.png" "$BASE&map=$MAP&hero=$HERO"
             test -s "qa-$NAME.png"
           done
-          "$CHROME" $FLAGS --window-size=412,915 --virtual-time-budget=8500 --screenshot=qa-mobile-festival.png --user-agent='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36' "$BASE&map=festival_finale&hero=pumpkin_jester"
+          "$CHROME" $FLAGS --window-size=412,915 --virtual-time-budget=9000 --screenshot=qa-mobile-festival.png --user-agent='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36' "$BASE&map=festival_finale&hero=pumpkin_jester"
           test -s qa-mobile-festival.png
 
       - name: Package releases
