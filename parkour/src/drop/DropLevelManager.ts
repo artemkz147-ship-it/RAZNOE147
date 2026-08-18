@@ -29,6 +29,8 @@ type SurfaceVisual = {
 };
 
 const STREET_Y = 0;
+const ROUTE_PALETTE = [0x9b775f, 0x6d7f8e, 0x8e806f, 0x7e6862, 0x687b80, 0x897465];
+const CITY_PALETTE = [0x7b858d, 0x927866, 0x7c8990, 0x9a8874, 0x727483, 0x887d73];
 
 export class DropLevelManager {
   private scene: THREE.Scene;
@@ -98,14 +100,14 @@ export class DropLevelManager {
       if (surface.marker) {
         surface.marker.position.set(
           surface.origin.x + offset.x,
-          surface.origin.y + 0.065,
+          surface.origin.y + 0.035,
           surface.origin.z + offset.z
         );
       }
       if (surface.beacon) {
         surface.beacon.position.set(
           surface.origin.x + offset.x,
-          surface.origin.y + 2.25,
+          surface.origin.y + 2.0,
           surface.origin.z + offset.z
         );
       }
@@ -115,10 +117,10 @@ export class DropLevelManager {
     if (active) {
       const pulse = 1 + Math.sin(time * 4.8) * 0.08;
       active.marker?.scale.setScalar(pulse);
-      active.beacon?.scale.set(1.15 * pulse, 1.15 * pulse, 1);
-      if (active.marker) active.marker.material.opacity = 0.9 + Math.sin(time * 4.8) * 0.08;
+      active.beacon?.scale.set(1.1 * pulse, 1.1 * pulse, 1);
+      if (active.marker) active.marker.material.opacity = 0.88 + Math.sin(time * 4.8) * 0.08;
       if (active.beacon?.material instanceof THREE.SpriteMaterial) {
-        active.beacon.material.opacity = 0.7 + Math.sin(time * 4.8 + 0.8) * 0.18;
+        active.beacon.material.opacity = 0.66 + Math.sin(time * 4.8 + 0.8) * 0.17;
       }
     }
   }
@@ -192,14 +194,16 @@ export class DropLevelManager {
     const position = this.authoredPosition(levelId, index, spec);
     const width = Math.max(0.7, spec.size[0]);
     const depth = Math.max(0.7, spec.size[1]);
-    const desiredHeight = this.visualHeight(spec, position.y);
+    const roofCap = this.roofCap(spec);
+    const desiredHeight = this.visualHeight(spec, position.y) + roofCap;
     root.scale.set(width / size.x, desiredHeight / size.y, depth / size.z);
     const scaled = new THREE.Box3().setFromObject(root);
     const center = scaled.getCenter(new THREE.Vector3());
     root.position.x += position.x - center.x;
     root.position.z += position.z - center.z;
-    root.position.y += position.y - scaled.max.y;
-    this.prepareMaterials(root, true);
+    // Route Y is the walkable deck, not the tallest parapet/antenna vertex.
+    root.position.y += position.y + roofCap - scaled.max.y;
+    this.prepareMaterials(root, true, levelId * 13 + index * 3);
     this.scene.add(root);
 
     const origin = position;
@@ -211,26 +215,28 @@ export class DropLevelManager {
 
   private authoredPosition(levelId: number, index: number, spec: DropSurface) {
     const position = new THREE.Vector3(...spec.p);
-    if (index === 1 && levelId === 1) position.set(6.2, spec.p[1], -3.8);
-    if (index === 1 && levelId === 2) position.set(7.0, spec.p[1], -4.2);
+    // Tutorial buildings must be visibly separate, while still reachable with a
+    // strong parkour jump and four metres of vertical drop.
+    if (index === 1 && levelId === 1) position.set(8.5, spec.p[1], -4.0);
+    if (index === 1 && levelId === 2) position.set(9.0, spec.p[1], -4.5);
     return position;
   }
 
   private createMarker(spec: DropSurface, origin: THREE.Vector3) {
     if (!this.markerTexture) return { marker: null, beacon: null };
-    const geometry = new THREE.PlaneGeometry(spec.radius * 2.15, spec.radius * 2.15);
+    const geometry = new THREE.PlaneGeometry(spec.radius * 2.05, spec.radius * 2.05);
     const material = new THREE.MeshBasicMaterial({
       map: this.markerTexture,
       transparent: true,
       depthWrite: false,
       depthTest: false,
       side: THREE.DoubleSide,
-      opacity: 0.94,
+      opacity: 0.92,
       toneMapped: false
     });
     const marker = new THREE.Mesh(geometry, material);
     marker.rotation.x = -Math.PI / 2;
-    marker.position.set(origin.x, origin.y + 0.065, origin.z);
+    marker.position.set(origin.x, origin.y + 0.035, origin.z);
     marker.renderOrder = 40;
     marker.visible = false;
 
@@ -239,12 +245,12 @@ export class DropLevelManager {
       transparent: true,
       depthWrite: false,
       depthTest: false,
-      opacity: 0.82,
+      opacity: 0.76,
       toneMapped: false
     });
     const beacon = new THREE.Sprite(beaconMaterial);
-    beacon.position.set(origin.x, origin.y + 2.25, origin.z);
-    beacon.scale.set(1.15, 1.15, 1);
+    beacon.position.set(origin.x, origin.y + 2.0, origin.z);
+    beacon.scale.set(1.1, 1.1, 1);
     beacon.renderOrder = 41;
     beacon.visible = false;
     return { marker, beacon };
@@ -270,14 +276,14 @@ export class DropLevelManager {
         const box = new THREE.Box3().setFromObject(root);
         const center = box.getCenter(new THREE.Vector3());
         const angle = (index / count) * Math.PI * 2 + level.id * 0.17;
-        const radius = 39 + (index % 4) * 6.5;
+        const radius = 42 + (index % 4) * 7.0;
         const x = centerX + Math.cos(angle) * radius;
         const z = centerZ + Math.sin(angle) * radius;
         root.position.x += x - center.x;
         root.position.z += z - center.z;
         root.position.y += STREET_Y - box.min.y;
         root.rotation.y = -angle + Math.PI * 0.5;
-        this.prepareMaterials(root, false);
+        this.prepareMaterials(root, false, level.id * 19 + index * 5);
         this.scene.add(root);
         return root;
       })
@@ -374,6 +380,11 @@ export class DropLevelManager {
     return null;
   }
 
+  private roofCap(spec: DropSurface) {
+    if (spec.moving || spec.kind !== 'roof') return 0;
+    return 0.78;
+  }
+
   private visualHeight(spec: DropSurface, topY: number) {
     if (spec.moving) return spec.kind === 'beam' ? 0.65 : 0.9;
     if (spec.kind === 'beam') return 0.7;
@@ -402,7 +413,9 @@ export class DropLevelManager {
     return new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());
   }
 
-  private prepareMaterials(root: THREE.Object3D, route: boolean) {
+  private prepareMaterials(root: THREE.Object3D, route: boolean, paletteIndex: number) {
+    const palette = route ? ROUTE_PALETTE : CITY_PALETTE;
+    const tint = new THREE.Color(palette[Math.abs(paletteIndex) % palette.length]);
     root.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       child.castShadow = route;
@@ -410,9 +423,12 @@ export class DropLevelManager {
       const cloneMaterial = (material: THREE.Material) => {
         const copy = material.clone();
         if (copy instanceof THREE.MeshStandardMaterial) {
-          copy.roughness = Math.max(copy.roughness, route ? 0.58 : 0.65);
-          copy.metalness = Math.min(copy.metalness, route ? 0.08 : 0.04);
-          copy.envMapIntensity = route ? 0.82 : 0.62;
+          // Keep authored maps, but give otherwise white low-poly buildings a restrained
+          // city palette instead of the washed-out all-white DF5/DF6 prototype look.
+          copy.color.lerp(tint, route ? 0.58 : 0.38);
+          copy.roughness = Math.max(copy.roughness, route ? 0.58 : 0.66);
+          copy.metalness = Math.min(copy.metalness, route ? 0.07 : 0.035);
+          copy.envMapIntensity = route ? 0.72 : 0.52;
         }
         return copy;
       };
