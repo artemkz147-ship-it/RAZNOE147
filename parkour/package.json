@@ -1,7 +1,7 @@
 {
   "name": "drop-flow-yandex",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -12,10 +12,10 @@
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.19.3",
-    "three": "0.185.1"
+    "three": "0.158.0"
   },
   "devDependencies": {
-    "@types/three": "0.185.1",
+    "@types/three": "0.158.3",
     "typescript": "5.7.2",
     "vite": "6.1.0"
   }
