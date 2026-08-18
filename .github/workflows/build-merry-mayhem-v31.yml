@@ -1,0 +1,217 @@
+name: Build Merry Mayhem 3D v3.1
+
+on:
+  push:
+    branches: [yandex-3d-merry-mayhem]
+    paths-ignore:
+      - '.build/v31-status.json'
+  workflow_dispatch:
+
+concurrency:
+  group: merry-mayhem-v31-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout v3.1 materialized source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Blender and QA tools
+        shell: bash
+        run: |
+          echo tools > /tmp/v31-stage
+          sudo apt-get update
+          sudo apt-get install -y blender python3-numpy zip unzip xvfb xauth libegl1 libgl1 libgl1-mesa-dri libgles2
+          blender --version | head -1
+
+      - name: Build v3.1 CC0 art library
+        shell: bash
+        run: |
+          echo assets > /tmp/v31-stage
+          set -euo pipefail
+          chmod +x tools/build_assets.sh
+          bash tools/build_assets.sh .asset-src
+          test "$(find public/assets -name '*.glb' | wc -l)" -ge 90
+          test "$(find public/portraits -name '*.png' | wc -l)" -eq 30
+          test -s public/assets/weapon-08.glb
+          test -s public/portraits/weapon-08.png
+
+      - name: Validate v3.1 source contract
+        shell: bash
+        run: |
+          echo source > /tmp/v31-stage
+          set -euo pipefail
+          node --check src/content.js
+          node --check src/main.js
+          node --check src/yandex.js
+          python3 -m py_compile tools/validate_build.py .build/v3_1_quality_pass.py
+          grep -q "weapon_src\[8\].*Torch" tools/build_assets.sh
+          ! grep -q "Pan.fbx" tools/build_assets.sh
+          ! grep -q "projectile:'food_" src/content.js
+          ! grep -Eq "food_(donut|cookie|pancake|pumpkin|watermelon)" src/main.js
+          grep -q "buildGroundField" src/main.js
+          grep -q "buildNearFieldLandmarks" src/main.js
+          grep -q "width:188" src/content.js
+          grep -q "Солнечный Посох" src/content.js
+          grep -q "Огненный Жезл" src/content.js
+          grep -q "Лазурная цитадель" src/content.js
+          grep -q "Лучезарный фестиваль" src/content.js
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          echo npm > /tmp/v31-stage
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund puppeteer-core@24
+
+      - name: Production build
+        shell: bash
+        run: |
+          echo vite > /tmp/v31-stage
+          npm run build
+
+      - name: Validate production package
+        shell: bash
+        run: |
+          echo validate > /tmp/v31-stage
+          set -euo pipefail
+          python3 tools/validate_build.py
+          python3 - <<'PY'
+          from pathlib import Path
+          glb=list(Path('dist/assets').glob('*.glb'))
+          hp=list(Path('dist/portraits').glob('hero-*.png'))
+          wp=list(Path('dist/portraits').glob('weapon-*.png'))
+          assert len(glb)>=90, len(glb)
+          assert len(hp)==15, len(hp)
+          assert len(wp)==15, len(wp)
+          html=Path('dist/index.html').read_text(encoding='utf-8')
+          assert './assets/' in html, 'Vite output must use relative asset paths'
+          assert 'src="/assets/' not in html and 'href="/assets/' not in html
+          total=sum(p.stat().st_size for p in Path('dist').rglob('*') if p.is_file())
+          assert total < 100*1024*1024, total
+          print(f'v3.1 package validated: {len(glb)} GLB, {total/1024/1024:.2f} MiB')
+          PY
+
+      - name: Real-time WebGL combat and visual QA
+        shell: bash
+        run: |
+          echo webgl > /tmp/v31-stage
+          set -euo pipefail
+          npm run preview -- --host 127.0.0.1 --port 4173 >/tmp/v31-vite.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 45); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROME"
+          CHROME="$CHROME" node .build/browser_qa.mjs
+          for f in qa-heroes.png qa-sunny-meadow.png qa-candy-park.png qa-snow-festival.png qa-rainbow-canyon.png qa-firefly-swamp.png qa-mobile-festival.png; do test -s "$f"; done
+          test "$(find . -maxdepth 1 -name 'qa-hero-*.png' | wc -l)" -eq 15
+
+      - name: Package v3.1 releases
+        shell: bash
+        run: |
+          echo package > /tmp/v31-stage
+          set -euo pipefail
+          cd dist
+          zip -9 -r ../vesely-natisk-3d-yandex-v3.1.0.zip .
+          cd ..
+          unzip -t vesely-natisk-3d-yandex-v3.1.0.zip >/dev/null
+          test "$(unzip -Z1 vesely-natisk-3d-yandex-v3.1.0.zip | grep -c '^index\.html$')" -eq 1
+          zip -9 -r vesely-natisk-3d-full-project-v3.1.0.zip index.html package.json vite.config.js README.md docs src tools public .github/workflows/build-merry-mayhem-v31.yml .build/v3_1_quality_pass.py .build/browser_qa.mjs -x '*.DS_Store'
+          unzip -t vesely-natisk-3d-full-project-v3.1.0.zip >/dev/null
+          rm -rf local-test && mkdir local-test
+          cp -a dist/. local-test/
+          cat > local-test/START_LOCAL.ps1 <<'POWERSHELL'
+          $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+          $port = 8765
+          $listener = [System.Net.HttpListener]::new()
+          $listener.Prefixes.Add("http://127.0.0.1:$port/")
+          $listener.Start()
+          Start-Process "http://127.0.0.1:$port/"
+          Write-Host "Весёлый Натиск 3D v3.1: http://127.0.0.1:$port/"
+          Write-Host "Для остановки закройте это окно."
+          $mime = @{'.html'='text/html; charset=utf-8';'.js'='text/javascript; charset=utf-8';'.css'='text/css; charset=utf-8';'.glb'='model/gltf-binary';'.json'='application/json';'.png'='image/png';'.jpg'='image/jpeg';'.svg'='image/svg+xml'}
+          while ($listener.IsListening) {
+            $ctx=$listener.GetContext(); $rel=[Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath.TrimStart('/'))
+            if ([string]::IsNullOrWhiteSpace($rel)) {$rel='index.html'}
+            if ($rel -eq 'sdk.js') {$ctx.Response.StatusCode=204; $ctx.Response.Close(); continue}
+            $path=[IO.Path]::GetFullPath((Join-Path $root $rel)); $base=[IO.Path]::GetFullPath($root)
+            if (-not $path.StartsWith($base) -or -not (Test-Path $path -PathType Leaf)) {$ctx.Response.StatusCode=404; $ctx.Response.Close(); continue}
+            $ext=[IO.Path]::GetExtension($path).ToLower(); if($mime.ContainsKey($ext)){$ctx.Response.ContentType=$mime[$ext]}
+            $bytes=[IO.File]::ReadAllBytes($path); $ctx.Response.ContentLength64=$bytes.Length; $ctx.Response.OutputStream.Write($bytes,0,$bytes.Length); $ctx.Response.Close()
+          }
+          POWERSHELL
+          cat > local-test/START_LOCAL.bat <<'BAT'
+          @echo off
+          cd /d "%~dp0"
+          powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0START_LOCAL.ps1"
+          BAT
+          cat > local-test/README_LOCAL.txt <<'TXT'
+          ЛОКАЛЬНЫЙ ЗАПУСК v3.1
+          1. Полностью распакуйте архив.
+          2. Запустите START_LOCAL.bat.
+          3. Игра откроется через локальный HTTP-сервер.
+          Не запускайте index.html двойным кликом.
+          TXT
+          cd local-test && zip -9 -r ../vesely-natisk-3d-local-test-v3.1.0.zip . && cd ..
+          unzip -t vesely-natisk-3d-local-test-v3.1.0.zip >/dev/null
+
+      - name: Upload Yandex v3.1
+        uses: actions/upload-artifact@v4
+        with:
+          name: vesely-natisk-3d-yandex-v3.1.0
+          path: vesely-natisk-3d-yandex-v3.1.0.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload full project v3.1
+        uses: actions/upload-artifact@v4
+        with:
+          name: vesely-natisk-3d-full-project-v3.1.0
+          path: vesely-natisk-3d-full-project-v3.1.0.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload local tester v3.1
+        uses: actions/upload-artifact@v4
+        with:
+          name: vesely-natisk-3d-local-test-v3.1.0
+          path: vesely-natisk-3d-local-test-v3.1.0.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload QA v3.1
+        uses: actions/upload-artifact@v4
+        with:
+          name: merry-mayhem-3d-qa-v3.1
+          path: qa-*.png
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Record v3.1 build result
+        if: always()
+        shell: bash
+        run: |
+          STAGE="$(cat /tmp/v31-stage 2>/dev/null || echo checkout)"
+          mkdir -p .build
+          printf '{"status":"%s","stage":"%s","run_id":"%s","sha":"%s"}\n' '${{ job.status }}' "$STAGE" '${{ github.run_id }}' '${{ github.sha }}' > .build/v31-status.json
+          git config user.name 'Merry Mayhem Build Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add .build/v31-status.json
+          git commit -m "v3.1 build status: ${{ job.status }} at $STAGE" || true
+          git pull --rebase origin yandex-3d-merry-mayhem || true
+          git push origin HEAD:yandex-3d-merry-mayhem || true
