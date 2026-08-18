@@ -14,6 +14,8 @@ export type ParkourProgress = {
   totalFalls: number;
 };
 
+const MAX_LEVEL = 12;
+
 const freshProgress = (): ParkourProgress => ({
   unlockedLevel: 1,
   bestTimes: {},
@@ -118,10 +120,10 @@ class YandexBridge {
   private normalize(input: Partial<ParkourProgress>): ParkourProgress {
     const base = freshProgress();
     return {
-      unlockedLevel: Math.max(1, Math.min(8, Math.floor(Number(input.unlockedLevel || base.unlockedLevel)))),
+      unlockedLevel: Math.max(1, Math.min(MAX_LEVEL, Math.floor(Number(input.unlockedLevel || base.unlockedLevel)))),
       bestTimes: typeof input.bestTimes === 'object' && input.bestTimes ? input.bestTimes : {},
       completedLevels: Array.isArray(input.completedLevels)
-        ? [...new Set(input.completedLevels.map(Number).filter((value) => value >= 1 && value <= 8))]
+        ? [...new Set(input.completedLevels.map(Number).filter((value) => value >= 1 && value <= MAX_LEVEL))]
         : [],
       tokens: Math.max(0, Math.floor(Number(input.tokens || 0))),
       totalFalls: Math.max(0, Math.floor(Number(input.totalFalls || 0)))
