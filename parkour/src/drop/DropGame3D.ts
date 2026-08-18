@@ -56,7 +56,11 @@ export class DropGame3D {
   private lastFrame = performance.now();
   private playerPos = new THREE.Vector3();
   private velocity = new THREE.Vector3();
+  private standingOffset = new THREE.Vector3();
   private facingYaw = 0;
+  private cameraYaw = 0.12;
+  private cameraPitch = 0.43;
+  private cameraZoom = 1;
   private targetIndex = 0;
   private standingSurface = -1;
   private stateTimer = 0;
@@ -79,9 +83,12 @@ export class DropGame3D {
   private tmpCamera = new THREE.Vector3();
   private tmpFocus = new THREE.Vector3();
   private tmpDirection = new THREE.Vector3();
-  private tmpSide = new THREE.Vector3();
+  private tmpOrbit = new THREE.Vector3();
   private tmpMidpoint = new THREE.Vector3();
   private tmpLift = new THREE.Vector3();
+  private tmpMoveForward = new THREE.Vector3();
+  private tmpMoveRight = new THREE.Vector3();
+  private readonly upAxis = new THREE.Vector3(0, 1, 0);
 
   constructor(host: HTMLElement, callbacks: DropCallbacks) {
     this.host = host;
@@ -98,6 +105,7 @@ export class DropGame3D {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.host.appendChild(this.renderer.domElement);
+    this.input.attachCameraSurface(this.renderer.domElement);
 
     this.createLighting();
     await Promise.all([this.levelManager.init(), this.avatar.init()]);
@@ -117,6 +125,10 @@ export class DropGame3D {
     this.simTime = 0;
     this.targetIndex = 0;
     this.standingSurface = -1;
+    this.standingOffset.set(0, 0, 0);
+    this.cameraYaw = 0.12;
+    this.cameraPitch = 0.43;
+    this.cameraZoom = 1;
     this.stateTimer = 0;
     this.score = 0;
     this.combo = 1;
@@ -156,6 +168,7 @@ export class DropGame3D {
     const dt = Math.min(0.04, Math.max(0, (now - this.lastFrame) / 1000));
     this.lastFrame = now;
     this.input.update();
+    this.updateCameraInput();
 
     if (this.running && !this.paused) {
       this.simTime += dt;
@@ -173,6 +186,7 @@ export class DropGame3D {
   private updateState(dt: number) {
     if (this.state === 'ready') {
       this.followStandingSurface();
+      this.moveOnSurface(dt);
       this.faceTarget();
       if (this.input.consumeJump()) this.launch();
       this.input.consumeTricks();
@@ -233,6 +247,7 @@ export class DropGame3D {
 
     if (this.state === 'fail' && this.stateTimer <= 0) {
       this.state = 'ready';
+      this.standingOffset.set(0, 0, 0);
       this.followStandingSurface();
       this.stageStartY = this.playerPos.y;
       this.trickRotation.set(0, 0, 0);
@@ -240,6 +255,40 @@ export class DropGame3D {
       this.resetStageTricks();
       this.faceTarget();
     }
+  }
+
+  private updateCameraInput() {
+    const look = this.input.consumeLook();
+    if (look.x !== 0 || look.y !== 0) {
+      this.cameraYaw -= look.x * 0.006;
+      this.cameraPitch = THREE.MathUtils.clamp(this.cameraPitch - look.y * 0.0045, 0.1, 1.08);
+    }
+    const zoom = this.input.consumeZoom();
+    if (zoom !== 0) this.cameraZoom = THREE.MathUtils.clamp(this.cameraZoom + zoom * 0.0009, 0.62, 1.6);
+  }
+
+  private moveOnSurface(dt: number) {
+    if (Math.abs(this.input.moveX) < 0.01 && Math.abs(this.input.moveZ) < 0.01) return;
+    const spec = this.standingSurface < 0
+      ? this.currentLevel.start
+      : this.currentLevel.targets[this.standingSurface];
+    if (!spec) return;
+
+    const forward = this.tmpMoveForward.copy(this.playerPos).sub(this.camera.position);
+    forward.y = 0;
+    if (forward.lengthSq() < 0.0001) forward.set(Math.sin(this.facingYaw), 0, Math.cos(this.facingYaw));
+    else forward.normalize();
+    const right = this.tmpMoveRight.set(forward.z, 0, -forward.x);
+    const speed = 2.65;
+    this.standingOffset
+      .addScaledVector(forward, this.input.moveZ * speed * dt)
+      .addScaledVector(right, this.input.moveX * speed * dt);
+
+    const maxX = Math.max(0.18, spec.size[0] * 0.5 - 0.5);
+    const maxZ = Math.max(0.18, spec.size[1] * 0.5 - 0.5);
+    this.standingOffset.x = THREE.MathUtils.clamp(this.standingOffset.x, -maxX, maxX);
+    this.standingOffset.z = THREE.MathUtils.clamp(this.standingOffset.z, -maxZ, maxZ);
+    this.followStandingSurface();
   }
 
   private launch() {
@@ -295,6 +344,7 @@ export class DropGame3D {
     const spec = this.levelManager.getTargetSpec(this.targetIndex);
     if (!spec) return;
     this.playerPos.copy(target);
+    this.standingOffset.set(0, 0, 0);
     const impact = Math.abs(this.velocity.y);
     this.velocity.set(0, 0, 0);
     const precision = Math.max(0, Math.min(1, 1 - distance / Math.max(0.2, spec.radius)));
@@ -375,8 +425,8 @@ export class DropGame3D {
   private followStandingSurface() {
     if (this.standingSurface < 0) this.levelManager.getStartPosition(this.tmpStanding);
     else this.levelManager.getStandingPosition(this.standingSurface, this.tmpStanding);
-    this.playerPos.copy(this.tmpStanding);
-    this.playerPos.y += 0.03;
+    this.playerPos.copy(this.tmpStanding).add(this.standingOffset);
+    this.playerPos.y = this.tmpStanding.y + 0.03;
   }
 
   private faceTarget() {
@@ -406,18 +456,18 @@ export class DropGame3D {
     const horizontal = direction.length();
     if (horizontal < 0.001) direction.set(Math.sin(this.facingYaw), 0, Math.cos(this.facingYaw));
     else direction.multiplyScalar(1 / horizontal);
-    const side = this.tmpSide.set(direction.z, 0, -direction.x);
+    const orbit = this.tmpOrbit.copy(direction).applyAxisAngle(this.upAxis, this.cameraYaw);
     const air = this.state === 'air' || this.state === 'jump';
 
     const playerWeight = air ? 0.56 : 0.48;
     const midpoint = this.tmpMidpoint.copy(target).lerp(this.playerPos, playerWeight);
-    const back = air ? 6.8 + Math.min(2.4, horizontal * 0.12) : 7.8 + Math.min(2.8, horizontal * 0.14);
-    const height = air ? 4.4 + Math.min(2.0, drop * 0.09) : 4.9 + Math.min(1.8, drop * 0.08);
-    const sideOffset = air ? 1.15 : 1.45;
+    const baseRadius = air ? 7.8 + Math.min(3, horizontal * 0.12) : 9.2 + Math.min(3.6, horizontal * 0.14);
+    const radius = baseRadius * this.cameraZoom;
+    const horizontalRadius = radius * Math.cos(this.cameraPitch);
+    const verticalRadius = radius * Math.sin(this.cameraPitch);
     const desired = this.tmpCamera.copy(midpoint)
-      .addScaledVector(direction, -back)
-      .addScaledVector(side, sideOffset)
-      .add(this.tmpLift.set(0, height, 0));
+      .addScaledVector(orbit, -horizontalRadius)
+      .add(this.tmpLift.set(0, verticalRadius + (air ? 1.2 : 1.45) + Math.min(1.4, drop * 0.045), 0));
     const focus = this.tmpFocus.copy(target).lerp(this.playerPos, air ? 0.56 : 0.5).add(this.tmpLift.set(0, 0.55, 0));
     return { desired, focus, drop, air };
   }
@@ -434,7 +484,7 @@ export class DropGame3D {
   private updateCamera(dt: number) {
     if (!this.currentLevel) return;
     const { desired, focus, drop, air } = this.routeCameraPose();
-    this.camera.position.lerp(desired, 1 - Math.exp(-(air ? 6.5 : 8.5) * dt));
+    this.camera.position.lerp(desired, 1 - Math.exp(-(air ? 7.2 : 10.5) * dt));
     this.camera.lookAt(focus);
     const desiredFov = (air ? 58 : 54) + Math.min(7, drop * 0.13);
     this.camera.fov += (desiredFov - this.camera.fov) * Math.min(1, dt * 4.8);
