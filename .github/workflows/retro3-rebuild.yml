@@ -2,6 +2,8 @@ name: Retro 3 in 1 rebuild
 on:
   push:
     branches: [retro-3in1-rebuild]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 jobs:
   build:
