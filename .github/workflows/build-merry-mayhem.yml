@@ -33,6 +33,7 @@ jobs:
           python3 tools/expand_progression.py
           python3 tools/visual_polish.py
           python3 tools/terrain_polish.py
+          python3 tools/final_qa_fixes.py
           node --check src/content.js
           node --check src/main.js
           node --check src/yandex.js
@@ -76,7 +77,7 @@ jobs:
         run: |
           echo validate > /tmp/merry-stage
           python3 tools/validate_build.py
-          test "$(find dist/assets -name '*.glb' | wc -l)" -ge 65
+          test "$(find dist/assets -name '*.glb' | wc -l)" -ge 75
           grep -q "const DEBUG_MAP" src/main.js
           grep -q "const DEBUG_HERO" src/main.js
           grep -q "grassShort" src/content.js
@@ -98,13 +99,13 @@ jobs:
           "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=12000 --dump-dom "$BASE&map=sunny_meadow&hero=donut_knight" >/tmp/merry-dom.html || true
           grep -q 'data-game-ready="true"' /tmp/merry-dom.html
           grep -Eq 'data-game-state="(playing|upgrade|gameover|victory)"' /tmp/merry-dom.html
-          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot=qa-sunny-meadow.png "$BASE&map=sunny_meadow&hero=donut_knight"
-          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot=qa-candy-park.png "$BASE&map=candy_park&hero=candy_witch"
-          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot=qa-snow-festival.png "$BASE&map=snow_festival&hero=snow_penguin"
-          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot=qa-rainbow-canyon.png "$BASE&map=rainbow_canyon&hero=fox_archer"
-          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot=qa-firefly-swamp.png "$BASE&map=firefly_swamp&hero=lightning_bee"
+          for SPEC in 'sunny-meadow sunny_meadow donut_knight' 'candy-park candy_park candy_witch' 'snow-festival snow_festival snow_penguin' 'rainbow-canyon rainbow_canyon fox_archer' 'firefly-swamp firefly_swamp lightning_bee'; do
+            set -- $SPEC; NAME=$1; MAP=$2; HERO=$3
+            "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot="qa-$NAME.png" "$BASE&map=$MAP&hero=$HERO"
+            test -s "qa-$NAME.png"
+          done
           "$CHROME" $FLAGS --window-size=412,915 --virtual-time-budget=8500 --screenshot=qa-mobile-festival.png --user-agent='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36' "$BASE&map=festival_finale&hero=pumpkin_jester"
-          test -s qa-sunny-meadow.png && test -s qa-candy-park.png && test -s qa-snow-festival.png && test -s qa-rainbow-canyon.png && test -s qa-firefly-swamp.png && test -s qa-mobile-festival.png
+          test -s qa-mobile-festival.png
 
       - name: Package releases
         shell: bash
