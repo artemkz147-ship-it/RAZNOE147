@@ -134,6 +134,7 @@ jobs:
           test -n "$CHROME"
           CHROME="$CHROME" node .build/browser_qa.mjs
           for f in qa-heroes.png qa-sunny-meadow.png qa-candy-park.png qa-snow-festival.png qa-rainbow-canyon.png qa-firefly-swamp.png qa-mobile-festival.png; do test -s "$f"; done
+          test "$(find . -maxdepth 1 -name 'qa-hero-*.png' | wc -l)" -eq 15
 
       - name: Package releases
         shell: bash
@@ -212,13 +213,7 @@ jobs:
         with:
           name: merry-mayhem-3d-qa-v3.0
           path: |
-            qa-heroes.png
-            qa-sunny-meadow.png
-            qa-candy-park.png
-            qa-snow-festival.png
-            qa-rainbow-canyon.png
-            qa-firefly-swamp.png
-            qa-mobile-festival.png
+            qa-*.png
           if-no-files-found: error
           retention-days: 30
 
