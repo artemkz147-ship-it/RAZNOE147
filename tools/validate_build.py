@@ -28,10 +28,14 @@ for marker in ['HEROES','MAPS','WEAPONS','ENEMIES','BOSSES']:
 print(f'Validated {len(assets)} imported GLB assets; no procedural gameplay geometry.')
 
 content=Path('src/content.js').read_text(encoding='utf-8')
+map_match=re.search(r"const maps\s*=\s*\[(.*?)\n\];",content,re.S)
+if not map_match:
+    raise SystemExit('Map definition table not found')
+map_ids=re.findall(r"^\s*\['([^']+)'",map_match.group(1),re.M)
 checks=[
     ('Expected 15 heroes', content.count("asset:'hero")>=15),
     ('Expected 15 weapon models', content.count("model:'weapon")>=15),
-    ('Expected 18 maps', content.count('unlockWins:')>=18),
+    ('Expected 18 unique maps', len(map_ids)==18 and len(set(map_ids))==18),
     ('Expected 24 enemy definitions', 'Array.from({length:24}' in content),
     ('Expected 18 bosses', "'Король Фестиваля'" in content),
     ('Expected expanded daily quests', content.count("id:'daily_")>=9),
@@ -39,4 +43,4 @@ checks=[
 ]
 for message,ok in checks:
     if not ok: raise SystemExit(message)
-print('Expanded content counts validated.')
+print(f'Expanded content counts validated ({len(map_ids)} maps).')
