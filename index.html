@@ -42,7 +42,7 @@
           <button id="review-btn" class="ghost hidden" data-i18n="review">ОЦЕНИТЬ ИГРУ</button>
         </div>
         <div class="menu-note" data-i18n="menuNote">WASD / стрелки · Space — рывок · на телефоне — виртуальный джойстик</div>
-        <div class="version">v1.0</div>
+        <div class="version">v1.0.1</div>
       </section>
     </div>
 
@@ -142,6 +142,19 @@
 
     <div id="toast" class="toast"></div>
   </div>
+  <script>
+    if (location.protocol === 'file:') {
+      document.body.innerHTML = `
+        <main style="min-height:100vh;box-sizing:border-box;display:grid;place-items:center;background:#071014;color:#f4f1e8;font-family:Arial,sans-serif;padding:24px">
+          <section style="max-width:620px;border:1px solid #33454d;background:#0d181d;padding:28px;border-radius:18px;box-shadow:0 24px 70px #0008">
+            <div style="font-size:13px;letter-spacing:.18em;color:#9fb2b9">SHADOWVALE SURVIVOR</div>
+            <h1 style="font-size:30px;margin:10px 0 14px">Локальный запуск</h1>
+            <p style="font-size:17px;line-height:1.55;margin:0 0 12px">Игру нельзя корректно запускать двойным кликом по <b>index.html</b>: браузеры блокируют модульный JavaScript и загрузку 3D-моделей через <b>file://</b>.</p>
+            <p style="font-size:17px;line-height:1.55;margin:0">Для проверки на Windows открой <b>START_LOCAL.bat</b> из локального тестового архива. Для Яндекс Игр загружай ZIP целиком в консоль.</p>
+          </section>
+        </main>`;
+    }
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
