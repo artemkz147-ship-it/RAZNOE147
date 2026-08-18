@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { FxSystem } from './FxSystem';
 import { PlayerController } from './PlayerController';
 import { WorldBuilder } from './WorldBuilder';
 
@@ -7,6 +8,7 @@ const asset = (path: string) => `assets/${path}`;
 export class GameScene extends Phaser.Scene {
   private world!: WorldBuilder;
   private player!: PlayerController;
+  private fx!: FxSystem;
   private sky!: Phaser.GameObjects.Image;
   private cityFar!: Phaser.GameObjects.TileSprite;
   private cityNear!: Phaser.GameObjects.TileSprite;
@@ -52,11 +54,16 @@ export class GameScene extends Phaser.Scene {
     this.load.image('vent', asset('world/vent.svg'));
     this.load.image('flow-token', asset('world/flow-token.svg'));
     this.load.image('sensor', asset('world/sensor.svg'));
+
+    this.load.image('fx-dust', asset('fx/dust.svg'));
+    this.load.image('fx-spark', asset('fx/spark.svg'));
+    this.load.image('fx-speed', asset('fx/speed-streak.svg'));
   }
 
   create() {
     this.physics.world.setBounds(-1200, 0, 200000, 1400);
     this.createBackground();
+    this.fx = new FxSystem(this);
 
     this.world = new WorldBuilder(this);
     this.world.reset();
@@ -90,8 +97,11 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player.host, this.world.tokens, (_player, tokenObject) => {
       const token = tokenObject as Phaser.Physics.Arcade.Image;
       if (!token.active) return;
+      const tokenX = token.x;
+      const tokenY = token.y;
       token.destroy();
       this.runTokens += 1;
+      this.fx.tokenBurst(tokenX, tokenY);
       this.addTrick('FLOW +', 0.12, false);
       this.emitHud();
     });
@@ -139,6 +149,7 @@ export class GameScene extends Phaser.Scene {
 
     const position = this.player.getPosition();
     this.world.update(position.x);
+    this.fx.update(delta, position.x, position.y, this.player.getSpeed());
     if (this.player.body.blocked.down || this.player.body.touching.down) {
       this.lastSafe = this.world.getSafeSpawn(position.x);
     }
@@ -174,6 +185,7 @@ export class GameScene extends Phaser.Scene {
     this.player.reset(180, 500, 430);
     this.cameras.main.stopFollow();
     this.cameras.main.setScroll(0, 0);
+    this.cameras.main.setZoom(1);
     this.cameras.main.startFollow(this.player.host, true, 0.1, 0.085, -300, 38);
     this.cameras.main.fadeIn(180, 10, 12, 25);
     this.runActive = true;
@@ -189,6 +201,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.resume();
     const safe = this.world.getSafeSpawn(this.lastSafe.x);
     this.player.revive(safe.x, safe.y - 8);
+    this.cameras.main.setZoom(1);
     this.cameras.main.startFollow(this.player.host, true, 0.1, 0.085, -300, 38);
     this.cameras.main.fadeIn(220, 12, 14, 28);
     this.runActive = true;
@@ -251,7 +264,10 @@ export class GameScene extends Phaser.Scene {
   private addTrick(label: string, boost: number, countAsTrick: boolean) {
     if (!this.runActive) return;
     this.flow = Phaser.Math.Clamp(this.flow + boost, 1, 5);
-    if (countAsTrick) this.runTricks += 1;
+    if (countAsTrick) {
+      this.runTricks += 1;
+      this.fx.trickBurst(this.player.host.x, this.player.host.y, label);
+    }
     window.dispatchEvent(new CustomEvent('parkour-trick', {
       detail: { label, flow: this.flow, tricks: this.runTricks, tokens: this.runTokens }
     }));
@@ -262,6 +278,7 @@ export class GameScene extends Phaser.Scene {
     this.runActive = false;
     this.player.stop();
     this.physics.pause();
+    this.cameras.main.setZoom(1);
     this.cameras.main.shake(180, 0.0075);
     this.cameras.main.flash(80, 255, 80, 70, false);
     window.dispatchEvent(new CustomEvent('parkour-gameover', {
