@@ -48,11 +48,12 @@ def unique_candidates(root: str):
 
 
 def convert(path: str, out_path: str):
-    if path.lower().endswith('.glb'):
-        shutil.copyfile(path, out_path)
-        return
+    # Always re-export, even when the source is already .glb. Kenney's source GLBs
+    # can reference a shared sibling colormap; a blind copy leaves a broken URL in
+    # the Yandex ZIP. Trimesh resolves the source file in-place and emits a single,
+    # self-contained shipping GLB.
     scene = trimesh.load(path, force='scene', process=False)
-    scene.export(out_path)
+    scene.export(out_path, file_type='glb')
 
 
 def write_manifest(paths):
@@ -66,7 +67,7 @@ try:
         request = urllib.request.Request(
             URL,
             headers={
-                'User-Agent': 'Mozilla/5.0 VerticalParkourBuild/1.0',
+                'User-Agent': 'Mozilla/5.0 DropFlowBuild/2.1',
                 'Referer': 'https://opengameart.org/content/city-kit-commercial',
             },
         )
@@ -108,7 +109,7 @@ try:
                 'Source: https://kenney.nl/assets/city-kit-commercial\n'
                 'Redistribution source used by build: OpenGameArt.org\n'
             )
-        print(f'Prepared {len(manifest)} CC0 city models for the game.')
+        print(f'Prepared {len(manifest)} self-contained CC0 city models for the game.')
 except Exception as error:
     print(f'WARNING: CC0 city fetch failed: {error}')
     if not os.path.exists(MANIFEST):
