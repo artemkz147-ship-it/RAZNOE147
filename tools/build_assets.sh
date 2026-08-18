@@ -13,8 +13,10 @@ fetch_zip(){
 }
 
 fetch_zip 'https://opengameart.org/sites/default/files/ultimate_animated_character_pack_by_quaternius.zip' characters
-fetch_zip 'https://opengameart.org/sites/default/files/ultimate_gun_pack_by_quaternius.zip' guns
+fetch_zip 'https://opengameart.org/sites/default/files/Animated%20Monster%20Pack%20by%20%40Quaternius.zip' classic_monsters
 fetch_zip 'https://opengameart.org/sites/default/files/cute_animated_monsters_-_aug_2020.zip' cute_monsters
+fetch_zip 'https://opengameart.org/sites/default/files/medieval_village_pack_-_dec_2020.zip' village
+fetch_zip 'https://opengameart.org/sites/default/files/survival_pack_-_sept_2020.zip' survival
 fetch_zip 'https://opengameart.org/sites/default/files/ultimate_nature_pack_by_quaternius_1.zip' nature
 fetch_zip 'https://opengameart.org/sites/default/files/ultimate_rpg_items_pack_by_quaternius_0.zip' rpg
 fetch_zip 'https://opengameart.org/sites/default/files/Updated%20Modular%20Dungeon%20-%20May%202019.zip' dungeon
@@ -52,22 +54,42 @@ convert(){
 }
 
 : > "$ROOT/used-heroes.txt"
-hero_keywords=("knight" "elf" "cowboy" "witch" "druid" "wizard" "robot" "chef" "ranger" "princess" "pirate" "viking" "ninja" "medic" "goblin")
+hero_keywords=("knight" "elf" "pirate" "witch" "druid" "wizard" "robot" "chef" "ranger" "princess" "pirate" "viking" "ninja" "medic" "goblin")
 for i in $(seq 1 15); do
   kw="${hero_keywords[$((i-1))]}"; src="$(pick_unique "$ROOT/characters" "$ROOT/used-heroes.txt" "$kw")"
   convert "$src" "hero-$(printf '%02d' "$i").glb" animated
 done
 
 : > "$ROOT/used-weapons.txt"
+declare -a weapon_src
+weapon_src[1]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Staff' 'Scepter' 'Wand')"
+weapon_src[2]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Lantern' 'Torch' 'Potion')"
+weapon_src[3]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Bomb' 'Mace' 'Potion')"
+weapon_src[4]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Book' 'Scroll' 'Wand')"
+weapon_src[5]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Staff' 'Wand' 'Spear')"
+weapon_src[6]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Crystal' 'Gem' 'Scepter')"
+weapon_src[7]="$(pick_unique "$ROOT/survival" "$ROOT/used-weapons.txt" 'Wrench' 'Hammer' 'Pickaxe' 'Axe')"
+weapon_src[8]="$(pick_unique "$ROOT/survival" "$ROOT/used-weapons.txt" 'Pan' 'Pot' 'Shovel' 'Axe')"
+weapon_src[9]="$(pick_unique "$ROOT/medieval" "$ROOT/used-weapons.txt" 'Bow' 'Crossbow' 'Longbow')"
+weapon_src[10]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Wand' 'Staff' 'Scepter')"
+weapon_src[11]="$(pick_unique "$ROOT/medieval" "$ROOT/used-weapons.txt" 'Crossbow' 'Mace' 'Hammer')"
+weapon_src[12]="$(pick_unique "$ROOT/medieval" "$ROOT/used-weapons.txt" 'Mace' 'Hammer' 'Spear')"
+weapon_src[13]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Dagger' 'Wand' 'Scepter')"
+weapon_src[14]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Staff' 'Spear' 'Wand')"
+weapon_src[15]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Lantern' 'Torch' 'Axe')"
 for i in $(seq 1 15); do
-  src="$(pick_unique "$ROOT/guns" "$ROOT/used-weapons.txt" 'pistol' 'rifle' 'smg' 'revolver' 'shotgun' 'sniper' 'gun')"
-  convert "$src" "weapon-$(printf '%02d' "$i").glb" static
+  convert "${weapon_src[$i]}" "weapon-$(printf '%02d' "$i").glb" static
 done
 
 : > "$ROOT/used-monsters.txt"
-monster_keywords=("slime" "mushroom" "bee" "penguin" "crab" "ghost" "demon" "alien" "dragon" "skull" "panda" "cactus")
-for i in $(seq 1 12); do
-  kw="${monster_keywords[$((i-1))]}"; src="$(pick_unique "$ROOT/cute_monsters" "$ROOT/used-monsters.txt" "$kw")"
+classic_keywords=("skeleton" "dragon" "bat" "slime")
+for i in $(seq 1 4); do
+  kw="${classic_keywords[$((i-1))]}"; src="$(pick_unique "$ROOT/classic_monsters" "$ROOT/used-monsters.txt" "$kw")"
+  convert "$src" "monster-$(printf '%02d' "$i").glb" animated
+done
+cute_keywords=("mushroom" "bee" "crab" "penguin" "cactus" "ghost" "demon" "alien")
+for j in $(seq 1 8); do
+  i=$((j+4)); kw="${cute_keywords[$((j-1))]}"; src="$(pick_unique "$ROOT/cute_monsters" "$ROOT/used-monsters.txt" "$kw")"
   convert "$src" "monster-$(printf '%02d' "$i").glb" animated
 done
 
@@ -107,6 +129,19 @@ BOW="$(pick "$ROOT/medieval" 'Bow' 'Longbow' 'Crossbow')"
 CLOUD="$GEM"
 BEE="$(pick "$ROOT/cute_monsters" 'Bee' 'Fly' 'Monster')"
 MINIROBOT="$(pick "$ROOT/characters" 'Robot' 'Mech' 'Knight')"
+HOUSE="$(pick "$ROOT/village" 'House' 'Cabin' 'Building')"
+WAGON="$(pick "$ROOT/village" 'Wagon' 'Cart')"
+FENCE="$(pick "$ROOT/village" 'Fence' 'Wall')"
+WELL="$(pick "$ROOT/village" 'Well' 'Fountain')"
+BRIDGE="$(pick "$ROOT/village" 'Bridge' 'Stairs')"
+STALL="$(pick "$ROOT/village" 'Market' 'Stall' 'Shop')"
+BARREL="$(pick "$ROOT/village" 'Barrel' 'Crate' 'Box')"
+SIGN="$(pick "$ROOT/village" 'Sign' 'Board' 'Fence')"
+BENCH="$(pick "$ROOT/village" 'Bench' 'Table' 'Chair')"
+CRATE2="$(pick "$ROOT/village" 'Crate' 'Box' 'Barrel')"
+TENT="$(pick "$ROOT/survival" 'Tent' 'Shelter' 'Camp')"
+CAMPFIRE="$(pick "$ROOT/survival" 'Campfire' 'Fire' 'Torch')"
+RAFT="$(pick "$ROOT/survival" 'Raft' 'Boat' 'Canoe')"
 
 convert "$TREE" tree.glb static
 convert "$DEAD_TREE" dead-tree.glb static
@@ -143,7 +178,22 @@ convert "$BOW" bow.glb static
 convert "$CLOUD" cloud.glb static
 convert "$BEE" bee.glb static
 convert "$MINIROBOT" mini-robot.glb static
+convert "$HOUSE" house.glb static
+convert "$WAGON" wagon.glb static
+convert "$FENCE" fence.glb static
+convert "$WELL" well.glb static
+convert "$BRIDGE" bridge.glb static
+convert "$STALL" stall.glb static
+convert "$BARREL" barrel.glb static
+convert "$TENT" tent.glb static
+convert "$CAMPFIRE" campfire.glb static
+convert "$RAFT" raft.glb static
+convert "$SIGN" sign.glb static
+convert "$BENCH" bench.glb static
+convert "$CRATE2" crate2.glb static
 
 echo '--- Built art assets ---'
 ls -lh "$OUT"
 python3 tools/check_glb_animations.py
+rm -rf public/portraits && mkdir -p public/portraits
+blender -b --factory-startup --python tools/render_portraits.py -- "$OUT" public/portraits

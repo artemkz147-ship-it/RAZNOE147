@@ -1,19 +1,19 @@
 export const HEROES = [
-  {id:'donut_knight',name:'Рыцарь Пончик',asset:'hero01',weapon:'donut',cost:0,desc:'Надёжный стрелок в тяжёлой броне.',bonus:{armor:.12,hp:.08}},
-  {id:'dew_fairy',name:'Фея Росинка',asset:'hero02',weapon:'firefly',cost:0,desc:'Быстро растёт по уровню и собирает опыт.',bonus:{xp:.16,pickup:.18}},
-  {id:'hamster_pirate',name:'Пират Хомяк',asset:'hero03',weapon:'pirate_bomb',cost:0,desc:'Сильные взрывы и повышенная удача.',bonus:{luck:.20,splash:.16}},
-  {id:'candy_witch',name:'Конфетная Ведьма',asset:'hero04',weapon:'rainbow_fan',cost:900,desc:'Широкие залпы и высокий базовый урон.',bonus:{damage:.12,projectiles:1}},
-  {id:'mushroom_druid',name:'Грибной Друид',asset:'hero05',weapon:'flower_burst',cost:1250,desc:'Большая площадь атак и контроль толпы.',bonus:{area:.18,slow:.08}},
-  {id:'cat_mage',name:'Кот-Маг',asset:'hero06',weapon:'amber_comet',cost:1600,desc:'Часто атакует и пробивает строй.',bonus:{cooldown:.12,pierce:1}},
-  {id:'toy_robot',name:'Игрушечный Робот',asset:'hero07',weapon:'blast_bot',cost:1950,desc:'Боты преследуют цели и взрываются.',bonus:{damageReduction:.10,homing:.18}},
-  {id:'baker_alchemist',name:'Пекарь Алхимик',asset:'hero08',weapon:'pancake',cost:2300,desc:'Возвратные снаряды бьют врагов дважды.',bonus:{duration:.20,regen:.18}},
-  {id:'fox_archer',name:'Лисёнок Лучник',asset:'hero09',weapon:'fox_bow',cost:2650,desc:'Быстрые критические стрелы.',bonus:{speed:.12,crit:.08}},
-  {id:'cloud_princess',name:'Облачная Принцесса',asset:'hero10',weapon:'cloud_orb',cost:3000,desc:'Самонаводящиеся облачные заряды.',bonus:{projectileSpeed:.16,dodge:.08}},
-  {id:'watermelon_captain',name:'Капитан Арбуз',asset:'hero11',weapon:'watermelon',cost:3350,desc:'Тяжёлые снаряды с крупным взрывом.',bonus:{knockback:.22,splash:.18}},
-  {id:'music_gnome',name:'Музыкальный Гном',asset:'hero12',weapon:'music_wave',cost:3700,desc:'Волновые залпы пробивают большие группы.',bonus:{area:.12,cooldown:.08}},
-  {id:'lightning_bee',name:'Пчёлка Молния',asset:'hero13',weapon:'smart_bee',cost:4050,desc:'Очень быстрые самонаводящиеся атаки.',bonus:{speed:.15,cooldown:.08}},
-  {id:'snow_penguin',name:'Снежный Пингвин',asset:'hero14',weapon:'snowball',cost:4400,desc:'Замедляет врагов и постепенно лечится.',bonus:{regen:.35,slow:.14}},
-  {id:'pumpkin_jester',name:'Тыквенный Чародей',asset:'hero15',weapon:'pumpkin',cost:4750,desc:'Дальние тыквенные мины и цепные взрывы.',bonus:{luck:.12,splash:.12}}
+  {id:'donut_knight',name:'Сэр Крендель',asset:'hero01',weapon:'donut',cost:0,desc:'Тяжёлый рыцарь-пекарь: крепкий, простой и очень живучий.',bonus:{armor:.12,hp:.08}},
+  {id:'dew_fairy',name:'Эльфа Росинка',asset:'hero02',weapon:'firefly',cost:0,desc:'Лесной стрелок: быстрее набирает уровни и притягивает опыт.',bonus:{xp:.16,pickup:.18}},
+  {id:'hamster_pirate',name:'Капитан Бомба',asset:'hero03',weapon:'pirate_bomb',cost:0,desc:'Пират-бомбардир: крупные взрывы и повышенная удача.',bonus:{luck:.20,splash:.16}},
+  {id:'candy_witch',name:'Конфетная Ведьма',asset:'hero04',weapon:'rainbow_fan',cost:900,desc:'Радужная магия: широкий залп и высокий базовый урон.',bonus:{damage:.12,projectiles:1}},
+  {id:'mushroom_druid',name:'Друид Цветень',asset:'hero05',weapon:'flower_burst',cost:1250,desc:'Контролирует толпу цветочной магией и замедлением.',bonus:{area:.18,slow:.08}},
+  {id:'cat_mage',name:'Янтарный Маг',asset:'hero06',weapon:'amber_comet',cost:1600,desc:'Точные пробивающие выстрелы и высокий темп магии.',bonus:{cooldown:.12,pierce:1}},
+  {id:'toy_robot',name:'Меха-Малыш',asset:'hero07',weapon:'blast_bot',cost:1950,desc:'Механический герой с самонаводящимися зарядами и защитой.',bonus:{damageReduction:.10,homing:.18}},
+  {id:'baker_alchemist',name:'Шеф Алхимик',asset:'hero08',weapon:'pancake',cost:2300,desc:'Возвратные атаки и постоянная регенерация в долгом забеге.',bonus:{duration:.20,regen:.18}},
+  {id:'fox_archer',name:'Лисий Следопыт',asset:'hero09',weapon:'fox_bow',cost:2650,desc:'Рейнджер с быстрыми критическими стрелами.',bonus:{speed:.12,crit:.08}},
+  {id:'cloud_princess',name:'Принцесса Облаков',asset:'hero10',weapon:'cloud_orb',cost:3000,desc:'Лёгкая магия облаков: быстрые заряды и шанс уклонения.',bonus:{projectileSpeed:.16,dodge:.08}},
+  {id:'watermelon_captain',name:'Арбузный Корсар',asset:'hero11',weapon:'watermelon',cost:3350,desc:'Тяжёлые арбузные снаряды разбрасывают большие группы.',bonus:{knockback:.22,splash:.18}},
+  {id:'music_gnome',name:'Гном-Громовержец',asset:'hero12',weapon:'music_wave',cost:3700,desc:'Громовые волны пробивают плотную толпу вокруг героя.',bonus:{area:.12,cooldown:.08}},
+  {id:'lightning_bee',name:'Ниндзя Искра',asset:'hero13',weapon:'smart_bee',cost:4050,desc:'Самый быстрый герой: рой сам ищет цели.',bonus:{speed:.15,cooldown:.08}},
+  {id:'snow_penguin',name:'Ледяной Медик',asset:'hero14',weapon:'snowball',cost:4400,desc:'Морозит врагов и медленно восстанавливает здоровье.',bonus:{regen:.35,slow:.14}},
+  {id:'pumpkin_jester',name:'Тыквенный Гоблин',asset:'hero15',weapon:'pumpkin',cost:4750,desc:'Трикстер с минами и цепными тыквенными взрывами.',bonus:{luck:.12,splash:.12}},
 ];
 
 const levelText = (name, evolution) => [
@@ -28,21 +28,21 @@ const levelText = (name, evolution) => [
 ];
 
 export const WEAPONS = [
-  {id:'donut',name:'Бублики-Спутники',evolution:'Планетарная Пекарня',model:'weapon01',projectile:'food_donut',type:'shot',damage:18,cooldown:.72,speed:18,count:2,spread:.13,pierce:1,range:27,scale:.32,passive:'area'},
-  {id:'firefly',name:'Цепь Светлячков',evolution:'Рой Зарниц',model:'weapon02',projectile:'gem',type:'chain',damage:14,cooldown:.68,speed:22,count:1,chain:3,chainRadius:6,range:28,scale:.21,passive:'cooldown'},
-  {id:'pirate_bomb',name:'Пиратская Бомба',evolution:'Пороховой Шторм',model:'weapon03',projectile:'bomb',type:'bomb',damage:30,cooldown:1.26,speed:13,count:1,splash:3.6,range:26,scale:.34,passive:'area'},
-  {id:'rainbow_fan',name:'Радужный Веер',evolution:'Семицветная Буря',model:'weapon04',projectile:'gem',type:'fan',damage:12,cooldown:.78,speed:20,count:5,spread:.18,pierce:1,range:24,scale:.18,passive:'projectiles'},
-  {id:'flower_burst',name:'Цветочная Карусель',evolution:'Цветочная Корона',model:'weapon05',projectile:'flower',type:'fan',damage:13,cooldown:.74,speed:17,count:4,spread:.24,slow:.16,range:22,scale:.28,passive:'area'},
-  {id:'amber_comet',name:'Янтарная Комета',evolution:'Янтарная Сверхновая',model:'weapon06',projectile:'gem',type:'shot',damage:24,cooldown:.82,speed:25,count:1,pierce:3,range:31,scale:.28,passive:'power'},
-  {id:'blast_bot',name:'Взрывной Бот',evolution:'Механический Карнавал',model:'weapon07',projectile:'mini_robot',type:'homing',damage:24,cooldown:1.08,speed:12,count:1,homing:6,splash:2.5,range:30,scale:.32,passive:'cooldown'},
-  {id:'pancake',name:'Возвратный Блин',evolution:'Бесконечный Блин',model:'weapon08',projectile:'food_pancake',type:'boomerang',damage:18,cooldown:1.02,speed:18,count:1,pierce:5,range:18,scale:.34,passive:'duration'},
-  {id:'fox_bow',name:'Лисий Лук',evolution:'Ливень Лисьих Стрел',model:'weapon09',projectile:'arrow',type:'shot',damage:20,cooldown:.68,speed:29,count:1,pierce:1,crit:.12,range:34,scale:.30,passive:'crit'},
-  {id:'cloud_orb',name:'Облачный Спутник',evolution:'Грозовой Спутник',model:'weapon10',projectile:'cloud',type:'homing',damage:16,cooldown:.64,speed:15,count:2,homing:8,pierce:1,range:28,scale:.30,passive:'speed'},
-  {id:'watermelon',name:'Взрывной Арбуз',evolution:'Гигантский Арбуз',model:'weapon11',projectile:'food_watermelon',type:'bomb',damage:34,cooldown:1.34,speed:12,count:1,splash:4.2,knockback:2.4,range:25,scale:.38,passive:'area'},
-  {id:'music_wave',name:'Буря Нот',evolution:'Громовой Концерт',model:'weapon12',projectile:'star',type:'radial',damage:12,cooldown:1.12,speed:17,count:8,pierce:2,range:20,scale:.18,passive:'projectiles'},
-  {id:'smart_bee',name:'Умная Пчела',evolution:'Королевский Рой',model:'weapon13',projectile:'bee',type:'homing',damage:14,cooldown:.48,speed:18,count:2,homing:10,range:27,scale:.26,passive:'cooldown'},
-  {id:'snowball',name:'Снежная Дорожка',evolution:'Полярная Буря',model:'weapon14',projectile:'snow',type:'fan',damage:14,cooldown:.76,speed:16,count:3,spread:.16,slow:.30,range:23,scale:.26,passive:'duration'},
-  {id:'pumpkin',name:'Тыквенная Засада',evolution:'Тыквенный Лабиринт',model:'weapon15',projectile:'food_pumpkin',type:'mine',damage:28,cooldown:1.16,speed:12,count:1,splash:3.1,range:20,scale:.34,passive:'area'}
+  {id:'donut',name:'Пекарский Жезл',evolution:'Планетарная Пекарня',model:'weapon01',projectile:'food_donut',type:'shot',damage:17,cooldown:.68,speed:19,count:3,spread:.12,pierce:1,range:29,scale:.34,passive:'area',fx:0xffcf6b},
+  {id:'firefly',name:'Фонарь Светлячков',evolution:'Рой Зарниц',model:'weapon02',projectile:'gem',type:'chain',damage:15,cooldown:.64,speed:23,count:1,chain:4,chainRadius:6.4,range:30,scale:.22,passive:'cooldown',fx:0x8effc8},
+  {id:'pirate_bomb',name:'Пороховая Мортира',evolution:'Пороховой Шторм',model:'weapon03',projectile:'bomb',type:'bomb',damage:32,cooldown:1.18,speed:14,count:1,splash:4.2,range:28,scale:.38,passive:'area',fx:0xff7b48},
+  {id:'rainbow_fan',name:'Радужный Жезл',evolution:'Семицветная Буря',model:'weapon04',projectile:'star',type:'fan',damage:12,cooldown:.70,speed:21,count:7,spread:.15,pierce:1,range:27,scale:.20,passive:'projectiles',fx:0xff78dc},
+  {id:'flower_burst',name:'Цветочный Посох',evolution:'Цветочная Корона',model:'weapon05',projectile:'flower',type:'fan',damage:14,cooldown:.70,speed:18,count:5,spread:.21,slow:.18,range:25,scale:.30,passive:'area',fx:0xff8fb1},
+  {id:'amber_comet',name:'Янтарный Скипетр',evolution:'Янтарная Сверхновая',model:'weapon06',projectile:'gem',type:'shot',damage:28,cooldown:.78,speed:28,count:1,pierce:4,range:34,scale:.30,passive:'power',fx:0xffb54a},
+  {id:'blast_bot',name:'Механический Пускатель',evolution:'Механический Карнавал',model:'weapon07',projectile:'mini_robot',type:'homing',damage:23,cooldown:.98,speed:14,count:2,homing:7,splash:2.7,range:31,scale:.30,passive:'cooldown',fx:0x73d9ff},
+  {id:'pancake',name:'Сковорода-Бумеранг',evolution:'Бесконечная Кухня',model:'weapon08',projectile:'food_pancake',type:'boomerang',damage:19,cooldown:.96,speed:19,count:2,pierce:6,range:20,scale:.36,passive:'duration',fx:0xffd78e},
+  {id:'fox_bow',name:'Лисий Лук',evolution:'Ливень Лисьих Стрел',model:'weapon09',projectile:'arrow',type:'shot',damage:22,cooldown:.62,speed:32,count:1,pierce:2,crit:.14,range:37,scale:.31,passive:'crit',fx:0xffa24c},
+  {id:'cloud_orb',name:'Облачный Посох',evolution:'Грозовой Спутник',model:'weapon10',projectile:'cloud',type:'homing',damage:17,cooldown:.58,speed:17,count:3,homing:9,pierce:1,range:30,scale:.31,passive:'speed',fx:0xb9e9ff},
+  {id:'watermelon',name:'Арбузная Рогатка',evolution:'Гигантский Арбуз',model:'weapon11',projectile:'food_watermelon',type:'bomb',damage:38,cooldown:1.24,speed:13,count:1,splash:4.8,knockback:2.8,range:28,scale:.42,passive:'area',fx:0x7dff78},
+  {id:'music_wave',name:'Камертон Бури',evolution:'Громовой Концерт',model:'weapon12',projectile:'star',type:'radial',damage:13,cooldown:1.02,speed:19,count:10,pierce:2,range:22,scale:.20,passive:'projectiles',fx:0x8e8cff},
+  {id:'smart_bee',name:'Жезл Роя',evolution:'Королевский Рой',model:'weapon13',projectile:'bee',type:'homing',damage:15,cooldown:.42,speed:20,count:3,homing:11,range:29,scale:.25,passive:'cooldown',fx:0xffe45d},
+  {id:'snowball',name:'Морозный Посох',evolution:'Полярная Буря',model:'weapon14',projectile:'snow',type:'fan',damage:15,cooldown:.70,speed:18,count:4,spread:.15,slow:.34,range:26,scale:.28,passive:'duration',fx:0x9feaff},
+  {id:'pumpkin',name:'Тыквенный Фонарь',evolution:'Тыквенный Лабиринт',model:'weapon15',projectile:'food_pumpkin',type:'mine',damage:31,cooldown:1.05,speed:13,count:2,splash:3.7,range:23,scale:.38,passive:'area',fx:0xff873f},
 ].map(w=>({...w,levels:levelText(w.name,w.evolution)}));
 
 export const PASSIVES = [
@@ -103,16 +103,19 @@ const layouts = {
 
 export const MAPS = maps.map((m,i)=>({
   id:m[0],name:m[1],desc:m[2],layout:m[3],ground:m[4],sky:m[5],accent:m[6],barrier:m[7],
-  width:112+(i%3)*8,height:92+(i%4)*7,unlockWins:i===0?0:i,enemyTier:i,bossIndex:i,
+  width:148+(i%3)*10,height:118+(i%4)*9,unlockWins:i===0?0:i,enemyTier:i,bossIndex:i,
   landmarks:layouts[m[3]]||layouts.forest,
   hazard: i===6?{type:'water',axis:'z',at:38,width:8}:i===9?{type:'lava',axis:'x',at:45,width:7}:i===13?{type:'water',axis:'x',at:-44,width:8}:i===17?{type:'lava',axis:'z',at:-40,width:7}:null
 }));
 
 const behaviors=['chase','zigzag','dash','ranged','split','charger','sniper','swarm','shield','healer','bomber','orbit'];
+const enemyKinds=['Скелет','Дракончик','Летучая мышь','Слизень','Гриб','Пчела','Краб','Пингвин','Кактус','Призрак','Демон','Пришелец'];
+const enemyTitles=['Шустрый','Сияющий','Дикий','Прыгучий','Заводной','Ловкий','Колючий','Хитрый'];
+const enemyColors=[0xfff2d0,0xffa17c,0xc9b8ff,0x8ff2a1,0xffd86e,0x79dcff,0xff91c8,0xb9f7ff];
 export const ENEMIES = Array.from({length:24},(_,i)=>({
-  id:`enemy_${String(i+1).padStart(2,'0')}`,name:['Прыгучий','Шустрый','Липкий','Шумный','Заводной','Сияющий'][i%6]+' '+['Слайм','Гриб','Жук','Кекс'][Math.floor(i/6)],
-  asset:`monster${String((i%12)+1).padStart(2,'0')}`,behavior:behaviors[i%behaviors.length],hp:42+i*7,speed:2.0+(i%6)*.32,damage:7+Math.floor(i/4),xp:1+Math.floor(i/8),scale:.88+(i%4)*.08,
-  color:[0xffffff,0xffe2a8,0xb9f4d0,0xcfc1ff][i%4]
+  id:`enemy_${String(i+1).padStart(2,'0')}`,name:`${enemyTitles[i%enemyTitles.length]} ${enemyKinds[i%enemyKinds.length]}`,
+  asset:`monster${String((i%12)+1).padStart(2,'0')}`,behavior:behaviors[i%behaviors.length],hp:44+i*8,speed:2.0+(i%6)*.31,damage:7+Math.floor(i/4),xp:1+Math.floor(i/8),scale:.96+(i%4)*.09,
+  color:enemyColors[i%enemyColors.length]
 }));
 
 export const BOSSES = [
@@ -181,7 +184,7 @@ export const CAREER_QUESTS = [
 ];
 
 export const ASSET_URLS = (()=>{
-  const a={floor:'./assets/floor.glb',tree:'./assets/tree.glb',deadTree:'./assets/dead-tree.glb',bush:'./assets/bush.glb',rock:'./assets/rock.glb',grass:'./assets/grass.glb',grassShort:'./assets/grass-short.glb',snowRock:'./assets/snow-rock.glb',pineSnow:'./assets/pine-snow.glb',birch:'./assets/birch.glb',birchAutumn:'./assets/birch-autumn.glb',willow:'./assets/willow.glb',cactus:'./assets/cactus.glb',palm:'./assets/palm.glb',mossRock:'./assets/moss-rock.glb',gem:'./assets/gem.glb',arch:'./assets/arch.glb',column:'./assets/column.glb',chest:'./assets/chest.glb',torch:'./assets/torch.glb',fire:'./assets/fire.glb',flower:'./assets/flower.glb',bomb:'./assets/bomb.glb',arrow:'./assets/arrow.glb',bow:'./assets/bow.glb',star:'./assets/star.glb',cloud:'./assets/cloud.glb',snow:'./assets/snow.glb',bee:'./assets/bee.glb',mini_robot:'./assets/mini-robot.glb',food_donut:'./assets/food-donut.glb',food_watermelon:'./assets/food-watermelon.glb',food_pancake:'./assets/food-pancake.glb',food_pumpkin:'./assets/food-pumpkin.glb',food_cookie:'./assets/food-cookie.glb'};
+  const a={floor:'./assets/floor.glb',tree:'./assets/tree.glb',deadTree:'./assets/dead-tree.glb',bush:'./assets/bush.glb',rock:'./assets/rock.glb',grass:'./assets/grass.glb',grassShort:'./assets/grass-short.glb',snowRock:'./assets/snow-rock.glb',pineSnow:'./assets/pine-snow.glb',birch:'./assets/birch.glb',birchAutumn:'./assets/birch-autumn.glb',willow:'./assets/willow.glb',cactus:'./assets/cactus.glb',palm:'./assets/palm.glb',mossRock:'./assets/moss-rock.glb',gem:'./assets/gem.glb',arch:'./assets/arch.glb',column:'./assets/column.glb',chest:'./assets/chest.glb',torch:'./assets/torch.glb',fire:'./assets/fire.glb',flower:'./assets/flower.glb',bomb:'./assets/bomb.glb',arrow:'./assets/arrow.glb',bow:'./assets/bow.glb',star:'./assets/star.glb',cloud:'./assets/cloud.glb',snow:'./assets/snow.glb',bee:'./assets/bee.glb',mini_robot:'./assets/mini-robot.glb',food_donut:'./assets/food-donut.glb',food_watermelon:'./assets/food-watermelon.glb',food_pancake:'./assets/food-pancake.glb',food_pumpkin:'./assets/food-pumpkin.glb',food_cookie:'./assets/food-cookie.glb',house:'./assets/house.glb',wagon:'./assets/wagon.glb',fence:'./assets/fence.glb',well:'./assets/well.glb',bridge:'./assets/bridge.glb',stall:'./assets/stall.glb',barrel:'./assets/barrel.glb',tent:'./assets/tent.glb',campfire:'./assets/campfire.glb',raft:'./assets/raft.glb',sign:'./assets/sign.glb',bench:'./assets/bench.glb',crate2:'./assets/crate2.glb'};
   for(let i=1;i<=15;i++)a[`hero${String(i).padStart(2,'0')}`]=`./assets/hero-${String(i).padStart(2,'0')}.glb`;
   for(let i=1;i<=15;i++)a[`weapon${String(i).padStart(2,'0')}`]=`./assets/weapon-${String(i).padStart(2,'0')}.glb`;
   for(let i=1;i<=12;i++)a[`monster${String(i).padStart(2,'0')}`]=`./assets/monster-${String(i).padStart(2,'0')}.glb`;
@@ -194,4 +197,19 @@ export const passiveById=id=>PASSIVES.find(p=>p.id===id);
 
 
 export const HELD_PROFILES={
- donut:['food_donut',.16,'throw'],firefly:['gem',.14,'spell'],pirate_bomb:['bomb',.18,'throw'],rainbow_fan:['star',.16,'spell'],flower_burst:['flower',.17,'spell'],amber_comet:['gem',.15,'spell'],blast_bot:['bomb',.17,'spell'],pancake:['food_pancake',.17,'throw'],fox_bow:['bow',.34,'shoot'],cloud_orb:['cloud',.16,'spell'],watermelon:['food_watermelon',.18,'throw'],music_wave:['star',.16,'spell'],smart_bee:['bee',.16,'spell'],snowball:['snow',.15,'throw'],pumpkin:['food_pumpkin',.16,'throw']};
+ donut:['weapon01',.54,'spell',[.06,-.12,-.03],[0,.12,.08],'low'],
+ firefly:['weapon02',.34,'spell',[.06,-.02,-.03],[0,.18,.05],'center'],
+ pirate_bomb:['weapon03',.42,'throw',[.07,-.10,-.03],[0,.16,.16],'low'],
+ rainbow_fan:['weapon04',.42,'spell',[.06,-.09,-.03],[0,.12,.08],'low'],
+ flower_burst:['weapon05',.58,'spell',[.07,-.16,-.04],[0,.10,.10],'low'],
+ amber_comet:['weapon06',.50,'spell',[.07,-.13,-.04],[0,.10,.08],'low'],
+ blast_bot:['weapon07',.43,'shoot',[.04,-.09,-.04],[Math.PI/2,0,.06],'low'],
+ pancake:['weapon08',.42,'throw',[.06,-.10,-.02],[0,.12,.18],'low'],
+ fox_bow:['weapon09',.62,'shoot',[.03,0,-.02],[Math.PI/2,0,0],'center'],
+ cloud_orb:['weapon10',.50,'spell',[.07,-.12,-.04],[0,.08,.08],'low'],
+ watermelon:['weapon11',.43,'shoot',[.05,-.08,-.03],[Math.PI/2,0,.08],'low'],
+ music_wave:['weapon12',.48,'spell',[.06,-.11,-.03],[0,.10,.12],'low'],
+ smart_bee:['weapon13',.38,'spell',[.06,-.09,-.03],[0,.12,.12],'low'],
+ snowball:['weapon14',.56,'spell',[.07,-.15,-.03],[0,.10,.08],'low'],
+ pumpkin:['weapon15',.40,'spell',[.06,-.08,-.03],[0,.14,.10],'center']
+};

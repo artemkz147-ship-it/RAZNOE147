@@ -2,10 +2,11 @@ from pathlib import Path
 import re
 root=Path('dist')
 assets=[
- 'floor.glb','tree.glb','dead-tree.glb','bush.glb','rock.glb','grass.glb','grass-short.glb','snow-rock.glb','pine-snow.glb','birch.glb','birch-autumn.glb','willow.glb','cactus.glb','palm.glb','moss-rock.glb','gem.glb','arch.glb','column.glb','chest.glb','torch.glb','fire.glb','flower.glb','bomb.glb','arrow.glb','bow.glb','star.glb','cloud.glb','snow.glb','bee.glb','mini-robot.glb','food-donut.glb','food-watermelon.glb','food-pancake.glb','food-pumpkin.glb','food-cookie.glb',
+ 'floor.glb','tree.glb','dead-tree.glb','bush.glb','rock.glb','grass.glb','grass-short.glb','snow-rock.glb','pine-snow.glb','birch.glb','birch-autumn.glb','willow.glb','cactus.glb','palm.glb','moss-rock.glb','gem.glb','arch.glb','column.glb','chest.glb','torch.glb','fire.glb','flower.glb','bomb.glb','arrow.glb','bow.glb','star.glb','cloud.glb','snow.glb','bee.glb','mini-robot.glb','food-donut.glb','food-watermelon.glb','food-pancake.glb','food-pumpkin.glb','food-cookie.glb','house.glb','wagon.glb','fence.glb','well.glb','bridge.glb','stall.glb','barrel.glb','tent.glb','campfire.glb','raft.glb','sign.glb','bench.glb','crate2.glb',
  *[f'hero-{i:02}.glb' for i in range(1,16)],*[f'weapon-{i:02}.glb' for i in range(1,16)],*[f'monster-{i:02}.glb' for i in range(1,13)]
 ]
-required=[root/'index.html',*[root/'assets'/n for n in assets]]
+portraits=[root/'portraits'/f'hero-{i:02}.png' for i in range(1,16)]+[root/'portraits'/f'weapon-{i:02}.png' for i in range(1,16)]
+required=[root/'index.html',*[root/'assets'/n for n in assets],*portraits]
 missing=[str(p) for p in required if not p.is_file() or p.stat().st_size==0]
 if missing: raise SystemExit('Missing build files: '+', '.join(missing))
 size=sum(p.stat().st_size for p in root.rglob('*') if p.is_file())
@@ -44,3 +45,8 @@ checks=[
 for message,ok in checks:
     if not ok: raise SystemExit(message)
 print(f'Expanded content counts validated ({len(map_ids)} maps).')
+
+build_script=Path('tools/build_assets.sh').read_text(encoding='utf-8')
+if 'ultimate_gun_pack' in build_script or '$ROOT/guns' in build_script: raise SystemExit('Modern gun asset pack must not ship in v3')
+if len(list((root/'portraits').glob('hero-*.png')))!=15 or len(list((root/'portraits').glob('weapon-*.png')))!=15: raise SystemExit('Expected 15 hero and 15 weapon portraits')
+print('V3 art validation passed: thematic weapons, portraits, expanded environment.')
