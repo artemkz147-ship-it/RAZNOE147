@@ -52,12 +52,13 @@ if "this.runToast('УКЛОНЕНИЕ')" not in s:
 
 p.write_text(s, encoding='utf-8')
 
-# The payload is intentionally reproducible, but two historical OpenGameArt
-# filenames changed. Normalize them before Blender tries to download assets.
+# Normalize the historical OpenGameArt download names to the exact files
+# currently linked from the CC0 pack pages.
 bp = Path('tools/build_assets.sh')
 bs = bp.read_text(encoding='utf-8')
-bs = bs.replace('ultimate_nature_pack_by_quaternius_1.zip', 'ultimate_nature_pack_by_quaternius.zip')
-bs = bs.replace('RPG%20Pack.zip', 'ultimate_rpg_items_pack_by_quaternius.zip')
+bs = bs.replace('ultimate_nature_pack_by_quaternius.zip', 'ultimate_nature_pack_by_quaternius_1.zip')
+bs = bs.replace('RPG%20Pack.zip', 'ultimate_rpg_items_pack_by_quaternius_0.zip')
+bs = bs.replace('ultimate_rpg_items_pack_by_quaternius.zip', 'ultimate_rpg_items_pack_by_quaternius_0.zip')
 bp.write_text(bs, encoding='utf-8')
 
 print('post-materialize gameplay and asset fixes applied')
