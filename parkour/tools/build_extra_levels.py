@@ -4,6 +4,15 @@ import build_assets as b
 
 levels = b.levels
 
+# Route-changing breakable floor: soft landings are safe, hard impacts destroy it.
+b.export([
+    b.box((3.2, .22, 3.2), (0, .11, 0), 'metal'),
+    b.box((3.0, .05, .16), (0, .245, -1.1), 'beam'),
+    b.box((3.0, .05, .16), (0, .245, 1.1), 'beam'),
+    b.box((.16, .05, 3.0), (-1.1, .245, 0), 'beam'),
+    b.box((.16, .05, 3.0), (1.1, .245, 0), 'beam'),
+], os.path.join(b.PR, 'fragile_roof.glb'))
+
 levels.append(b.make(
     9,
     'Водонапорные крыши',
@@ -32,7 +41,7 @@ levels.append(b.make(
 levels.append(b.make(
     10,
     'Промзона',
-    'Трубы, сервисные мосты, стеклянные перегородки и силовые проломы',
+    'Трубы, низкий техпролёт, хрупкая крыша, стекло и силовые проломы',
     [0, 1.2, 0],
     [66, 4.2, 1],
     [
@@ -43,6 +52,8 @@ levels.append(b.make(
         ((63, 3, 1), (10, 1, 10), 'dark'),
     ],
     [
+        # Bottom is low enough that a standing capsule cannot pass; slide can.
+        ('box', (7, 1.88, 0), (4.2, .24, 5.0), 'metal'),
         ('box', (10, 2.0, 3), (8, .34, .55), 'metal'),
         ('box', (25, 1.3, 1), (9, .28, .46), 'beam'),
         ('box', (41, 3.0, -2), (8, .28, .46), 'beam'),
@@ -50,6 +61,7 @@ levels.append(b.make(
     ],
     [
         {'asset': 'assets/props/breakable_barrier.glb', 'p': [29, 1.75, 2], 'r': [0, b.math.pi / 2, 0], 'threshold': 6.8, 'reward': 25},
+        {'asset': 'assets/props/fragile_roof.glb', 'p': [43, 2.65, 1], 'threshold': 9.4, 'reward': 30},
         {'asset': 'assets/props/glass_panel.glb', 'p': [55, 3.8, 0], 'r': [0, b.math.pi / 2, 0], 'threshold': 7.0, 'reward': 35},
     ],
     checkpoints=[[34, 1.6, 2], [51, .6, -2]],
@@ -89,7 +101,7 @@ final_extras = [
 levels.append(b.make(
     12,
     'Шпиль',
-    'Финальная акробатическая линия: высота, wall-run, стекло и сверхточные приземления',
+    'Финальная акробатическая линия: высота, край, wall-run, хрупкая секция и сверхточные посадки',
     [0, 1.2, 0],
     [84, 11.2, 0],
     [
@@ -98,6 +110,7 @@ levels.append(b.make(
     ],
     final_extras,
     [
+        {'asset': 'assets/props/fragile_roof.glb', 'p': [48, 8.62, -1], 'threshold': 9.6, 'reward': 45},
         {'asset': 'assets/props/glass_panel.glb', 'p': [77, 10.9, 0], 'r': [0, b.math.pi / 2, 0], 'threshold': 7.2, 'reward': 70},
         {'asset': 'assets/props/breakable_barrier.glb', 'p': [47, 8.7, 1], 'r': [0, b.math.pi / 2, 0], 'threshold': 7.0, 'reward': 35},
     ],
