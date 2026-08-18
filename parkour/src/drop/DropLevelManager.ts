@@ -75,6 +75,10 @@ export class DropLevelManager {
       if (visual) this.surfaces.push(visual);
     }
     await this.createBackground(level);
+    if (this.skyTexture) {
+      this.scene.background = this.skyTexture;
+      this.scene.environment = this.skyTexture;
+    }
     this.setActiveTarget(0);
   }
 
