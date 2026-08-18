@@ -102,7 +102,8 @@ WATERMELON="$(pick "$ROOT/food" 'Watermelon' 'Melon' 'Apple')"
 PANCAKE="$(pick "$ROOT/food" 'Pancake' 'Waffle' 'Bread')"
 PUMPKIN="$(pick "$ROOT/food" 'Pumpkin' 'Orange' 'Apple')"
 COOKIE="$(pick "$ROOT/food" 'Cookie' 'Biscuit' 'Donut')"
-ARROW="$(pick "$ROOT/medieval" 'Arrow' 'Bolt' 'Bow')"
+ARROW="$(pick "$ROOT/medieval" 'Arrow' 'Bolt')"
+BOW="$(pick "$ROOT/medieval" 'Bow' 'Longbow' 'Crossbow')"
 CLOUD="$GEM"
 BEE="$(pick "$ROOT/cute_monsters" 'Bee' 'Fly' 'Monster')"
 MINIROBOT="$(pick "$ROOT/characters" 'Robot' 'Mech' 'Knight')"
@@ -138,6 +139,7 @@ convert "$PANCAKE" food-pancake.glb static
 convert "$PUMPKIN" food-pumpkin.glb static
 convert "$COOKIE" food-cookie.glb static
 convert "$ARROW" arrow.glb static
+convert "$BOW" bow.glb static
 convert "$CLOUD" cloud.glb static
 convert "$BEE" bee.glb static
 convert "$MINIROBOT" mini-robot.glb static

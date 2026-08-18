@@ -186,7 +186,7 @@ class MerryMayhem3D {
 
   heldProfile(w){const p=HELD_PROFILES[w?.id]||[w?.projectile||'gem',.34,'spell'];return{asset:p[0],height:p[1],attack:p[2]};}
   playWeaponAttack(a,w){if(!a?.mixer||!a.gltf)return;const k=this.heldProfile(w).attack,t=k==='throw'?['throw','attack','punch','shoot']:k==='shoot'?['shoot','attack','throw','punch']:['spell','cast','attack','punch','shoot'];const clip=this.findClip(a.gltf,t);if(!clip)return;const n=a.mixer.clipAction(clip);n.reset();n.enabled=true;n.setLoop(THREE.LoopOnce,1);n.clampWhenFinished=true;n.fadeIn(.03).play();a.action?.fadeOut(.03);a.action=n;a.kind='attack';}
-  attachHeldWeapon(actor,w){actor.root.userData.weapon?.removeFromParent();const p=this.heldProfile(w),src=this.assets[p.asset]||this.assets[w.projectile]||this.assets.gem,weapon=this.prepareAttachment(src,p.height),hand=this.findRightHand(actor.root);if(hand){hand.add(weapon);weapon.position.set(.06,.015,-.035);weapon.rotation.set(p.attack==='throw'?.15:0,p.attack==='shoot'?1.45:.15,p.attack==='throw'?.55:.12);}else{actor.root.add(weapon);weapon.position.set(.26,1,.12);}actor.root.userData.weapon=weapon;actor.root.userData.weaponHand=hand||null;return weapon;}
+  attachHeldWeapon(actor,w){actor.root.userData.weapon?.removeFromParent();const p=this.heldProfile(w),src=this.assets[p.asset]||this.assets[w.projectile]||this.assets.gem,weapon=this.prepareAttachment(src,p.height),hand=this.findRightHand(actor.root);if(hand){hand.add(weapon);weapon.position.set(p.attack==='shoot'?.03:.11,p.attack==='throw'?.02:0,p.attack==='throw'?.02:-.025);weapon.rotation.set(p.attack==='throw'?.10:0,p.attack==='shoot'?1.42:.08,p.attack==='throw'?.42:.10);}else{actor.root.add(weapon);weapon.position.set(.26,1,.12);}actor.root.userData.weapon=weapon;actor.root.userData.weaponHand=hand||null;return weapon;}
   projectileOrigin(a){const v=new THREE.Vector3(),h=a?.root?.userData?.weaponHand;if(h){h.updateWorldMatrix(true,false);h.getWorldPosition(v);v.y=Math.max(.72,v.y);return v;}v.copy(a.root.position);v.y=.95;return v;}
 
 
@@ -356,7 +356,7 @@ class MerryMayhem3D {
     this.audio.resume();this.audio.startMusic();this.clearWorld();this.menuPreview?.root?.removeFromParent();this.menuPreview=null;this.buildEnvironment(map);this.buildPlayer();
     this.elapsed=0;this.kills=0;this.level=1;this.xp=0;this.nextXp=8;this.runCoins=0;this.spawnClock=0;this.eliteClock=0;this.runWon=false;this.reviveUsed=false;this.doubleUsed=false;this.boss=null;
     this.state='playing';document.body.dataset.gameState='playing';$('#menu').classList.remove('screen--visible');$('#gameover').classList.remove('screen--visible');$('#pause-panel').classList.remove('screen--visible');$('#hud').classList.remove('hidden');
-    if(this.lowPower)$('#mobile-controls').classList.remove('hidden');this.bridge.startGameplay();this.camera.position.set(0,this.lowPower?10.2:9.2,this.lowPower?12.0:10.6);if(DEBUG_FAST){for(let q=0;q<3;q++){const e=this.spawnEnemy(false,ENEMIES[0]);e.root.position.set(6.5+q*1.4,0,-3+q*2.2);e.hp=6;e.maxHp=6;e.speed=.15;e.damage=1;e.def={...e.def,behavior:'chase'};}}this.updateHUD();
+    if(this.lowPower)$('#mobile-controls').classList.remove('hidden');this.bridge.startGameplay();this.camera.position.set(0,this.lowPower?10.2:9.2,this.lowPower?12.0:10.6);if(DEBUG_FAST){for(let q=0;q<3;q++){const e=this.spawnEnemy(false,ENEMIES[0]);e.root.position.set(2.8+q*1.25,0,-1.3+q*1.3);e.hp=4;e.maxHp=4;e.speed=0;e.damage=1;e.def={...e.def,behavior:'chase'};}}this.updateHUD();
   }
 
   updatePlayer(dt){
@@ -379,7 +379,7 @@ class MerryMayhem3D {
   updateWeapon(id,dt){
     const p=this.player,w=weaponById(id);if(!w)return;const rank=p.weaponRanks[id]||1;let timer=(p.weaponTimers[id]||0)-dt;p.weaponTimers[id]=timer;if(timer>0)return;
     const target=this.nearestEnemy(p.root.position,w.range*(1+rank*.018));if(!target)return;
-    p.weaponTimers[id]=Math.max(.10,w.cooldown*p.cooldownMul*Math.pow(.94,rank-1));this.fireWeapon(w,rank,target);this.playWeaponAttack(p,w);setTimeout(()=>{if(this.state==='playing'&&this.player===p)this.playActor(p,'idle',true,.08);},160);
+    p.weaponTimers[id]=Math.max(.10,w.cooldown*p.cooldownMul*Math.pow(.94,rank-1));this.fireWeapon(w,rank,target);document.body.dataset.qaShots=String((Number(document.body.dataset.qaShots)||0)+1);this.playWeaponAttack(p,w);setTimeout(()=>{if(this.state==='playing'&&this.player===p)this.playActor(p,'idle',true,.08);},160);
     this.audio.attack();
   }
 
@@ -444,10 +444,10 @@ class MerryMayhem3D {
   updateEnemyProjectiles(dt){for(let i=this.enemyProjectiles.length-1;i>=0;i--){const p=this.enemyProjectiles[i];p.life-=dt;p.root.position.addScaledVector(p.vel,dt);p.root.rotation.y+=dt*4;if(p.root.position.distanceToSquared(this.player.root.position)<.8&&this.player.invuln<=0){this.hurtPlayer(p.damage);this.player.invuln=.42;p.life=0;}if(p.life<=0){p.root.removeFromParent();this.enemyProjectiles.splice(i,1);}}}
   splashEnemyExplosion(e){const d=e.root.position.distanceTo(this.player.root.position);if(d<4.2)this.hurtPlayer(e.damage*1.35);}
 
-  damageEnemy(e,amount,proj){if(e.dead)return;if(e.shield>0){const used=Math.min(e.shield,amount);e.shield-=used;amount-=used;}e.hp-=amount;if(e.hp<=0)this.killEnemy(e,true);}
+  damageEnemy(e,amount,proj){if(e.dead)return;document.body.dataset.qaHits=String((Number(document.body.dataset.qaHits)||0)+1);if(e.shield>0){const used=Math.min(e.shield,amount);e.shield-=used;amount-=used;}e.hp-=amount;if(e.hp<=0)this.killEnemy(e,true);}
   killEnemy(e,reward=true){
     if(e.dead)return;const deathPos=e.root.position.clone(),shouldSplit=reward&&!e.elite&&e.def.behavior==='split';e.dead=true;this.playActor(e,'death',false,.03);
-    if(reward){this.kills++;this.runCoins+=e.elite?16:1+Math.floor(e.def.xp/2);const xpValue=e.def.xp*(e.elite?7:1);this.spawnPickup(deathPos,'xp',xpValue);if(e.elite)this.spawnPickup(deathPos,'coin',8);this.audio.kill();this.progress.daily.kills++;this.progress.career.kills++;if(e.elite)setTimeout(()=>this.openChest(),280);}
+    if(reward){this.kills++;document.body.dataset.qaKills=String(this.kills);this.runCoins+=e.elite?16:1+Math.floor(e.def.xp/2);const xpValue=e.def.xp*(e.elite?7:1);this.spawnPickup(deathPos,'xp',xpValue);if(e.elite)this.spawnPickup(deathPos,'coin',8);this.audio.kill();this.progress.daily.kills++;this.progress.career.kills++;if(e.elite)setTimeout(()=>this.openChest(),280);}
     if(shouldSplit){for(let n=0;n<2;n++){const child=this.spawnEnemy(false,e.def);child.root.position.copy(deathPos).add(new THREE.Vector3(n?1:-1,0,(Math.random()-.5)*1.4));child.root.scale.multiplyScalar(.62);child.radius*=.62;child.hp=Math.max(12,e.maxHp*.26);child.maxHp=child.hp;child.damage*=.72;child.speed*=1.18;child.def={...child.def,behavior:'chase',xp:Math.max(1,Math.floor(e.def.xp*.55))};}}
     setTimeout(()=>{e.root.removeFromParent();const i=this.enemies.indexOf(e);if(i>=0)this.enemies.splice(i,1);},240);
   }
