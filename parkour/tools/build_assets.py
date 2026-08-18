@@ -1,4 +1,4 @@
-import json, math, os, random
+import json, math, os
 import numpy as np
 import trimesh
 from trimesh.visual.material import PBRMaterial
@@ -34,12 +34,9 @@ def prop_assets():
     export([box((.55,.12,.3),(0,0,0),'metal')],os.path.join(PR,'metal_fragment.glb'))
 
 def dress(meshes,idx):
-    rng=random.Random(1400+idx)
-    for j in range(24):
-        x=rng.uniform(-15,72); z=rng.choice((-1,1))*rng.uniform(14,34); h=rng.uniform(7,25); w=rng.uniform(5,12); d=rng.uniform(5,12)
-        meshes.append(box((w,h,d),(x,-h/2-2,z),rng.choice(('dark','brick','roof2','concrete'))))
-        if j%4==0: meshes.append(cyl(rng.uniform(.8,1.5),rng.uniform(1.2,2.3),(x,-.3,z),'metal'))
-        if j%5==0: meshes.append(cyl(.06,rng.uniform(3,6),(x,1.2,z),'metal'))
+    # Final city scenery is supplied by packaged CC0 Kenney building models in ScenerySystem.
+    # Keep generated GLBs limited to actual playable route geometry and collision-readable props.
+    return meshes
 
 def make(idx,name,subtitle,spawn,finish,plats,extras=(),breakables=(),movers=(),checkpoints=(),theme='roof'):
     meshes=[]; coll=[]
