@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { LevelSpec, MoverSpec } from './types';
 import { DestructionSystem } from './DestructionSystem';
+import { ScenerySystem } from './ScenerySystem';
 
 type Mover = {
   spec: MoverSpec;
@@ -17,6 +18,7 @@ export class LevelManager {
   private scene: THREE.Scene;
   private world: RAPIER.World;
   private loader = new GLTFLoader();
+  private scenery: ScenerySystem;
   private levelRoot: THREE.Object3D | null = null;
   private staticBodies: RAPIER.RigidBody[] = [];
   private movers: Mover[] = [];
@@ -26,6 +28,7 @@ export class LevelManager {
   constructor(scene: THREE.Scene, world: RAPIER.World, onBreak: (reward: number) => void) {
     this.scene = scene;
     this.world = world;
+    this.scenery = new ScenerySystem(scene);
     this.destruction = new DestructionSystem(scene, world, onBreak);
   }
 
@@ -58,8 +61,11 @@ export class LevelManager {
       this.staticBodies.push(body);
     }
 
-    await Promise.all(level.breakables.map((spec) => this.destruction.add(spec)));
-    await Promise.all(level.movers.map((spec) => this.addMover(spec)));
+    await Promise.all([
+      this.scenery.load(level),
+      ...level.breakables.map((spec) => this.destruction.add(spec)),
+      ...level.movers.map((spec) => this.addMover(spec))
+    ]);
   }
 
   update(time: number) {
@@ -75,7 +81,7 @@ export class LevelManager {
       mover.object.position.set(p.x, p.y, p.z);
       mover.object.quaternion.set(q.x, q.y, q.z, q.w);
     }
-    this.destruction.update(performance.now() / 1000);
+    this.destruction.update(time);
   }
 
   updateCheckpoints(playerFoot: THREE.Vector3) {
@@ -110,6 +116,7 @@ export class LevelManager {
       this.scene.remove(this.levelRoot);
       this.levelRoot = null;
     }
+    this.scenery.clear();
     this.destruction.clear();
     for (const mover of this.movers) {
       this.scene.remove(mover.object);
