@@ -4,7 +4,7 @@ import avatarManifest from '../game3d/avatar.json';
 import locomotionManifest from '../game3d/locomotion.json';
 
 type Manifest = { asset: string | null; clips: string[] };
-type AvatarState = 'idle' | 'jump' | 'air' | 'land' | 'roll' | 'fail';
+type AvatarState = 'idle' | 'walk' | 'run' | 'jump' | 'air' | 'land' | 'roll' | 'fail';
 
 export class DropAvatarSystem {
   private scene: THREE.Scene;
@@ -49,8 +49,8 @@ export class DropAvatarSystem {
         const cloneMaterial = (material: THREE.Material) => {
           const copy = material.clone();
           if (copy instanceof THREE.MeshStandardMaterial) {
-            copy.roughness = Math.max(0.46, copy.roughness);
-            copy.metalness = Math.min(0.12, copy.metalness);
+            copy.roughness = Math.max(0.5, copy.roughness);
+            copy.metalness = Math.min(0.08, copy.metalness);
           }
           return copy;
         };
@@ -59,8 +59,6 @@ export class DropAvatarSystem {
           : cloneMaterial(child.material);
       });
 
-      // The web-ready Universal Base Character is already authored in human-sized units.
-      // Do NOT normalize a skinned mesh via Box3: its bind-pose bounds can produce giant characters.
       this.model.scale.setScalar(1);
       const bounds = new THREE.Box3().setFromObject(this.model);
       const center = bounds.getCenter(new THREE.Vector3());
@@ -128,20 +126,22 @@ export class DropAvatarSystem {
     const previous = this.currentAction;
     this.currentAction = action;
     const oneShot = state === 'jump' || state === 'land' || state === 'fail';
-    action.reset().setEffectiveWeight(1).setEffectiveTimeScale(1);
+    action.reset().setEffectiveWeight(1).setEffectiveTimeScale(state === 'run' ? 1.08 : 1);
     action.setLoop(oneShot ? THREE.LoopOnce : THREE.LoopRepeat, oneShot ? 1 : Infinity);
     action.clampWhenFinished = oneShot;
-    action.fadeIn(previous ? 0.08 : 0.01).play();
-    if (previous) previous.fadeOut(0.08);
+    action.fadeIn(previous ? 0.11 : 0.01).play();
+    if (previous) previous.fadeOut(0.11);
   }
 
   private pickClip(state: AvatarState) {
     const priorities: Record<AvatarState, string[]> = {
-      idle: ['Idle_Loop', 'Idle_No_Loop'],
+      idle: ['Idle_Loop'],
+      walk: ['Walk_Loop', 'Walk_Formal_Loop', 'Jog_Fwd_Loop'],
+      run: ['Jog_Fwd_Loop', 'Sprint_Loop', 'Walk_Loop'],
       jump: ['Jump_Start', 'Jump_Loop'],
-      air: ['Jump_Loop', 'Fall_Loop', 'Jump_Start'],
-      land: ['Jump_Land', 'ClimbUp_1m'],
-      roll: ['Crouch_Fwd_Loop', 'Dodge_Roll', 'Jump_Land'],
+      air: ['Jump_Loop', 'Jump_Start'],
+      land: ['Jump_Land'],
+      roll: ['Roll', 'Crouch_Fwd_Loop', 'Jump_Land'],
       fail: ['Hit_Chest', 'Hit_Head', 'Death01']
     };
     for (const preferred of priorities[state]) {
@@ -150,10 +150,12 @@ export class DropAvatarSystem {
     }
     const patterns: Record<AvatarState, RegExp[]> = {
       idle: [/^idle.*loop/i, /^idle/i],
+      walk: [/^walk.*loop/i, /jog.*fwd/i],
+      run: [/sprint.*loop/i, /jog.*fwd/i, /^walk.*loop/i],
       jump: [/jump.*start/i, /^jump/i],
-      air: [/jump.*loop/i, /fall.*loop/i, /^fall/i],
+      air: [/jump.*loop/i, /^jump/i],
       land: [/jump.*land/i, /land/i],
-      roll: [/roll/i, /dodge/i, /crouch.*fwd/i],
+      roll: [/^roll$/i, /roll/i, /crouch.*fwd/i],
       fail: [/hit.*chest/i, /hit.*head/i, /death/i]
     };
     for (const pattern of patterns[state]) {
