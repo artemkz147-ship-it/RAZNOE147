@@ -5,6 +5,10 @@ on:
     branches: [yandex-3d-merry-mayhem]
   workflow_dispatch:
 
+concurrency:
+  group: merry-mayhem-3d-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
