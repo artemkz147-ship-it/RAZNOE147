@@ -1,8 +1,8 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 
-const ASSET_ROOT = '/assets3d_df4_20260818/';
-const BUILD_ID = 'DF4-20260818-1751';
+const ASSET_ROOT = '/assets3d_df5_20260818/';
+const BUILD_ID = 'DF5-20260818-1833';
 
 await fs.mkdir('qa', { recursive: true });
 
@@ -52,7 +52,7 @@ await page.waitForFunction(
   undefined,
   { timeout: 90_000 }
 );
-await page.waitForTimeout(1200);
+await page.waitForTimeout(900);
 
 const resources = await page.evaluate(() => performance.getEntriesByType('resource').map((entry) => entry.name));
 await fs.writeFile('qa/resource-urls.txt', resources.join('\n'), 'utf8');
@@ -64,9 +64,7 @@ const staleAssets = resources.filter((url) => {
     return false;
   }
 });
-if (staleAssets.length) {
-  throw new Error(`Stale unversioned assets were requested:\n${staleAssets.join('\n')}`);
-}
+if (staleAssets.length) throw new Error(`Stale unversioned assets were requested:\n${staleAssets.join('\n')}`);
 
 const versionedResources = resources.filter((url) => {
   try {
@@ -77,12 +75,31 @@ const versionedResources = resources.filter((url) => {
 });
 const required = ['parkour_performer.glb', 'parkour_locomotion.glb', 'rooftop_sunset_1k.hdr', 'landing-target.svg', 'kenney_city_'];
 for (const token of required) {
-  if (!versionedResources.some((url) => url.includes(token))) {
-    throw new Error(`Expected DF4 asset was not requested: ${token}`);
-  }
+  if (!versionedResources.some((url) => url.includes(token))) throw new Error(`Expected DF5 asset was not requested: ${token}`);
 }
 
-await page.screenshot({ path: 'qa/drop-flow-df4-level-01-ready.png' });
+await page.screenshot({ path: 'qa/drop-flow-df5-level-01-ready.png' });
+
+// Exercise the controls the player actually needs: orbit camera + walk before the drop.
+const canvas = page.locator('#game canvas');
+const box = await canvas.boundingBox();
+if (!box) throw new Error('Gameplay canvas not found');
+const startX = box.x + box.width * 0.62;
+const startY = box.y + box.height * 0.46;
+await page.mouse.move(startX, startY);
+await page.mouse.down({ button: 'left' });
+await page.mouse.move(startX - 190, startY + 75, { steps: 12 });
+await page.mouse.up({ button: 'left' });
+await page.mouse.wheel(0, -260);
+await page.keyboard.down('KeyW');
+await page.waitForTimeout(700);
+await page.keyboard.up('KeyW');
+await page.waitForTimeout(500);
+await page.screenshot({ path: 'qa/drop-flow-df5-level-01-camera-walk.png' });
+
+if (!(await page.locator('#state').textContent())?.includes('ГОТОВ К ПРЫЖКУ')) {
+  throw new Error('Camera/walk input unexpectedly changed gameplay state before jump');
+}
 
 await page.keyboard.press('Space');
 await page.waitForFunction(
@@ -93,7 +110,7 @@ await page.waitForFunction(
 );
 await page.keyboard.press('Digit1');
 await page.waitForTimeout(340);
-await page.screenshot({ path: 'qa/drop-flow-df4-level-01-air.png' });
+await page.screenshot({ path: 'qa/drop-flow-df5-level-01-air.png' });
 
 await fs.writeFile('qa/browser-errors.txt', errors.join('\n'), 'utf8');
 if (errors.some((line) => /pageerror/i.test(line))) {
