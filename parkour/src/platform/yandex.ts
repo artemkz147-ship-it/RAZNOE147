@@ -6,19 +6,26 @@ declare global {
   }
 }
 
+export type Medal = 'bronze' | 'silver' | 'gold';
+
 export type ParkourProgress = {
   unlockedLevel: number;
   bestTimes: Record<string, number>;
+  bestMedals: Record<string, Medal>;
+  cleanLevels: number[];
   completedLevels: number[];
   tokens: number;
   totalFalls: number;
 };
 
 const MAX_LEVEL = 12;
+const MEDALS = new Set<Medal>(['bronze', 'silver', 'gold']);
 
 const freshProgress = (): ParkourProgress => ({
   unlockedLevel: 1,
   bestTimes: {},
+  bestMedals: {},
+  cleanLevels: [],
   completedLevels: [],
   tokens: 0,
   totalFalls: 0
@@ -119,9 +126,19 @@ class YandexBridge {
 
   private normalize(input: Partial<ParkourProgress>): ParkourProgress {
     const base = freshProgress();
+    const bestMedals: Record<string, Medal> = {};
+    if (input.bestMedals && typeof input.bestMedals === 'object') {
+      for (const [key, value] of Object.entries(input.bestMedals)) {
+        if (MEDALS.has(value as Medal)) bestMedals[key] = value as Medal;
+      }
+    }
     return {
       unlockedLevel: Math.max(1, Math.min(MAX_LEVEL, Math.floor(Number(input.unlockedLevel || base.unlockedLevel)))),
       bestTimes: typeof input.bestTimes === 'object' && input.bestTimes ? input.bestTimes : {},
+      bestMedals,
+      cleanLevels: Array.isArray(input.cleanLevels)
+        ? [...new Set(input.cleanLevels.map(Number).filter((value) => value >= 1 && value <= MAX_LEVEL))]
+        : [],
       completedLevels: Array.isArray(input.completedLevels)
         ? [...new Set(input.completedLevels.map(Number).filter((value) => value >= 1 && value <= MAX_LEVEL))]
         : [],
