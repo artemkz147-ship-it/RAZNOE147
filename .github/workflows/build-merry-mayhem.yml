@@ -28,6 +28,7 @@ jobs:
           tar -tzf /tmp/merry-payload.tgz
           tar -xzf /tmp/merry-payload.tgz
           chmod +x tools/build_assets.sh
+          python3 tools/post_materialize_fixes.py
           node --check src/content.js
           node --check src/main.js
           node --check src/yandex.js
