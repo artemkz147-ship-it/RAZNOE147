@@ -10,13 +10,26 @@ android {
         applicationId 'ru.forma365.app'
         minSdk 23
         targetSdk 35
-        versionCode 2
-        versionName '1.1.0'
+        versionCode 3
+        versionName '1.1.1'
+    }
+
+    signingConfigs {
+        stableDebug {
+            storeFile file('../keystore/forma365-release.jks')
+            storePassword 'Forma365_2026'
+            keyAlias 'forma365'
+            keyPassword 'Forma365_2026'
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.stableDebug
+        }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.stableDebug
         }
     }
 }
