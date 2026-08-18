@@ -12,7 +12,7 @@ jobs:
   build:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,14 +36,16 @@ jobs:
           python3 tools/final_qa_fixes.py
           python3 .build/pro_overhaul.py
           python3 .build/pro_finish.py
+          python3 .build/v3_top_overhaul.py
           node --check src/content.js
           node --check src/main.js
           node --check src/yandex.js
+          python3 -m py_compile tools/render_portraits.py tools/validate_build.py
           git config user.name 'Merry Mayhem Build Bot'
           git config user.email 'actions@users.noreply.github.com'
           git add src/content.js src/main.js src/style.css src/yandex.js tools/build_assets.sh tools/check_glb_animations.py tools/validate_build.py
           if ! git diff --cached --quiet; then
-            git commit -m 'Materialize final Merry Mayhem 3D gameplay'
+            git commit -m 'Materialize Merry Mayhem 3D v3 top-art gameplay'
             git push origin HEAD:yandex-3d-merry-mayhem
           fi
 
@@ -60,10 +62,12 @@ jobs:
           blender --version | head -1
           blender -b --factory-startup --python-expr "import numpy; print('Blender numpy', numpy.__version__)"
 
-      - name: Build CC0 GLB library
+      - name: Build CC0 GLB library and portraits
         run: |
           echo assets > /tmp/merry-stage
           bash tools/build_assets.sh .asset-src
+          test "$(find public/assets -name '*.glb' | wc -l)" -ge 90
+          test "$(find public/portraits -name '*.png' | wc -l)" -eq 30
 
       - name: Install dependencies
         run: |
@@ -80,15 +84,18 @@ jobs:
         run: |
           echo validate > /tmp/merry-stage
           python3 tools/validate_build.py
-          test "$(find dist/assets -name '*.glb' | wc -l)" -ge 77
+          test "$(find dist/assets -name '*.glb' | wc -l)" -ge 90
+          test "$(find dist/portraits -name '*.png' | wc -l)" -eq 30
           grep -q "const DEBUG_MAP" src/main.js
           grep -q "const DEBUG_HERO" src/main.js
-          grep -q "buildMacroClusters" src/main.js
+          grep -q "buildV3SetPieces" src/main.js
+          grep -q "heroPortrait" src/main.js
           grep -q "HELD_PROFILES" src/content.js
-          grep -q "bow.glb" src/content.js
+          grep -q "weapon09" src/content.js
           grep -q "qaKills" src/main.js
           grep -q "qaHits" src/main.js
           grep -q "qaShots" src/main.js
+          ! grep -q "ultimate_gun_pack" tools/build_assets.sh
 
       - name: Real-time WebGL combat and visual QA
         shell: bash
@@ -101,19 +108,19 @@ jobs:
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           test -n "$CHROME"
           CHROME="$CHROME" node .build/browser_qa.mjs
-          for f in qa-sunny-meadow.png qa-candy-park.png qa-snow-festival.png qa-rainbow-canyon.png qa-firefly-swamp.png qa-mobile-festival.png; do test -s "$f"; done
+          for f in qa-heroes.png qa-sunny-meadow.png qa-candy-park.png qa-snow-festival.png qa-rainbow-canyon.png qa-firefly-swamp.png qa-mobile-festival.png; do test -s "$f"; done
 
       - name: Package releases
         shell: bash
         run: |
           echo package > /tmp/merry-stage
           cd dist
-          zip -9 -r ../vesely-natisk-3d-yandex-v2.1.0.zip .
+          zip -9 -r ../vesely-natisk-3d-yandex-v3.0.0.zip .
           cd ..
-          unzip -t vesely-natisk-3d-yandex-v2.1.0.zip >/dev/null
-          test "$(unzip -Z1 vesely-natisk-3d-yandex-v2.1.0.zip | grep -c '^index\.html$')" -eq 1
-          zip -9 -r vesely-natisk-3d-full-project-v2.1.0.zip index.html package.json vite.config.js README.md src tools public .github/workflows/build-merry-mayhem.yml .build/pro_overhaul.py .build/pro_finish.py .build/browser_qa.mjs -x '*.DS_Store'
-          unzip -t vesely-natisk-3d-full-project-v2.1.0.zip >/dev/null
+          unzip -t vesely-natisk-3d-yandex-v3.0.0.zip >/dev/null
+          test "$(unzip -Z1 vesely-natisk-3d-yandex-v3.0.0.zip | grep -c '^index\.html$')" -eq 1
+          zip -9 -r vesely-natisk-3d-full-project-v3.0.0.zip index.html package.json vite.config.js README.md docs src tools public .github/workflows/build-merry-mayhem.yml .build/pro_overhaul.py .build/pro_finish.py .build/v3_top_overhaul.py .build/browser_qa.mjs -x '*.DS_Store'
+          unzip -t vesely-natisk-3d-full-project-v3.0.0.zip >/dev/null
           rm -rf local-test && mkdir local-test
           cp -a dist/. local-test/
           cat > local-test/START_LOCAL.ps1 <<'POWERSHELL'
@@ -123,7 +130,7 @@ jobs:
           $listener.Prefixes.Add("http://127.0.0.1:$port/")
           $listener.Start()
           Start-Process "http://127.0.0.1:$port/"
-          Write-Host "Весёлый Натиск 3D: http://127.0.0.1:$port/"
+          Write-Host "Весёлый Натиск 3D v3: http://127.0.0.1:$port/"
           Write-Host "Для остановки закройте это окно."
           $mime = @{'.html'='text/html; charset=utf-8';'.js'='text/javascript; charset=utf-8';'.css'='text/css; charset=utf-8';'.glb'='model/gltf-binary';'.json'='application/json';'.png'='image/png';'.jpg'='image/jpeg';'.svg'='image/svg+xml'}
           while ($listener.IsListening) {
@@ -147,39 +154,40 @@ jobs:
           3. Игра откроется в браузере автоматически.
           Не открывайте index.html двойным кликом: WebGL-модули и ассеты должны загружаться через локальный HTTP-сервер.
           TXT
-          cd local-test && zip -9 -r ../vesely-natisk-3d-local-test-v2.1.0.zip . && cd ..
-          unzip -t vesely-natisk-3d-local-test-v2.1.0.zip >/dev/null
+          cd local-test && zip -9 -r ../vesely-natisk-3d-local-test-v3.0.0.zip . && cd ..
+          unzip -t vesely-natisk-3d-local-test-v3.0.0.zip >/dev/null
           ls -lh vesely-natisk-3d-*.zip
 
       - name: Upload Yandex build
         uses: actions/upload-artifact@v4
         with:
-          name: vesely-natisk-3d-yandex-v2.1.0
-          path: vesely-natisk-3d-yandex-v2.1.0.zip
+          name: vesely-natisk-3d-yandex-v3.0.0
+          path: vesely-natisk-3d-yandex-v3.0.0.zip
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload full project
         uses: actions/upload-artifact@v4
         with:
-          name: vesely-natisk-3d-full-project-v2.1.0
-          path: vesely-natisk-3d-full-project-v2.1.0.zip
+          name: vesely-natisk-3d-full-project-v3.0.0
+          path: vesely-natisk-3d-full-project-v3.0.0.zip
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload local tester
         uses: actions/upload-artifact@v4
         with:
-          name: vesely-natisk-3d-local-test-v2.1.0
-          path: vesely-natisk-3d-local-test-v2.1.0.zip
+          name: vesely-natisk-3d-local-test-v3.0.0
+          path: vesely-natisk-3d-local-test-v3.0.0.zip
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload QA screenshots
         uses: actions/upload-artifact@v4
         with:
-          name: merry-mayhem-3d-qa-v2.1
+          name: merry-mayhem-3d-qa-v3.0
           path: |
+            qa-heroes.png
             qa-sunny-meadow.png
             qa-candy-park.png
             qa-snow-festival.png
