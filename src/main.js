@@ -450,7 +450,7 @@ class MerryMayhem3D {
   spawnEnemy(elite=false,defOverride=null){
     const map=this.currentMap(),mode=this.currentMode(),tier=Math.min(ENEMIES.length-1,Math.floor(this.elapsed/(DEBUG_FAST?10:55))+Math.floor(map.enemyTier/2));
     const pool=ENEMIES.slice(0,Math.max(5,tier+1));const def=defOverride||pool[Math.floor(Math.random()*pool.length)];
-    const root=this.cloneVisual(this.assets[def.asset],def.scale*(elite?1.45:1),{tint:def.color});const hx=map.width/2-6,hz=map.height/2-6;let x,z;
+    const root=this.cloneVisual(this.assets[def.asset],def.scale*(elite?1.45:1),{tint:elite?0xffd76a:null});const hx=map.width/2-6,hz=map.height/2-6;let x,z;
     const side=Math.floor(Math.random()*4);if(side===0){x=-hx;z=(Math.random()*2-1)*hz;}else if(side===1){x=hx;z=(Math.random()*2-1)*hz;}else if(side===2){z=-hz;x=(Math.random()*2-1)*hx;}else{z=hz;x=(Math.random()*2-1)*hx;}
     root.position.set(x,0,z);this.scene.add(root);const hp=def.hp*mode.difficulty*(1+this.elapsed/(DEBUG_FAST?55:680))*(elite?5.2:1),actor={root,gltf:this.assets[def.asset],mixer:new THREE.AnimationMixer(root),action:null,kind:''};
     const e={...actor,def,hp,maxHp:hp,speed:def.speed*(elite?1.07:1),damage:def.damage*mode.difficulty*(elite?1.7:1),radius:.7*def.scale*(elite?1.4:1),elite,dead:false,brain:Math.random()*10,attackCd:Math.random(),dashCd:1+Math.random()*2,shield:def.behavior==='shield'?hp*.45:0};

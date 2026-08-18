@@ -19,6 +19,7 @@ fetch_zip 'https://opengameart.org/sites/default/files/medieval_village_pack_-_d
 fetch_zip 'https://opengameart.org/sites/default/files/survival_pack_-_sept_2020.zip' survival
 fetch_zip 'https://opengameart.org/sites/default/files/ultimate_nature_pack_by_quaternius_1.zip' nature
 fetch_zip 'https://opengameart.org/sites/default/files/ultimate_rpg_items_pack_by_quaternius_0.zip' rpg
+fetch_zip 'https://opengameart.org/sites/default/files/RPG%20Pack.zip' rpg_old
 fetch_zip 'https://opengameart.org/sites/default/files/Updated%20Modular%20Dungeon%20-%20May%202019.zip' dungeon
 fetch_zip 'https://opengameart.org/sites/default/files/ultimate_food_pack_by_quaternius.zip' food
 fetch_zip 'https://opengameart.org/sites/default/files/Medieval%20Weapons%20Pack%20-%20Sept%202018.zip' medieval
@@ -30,6 +31,15 @@ pick(){
     f="$(all_fbx "$dir" | grep -i "$kw" | head -1 || true)"; [[ -n "$f" ]] && { printf '%s' "$f"; return 0; }
   done
   all_fbx "$dir" | head -1
+}
+pick_match(){
+  local dir="$1"; shift; local kw f
+  for kw in "$@"; do
+    f="$(all_fbx "$dir" | grep -i "$kw" | head -1 || true)"
+    [[ -n "$f" ]] && { printf '%s' "$f"; return 0; }
+  done
+  echo "::error::No intended asset in $dir for: $*" >&2
+  return 1
 }
 pick_unique(){
   local dir="$1" used_file="$2"; shift 2; local kw f
@@ -62,21 +72,23 @@ done
 
 : > "$ROOT/used-weapons.txt"
 declare -a weapon_src
-weapon_src[1]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Staff' 'Scepter' 'Wand')"
-weapon_src[2]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Lantern' 'Torch' 'Potion')"
-weapon_src[3]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Bomb' 'Mace' 'Potion')"
-weapon_src[4]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Book' 'Scroll' 'Wand')"
-weapon_src[5]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Staff' 'Wand' 'Spear')"
-weapon_src[6]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Crystal' 'Gem' 'Scepter')"
-weapon_src[7]="$(pick_unique "$ROOT/survival" "$ROOT/used-weapons.txt" 'Wrench' 'Hammer' 'Pickaxe' 'Axe')"
-weapon_src[8]="$(pick_unique "$ROOT/survival" "$ROOT/used-weapons.txt" 'Pan' 'Pot' 'Shovel' 'Axe')"
-weapon_src[9]="$(pick_unique "$ROOT/medieval" "$ROOT/used-weapons.txt" 'Bow' 'Crossbow' 'Longbow')"
-weapon_src[10]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Wand' 'Staff' 'Scepter')"
-weapon_src[11]="$(pick_unique "$ROOT/medieval" "$ROOT/used-weapons.txt" 'Crossbow' 'Mace' 'Hammer')"
-weapon_src[12]="$(pick_unique "$ROOT/medieval" "$ROOT/used-weapons.txt" 'Mace' 'Hammer' 'Spear')"
-weapon_src[13]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Dagger' 'Wand' 'Scepter')"
-weapon_src[14]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Staff' 'Spear' 'Wand')"
-weapon_src[15]="$(pick_unique "$ROOT/rpg" "$ROOT/used-weapons.txt" 'Lantern' 'Torch' 'Axe')"
+# 15 deliberately different fantasy/tool silhouettes. No modern gun pack and
+# no alphabetic fallback are allowed here.
+weapon_src[1]="$(pick_match "$ROOT/rpg_old" 'Staff')"
+weapon_src[2]="$(pick_match "$ROOT/rpg" 'Potion10_Filled' 'Potion9_Filled' 'Potion8_Filled')"
+weapon_src[3]="$(pick_match "$ROOT/medieval" 'Hammer_Double' 'Mace_Double' 'Hammer')"
+weapon_src[4]="$(pick_match "$ROOT/rpg" 'Book1_Closed' 'Book2_Closed' 'Book')"
+weapon_src[5]="$(pick_match "$ROOT/rpg_old" 'Sword' 'Staff')"
+weapon_src[6]="$(pick_match "$ROOT/rpg" 'Crystal1' 'Crystal2' 'Gem')"
+weapon_src[7]="$(pick_match "$ROOT/survival" 'Axe.fbx' 'Pickaxe' 'Hammer')"
+weapon_src[8]="$(pick_match "$ROOT/survival" 'Pan.fbx' 'Pot.fbx' 'Shovel')"
+weapon_src[9]="$(pick_match "$ROOT/medieval" 'Bow_Evil' 'Bow_Golden' 'Bow')"
+weapon_src[10]="$(pick_match "$ROOT/rpg_old" 'Staff' 'Spear')"
+weapon_src[11]="$(pick_match "$ROOT/medieval" 'Crossbow' 'Bow_Golden' 'Bow')"
+weapon_src[12]="$(pick_match "$ROOT/medieval" 'Hammer_Small' 'Mace' 'Hammer')"
+weapon_src[13]="$(pick_match "$ROOT/rpg" 'Dagger' 'Sword')"
+weapon_src[14]="$(pick_match "$ROOT/rpg_old" 'Staff' 'Spear')"
+weapon_src[15]="$(pick_match "$ROOT/rpg" 'Axe_Double' 'Axe')"
 for i in $(seq 1 15); do
   convert "${weapon_src[$i]}" "weapon-$(printf '%02d' "$i").glb" static
 done
@@ -196,4 +208,4 @@ echo '--- Built art assets ---'
 ls -lh "$OUT"
 python3 tools/check_glb_animations.py
 rm -rf public/portraits && mkdir -p public/portraits
-blender -b --factory-startup --python tools/render_portraits.py -- "$OUT" public/portraits
+xvfb-run -a blender -b --factory-startup --python tools/render_portraits.py -- "$OUT" public/portraits

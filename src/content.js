@@ -1,19 +1,19 @@
 export const HEROES = [
-  {id:'donut_knight',name:'Сэр Крендель',asset:'hero01',weapon:'donut',cost:0,desc:'Тяжёлый рыцарь-пекарь: крепкий, простой и очень живучий.',bonus:{armor:.12,hp:.08}},
-  {id:'dew_fairy',name:'Эльфа Росинка',asset:'hero02',weapon:'firefly',cost:0,desc:'Лесной стрелок: быстрее набирает уровни и притягивает опыт.',bonus:{xp:.16,pickup:.18}},
+  {id:'donut_knight',name:'Золотая Рыцарка',asset:'hero01',weapon:'donut',cost:0,desc:'Бронированный герой: высокий запас здоровья и защита.',bonus:{armor:.12,hp:.08}},
+  {id:'dew_fairy',name:'Лесная Эльфийка',asset:'hero02',weapon:'firefly',cost:0,desc:'Быстрый герой: быстрее набирает уровни и притягивает опыт.',bonus:{xp:.16,pickup:.18}},
   {id:'hamster_pirate',name:'Капитан Бомба',asset:'hero03',weapon:'pirate_bomb',cost:0,desc:'Пират-бомбардир: крупные взрывы и повышенная удача.',bonus:{luck:.20,splash:.16}},
   {id:'candy_witch',name:'Конфетная Ведьма',asset:'hero04',weapon:'rainbow_fan',cost:900,desc:'Радужная магия: широкий залп и высокий базовый урон.',bonus:{damage:.12,projectiles:1}},
-  {id:'mushroom_druid',name:'Друид Цветень',asset:'hero05',weapon:'flower_burst',cost:1250,desc:'Контролирует толпу цветочной магией и замедлением.',bonus:{area:.18,slow:.08}},
+  {id:'mushroom_druid',name:'Зелёная Авантюристка',asset:'hero05',weapon:'flower_burst',cost:1250,desc:'Контроль толпы, увеличенная площадь и замедление.',bonus:{area:.18,slow:.08}},
   {id:'cat_mage',name:'Янтарный Маг',asset:'hero06',weapon:'amber_comet',cost:1600,desc:'Точные пробивающие выстрелы и высокий темп магии.',bonus:{cooldown:.12,pierce:1}},
-  {id:'toy_robot',name:'Меха-Малыш',asset:'hero07',weapon:'blast_bot',cost:1950,desc:'Механический герой с самонаводящимися зарядами и защитой.',bonus:{damageReduction:.10,homing:.18}},
+  {id:'toy_robot',name:'Лазурная Стражница',asset:'hero07',weapon:'blast_bot',cost:1950,desc:'Защитный класс с самонаводящимися механическими зарядами.',bonus:{damageReduction:.10,homing:.18}},
   {id:'baker_alchemist',name:'Шеф Алхимик',asset:'hero08',weapon:'pancake',cost:2300,desc:'Возвратные атаки и постоянная регенерация в долгом забеге.',bonus:{duration:.20,regen:.18}},
-  {id:'fox_archer',name:'Лисий Следопыт',asset:'hero09',weapon:'fox_bow',cost:2650,desc:'Рейнджер с быстрыми критическими стрелами.',bonus:{speed:.12,crit:.08}},
-  {id:'cloud_princess',name:'Принцесса Облаков',asset:'hero10',weapon:'cloud_orb',cost:3000,desc:'Лёгкая магия облаков: быстрые заряды и шанс уклонения.',bonus:{projectileSpeed:.16,dodge:.08}},
-  {id:'watermelon_captain',name:'Арбузный Корсар',asset:'hero11',weapon:'watermelon',cost:3350,desc:'Тяжёлые арбузные снаряды разбрасывают большие группы.',bonus:{knockback:.22,splash:.18}},
-  {id:'music_gnome',name:'Гном-Громовержец',asset:'hero12',weapon:'music_wave',cost:3700,desc:'Громовые волны пробивают плотную толпу вокруг героя.',bonus:{area:.12,cooldown:.08}},
+  {id:'fox_archer',name:'Лазурный Стрелок',asset:'hero09',weapon:'fox_bow',cost:2650,desc:'Скоростной стрелок с повышенным шансом критического попадания.',bonus:{speed:.12,crit:.08}},
+  {id:'cloud_princess',name:'Небесная Путница',asset:'hero10',weapon:'cloud_orb',cost:3000,desc:'Быстрые воздушные заряды и шанс уклонения.',bonus:{projectileSpeed:.16,dodge:.08}},
+  {id:'watermelon_captain',name:'Арбузный Корсар',asset:'hero11',weapon:'watermelon',cost:3350,desc:'Тяжёлые снаряды разбрасывают большие группы.',bonus:{knockback:.22,splash:.18}},
+  {id:'music_gnome',name:'Северный Громовержец',asset:'hero12',weapon:'music_wave',cost:3700,desc:'Громовые волны пробивают плотную толпу вокруг героя.',bonus:{area:.12,cooldown:.08}},
   {id:'lightning_bee',name:'Ниндзя Искра',asset:'hero13',weapon:'smart_bee',cost:4050,desc:'Самый быстрый герой: рой сам ищет цели.',bonus:{speed:.15,cooldown:.08}},
-  {id:'snow_penguin',name:'Ледяной Медик',asset:'hero14',weapon:'snowball',cost:4400,desc:'Морозит врагов и медленно восстанавливает здоровье.',bonus:{regen:.35,slow:.14}},
-  {id:'pumpkin_jester',name:'Тыквенный Гоблин',asset:'hero15',weapon:'pumpkin',cost:4750,desc:'Трикстер с минами и цепными тыквенными взрывами.',bonus:{luck:.12,splash:.12}},
+  {id:'snow_penguin',name:'Полярный Разведчик',asset:'hero14',weapon:'snowball',cost:4400,desc:'Морозит врагов и постепенно восстанавливает здоровье.',bonus:{regen:.35,slow:.14}},
+  {id:'pumpkin_jester',name:'Тыквенная Гоблинка',asset:'hero15',weapon:'pumpkin',cost:4750,desc:'Трикстер с минами и цепными тыквенными взрывами.',bonus:{luck:.12,splash:.12}},
 ];
 
 const levelText = (name, evolution) => [
@@ -28,21 +28,21 @@ const levelText = (name, evolution) => [
 ];
 
 export const WEAPONS = [
-  {id:'donut',name:'Пекарский Жезл',evolution:'Планетарная Пекарня',model:'weapon01',projectile:'food_donut',type:'shot',damage:17,cooldown:.68,speed:19,count:3,spread:.12,pierce:1,range:29,scale:.34,passive:'area',fx:0xffcf6b},
-  {id:'firefly',name:'Фонарь Светлячков',evolution:'Рой Зарниц',model:'weapon02',projectile:'gem',type:'chain',damage:15,cooldown:.64,speed:23,count:1,chain:4,chainRadius:6.4,range:30,scale:.22,passive:'cooldown',fx:0x8effc8},
-  {id:'pirate_bomb',name:'Пороховая Мортира',evolution:'Пороховой Шторм',model:'weapon03',projectile:'bomb',type:'bomb',damage:32,cooldown:1.18,speed:14,count:1,splash:4.2,range:28,scale:.38,passive:'area',fx:0xff7b48},
-  {id:'rainbow_fan',name:'Радужный Жезл',evolution:'Семицветная Буря',model:'weapon04',projectile:'star',type:'fan',damage:12,cooldown:.70,speed:21,count:7,spread:.15,pierce:1,range:27,scale:.20,passive:'projectiles',fx:0xff78dc},
-  {id:'flower_burst',name:'Цветочный Посох',evolution:'Цветочная Корона',model:'weapon05',projectile:'flower',type:'fan',damage:14,cooldown:.70,speed:18,count:5,spread:.21,slow:.18,range:25,scale:.30,passive:'area',fx:0xff8fb1},
-  {id:'amber_comet',name:'Янтарный Скипетр',evolution:'Янтарная Сверхновая',model:'weapon06',projectile:'gem',type:'shot',damage:28,cooldown:.78,speed:28,count:1,pierce:4,range:34,scale:.30,passive:'power',fx:0xffb54a},
-  {id:'blast_bot',name:'Механический Пускатель',evolution:'Механический Карнавал',model:'weapon07',projectile:'mini_robot',type:'homing',damage:23,cooldown:.98,speed:14,count:2,homing:7,splash:2.7,range:31,scale:.30,passive:'cooldown',fx:0x73d9ff},
+  {id:'donut',name:'Пекарский Посох',evolution:'Планетарная Пекарня',model:'weapon01',projectile:'food_donut',type:'shot',damage:17,cooldown:.68,speed:19,count:3,spread:.12,pierce:1,range:29,scale:.34,passive:'area',fx:0xffcf6b},
+  {id:'firefly',name:'Эликсир Светлячков',evolution:'Рой Зарниц',model:'weapon02',projectile:'gem',type:'chain',damage:15,cooldown:.64,speed:23,count:1,chain:4,chainRadius:6.4,range:30,scale:.22,passive:'cooldown',fx:0x8effc8},
+  {id:'pirate_bomb',name:'Пороховой Молот',evolution:'Пороховой Шторм',model:'weapon03',projectile:'bomb',type:'bomb',damage:32,cooldown:1.18,speed:14,count:1,splash:4.2,range:28,scale:.38,passive:'area',fx:0xff7b48},
+  {id:'rainbow_fan',name:'Радужный Гримуар',evolution:'Семицветная Буря',model:'weapon04',projectile:'star',type:'fan',damage:12,cooldown:.70,speed:21,count:7,spread:.15,pierce:1,range:27,scale:.20,passive:'projectiles',fx:0xff78dc},
+  {id:'flower_burst',name:'Клинок Цветения',evolution:'Цветочная Корона',model:'weapon05',projectile:'flower',type:'fan',damage:14,cooldown:.70,speed:18,count:5,spread:.21,slow:.18,range:25,scale:.30,passive:'area',fx:0xff8fb1},
+  {id:'amber_comet',name:'Янтарный Кристалл',evolution:'Янтарная Сверхновая',model:'weapon06',projectile:'gem',type:'shot',damage:28,cooldown:.78,speed:28,count:1,pierce:4,range:34,scale:.30,passive:'power',fx:0xffb54a},
+  {id:'blast_bot',name:'Механический Топор',evolution:'Механический Карнавал',model:'weapon07',projectile:'mini_robot',type:'homing',damage:23,cooldown:.98,speed:14,count:2,homing:7,splash:2.7,range:31,scale:.30,passive:'cooldown',fx:0x73d9ff},
   {id:'pancake',name:'Сковорода-Бумеранг',evolution:'Бесконечная Кухня',model:'weapon08',projectile:'food_pancake',type:'boomerang',damage:19,cooldown:.96,speed:19,count:2,pierce:6,range:20,scale:.36,passive:'duration',fx:0xffd78e},
   {id:'fox_bow',name:'Лисий Лук',evolution:'Ливень Лисьих Стрел',model:'weapon09',projectile:'arrow',type:'shot',damage:22,cooldown:.62,speed:32,count:1,pierce:2,crit:.14,range:37,scale:.31,passive:'crit',fx:0xffa24c},
   {id:'cloud_orb',name:'Облачный Посох',evolution:'Грозовой Спутник',model:'weapon10',projectile:'cloud',type:'homing',damage:17,cooldown:.58,speed:17,count:3,homing:9,pierce:1,range:30,scale:.31,passive:'speed',fx:0xb9e9ff},
-  {id:'watermelon',name:'Арбузная Рогатка',evolution:'Гигантский Арбуз',model:'weapon11',projectile:'food_watermelon',type:'bomb',damage:38,cooldown:1.24,speed:13,count:1,splash:4.8,knockback:2.8,range:28,scale:.42,passive:'area',fx:0x7dff78},
-  {id:'music_wave',name:'Камертон Бури',evolution:'Громовой Концерт',model:'weapon12',projectile:'star',type:'radial',damage:13,cooldown:1.02,speed:19,count:10,pierce:2,range:22,scale:.20,passive:'projectiles',fx:0x8e8cff},
-  {id:'smart_bee',name:'Жезл Роя',evolution:'Королевский Рой',model:'weapon13',projectile:'bee',type:'homing',damage:15,cooldown:.42,speed:20,count:3,homing:11,range:29,scale:.25,passive:'cooldown',fx:0xffe45d},
+  {id:'watermelon',name:'Арбузный Арбалет',evolution:'Гигантский Арбуз',model:'weapon11',projectile:'food_watermelon',type:'bomb',damage:38,cooldown:1.24,speed:13,count:1,splash:4.8,knockback:2.8,range:28,scale:.42,passive:'area',fx:0x7dff78},
+  {id:'music_wave',name:'Молот Грома',evolution:'Громовой Концерт',model:'weapon12',projectile:'star',type:'radial',damage:13,cooldown:1.02,speed:19,count:10,pierce:2,range:22,scale:.20,passive:'projectiles',fx:0x8e8cff},
+  {id:'smart_bee',name:'Клинок Роя',evolution:'Королевский Рой',model:'weapon13',projectile:'bee',type:'homing',damage:15,cooldown:.42,speed:20,count:3,homing:11,range:29,scale:.25,passive:'cooldown',fx:0xffe45d},
   {id:'snowball',name:'Морозный Посох',evolution:'Полярная Буря',model:'weapon14',projectile:'snow',type:'fan',damage:15,cooldown:.70,speed:18,count:4,spread:.15,slow:.34,range:26,scale:.28,passive:'duration',fx:0x9feaff},
-  {id:'pumpkin',name:'Тыквенный Фонарь',evolution:'Тыквенный Лабиринт',model:'weapon15',projectile:'food_pumpkin',type:'mine',damage:31,cooldown:1.05,speed:13,count:2,splash:3.7,range:23,scale:.38,passive:'area',fx:0xff873f},
+  {id:'pumpkin',name:'Тыквенный Топор',evolution:'Тыквенный Лабиринт',model:'weapon15',projectile:'food_pumpkin',type:'mine',damage:31,cooldown:1.05,speed:13,count:2,splash:3.7,range:23,scale:.38,passive:'area',fx:0xff873f},
 ].map(w=>({...w,levels:levelText(w.name,w.evolution)}));
 
 export const PASSIVES = [
