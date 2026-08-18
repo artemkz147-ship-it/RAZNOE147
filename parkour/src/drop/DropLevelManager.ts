@@ -21,8 +21,7 @@ type SurfaceVisual = {
   origin: THREE.Vector3;
 };
 
-const ROUTE_TONES = [0x58687a, 0x6b6f78, 0x75685e, 0x4f6970, 0x6a5f73, 0x596f61];
-const CITY_TONES = [0x8b98a5, 0x9d8d80, 0x7f918c, 0x8a8498, 0x748592, 0xa0927e, 0x7d8794];
+const STREET_Y = 0;
 
 export class DropLevelManager {
   private scene: THREE.Scene;
@@ -137,6 +136,12 @@ export class DropLevelManager {
     return target.copy(surface.origin).add(this.movingOffset(surface.spec, this.time));
   }
 
+  getSurfaceBasePosition(surfaceIndex: number, target = new THREE.Vector3()) {
+    const surface = this.surfaces[surfaceIndex + 1];
+    if (!surface) return this.getStartPosition(target);
+    return target.copy(surface.origin);
+  }
+
   getTargetSpec(targetIndex: number) {
     return this.surfaces[targetIndex + 1]?.spec ?? null;
   }
@@ -179,14 +184,14 @@ export class DropLevelManager {
     const position = this.authoredPosition(levelId, index, spec);
     const width = Math.max(0.7, spec.size[0]);
     const depth = Math.max(0.7, spec.size[1]);
-    const desiredHeight = this.visualHeight(spec);
+    const desiredHeight = this.visualHeight(spec, position.y);
     root.scale.set(width / size.x, desiredHeight / size.y, depth / size.z);
     const scaled = new THREE.Box3().setFromObject(root);
     const center = scaled.getCenter(new THREE.Vector3());
     root.position.x += position.x - center.x;
     root.position.z += position.z - center.z;
     root.position.y += position.y - scaled.max.y;
-    this.decorate(root, levelId * 5 + index, true);
+    this.prepareMaterials(root, true);
     this.scene.add(root);
 
     const origin = position;
@@ -198,8 +203,6 @@ export class DropLevelManager {
 
   private authoredPosition(levelId: number, index: number, spec: DropSurface) {
     const position = new THREE.Vector3(...spec.p);
-    // The first tutorial targets must be visibly separate buildings, not hidden
-    // inside the start roof footprint. Later authored routes already have enough gap.
     if (index === 1 && levelId === 1) position.set(9, spec.p[1], -6);
     if (index === 1 && levelId === 2) position.set(9, spec.p[1], -5);
     return position;
@@ -245,28 +248,28 @@ export class DropLevelManager {
     const centerX = (level.start.p[0] + end[0]) * 0.5;
     const centerZ = (level.start.p[2] + end[2]) * 0.5;
     const top = level.start.p[1];
-    const count = Math.min(12, this.cityAssets.length);
+    const count = 16;
     const roots = await Promise.all(
       Array.from({ length: count }, async (_, index) => {
         const asset = this.cityAssets[(level.id * 5 + index * 3) % this.cityAssets.length];
         const root = await this.clone(asset);
         const size = this.measure(root);
         if (size.x <= 0.001 || size.y <= 0.001 || size.z <= 0.001) return null;
-        const width = 7 + (index % 5) * 2.5;
-        const scale = width / Math.max(size.x, size.z);
-        root.scale.setScalar(scale);
+
+        const lane = Math.floor(index / 2);
+        const side = index % 2 === 0 ? -1 : 1;
+        const width = 7.5 + ((index * 3 + level.id) % 5) * 2.1;
+        const roofY = Math.max(6, Math.min(top + 16, 10 + ((index * 7 + level.id * 5) % Math.max(12, Math.round(top + 8)))));
+        root.scale.set(width / size.x, Math.max(5, roofY - STREET_Y) / size.y, width / size.z);
         const box = new THREE.Box3().setFromObject(root);
         const center = box.getCenter(new THREE.Vector3());
-        const side = index % 2 === 0 ? -1 : 1;
-        const lane = Math.floor(index / 2);
-        const x = centerX - 30 + lane * 11 + ((level.id + index) % 3) * 2.4;
-        const z = centerZ + side * (18 + (index % 4) * 6.2);
-        const roofY = Math.max(-8, top - 15 - (index % 6) * 5.1);
+        const x = centerX - 42 + lane * 12.5 + ((level.id + index) % 3) * 2.2;
+        const z = centerZ + side * (20 + (index % 4) * 6.8);
         root.position.x += x - center.x;
         root.position.z += z - center.z;
-        root.position.y += roofY - box.max.y;
+        root.position.y += STREET_Y - box.min.y;
         root.rotation.y = side > 0 ? Math.PI : 0;
-        this.decorate(root, level.id * 11 + index, false);
+        this.prepareMaterials(root, false);
         this.scene.add(root);
         return root;
       })
@@ -289,11 +292,10 @@ export class DropLevelManager {
     return null;
   }
 
-  private visualHeight(spec: DropSurface) {
-    if (spec.kind === 'roof') return Math.max(8, spec.p[1] + 11);
-    if (spec.kind === 'pole') return Math.max(5, Math.min(18, spec.p[1] + 8));
-    if (spec.kind === 'beam') return Math.max(1.3, Math.min(4, spec.p[1] * 0.12 + 1.5));
-    return Math.max(2.2, Math.min(7, spec.p[1] * 0.2 + 2.5));
+  private visualHeight(spec: DropSurface, topY: number) {
+    if (spec.moving) return spec.kind === 'beam' ? 0.65 : 0.9;
+    if (spec.kind === 'beam') return 0.7;
+    return Math.max(spec.kind === 'pole' ? 1.2 : 1.8, topY - STREET_Y);
   }
 
   private movingOffset(spec: DropSurface, time: number) {
@@ -318,9 +320,7 @@ export class DropLevelManager {
     return new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());
   }
 
-  private decorate(root: THREE.Object3D, paletteIndex: number, route: boolean) {
-    const palette = route ? ROUTE_TONES : CITY_TONES;
-    const tint = new THREE.Color(palette[Math.abs(paletteIndex) % palette.length]);
+  private prepareMaterials(root: THREE.Object3D, route: boolean) {
     root.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       child.castShadow = route;
@@ -328,10 +328,11 @@ export class DropLevelManager {
       const cloneMaterial = (material: THREE.Material) => {
         const copy = material.clone();
         if (copy instanceof THREE.MeshStandardMaterial) {
-          copy.color.multiply(tint);
-          copy.roughness = route ? 0.7 : 0.78;
+          // Preserve the authored color/texture. DF5 multiplied every building by a
+          // grey-green tint, which made the whole city look like an untextured mock-up.
+          copy.roughness = Math.max(copy.roughness, route ? 0.58 : 0.65);
           copy.metalness = Math.min(copy.metalness, route ? 0.08 : 0.04);
-          copy.envMapIntensity = route ? 0.72 : 0.45;
+          copy.envMapIntensity = route ? 0.82 : 0.62;
         }
         return copy;
       };
