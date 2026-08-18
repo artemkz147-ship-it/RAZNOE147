@@ -185,8 +185,8 @@ class MerryMayhem3D {
   }
 
   heldProfile(w){const p=HELD_PROFILES[w?.id]||[w?.projectile||'gem',.34,'spell'];return{asset:p[0],height:p[1],attack:p[2]};}
-  playWeaponAttack(a,w){if(!a?.mixer||!a.gltf)return;const k=this.heldProfile(w).attack,t=k==='throw'?['throw','attack','punch','shoot']:k==='shoot'?['shoot','attack','throw']:['spell','cast','attack','throw'];const clip=this.findClip(a.gltf,t);if(!clip)return;const n=a.mixer.clipAction(clip);n.reset();n.enabled=true;n.setLoop(THREE.LoopOnce,1);n.clampWhenFinished=true;n.fadeIn(.03).play();a.action?.fadeOut(.03);a.action=n;a.kind='attack';}
-  attachHeldWeapon(actor,w){actor.root.userData.weapon?.removeFromParent();const p=this.heldProfile(w),src=this.assets[p.asset]||this.assets[w.projectile]||this.assets.gem,weapon=this.prepareAttachment(src,p.height),hand=this.findRightHand(actor.root);if(hand){hand.add(weapon);weapon.position.set(.07,0,-.025);weapon.rotation.set(0,p.attack==='shoot'?1.57:.22,p.attack==='throw'?.45:.18);}else{actor.root.add(weapon);weapon.position.set(.28,1,.12);}actor.root.userData.weapon=weapon;actor.root.userData.weaponHand=hand||null;return weapon;}
+  playWeaponAttack(a,w){if(!a?.mixer||!a.gltf)return;const k=this.heldProfile(w).attack,t=k==='throw'?['throw','attack','punch','shoot']:k==='shoot'?['shoot','attack','throw','punch']:['spell','cast','attack','punch','shoot'];const clip=this.findClip(a.gltf,t);if(!clip)return;const n=a.mixer.clipAction(clip);n.reset();n.enabled=true;n.setLoop(THREE.LoopOnce,1);n.clampWhenFinished=true;n.fadeIn(.03).play();a.action?.fadeOut(.03);a.action=n;a.kind='attack';}
+  attachHeldWeapon(actor,w){actor.root.userData.weapon?.removeFromParent();const p=this.heldProfile(w),src=this.assets[p.asset]||this.assets[w.projectile]||this.assets.gem,weapon=this.prepareAttachment(src,p.height),hand=this.findRightHand(actor.root);if(hand){hand.add(weapon);weapon.position.set(.06,.015,-.035);weapon.rotation.set(p.attack==='throw'?.15:0,p.attack==='shoot'?1.45:.15,p.attack==='throw'?.55:.12);}else{actor.root.add(weapon);weapon.position.set(.26,1,.12);}actor.root.userData.weapon=weapon;actor.root.userData.weaponHand=hand||null;return weapon;}
   projectileOrigin(a){const v=new THREE.Vector3(),h=a?.root?.userData?.weaponHand;if(h){h.updateWorldMatrix(true,false);h.getWorldPosition(v);v.y=Math.max(.72,v.y);return v;}v.copy(a.root.position);v.y=.95;return v;}
 
 
@@ -356,7 +356,7 @@ class MerryMayhem3D {
     this.audio.resume();this.audio.startMusic();this.clearWorld();this.menuPreview?.root?.removeFromParent();this.menuPreview=null;this.buildEnvironment(map);this.buildPlayer();
     this.elapsed=0;this.kills=0;this.level=1;this.xp=0;this.nextXp=8;this.runCoins=0;this.spawnClock=0;this.eliteClock=0;this.runWon=false;this.reviveUsed=false;this.doubleUsed=false;this.boss=null;
     this.state='playing';document.body.dataset.gameState='playing';$('#menu').classList.remove('screen--visible');$('#gameover').classList.remove('screen--visible');$('#pause-panel').classList.remove('screen--visible');$('#hud').classList.remove('hidden');
-    if(this.lowPower)$('#mobile-controls').classList.remove('hidden');this.bridge.startGameplay();this.camera.position.set(0,this.lowPower?10.2:9.2,this.lowPower?12.0:10.6);this.updateHUD();
+    if(this.lowPower)$('#mobile-controls').classList.remove('hidden');this.bridge.startGameplay();this.camera.position.set(0,this.lowPower?10.2:9.2,this.lowPower?12.0:10.6);if(DEBUG_FAST){for(let q=0;q<3;q++){const e=this.spawnEnemy(false,ENEMIES[0]);e.root.position.set(6.5+q*1.4,0,-3+q*2.2);e.hp=6;e.maxHp=6;e.speed=.15;e.damage=1;e.def={...e.def,behavior:'chase'};}}this.updateHUD();
   }
 
   updatePlayer(dt){
