@@ -29,12 +29,21 @@ await page.waitForFunction(
     const state = document.querySelector('#state')?.textContent ?? '';
     const target = document.querySelector('#target')?.textContent ?? '';
     const drop = Number.parseFloat(document.querySelector('#drop')?.textContent ?? '0');
+    const indicator = document.querySelector('#targetIndicator');
+    const indicatorBox = indicator?.getBoundingClientRect();
     return hud?.classList.contains('visible')
       && state.includes('ГОТОВ К ПРЫЖКУ')
       && target !== 'ЦЕЛЬ'
       && target.length > 2
       && Number.isFinite(drop)
-      && drop > 0.5;
+      && drop > 0.5
+      && indicator?.classList.contains('visible')
+      && indicatorBox
+      && indicatorBox.width > 40
+      && indicatorBox.left >= 0
+      && indicatorBox.right <= innerWidth
+      && indicatorBox.top >= 0
+      && indicatorBox.bottom <= innerHeight;
   },
   undefined,
   { timeout: 90_000 }
@@ -44,7 +53,8 @@ await page.screenshot({ path: 'qa/drop-flow-level-01-ready.png' });
 
 await page.keyboard.press('Space');
 await page.waitForFunction(
-  () => (document.querySelector('#state')?.textContent ?? '').includes('В ПОЛЁТЕ'),
+  () => (document.querySelector('#state')?.textContent ?? '').includes('В ПОЛЁТЕ')
+    && document.querySelector('#targetIndicator')?.classList.contains('visible'),
   undefined,
   { timeout: 10_000 }
 );
