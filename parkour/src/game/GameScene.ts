@@ -24,6 +24,8 @@ export class GameScene extends Phaser.Scene {
   private flow = 1;
   private hudClock = 0;
   private runIndex = 0;
+  private runTokens = 0;
+  private runTricks = 0;
   private canRevive = true;
   private lastSafe = { x: 180, y: 500 };
 
@@ -62,7 +64,7 @@ export class GameScene extends Phaser.Scene {
       this,
       180,
       500,
-      (label, boost) => this.addTrick(label, boost),
+      (label, boost) => this.addTrick(label, boost, true),
       (reason) => this.crash(reason)
     );
     this.player.stop();
@@ -82,14 +84,16 @@ export class GameScene extends Phaser.Scene {
       if (sensor.getData('used')) return;
       if (sensor.getData('kind') === 'slide' && this.player.isSliding()) {
         sensor.setData('used', true);
-        this.addTrick('LOW PROFILE', 0.34);
+        this.addTrick('LOW PROFILE', 0.34, true);
       }
     });
     this.physics.add.overlap(this.player.host, this.world.tokens, (_player, tokenObject) => {
       const token = tokenObject as Phaser.Physics.Arcade.Image;
       if (!token.active) return;
       token.destroy();
-      this.addTrick('FLOW +', 0.12);
+      this.runTokens += 1;
+      this.addTrick('FLOW +', 0.12, false);
+      this.emitHud();
     });
 
     this.bindKeyboard();
@@ -157,6 +161,8 @@ export class GameScene extends Phaser.Scene {
     this.distance = 0;
     this.flow = 1;
     this.hudClock = 0;
+    this.runTokens = 0;
+    this.runTricks = 0;
     this.runIndex += 1;
     this.canRevive = true;
     this.manualPaused = false;
@@ -242,10 +248,13 @@ export class GameScene extends Phaser.Scene {
     this.rightKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
   }
 
-  private addTrick(label: string, boost: number) {
+  private addTrick(label: string, boost: number, countAsTrick: boolean) {
     if (!this.runActive) return;
     this.flow = Phaser.Math.Clamp(this.flow + boost, 1, 5);
-    window.dispatchEvent(new CustomEvent('parkour-trick', { detail: { label, flow: this.flow } }));
+    if (countAsTrick) this.runTricks += 1;
+    window.dispatchEvent(new CustomEvent('parkour-trick', {
+      detail: { label, flow: this.flow, tricks: this.runTricks, tokens: this.runTokens }
+    }));
   }
 
   private crash(reason: string) {
@@ -260,6 +269,8 @@ export class GameScene extends Phaser.Scene {
         reason,
         distance: Math.max(0, Math.floor(this.distance)),
         flow: this.flow,
+        tokens: this.runTokens,
+        tricks: this.runTricks,
         runIndex: this.runIndex,
         canRevive: this.canRevive
       }
@@ -271,7 +282,8 @@ export class GameScene extends Phaser.Scene {
       detail: {
         distance: Math.max(0, Math.floor(this.distance)),
         flow: this.flow,
-        speed: this.player?.getSpeed?.() ?? 0
+        speed: this.player?.getSpeed?.() ?? 0,
+        tokens: this.runTokens
       }
     }));
   }
