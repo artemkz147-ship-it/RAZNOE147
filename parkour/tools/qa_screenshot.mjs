@@ -97,16 +97,27 @@ await page.mouse.down({ button: 'left' });
 await page.mouse.move(startX - 170, startY + 62, { steps: 12 });
 await page.mouse.up({ button: 'left' });
 await page.mouse.wheel(0, -220);
+
+// Walk toward an edge and verify the dynamic capsule remains grounded.
 await page.keyboard.down('KeyW');
 await page.waitForTimeout(800);
 await page.keyboard.up('KeyW');
-await page.waitForTimeout(450);
+await page.waitForTimeout(300);
 await page.screenshot({ path: 'qa/drop-flow-df6-level-01-grounded-walk.png' });
-
 if (!(await page.locator('#state').textContent())?.includes('ГОТОВ К ПРЫЖКУ')) {
   throw new Error('Grounded walking left the roof or changed gameplay state before jump');
 }
 
+// Return to a neutral launch area. Edge safety and jump reach are separate checks.
+await page.keyboard.down('KeyS');
+await page.waitForTimeout(800);
+await page.keyboard.up('KeyS');
+await page.waitForTimeout(350);
+if (!(await page.locator('#state').textContent())?.includes('ГОТОВ К ПРЫЖКУ')) {
+  throw new Error('Player did not remain grounded after walking back from the edge');
+}
+
+// Standard physical takeoff -> flight -> physical target contact -> scored landing.
 await page.keyboard.press('Space');
 await page.waitForFunction(
   () => (document.querySelector('#state')?.textContent ?? '').includes('В ПОЛЁТЕ')
