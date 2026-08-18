@@ -6,7 +6,7 @@ import { YandexBridge } from './yandex.js';
 import { AudioDirector } from './audio.js';
 import {
   HEROES, WEAPONS, PASSIVES, MAPS, ENEMIES, BOSSES, MODES, META_UPGRADES,
-  DAILY_QUESTS, CAREER_QUESTS, ASSET_URLS, metaCost, weaponById, passiveById
+  DAILY_QUESTS, CAREER_QUESTS, ASSET_URLS, HELD_PROFILES, metaCost, weaponById, passiveById
 } from './content.js';
 
 const $ = s => document.querySelector(s);
@@ -72,7 +72,7 @@ class MerryMayhem3D {
     this.bridge=bridge; this.canvas=$('#game'); this.input=new Input();
     this.renderer=new THREE.WebGLRenderer({canvas:this.canvas,antialias:true,powerPreference:'high-performance'});
     this.renderer.outputColorSpace=THREE.SRGBColorSpace; this.renderer.toneMapping=THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure=1.08;
-    this.scene=new THREE.Scene(); this.camera=new THREE.PerspectiveCamera(46,1,.1,220); this.camera.position.set(0,9.4,11.2);
+    this.scene=new THREE.Scene(); this.camera=new THREE.PerspectiveCamera(48,1,.1,240); this.camera.position.set(0,9.4,11.2);
     this.clock=new THREE.Clock(); this.loader=new GLTFLoader(); this.assets={}; this.audio=new AudioDirector();
     this.state='loading'; this.progress={}; this.settings={music:true,sfx:true,vibration:true,quality:'auto'};
     this.environment=null; this.menuPreview=null; this.player=null; this.boss=null;
@@ -184,11 +184,11 @@ class MerryMayhem3D {
     let best=null,fallback=null;root.traverse(o=>{if(!o.isBone)return;const n=o.name.toLowerCase();if(!fallback&&(n.includes('hand')||n.includes('palm')||n.includes('wrist')))fallback=o;if(!best&&(n.includes('right')||n.includes('.r')||n.includes('_r')||n.endsWith('r'))&&(n.includes('hand')||n.includes('palm')||n.includes('wrist')))best=o;});return best||fallback;
   }
 
-  attachHeldWeapon(actor,weaponDef){
-    actor.root.userData.weapon?.removeFromParent();const weapon=this.prepareAttachment(this.assets[weaponDef.model],.82);
-    const hand=this.findRightHand(actor.root);if(hand){hand.add(weapon);weapon.position.set(.03,.02,-.02);weapon.rotation.set(0,Math.PI/2,Math.PI/2);weapon.scale.setScalar(.85);}else{actor.root.add(weapon);weapon.position.set(.38,1.12,.18);weapon.rotation.set(0,Math.PI/2,0);}
-    actor.root.userData.weapon=weapon;return weapon;
-  }
+  heldProfile(w){const p=HELD_PROFILES[w?.id]||[w?.projectile||'gem',.34,'spell'];return{asset:p[0],height:p[1],attack:p[2]};}
+  playWeaponAttack(a,w){if(!a?.mixer||!a.gltf)return;const k=this.heldProfile(w).attack,t=k==='throw'?['throw','attack','punch','shoot']:k==='shoot'?['shoot','attack','throw']:['spell','cast','attack','throw'];const clip=this.findClip(a.gltf,t);if(!clip)return;const n=a.mixer.clipAction(clip);n.reset();n.enabled=true;n.setLoop(THREE.LoopOnce,1);n.clampWhenFinished=true;n.fadeIn(.03).play();a.action?.fadeOut(.03);a.action=n;a.kind='attack';}
+  attachHeldWeapon(actor,w){actor.root.userData.weapon?.removeFromParent();const p=this.heldProfile(w),src=this.assets[p.asset]||this.assets[w.projectile]||this.assets.gem,weapon=this.prepareAttachment(src,p.height),hand=this.findRightHand(actor.root);if(hand){hand.add(weapon);weapon.position.set(.07,0,-.025);weapon.rotation.set(0,p.attack==='shoot'?1.57:.22,p.attack==='throw'?.45:.18);}else{actor.root.add(weapon);weapon.position.set(.28,1,.12);}actor.root.userData.weapon=weapon;actor.root.userData.weaponHand=hand||null;return weapon;}
+  projectileOrigin(a){const v=new THREE.Vector3(),h=a?.root?.userData?.weaponHand;if(h){h.updateWorldMatrix(true,false);h.getWorldPosition(v);v.y=Math.max(.72,v.y);return v;}v.copy(a.root.position);v.y=.95;return v;}
+
 
   async buildMenuPreview(){
     if(this.menuPreview)this.menuPreview.removeFromParent();
@@ -274,13 +274,14 @@ class MerryMayhem3D {
   buildEnvironment(map){
     this.environment=new THREE.Group();this.scene.add(this.environment);
     this.scene.background=new THREE.Color(map.sky);this.scene.fog=new THREE.FogExp2(map.sky,this.lowPower?.0085:.0068);this.hemi.color.set(map.sky);this.hemi.groundColor.set(map.ground);
-    const indoor=['castle','clock','sky','rooftop'].includes(map.layout),tileSize=indoor?12:22,cols=Math.ceil((map.width+36)/tileSize),rows=Math.ceil((map.height+36)/tileSize),base=this.prepareGround(this.assets.floor,tileSize,map.ground);
-    for(let ix=-Math.ceil(cols/2);ix<=Math.ceil(cols/2);ix++)for(let iz=-Math.ceil(rows/2);iz<=Math.ceil(rows/2);iz++){const t=base.clone(true);t.position.set(ix*tileSize,-.035,iz*tileSize);t.rotation.y=((ix*5+iz*3)&3)*Math.PI/2;t.scale.setScalar(1.035);this.environment.add(t);}
+    const groundSize=Math.max(map.width,map.height)+76,ground=this.prepareGround(this.assets.floor,groundSize,map.ground);ground.position.y=-.06;this.environment.add(ground);
     for(const [asset,x,z,height] of map.landmarks){const r=this.cloneVisual(this.assets[asset]||this.assets.rock,height,{tint:map.accent});r.position.set(x,0,z);r.rotation.y=(x*19+z*13)%TAU;this.environment.add(r);this.obstacles.push({x,z,radius:Math.max(.8,height*.24)});}
-    this.buildBoundary(map);
+    this.buildMacroClusters(map);this.buildBoundary(map);
     if(map.hazard)this.buildHazard(map,map.hazard);
     this.populateMapDecor(map);
   }
+
+  buildMacroClusters(map){const P={forest:[['tree',-.35,-.28,11,7,4],['birch',.34,.26,10,7,3.6],['mossRock',.28,-.30,7,5,1.4]],park:[['birch',-.35,-.28,8,6,3.3],['food_cookie',.32,.26,8,6,1.35],['bush',-.28,.30,10,6,1]],village:[['birchAutumn',-.34,-.27,9,6,3.4],['deadTree',.34,.26,8,6,3.2],['food_pumpkin',-.28,.31,9,5,1.2]],snow:[['pineSnow',-.35,-.28,12,7,4],['pineSnow',.34,.27,12,7,4],['snowRock',-.27,.31,9,5,1.3]],castle:[['column',-.36,-.26,8,6,3.2],['column',.36,.26,8,6,3.2],['arch',0,.34,6,5,3.6]],beach:[['palm',-.35,-.27,10,7,4],['palm',.34,.27,10,7,4],['rock',.28,-.31,8,5,1.3]],moon:[['rock',-.35,-.27,13,7,1.6],['gem',.34,.27,11,6,1.3]],clock:[['column',-.35,-.27,9,6,3.2],['arch',.34,.27,7,6,3.6]],canyon:[['rock',-.38,-.10,16,10,1.9],['rock',.38,.10,16,10,1.9],['cactus',-.28,.32,8,5,2]],cave:[['mossRock',-.35,-.27,13,7,1.7],['gem',.34,.27,12,6,1.4]],sky:[['arch',-.35,-.27,7,6,3.8],['column',.34,.27,9,6,3]],desert:[['cactus',-.35,-.27,11,7,2.2],['palm',.34,.27,8,6,4],['rock',-.28,.31,9,5,1.3]],swamp:[['willow',-.35,-.27,10,7,4],['willow',.34,.27,10,7,4],['mossRock',-.28,.31,9,5,1.3]],fair:[['arch',-.35,-.27,7,6,3.8],['birch',.34,.27,8,6,3.3],['food_donut',-.28,.31,8,5,1.2]],crystal:[['gem',-.35,-.27,14,7,1.6],['gem',.34,.27,14,7,1.6],['mossRock',-.28,.31,8,5,1.3]],rooftop:[['column',-.35,-.27,9,6,3.1],['arch',.34,.27,7,6,3.6],['torch',-.28,.31,9,5,1.4]],festival:[['arch',-.35,-.27,7,6,3.8],['birch',.34,.27,8,6,3.3],['gem',-.28,.31,10,5,1.3]]},plan=P[map.layout]||P.forest,hx=map.width*.5,hz=map.height*.5;for(let g=0;g<plan.length;g++){const[a,nx,nz,n,r,h]=plan[g],cx=nx*map.width,cz=nz*map.height;for(let i=0;i<n;i++){const q=i*2.4+g*.8,rr=r*(.28+((i*37)%63)/100),x=clamp(cx+Math.cos(q)*rr,-hx+5,hx-5),z=clamp(cz+Math.sin(q)*rr,-hz+5,hz-5);if(Math.hypot(x,z)<7)continue;const o=this.cloneVisual(this.assets[a]||this.assets.rock,h*(.82+(i%5)*.06),{tint:null});o.position.set(x,0,z);o.rotation.y=q;this.environment.add(o);if(h>1.45||['rock','mossRock','cactus'].includes(a))this.obstacles.push({x,z,radius:Math.min(1.25,h*.18)});}}}
 
   populateMapDecor(map){
     const themes={
@@ -306,7 +307,7 @@ class MerryMayhem3D {
     // Ground cover is dense but non-colliding and deterministic: it masks the
     // modular base surface while leaving readable lanes for combat.
     if(!['castle','clock','sky','rooftop'].includes(map.layout)){
-      const coverCount=this.lowPower?44:78;
+      const coverCount=this.lowPower?70:128;
       for(let i=0;i<coverCount;i++){
         const a=i*2.3999632297+map.enemyTier*.47,rad=.13+((i*37)%100)/100*.73;
         let x=Math.cos(a)*hx*rad*.93,z=Math.sin(a)*hz*rad*.93;
@@ -317,7 +318,7 @@ class MerryMayhem3D {
         const root=this.cloneVisual(this.assets[key]||this.assets.bush,h,{shadow:false,tint:map.accent});root.position.set(x,.01,z);root.rotation.y=(i*.91)%TAU;root.scale.multiplyScalar(.78+((i*13)%29)/100);this.environment.add(root);
       }
     }
-    const propCount=this.lowPower?24:42;
+    const propCount=this.lowPower?30:54;
     for(let i=0;i<propCount;i++){
       const ring=.25+((i*29)%70)/100*.65,a=i*2.117+map.enemyTier*.71;
       let x=Math.cos(a)*hx*ring*.91,z=Math.sin(a)*hz*ring*.91;
@@ -331,16 +332,7 @@ class MerryMayhem3D {
     }
   }
 
-  buildBoundary(map){
-    const asset=this.assets[map.barrier]||this.assets.rock,step=5.2,h=map.barrier==='tree'||map.barrier==='deadTree'?5.4:map.barrier==='column'||map.barrier==='arch'?4.3:2.8;
-    const hx=map.width/2,hz=map.height/2;
-    const add=(x,z,rot=0)=>{const r=this.cloneVisual(asset,h,{tint:map.accent});r.position.set(x,0,z);r.rotation.y=rot;this.environment.add(r);};
-    for(let x=-hx-2;x<=hx+2;x+=step){add(x,-hz-1.7,.2);add(x,hz+1.7,Math.PI+.2);}
-    for(let z=-hz+step;z<=hz-step;z+=step){add(-hx-1.7,z,Math.PI/2);add(hx+1.7,z,-Math.PI/2);}
-    // secondary wall prevents camera from ever exposing a hard world edge
-    for(let x=-hx-10;x<=hx+10;x+=step*1.25){add(x,-hz-8,.4);add(x,hz+8,Math.PI+.4);}
-    for(let z=-hz-4;z<=hz+4;z+=step*1.25){add(-hx-8,z,Math.PI/2+.2);add(hx+8,z,-Math.PI/2+.2);}
-  }
+  buildBoundary(map){const S={forest:['tree','birch','bush','mossRock'],park:['birch','bush','food_cookie','rock'],village:['birchAutumn','deadTree','rock','food_pumpkin'],snow:['pineSnow','snowRock','pineSnow','rock'],castle:['column','arch','rock','column'],beach:['palm','rock','palm','bush'],moon:['rock','gem','rock','star'],clock:['column','arch','rock','gem'],canyon:['rock','mossRock','cactus','rock'],cave:['rock','mossRock','gem','rock'],sky:['arch','column','gem','arch'],desert:['cactus','rock','deadTree','palm'],swamp:['willow','bush','mossRock','willow'],fair:['arch','birch','food_cookie','torch'],crystal:['gem','mossRock','rock','gem'],rooftop:['column','arch','torch','column'],festival:['arch','birch','gem','food_donut']},A=S[map.layout]||S.forest,hx=map.width/2,hz=map.height/2,step=this.lowPower?6.7:5.3;const add=(a,x,z,r,h)=>{const o=this.cloneVisual(this.assets[a]||this.assets.rock,h,{tint:null});o.position.set(x,0,z);o.rotation.y=r;this.environment.add(o);};for(let ring=0;ring<3;ring++){const out=2+ring*5.2;let k=0;for(let x=-hx-4;x<=hx+4;x+=step){const j=Math.sin((x+ring*13)*.36)*1.3,a=A[(k++ +ring)%A.length],h=['tree','birch','birchAutumn','pineSnow','willow','palm'].includes(a)?4.5:a==='column'||a==='arch'?3.7:1.8;add(a,x+j,-hz-out,.2,h);add(A[k%A.length],x-j,hz+out,3.3,h);}for(let z=-hz;z<=hz;z+=step){const j=Math.cos((z-ring*11)*.31)*1.2,a=A[(k++ +ring)%A.length],h=['tree','birch','birchAutumn','pineSnow','willow','palm'].includes(a)?4.5:a==='column'||a==='arch'?3.7:1.8;add(a,-hx-out,z+j,1.57,h);add(A[k%A.length],hx+out,z-j,-1.57,h);}}}
 
   buildHazard(map,hz){
     const tint=hz.type==='lava'?0xff6a25:0x4baee8;const axis=hz.axis;const span=axis==='x'?map.height:map.width;const base=this.prepareGround(this.assets.floor,5,tint);
@@ -387,13 +379,13 @@ class MerryMayhem3D {
   updateWeapon(id,dt){
     const p=this.player,w=weaponById(id);if(!w)return;const rank=p.weaponRanks[id]||1;let timer=(p.weaponTimers[id]||0)-dt;p.weaponTimers[id]=timer;if(timer>0)return;
     const target=this.nearestEnemy(p.root.position,w.range*(1+rank*.018));if(!target)return;
-    p.weaponTimers[id]=Math.max(.12,w.cooldown*p.cooldownMul*Math.pow(.94,rank-1));this.fireWeapon(w,rank,target);this.playActor(p,'attack',false,.04);setTimeout(()=>{if(this.state==='playing'&&this.player===p)this.playActor(p,'idle',true,.08);},160);
+    p.weaponTimers[id]=Math.max(.10,w.cooldown*p.cooldownMul*Math.pow(.94,rank-1));this.fireWeapon(w,rank,target);this.playWeaponAttack(p,w);setTimeout(()=>{if(this.state==='playing'&&this.player===p)this.playActor(p,'idle',true,.08);},160);
     this.audio.attack();
   }
 
   fireWeapon(w,rank,target){
     const p=this.player,count=Math.max(1,(w.count||1)+(p.extraProjectiles||0)+(rank>=3?1:0)),damage=w.damage*p.damageMul*(1+(rank-1)*.22),area=p.areaMul*(1+(rank-1)*.035),pierce=(w.pierce||0)+p.extraPierce+(rank>=5?1:0);
-    const from=p.root.position.clone();from.y=1.15;const baseDir=target.root.position.clone().sub(from);baseDir.y=0;baseDir.normalize();
+    const from=this.projectileOrigin(p);const baseDir=target.root.position.clone().sub(from);baseDir.y=0;baseDir.normalize();
     const spawn=(dir,opts={})=>this.spawnProjectile(w,from,dir,{damage,area,pierce,rank,...opts});
     if(w.type==='radial'){for(let i=0;i<count;i++){const a=i/count*TAU;spawn(new THREE.Vector3(Math.sin(a),0,Math.cos(a)));}return;}
     if(w.type==='mine'){const dir=baseDir.clone();spawn(dir,{mine:true});return;}
@@ -413,7 +405,7 @@ class MerryMayhem3D {
       if(p.boomerang&&p.life<.55){const desired=this.player.root.position.clone().sub(p.root.position);desired.y=0;desired.normalize().multiplyScalar(p.w.speed||18);p.vel.lerp(desired,clamp(dt*5,0,1));}
       p.root.position.addScaledVector(p.vel,dt);p.root.rotation.x+=dt*5;p.root.rotation.z+=dt*3;
       const expired=p.life<=0;let remove=expired;
-      for(const e of this.enemies){if(e.dead||p.hit.has(e))continue;const rr=(e.radius||.75)+.38*(p.root.scale.x||1);if(e.root.position.distanceToSquared(p.root.position)<rr*rr){p.hit.add(e);let dmg=p.damage;if(Math.random()<p.crit)dmg*=2;this.damageEnemy(e,dmg,p);if(p.chain>0)this.chainFrom(e,p);if(p.splash>0)this.splashDamage(e.root.position,p.splash,dmg*.62,e);if(p.knockback){const d=e.root.position.clone().sub(this.player.root.position);d.y=0;d.normalize();e.root.position.addScaledVector(d,p.knockback);}p.pierce--;if(p.pierce<0){remove=true;break;}}}
+      for(const e of this.enemies){if(e.dead||p.hit.has(e))continue;const rr=(e.radius||.75)+.58*(p.root.scale.x||1);const dx=e.root.position.x-p.root.position.x,dz=e.root.position.z-p.root.position.z;if(dx*dx+dz*dz<rr*rr){p.hit.add(e);let dmg=p.damage;if(Math.random()<p.crit)dmg*=2;this.damageEnemy(e,dmg,p);if(p.chain>0)this.chainFrom(e,p);if(p.splash>0)this.splashDamage(e.root.position,p.splash,dmg*.62,e);if(p.knockback){const d=e.root.position.clone().sub(this.player.root.position);d.y=0;d.normalize();e.root.position.addScaledVector(d,p.knockback);}p.pierce--;if(p.pierce<0){remove=true;break;}}}
       if(remove){if(p.mine&&expired&&p.splash>0)this.splashDamage(p.root.position,p.splash,p.damage*.62,null);p.root.removeFromParent();this.projectiles.splice(i,1);}
     }
   }
@@ -519,9 +511,9 @@ class MerryMayhem3D {
   resumeExternal(){if(this.state==='externalPaused'&&this.externalPaused){this.externalPaused=false;this.state='playing';this.clock.getDelta();this.bridge.startGameplay();}}
   async leaveToMenu(){this.bridge.stopGameplay();this.clearWorld();$('#gameover').classList.remove('screen--visible');$('#pause-panel').classList.remove('screen--visible');$('#hud').classList.add('hidden');$('#mobile-controls').classList.add('hidden');this.state='menu';document.body.dataset.gameState='menu';$('#menu').classList.add('screen--visible');await this.buildMenuPreview();this.updateMenu();}
 
-  updateHUD(){if(!this.player)return;const remain=this.currentMode().id==='endless'?this.elapsed:Math.max(0,this.currentMode().seconds-this.elapsed);$('#time').textContent=this.currentMode().id==='endless'?fmtTime(this.elapsed):fmtTime(remain);$('#level').textContent=this.level;$('#kills').textContent=this.kills;$('#run-coins').textContent=Math.floor(this.runCoins);$('#hp-fill').style.width=`${clamp(this.player.hp/this.player.maxHp,0,1)*100}%`;$('#hp-text').textContent=`${Math.ceil(Math.max(0,this.player.hp))} / ${Math.ceil(this.player.maxHp)}`;$('#xp-fill').style.width=`${clamp(this.xp/this.nextXp,0,1)*100}%`;$('#xp-text').textContent=`${Math.floor(this.xp)} / ${this.nextXp}`;}
+  updateHUD(){if(!this.player)return;const remain=this.currentMode().id==='endless'?this.elapsed:Math.max(0,this.currentMode().seconds-this.elapsed);$('#time').textContent=this.currentMode().id==='endless'?fmtTime(this.elapsed):fmtTime(remain);$('#level').textContent=this.level;$('#kills').textContent=this.kills;$('#run-coins').textContent=Math.floor(this.runCoins);$('#hp-fill').style.width=`${clamp(this.player.hp/this.player.maxHp,0,1)*100}%`;$('#hp-text').textContent=`${Math.ceil(Math.max(0,this.player.hp))} / ${Math.ceil(this.player.maxHp)}`;$('#xp-fill').style.width=`${clamp(this.xp/this.nextXp,0,1)*100}%`;$('#xp-text').textContent=`${Math.floor(this.xp)} / ${this.nextXp}`;document.body.dataset.qaKills=String(this.kills);document.body.dataset.qaProjectiles=String(this.projectiles.length);}
 
-  updateCamera(dt){if(!this.player)return;const pos=this.player.root.position,target=new THREE.Vector3(pos.x,pos.y+(this.lowPower?9.6:8.6),pos.z+(this.lowPower?11.3:10.0)),look=new THREE.Vector3(pos.x,pos.y+1,pos.z-2.7);this.camera.position.lerp(target,1-Math.exp(-dt*7));const q=new THREE.Quaternion();const m=new THREE.Matrix4().lookAt(this.camera.position,look,new THREE.Vector3(0,1,0));q.setFromRotationMatrix(m);this.camera.quaternion.slerp(q,1-Math.exp(-dt*9));}
+  updateCamera(dt){if(!this.player)return;const pos=this.player.root.position,target=new THREE.Vector3(pos.x,pos.y+(this.lowPower?9.5:7.7),pos.z+(this.lowPower?11.8:10.5)),look=new THREE.Vector3(pos.x,pos.y+1,pos.z-2.7);this.camera.position.lerp(target,1-Math.exp(-dt*7));const q=new THREE.Quaternion();const m=new THREE.Matrix4().lookAt(this.camera.position,look,new THREE.Vector3(0,1,0));q.setFromRotationMatrix(m);this.camera.quaternion.slerp(q,1-Math.exp(-dt*9));}
   vibrate(ms){if(this.settings.vibration&&navigator.vibrate)navigator.vibrate(ms);}
 
   animate(){

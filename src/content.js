@@ -191,3 +191,7 @@ export const ASSET_URLS = (()=>{
 export const metaCost=(def,rank)=>Math.floor(def.cost*Math.pow(1.38,rank));
 export const weaponById=id=>WEAPONS.find(w=>w.id===id);
 export const passiveById=id=>PASSIVES.find(p=>p.id===id);
+
+
+export const HELD_PROFILES={
+ donut:['food_donut',.34,'throw'],firefly:['gem',.30,'spell'],pirate_bomb:['bomb',.38,'throw'],rainbow_fan:['star',.34,'spell'],flower_burst:['flower',.38,'spell'],amber_comet:['gem',.36,'spell'],blast_bot:['mini_robot',.34,'spell'],pancake:['food_pancake',.34,'throw'],fox_bow:['arrow',.46,'shoot'],cloud_orb:['cloud',.34,'spell'],watermelon:['food_watermelon',.40,'throw'],music_wave:['star',.36,'spell'],smart_bee:['bee',.34,'spell'],snowball:['snow',.34,'throw'],pumpkin:['food_pumpkin',.40,'throw']};
