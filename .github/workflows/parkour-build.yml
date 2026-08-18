@@ -33,6 +33,27 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build vertical drop game
         run: npm run build
+      - name: Install Chromium for visual QA
+        run: |
+          npm install --no-save playwright@1.62.1
+          npx playwright install --with-deps chromium
+      - name: Render gameplay QA screenshots
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 >/tmp/drop-flow-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID || true' EXIT
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then break; fi
+            sleep 1
+          done
+          node tools/qa_screenshot.mjs
+      - name: Upload gameplay QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drop-flow-visual-qa
+          path: parkour/qa
+          if-no-files-found: warn
       - name: Create Yandex Games ZIP
         run: |
           cd dist
