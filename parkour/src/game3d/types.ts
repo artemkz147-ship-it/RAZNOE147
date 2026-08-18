@@ -41,4 +41,6 @@ export type RunStats = {
   falls: number;
   breaks: number;
   checkpoints: number;
+  parkourMoves: number;
+  perfectLandings: number;
 };
