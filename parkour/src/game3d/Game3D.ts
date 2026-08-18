@@ -3,13 +3,23 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import levelsJson from './levels.json';
 import { Input } from './Input';
 import { LevelManager } from './LevelManager';
-import { PlayerController } from './PlayerController';
+import { PlayerController, type ParkourEvent } from './PlayerController';
 import type { LevelSpec, RunStats } from './types';
 
 export type GameCallbacks = {
-  onHud: (data: { level: LevelSpec; time: number; speed: number; checkpoint: number; checkpointCount: number; wallRun: boolean; breaks: number }) => void;
+  onHud: (data: {
+    level: LevelSpec;
+    time: number;
+    speed: number;
+    checkpoint: number;
+    checkpointCount: number;
+    wallRun: boolean;
+    breaks: number;
+    motion: string;
+  }) => void;
   onCheckpoint: (index: number, total: number) => void;
   onFall: (falls: number) => void;
+  onParkour: (event: ParkourEvent) => void;
   onFinish: (data: { level: LevelSpec; time: number; stats: RunStats; reward: number }) => void;
   onReady: () => void;
 };
@@ -36,7 +46,7 @@ export class Game3D {
   private lastFrame = performance.now();
   private hudClock = 0;
   private cameraKick = 0;
-  private stats: RunStats = { falls: 0, breaks: 0, checkpoints: 0 };
+  private stats: RunStats = { falls: 0, breaks: 0, checkpoints: 0, parkourMoves: 0, perfectLandings: 0 };
   private tmpFoot = new THREE.Vector3();
   private tmpEye = new THREE.Vector3();
 
@@ -68,9 +78,14 @@ export class Game3D {
     await this.levelManager.init();
 
     const spawn = new THREE.Vector3(...this.levels[0].spawn);
-    this.player = new PlayerController(this.world, spawn, (collider, impactSpeed, normal) => {
-      if (this.levelManager.destruction.hit(collider, impactSpeed, normal)) this.cameraKick = 0.8;
-    });
+    this.player = new PlayerController(
+      this.world,
+      spawn,
+      (collider, impactSpeed, normal) => {
+        if (this.levelManager.destruction.hit(collider, impactSpeed, normal)) this.cameraKick = 0.8;
+      },
+      (event) => this.handleParkourEvent(event)
+    );
 
     addEventListener('resize', () => this.resize());
     document.addEventListener('visibilitychange', () => this.setPaused(document.hidden));
@@ -87,7 +102,7 @@ export class Game3D {
     this.elapsed = 0;
     this.simTime = 0;
     this.accumulator = 0;
-    this.stats = { falls: 0, breaks: 0, checkpoints: 0 };
+    this.stats = { falls: 0, breaks: 0, checkpoints: 0, parkourMoves: 0, perfectLandings: 0 };
     this.applyTheme(level.theme);
     await this.levelManager.load(level);
     const spawn = new THREE.Vector3(...level.spawn);
@@ -154,7 +169,14 @@ export class Game3D {
 
     if (this.levelManager.reachedFinish(foot)) {
       this.running = false;
-      const reward = Math.max(20, 120 - this.stats.falls * 10 + this.stats.breaks * 8);
+      const reward = Math.max(
+        20,
+        120
+          - this.stats.falls * 10
+          + this.stats.breaks * 8
+          + this.stats.parkourMoves * 3
+          + this.stats.perfectLandings * 6
+      );
       this.callbacks.onFinish({ level: this.currentLevel, time: this.elapsed, stats: { ...this.stats }, reward });
     }
 
@@ -177,7 +199,10 @@ export class Game3D {
       this.player.getCameraRoll(this.input),
       'YXZ'
     );
-    const desiredFov = 72 + Math.min(10, Math.max(0, this.player.getSpeed() - 4.5) * 1.6) + (this.player.isWallRunning() ? 3 : 0);
+    const desiredFov = 72
+      + Math.min(10, Math.max(0, this.player.getSpeed() - 4.5) * 1.6)
+      + (this.player.isWallRunning() ? 3 : 0)
+      + (this.player.isSliding() ? 2 : 0);
     this.camera.fov += (desiredFov - this.camera.fov) * Math.min(1, dt * 5.5);
     this.camera.updateProjectionMatrix();
   }
@@ -191,8 +216,16 @@ export class Game3D {
       checkpoint: this.levelManager.getCheckpointIndex() + 1,
       checkpointCount: this.levelManager.getCheckpointCount(),
       wallRun: this.player.isWallRunning(),
-      breaks: this.stats.breaks
+      breaks: this.stats.breaks,
+      motion: this.player.getMotionState()
     });
+  }
+
+  private handleParkourEvent(event: ParkourEvent) {
+    if (event.type !== 'hard-land') this.stats.parkourMoves += 1;
+    if (event.type === 'perfect-land') this.stats.perfectLandings += 1;
+    this.cameraKick = Math.min(1, this.cameraKick + event.intensity * 0.42);
+    this.callbacks.onParkour(event);
   }
 
   private createLighting() {
