@@ -70,7 +70,7 @@ class MerryMayhem3D {
     this.bridge=bridge; this.canvas=$('#game'); this.input=new Input();
     this.renderer=new THREE.WebGLRenderer({canvas:this.canvas,antialias:true,powerPreference:'high-performance'});
     this.renderer.outputColorSpace=THREE.SRGBColorSpace; this.renderer.toneMapping=THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure=1.08;
-    this.scene=new THREE.Scene(); this.camera=new THREE.PerspectiveCamera(48,1,.1,220); this.camera.position.set(0,11.5,13.5);
+    this.scene=new THREE.Scene(); this.camera=new THREE.PerspectiveCamera(46,1,.1,220); this.camera.position.set(0,9.4,11.2);
     this.clock=new THREE.Clock(); this.loader=new GLTFLoader(); this.assets={}; this.audio=new AudioDirector();
     this.state='loading'; this.progress={}; this.settings={music:true,sfx:true,vibration:true,quality:'auto'};
     this.environment=null; this.menuPreview=null; this.player=null; this.boss=null;
@@ -275,6 +275,23 @@ class MerryMayhem3D {
     for(const [asset,x,z,height] of map.landmarks){const r=this.cloneVisual(this.assets[asset]||this.assets.rock,height,{tint:map.accent});r.position.set(x,0,z);r.rotation.y=(x*19+z*13)%TAU;this.environment.add(r);this.obstacles.push({x,z,radius:Math.max(.8,height*.24)});}
     this.buildBoundary(map);
     if(map.hazard)this.buildHazard(map,map.hazard);
+    this.populateMapDecor(map);
+  }
+
+  populateMapDecor(map){
+    const themes={
+      forest:['bush','flower','rock','tree'],park:['bush','flower','food_donut','food_cookie'],village:['food_pumpkin','bush','deadTree','rock'],snow:['snow','rock','tree','gem'],castle:['column','chest','torch','arch'],beach:['rock','food_watermelon','bush','tree'],moon:['rock','gem','star','rock'],clock:['column','gem','torch','arch'],canyon:['rock','deadTree','rock','gem'],cave:['gem','rock','gem','rock'],sky:['arch','column','gem','star'],desert:['rock','deadTree','food_cookie','rock'],swamp:['bush','tree','torch','rock'],fair:['food_donut','food_cookie','torch','flower'],crystal:['gem','rock','gem','star'],rooftop:['column','torch','chest','arch'],festival:['flower','food_donut','gem','torch']
+    };
+    const points=[[-.39,-.34],[-.28,-.31],[-.15,-.36],[.12,-.34],[.27,-.30],[.39,-.34],[-.43,-.16],[-.31,-.12],[-.18,-.17],[.18,-.15],[.31,-.12],[.43,-.17],[-.42,.02],[-.30,.08],[-.18,.12],[.19,.10],[.31,.07],[.43,.01],[-.40,.20],[-.28,.24],[-.13,.20],[.14,.23],[.28,.25],[.40,.20],[-.34,.35],[-.20,.34],[.20,.34],[.35,.35],[-.07,-.25],[.08,-.22],[-.08,.27],[.09,.29]];
+    const list=themes[map.layout]||themes.forest,hx=map.width*.5,hz=map.height*.5;
+    for(let i=0;i<points.length;i++){
+      const [nx,nz]=points[i],x=nx*map.width,z=nz*map.height;if(Math.hypot(x,z)<9)continue;
+      if(map.hazard){const c=map.hazard.axis==='x'?x:z;if(Math.abs(c-map.hazard.at)<map.hazard.width*.72)continue;}
+      const key=list[(i+map.enemyTier)%list.length],large=['tree','deadTree','column','arch'].includes(key),solid=['rock','column','arch','tree','deadTree'].includes(key);
+      const height=large?2.7+(i%4)*.32:.62+(i%5)*.11,root=this.cloneVisual(this.assets[key]||this.assets.bush,height,{tint:map.accent});
+      root.position.set(x,0,z);root.rotation.y=((i*1.77+map.enemyTier*.61)%TAU);this.environment.add(root);
+      if(solid)this.obstacles.push({x,z,radius:large?.72:.48});
+    }
   }
 
   buildBoundary(map){
@@ -310,7 +327,7 @@ class MerryMayhem3D {
     this.audio.resume();this.audio.startMusic();this.clearWorld();this.menuPreview?.root?.removeFromParent();this.menuPreview=null;this.buildEnvironment(map);this.buildPlayer();
     this.elapsed=0;this.kills=0;this.level=1;this.xp=0;this.nextXp=8;this.runCoins=0;this.spawnClock=0;this.eliteClock=0;this.runWon=false;this.reviveUsed=false;this.doubleUsed=false;this.boss=null;
     this.state='playing';document.body.dataset.gameState='playing';$('#menu').classList.remove('screen--visible');$('#gameover').classList.remove('screen--visible');$('#pause-panel').classList.remove('screen--visible');$('#hud').classList.remove('hidden');
-    if(this.lowPower)$('#mobile-controls').classList.remove('hidden');this.bridge.startGameplay();this.camera.position.set(0,11.4,13.2);this.updateHUD();
+    if(this.lowPower)$('#mobile-controls').classList.remove('hidden');this.bridge.startGameplay();this.camera.position.set(0,this.lowPower?10.2:9.2,this.lowPower?12.0:10.6);this.updateHUD();
   }
 
   updatePlayer(dt){
@@ -467,7 +484,7 @@ class MerryMayhem3D {
 
   updateHUD(){if(!this.player)return;const remain=this.currentMode().id==='endless'?this.elapsed:Math.max(0,this.currentMode().seconds-this.elapsed);$('#time').textContent=this.currentMode().id==='endless'?fmtTime(this.elapsed):fmtTime(remain);$('#level').textContent=this.level;$('#kills').textContent=this.kills;$('#run-coins').textContent=Math.floor(this.runCoins);$('#hp-fill').style.width=`${clamp(this.player.hp/this.player.maxHp,0,1)*100}%`;$('#hp-text').textContent=`${Math.ceil(Math.max(0,this.player.hp))} / ${Math.ceil(this.player.maxHp)}`;$('#xp-fill').style.width=`${clamp(this.xp/this.nextXp,0,1)*100}%`;$('#xp-text').textContent=`${Math.floor(this.xp)} / ${this.nextXp}`;}
 
-  updateCamera(dt){if(!this.player)return;const pos=this.player.root.position,target=new THREE.Vector3(pos.x,pos.y+10.7,pos.z+12.6),look=new THREE.Vector3(pos.x,pos.y+1,pos.z-2.2);this.camera.position.lerp(target,1-Math.exp(-dt*7));const q=new THREE.Quaternion();const m=new THREE.Matrix4().lookAt(this.camera.position,look,new THREE.Vector3(0,1,0));q.setFromRotationMatrix(m);this.camera.quaternion.slerp(q,1-Math.exp(-dt*9));}
+  updateCamera(dt){if(!this.player)return;const pos=this.player.root.position,target=new THREE.Vector3(pos.x,pos.y+(this.lowPower?9.6:8.6),pos.z+(this.lowPower?11.3:10.0)),look=new THREE.Vector3(pos.x,pos.y+1,pos.z-2.7);this.camera.position.lerp(target,1-Math.exp(-dt*7));const q=new THREE.Quaternion();const m=new THREE.Matrix4().lookAt(this.camera.position,look,new THREE.Vector3(0,1,0));q.setFromRotationMatrix(m);this.camera.quaternion.slerp(q,1-Math.exp(-dt*9));}
   vibrate(ms){if(this.settings.vibration&&navigator.vibrate)navigator.vibrate(ms);}
 
   animate(){

@@ -93,9 +93,9 @@ PANCAKE="$(pick "$ROOT/food" 'Pancake' 'Waffle' 'Bread')"
 PUMPKIN="$(pick "$ROOT/food" 'Pumpkin' 'Orange' 'Apple')"
 COOKIE="$(pick "$ROOT/food" 'Cookie' 'Biscuit' 'Donut')"
 ARROW="$(pick "$ROOT/medieval" 'Arrow' 'Bolt' 'Bow')"
-CLOUD="$SNOW"
+CLOUD="$GEM"
 BEE="$(pick "$ROOT/cute_monsters" 'Bee' 'Fly' 'Monster')"
-MINIROBOT="$(pick "$ROOT/guns" 'Grenade' 'Mine' 'Pistol')"
+MINIROBOT="$(pick "$ROOT/characters" 'Robot' 'Mech' 'Knight')"
 
 convert "$TREE" tree.glb static
 convert "$DEAD_TREE" dead-tree.glb static
