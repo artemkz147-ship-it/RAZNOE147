@@ -1,9 +1,13 @@
 import './style.css';
 import { Game3D } from './game3d/Game3D';
-import { yandex, type ParkourProgress } from './platform/yandex';
+import { yandex, type Medal, type ParkourProgress } from './platform/yandex';
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector(selector) as T;
 const MAX_LEVEL = 12;
+const GOLD_TIMES = [22, 27, 35, 33, 34, 38, 43, 50, 51, 55, 62, 72];
+const MEDAL_RANK: Record<Medal, number> = { bronze: 1, silver: 2, gold: 3 };
+const MEDAL_ICON: Record<Medal, string> = { bronze: '●', silver: '●', gold: '●' };
+const MEDAL_NAME: Record<Medal, string> = { bronze: 'БРОНЗА', silver: 'СЕРЕБРО', gold: 'ЗОЛОТО' };
 
 const gameHost = $('#game');
 const menu = $('#menu');
@@ -27,7 +31,15 @@ const pauseOverlay = $('#pauseOverlay');
 let game: Game3D;
 let currentLevel = 1;
 let pendingNextLevel = 1;
-let progress: ParkourProgress = { unlockedLevel: 1, bestTimes: {}, completedLevels: [], tokens: 0, totalFalls: 0 };
+let progress: ParkourProgress = {
+  unlockedLevel: 1,
+  bestTimes: {},
+  bestMedals: {},
+  cleanLevels: [],
+  completedLevels: [],
+  tokens: 0,
+  totalFalls: 0
+};
 let completionCount = 0;
 
 function show(element: HTMLElement, visible: boolean) {
@@ -48,19 +60,49 @@ function popToast(message: string) {
   toast.classList.add('pop');
 }
 
+function medalFor(levelId: number, seconds: number): Medal | null {
+  const gold = GOLD_TIMES[levelId - 1] ?? 60;
+  if (seconds <= gold) return 'gold';
+  if (seconds <= gold * 1.32) return 'silver';
+  if (seconds <= gold * 1.8) return 'bronze';
+  return null;
+}
+
+function medalBonus(medal: Medal | null) {
+  if (medal === 'gold') return 60;
+  if (medal === 'silver') return 35;
+  if (medal === 'bronze') return 20;
+  return 0;
+}
+
+function medalClass(medal: Medal | undefined) {
+  return medal ? ` medal-${medal}` : '';
+}
+
 function renderLevels() {
   levelsHost.innerHTML = '';
   for (const level of game.levels) {
     const unlocked = level.id <= progress.unlockedLevel;
     const complete = progress.completedLevels.includes(level.id);
+    const clean = progress.cleanLevels.includes(level.id);
     const best = progress.bestTimes[String(level.id)];
+    const medal = progress.bestMedals[String(level.id)];
     const button = document.createElement('button');
-    button.className = `level-card${complete ? ' complete' : ''}`;
+    button.className = `level-card${complete ? ' complete' : ''}${medalClass(medal)}`;
     button.disabled = !unlocked;
+    const resultMeta = !unlocked
+      ? 'ЗАКРЫТО'
+      : medal
+        ? `<i class="medal-dot">${MEDAL_ICON[medal]}</i>${MEDAL_NAME[medal]}${clean ? ' · ЧИСТО' : ''}`
+        : best
+          ? formatTime(best)
+          : complete
+            ? 'ПРОЙДЕНО'
+            : 'СТАРТ';
     button.innerHTML = `
       <span class="level-number">${String(level.id).padStart(2, '0')}</span>
       <span class="level-copy"><b>${level.name}</b><small>${level.subtitle}</small></span>
-      <span class="level-meta">${!unlocked ? 'ЗАКРЫТО' : best ? formatTime(best) : complete ? 'ПРОЙДЕНО' : 'СТАРТ'}</span>
+      <span class="level-meta">${resultMeta}</span>
     `;
     button.addEventListener('click', () => void launch(level.id));
     levelsHost.appendChild(button);
@@ -122,18 +164,31 @@ async function bootstrap() {
       if (!previous || time < previous) progress.bestTimes[key] = time;
       if (!progress.completedLevels.includes(level.id)) progress.completedLevels.push(level.id);
       progress.unlockedLevel = Math.max(progress.unlockedLevel, Math.min(MAX_LEVEL, level.id + 1));
-      progress.tokens += reward;
+
+      const medal = medalFor(level.id, time);
+      const previousMedal = progress.bestMedals[key];
+      const medalImproved = medal && (!previousMedal || MEDAL_RANK[medal] > MEDAL_RANK[previousMedal]);
+      if (medalImproved && medal) progress.bestMedals[key] = medal;
+      const cleanNow = stats.falls === 0;
+      const firstClean = cleanNow && !progress.cleanLevels.includes(level.id);
+      if (firstClean) progress.cleanLevels.push(level.id);
+
+      const bonus = (medalImproved ? medalBonus(medal) : 0) + (firstClean ? 40 : 0);
+      const totalReward = reward + bonus;
+      progress.tokens += totalReward;
       await yandex.saveProgress(progress);
 
       pendingNextLevel = Math.min(MAX_LEVEL, level.id + 1);
+      const medalLabel = medal ? MEDAL_NAME[medal] : 'БЕЗ МЕДАЛИ';
       finishTitle.textContent = `${level.name} пройден`;
       finishStats.innerHTML = `
         <b>${formatTime(time)}</b>
-        <span>падения: ${stats.falls}</span>
+        <span class="result-medal ${medal ? `medal-${medal}` : ''}">${medalLabel}</span>
+        <span>падения: ${stats.falls}${cleanNow ? ' · ЧИСТАЯ ЛИНИЯ' : ''}</span>
         <span>акробатика: ${stats.parkourMoves}</span>
         <span>идеальные посадки: ${stats.perfectLandings}</span>
         <span>разрушено: ${stats.breaks}</span>
-        <span>награда: +${reward} ◆</span>
+        <span>награда: +${totalReward} ◆${bonus ? ` (+${bonus} бонус)` : ''}</span>
       `;
       nextButton.hidden = level.id >= MAX_LEVEL;
       show(hud, false);
