@@ -1,20 +1,48 @@
-# Shadowvale Survivor
+# Весёлый Натиск 3D
 
-Production-oriented 3D survival roguelike for Yandex Games.
+Полноценная браузерная 3D-переделка пользовательской 2D-игры «Весёлый Натиск» под Яндекс Игры. Старый Shadowvale используется только как техническая основа WebGL/Yandex SDK; контент, прогрессия и игровой цикл перестроены вокруг «Весёлого Натиска».
 
-## Gameplay
-- Third-person / elevated follow camera.
-- Automatic sword combat, manual movement and invulnerable dash.
-- Skeleton, Slime, Bat and Dragon enemies with different roles.
-- Elite waves and a multi-phase Lord of Mist boss.
-- 14 run upgrades including orbiting imported swords and crystal projectiles.
-- Persistent Soul Shards and five permanent altar upgrades.
-- Rewarded revive, rewarded reroll, rewarded double run reward, fullscreen ad between runs.
-- Desktop and touch controls, pause, quality/audio/vibration settings.
-- RU/EN localization, cloud + local progress, optional Yandex review prompt.
+## Контент v2.0
 
-## Art policy
-All visible gameplay models are converted from CC0 Quaternius packs. The build validator rejects common Three.js primitive geometry constructors in gameplay source. No procedural placeholder geometry is shipped as visible game art.
+- 15 выбираемых героев с разными стартовыми дальнобойными оружиями и пассивными преимуществами.
+- 15 стартовых оружий, 8 ступеней развития каждого и эволюции по рецептам.
+- Весь урон героя дальний: прямые выстрелы, веера, бомбы, цепные атаки, самонаведение, бумеранги, радиальные залпы и мины.
+- Оружие прикрепляется к кости правой руки персонажа и следует авторским анимациям движения/атаки.
+- 18 больших карт: яркие, лесные, снежные, сладкие, пустынные, болотные, городские, кристальные и праздничные биомы.
+- Границы карт оформляются импортированным окружением; жёсткий край игровой поверхности не должен попадать в камеру.
+- Биомные препятствия и опасные зоны: скалы, деревья, руины, вода, лава и тематические декорации.
+- 24 конфигурации рядовых врагов и 12 поведенческих архетипов: преследование, зигзаг, рывки, дальний бой, разделение, таран, снайпер, рой, щит, лечение, подрывник и орбита.
+- 18 боссов с несколькими типами паттернов атак.
+- 12 пассивных усилений в забеге и 12 веток постоянной мета-прокачки.
+- 4 режима: быстрый, классический, марафон и бесконечный.
+- 9 ежедневных задач и 24 карьерных этапа.
+- Коллекция, разблокировки, рекорды и сохранение прогресса.
 
-## Build
-GitHub Actions downloads source art, converts FBX to GLB with Blender, runs Vite production build, validates Yandex packaging rules, boots the game in headless Chrome/WebGL on desktop and mobile viewports, captures smoke screenshots, and publishes the upload ZIP.
+## Управление
+
+- ПК: WASD/стрелки, Space — рывок.
+- Телефон/планшет: виртуальный джойстик и отдельная кнопка рывка.
+- Атака выполняется автоматически по подходящим целям, как в survival-roguelite.
+
+## Графика
+
+Игра работает на Three.js/WebGL. Видимые игровые объекты берутся из импортированных GLB-ассетов; production-валидатор запрещает common Three.js primitive geometry constructors в игровом коде. Используется стилизованный low-poly визуальный стиль с импортированными анимированными персонажами, оружием, монстрами, растительностью, природными объектами, декором и тематическими снарядами.
+
+## Сборка
+
+Основной workflow: `.github/workflows/build-merry-mayhem.yml`.
+
+GitHub Actions:
+1. восстанавливает production-исходники;
+2. скачивает бесплатные исходные 3D-наборы;
+3. конвертирует FBX в GLB через Blender;
+4. проверяет библиотеки анимаций;
+5. собирает Vite production build;
+6. проверяет структуру и размер пакета;
+7. запускает реальную WebGL-игру в headless Chrome;
+8. делает QA-кадры нескольких контрастных карт и мобильного режима;
+9. выпускает ZIP для Яндекс Игр, полный проект и локальный тестовый архив.
+
+## Локальная проверка релиза
+
+Используйте отдельный `vesely-natisk-3d-local-test-v2.0.0.zip`. После распаковки запустите `START_LOCAL.bat`. Не открывайте production `index.html` двойным кликом: ES-модули и GLB должны загружаться через HTTP.
