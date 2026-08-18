@@ -1,0 +1,118 @@
+name: Build Merry Mayhem 3D Yandex
+
+on:
+  push:
+    branches: [yandex-3d-merry-mayhem]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Materialize full 3D project
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .build/payload.part* | tr -d '\r\n' | base64 -d > /tmp/merry-payload.tgz
+          tar -tzf /tmp/merry-payload.tgz
+          tar -xzf /tmp/merry-payload.tgz
+          chmod +x tools/build_assets.sh
+          node --check src/content.js
+          node --check src/main.js
+          node --check src/yandex.js
+          git config user.name 'Merry Mayhem Build Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/content.js src/main.js src/style.css src/yandex.js tools/build_assets.sh tools/check_glb_animations.py tools/validate_build.py
+          if ! git diff --cached --quiet; then
+            git commit -m 'Materialize full Merry Mayhem 3D gameplay'
+            git push origin HEAD:yandex-3d-merry-mayhem
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Blender and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender python3-numpy zip unzip
+          blender --version | head -1
+          blender -b --factory-startup --python-expr "import numpy; print('Blender numpy', numpy.__version__)"
+
+      - name: Build CC0 GLB library
+        run: bash tools/build_assets.sh .asset-src
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Production build
+        run: npm run build
+
+      - name: Validate content and Yandex package
+        run: python3 tools/validate_build.py
+
+      - name: WebGL QA on desktop and mobile
+        shell: bash
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 >/tmp/merry-vite.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 45); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          URL='http://127.0.0.1:4173/?autostart=1&debug-fast=1'
+          FLAGS='--headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required'
+          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=11000 --dump-dom "$URL" >/tmp/merry-dom.html || true
+          grep -q 'data-game-ready="true"' /tmp/merry-dom.html
+          grep -Eq 'data-game-state="(playing|upgrade|gameover|victory)"' /tmp/merry-dom.html
+          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8000 --screenshot=smoke-desktop.png "$URL"
+          "$CHROME" $FLAGS --window-size=412,915 --virtual-time-budget=8000 --screenshot=smoke-mobile.png --user-agent='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36' "$URL"
+          test -s smoke-desktop.png
+          test -s smoke-mobile.png
+
+      - name: Package releases
+        shell: bash
+        run: |
+          cd dist
+          zip -9 -r ../vesely-natisk-3d-yandex-v2.0.0.zip .
+          cd ..
+          unzip -t vesely-natisk-3d-yandex-v2.0.0.zip
+          zip -9 -r vesely-natisk-3d-full-project-v2.0.0.zip index.html package.json vite.config.js README.md src tools public .github -x '*.DS_Store'
+          unzip -t vesely-natisk-3d-full-project-v2.0.0.zip
+          ls -lh vesely-natisk-3d-*.zip
+
+      - name: Upload Yandex build
+        uses: actions/upload-artifact@v4
+        with:
+          name: vesely-natisk-3d-yandex-v2.0.0
+          path: vesely-natisk-3d-yandex-v2.0.0.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload full project
+        uses: actions/upload-artifact@v4
+        with:
+          name: vesely-natisk-3d-full-project-v2.0.0
+          path: vesely-natisk-3d-full-project-v2.0.0.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload QA screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: merry-mayhem-3d-qa
+          path: |
+            smoke-desktop.png
+            smoke-mobile.png
+          if-no-files-found: error
+          retention-days: 14
