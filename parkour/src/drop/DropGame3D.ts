@@ -43,7 +43,7 @@ export class DropGame3D {
   private callbacks: DropCallbacks;
   private renderer!: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(61, 1, 0.05, 600);
+  private camera = new THREE.PerspectiveCamera(56, 1, 0.05, 600);
   private input = new DropInput();
   private levelManager = new DropLevelManager(this.scene);
   private avatar = new DropAvatarSystem(this.scene);
@@ -80,6 +80,8 @@ export class DropGame3D {
   private tmpFocus = new THREE.Vector3();
   private tmpDirection = new THREE.Vector3();
   private tmpSide = new THREE.Vector3();
+  private tmpMidpoint = new THREE.Vector3();
+  private tmpLift = new THREE.Vector3();
 
   constructor(host: HTMLElement, callbacks: DropCallbacks) {
     this.host = host;
@@ -135,6 +137,7 @@ export class DropGame3D {
     this.audio.startAmbient();
     this.running = true;
     this.lastFrame = performance.now();
+    this.snapCameraToRoute();
     this.emitHud();
   }
 
@@ -393,30 +396,48 @@ export class DropGame3D {
     this.avatar.update(dt, this.playerPos, this.facingYaw, avatarState, this.trickRotation, true);
   }
 
-  private updateCamera(dt: number) {
-    if (!this.currentLevel) return;
+  private routeCameraPose() {
     const target = this.targetIndex < this.currentLevel.targets.length
       ? this.levelManager.getTargetPosition(this.targetIndex, this.tmpTarget)
       : this.playerPos;
     const direction = this.tmpDirection.copy(target).sub(this.playerPos);
+    const drop = Math.max(0, this.playerPos.y - target.y);
     direction.y = 0;
-    if (direction.lengthSq() < 0.001) direction.set(Math.sin(this.facingYaw), 0, Math.cos(this.facingYaw));
-    direction.normalize();
+    const horizontal = direction.length();
+    if (horizontal < 0.001) direction.set(Math.sin(this.facingYaw), 0, Math.cos(this.facingYaw));
+    else direction.multiplyScalar(1 / horizontal);
     const side = this.tmpSide.set(direction.z, 0, -direction.x);
     const air = this.state === 'air' || this.state === 'jump';
-    const drop = Math.max(0, this.playerPos.y - target.y);
-    const distanceBack = air ? 8.2 : 7.0;
-    const height = air ? 6.3 + Math.min(3.2, drop * 0.07) : 8.1;
-    const desired = this.tmpCamera.copy(this.playerPos)
-      .addScaledVector(direction, -distanceBack)
-      .addScaledVector(side, 2.4)
-      .add(new THREE.Vector3(0, height, 0));
-    this.camera.position.lerp(desired, 1 - Math.exp(-7.5 * dt));
-    const focusWeight = air ? 0.26 : 0.42;
-    const focus = this.tmpFocus.copy(this.playerPos).lerp(target, focusWeight).add(new THREE.Vector3(0, 0.7, 0));
+
+    const playerWeight = air ? 0.56 : 0.48;
+    const midpoint = this.tmpMidpoint.copy(target).lerp(this.playerPos, playerWeight);
+    const back = air ? 6.8 + Math.min(2.4, horizontal * 0.12) : 7.8 + Math.min(2.8, horizontal * 0.14);
+    const height = air ? 4.4 + Math.min(2.0, drop * 0.09) : 4.9 + Math.min(1.8, drop * 0.08);
+    const sideOffset = air ? 1.15 : 1.45;
+    const desired = this.tmpCamera.copy(midpoint)
+      .addScaledVector(direction, -back)
+      .addScaledVector(side, sideOffset)
+      .add(this.tmpLift.set(0, height, 0));
+    const focus = this.tmpFocus.copy(target).lerp(this.playerPos, air ? 0.56 : 0.5).add(this.tmpLift.set(0, 0.55, 0));
+    return { desired, focus, drop, air };
+  }
+
+  private snapCameraToRoute() {
+    if (!this.currentLevel) return;
+    const { desired, focus, drop } = this.routeCameraPose();
+    this.camera.position.copy(desired);
     this.camera.lookAt(focus);
-    const desiredFov = 59 + Math.min(12, drop * 0.22) + (air ? 3 : 0);
-    this.camera.fov += (desiredFov - this.camera.fov) * Math.min(1, dt * 4.5);
+    this.camera.fov = 54 + Math.min(5, drop * 0.12);
+    this.camera.updateProjectionMatrix();
+  }
+
+  private updateCamera(dt: number) {
+    if (!this.currentLevel) return;
+    const { desired, focus, drop, air } = this.routeCameraPose();
+    this.camera.position.lerp(desired, 1 - Math.exp(-(air ? 6.5 : 8.5) * dt));
+    this.camera.lookAt(focus);
+    const desiredFov = (air ? 58 : 54) + Math.min(7, drop * 0.13);
+    this.camera.fov += (desiredFov - this.camera.fov) * Math.min(1, dt * 4.8);
     this.camera.updateProjectionMatrix();
   }
 
@@ -472,9 +493,9 @@ export class DropGame3D {
   }
 
   private createLighting() {
-    const hemi = new THREE.HemisphereLight(0xb7d7ff, 0x161b25, 1.7);
+    const hemi = new THREE.HemisphereLight(0xb7d7ff, 0x161b25, 1.45);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xffe1bd, 3.3);
+    const sun = new THREE.DirectionalLight(0xffe1bd, 2.6);
     sun.position.set(-28, 48, 22);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -489,14 +510,14 @@ export class DropGame3D {
 
   private applyTheme(theme: DropLevelSpec['theme']) {
     const palette: Record<DropLevelSpec['theme'], { bg: number; fog: number; density: number }> = {
-      sunset: { bg: 0xb78b8d, fog: 0xb78b8d, density: 0.006 },
-      city: { bg: 0x8fa8c2, fog: 0x8fa8c2, density: 0.0065 },
-      industrial: { bg: 0x7d8996, fog: 0x7d8996, density: 0.007 },
-      night: { bg: 0x263247, fog: 0x263247, density: 0.0085 },
-      final: { bg: 0x161e30, fog: 0x161e30, density: 0.009 }
+      sunset: { bg: 0x9aa7b5, fog: 0xb7a9a0, density: 0.0045 },
+      city: { bg: 0x8fa8c2, fog: 0x8fa8c2, density: 0.0052 },
+      industrial: { bg: 0x7d8996, fog: 0x7d8996, density: 0.006 },
+      night: { bg: 0x263247, fog: 0x263247, density: 0.0075 },
+      final: { bg: 0x161e30, fog: 0x161e30, density: 0.008 }
     };
     const colors = palette[theme];
-    this.scene.background = new THREE.Color(colors.bg);
+    if (!this.levelManager.hasSky()) this.scene.background = new THREE.Color(colors.bg);
     this.scene.fog = new THREE.FogExp2(colors.fog, colors.density);
   }
 
