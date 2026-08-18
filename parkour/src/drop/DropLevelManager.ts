@@ -15,9 +15,13 @@ type SurfaceVisual = {
   spec: DropSurface;
   root: THREE.Object3D;
   basePosition: THREE.Vector3;
-  marker: THREE.Mesh | null;
+  marker: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null;
+  beacon: THREE.Sprite | null;
   origin: THREE.Vector3;
 };
+
+const ROUTE_TONES = [0x58687a, 0x6b6f78, 0x75685e, 0x4f6970, 0x6a5f73, 0x596f61];
+const CITY_TONES = [0x8b98a5, 0x9d8d80, 0x7f918c, 0x8a8498, 0x748592, 0xa0927e, 0x7d8794];
 
 export class DropLevelManager {
   private scene: THREE.Scene;
@@ -59,16 +63,34 @@ export class DropLevelManager {
 
   update(time: number) {
     this.time = time;
-    for (let i = 1; i < this.surfaces.length; i += 1) {
+    for (let i = 0; i < this.surfaces.length; i += 1) {
       const surface = this.surfaces[i];
-      const offset = this.movingOffset(surface.spec, time);
+      const offset = i === 0 ? new THREE.Vector3() : this.movingOffset(surface.spec, time);
       surface.root.position.copy(surface.basePosition).add(offset);
       if (surface.marker) {
         surface.marker.position.set(
           surface.origin.x + offset.x,
-          surface.origin.y + 0.055,
+          surface.origin.y + 0.065,
           surface.origin.z + offset.z
         );
+      }
+      if (surface.beacon) {
+        surface.beacon.position.set(
+          surface.origin.x + offset.x,
+          surface.origin.y + 2.25,
+          surface.origin.z + offset.z
+        );
+      }
+    }
+
+    const active = this.surfaces[this.activeTarget + 1];
+    if (active) {
+      const pulse = 1 + Math.sin(time * 4.8) * 0.08;
+      active.marker?.scale.setScalar(pulse);
+      active.beacon?.scale.set(1.15 * pulse, 1.15 * pulse, 1);
+      if (active.marker) active.marker.material.opacity = 0.9 + Math.sin(time * 4.8) * 0.08;
+      if (active.beacon?.material instanceof THREE.SpriteMaterial) {
+        active.beacon.material.opacity = 0.7 + Math.sin(time * 4.8 + 0.8) * 0.18;
       }
     }
   }
@@ -76,8 +98,9 @@ export class DropLevelManager {
   setActiveTarget(targetIndex: number) {
     this.activeTarget = targetIndex;
     for (let i = 0; i < this.surfaces.length; i += 1) {
-      const marker = this.surfaces[i].marker;
-      if (marker) marker.visible = i === targetIndex + 1;
+      const visible = i === targetIndex + 1;
+      if (this.surfaces[i].marker) this.surfaces[i].marker!.visible = visible;
+      if (this.surfaces[i].beacon) this.surfaces[i].beacon!.visible = visible;
     }
   }
 
@@ -109,10 +132,18 @@ export class DropLevelManager {
       if (surface.marker) {
         this.scene.remove(surface.marker);
         surface.marker.geometry.dispose();
-        if (surface.marker.material instanceof THREE.Material) surface.marker.material.dispose();
+        surface.marker.material.dispose();
       }
+      if (surface.beacon) {
+        this.scene.remove(surface.beacon);
+        if (surface.beacon.material instanceof THREE.Material) surface.beacon.material.dispose();
+      }
+      this.disposeMaterials(surface.root);
     }
-    for (const root of this.background) this.scene.remove(root);
+    for (const root of this.background) {
+      this.scene.remove(root);
+      this.disposeMaterials(root);
+    }
     this.surfaces = [];
     this.background = [];
   }
@@ -133,31 +164,48 @@ export class DropLevelManager {
     root.position.x += spec.p[0] - center.x;
     root.position.z += spec.p[2] - center.z;
     root.position.y += spec.p[1] - scaled.max.y;
-    this.decorate(root);
+    this.decorate(root, levelId * 5 + index, true);
     this.scene.add(root);
 
     const origin = new THREE.Vector3(...spec.p);
-    const marker = this.createMarker(spec, origin);
+    const { marker, beacon } = this.createMarker(spec, origin);
     if (marker) this.scene.add(marker);
-    return { spec, root, basePosition: root.position.clone(), marker, origin };
+    if (beacon) this.scene.add(beacon);
+    return { spec, root, basePosition: root.position.clone(), marker, beacon, origin };
   }
 
   private createMarker(spec: DropSurface, origin: THREE.Vector3) {
-    if (!this.markerTexture) return null;
-    const geometry = new THREE.PlaneGeometry(spec.radius * 2.05, spec.radius * 2.05);
+    if (!this.markerTexture) return { marker: null, beacon: null };
+    const geometry = new THREE.PlaneGeometry(spec.radius * 2.15, spec.radius * 2.15);
     const material = new THREE.MeshBasicMaterial({
       map: this.markerTexture,
       transparent: true,
       depthWrite: false,
+      depthTest: false,
       side: THREE.DoubleSide,
-      opacity: 0.92
+      opacity: 0.94,
+      toneMapped: false
     });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(origin.x, origin.y + 0.055, origin.z);
-    mesh.renderOrder = 4;
-    mesh.visible = false;
-    return mesh;
+    const marker = new THREE.Mesh(geometry, material);
+    marker.rotation.x = -Math.PI / 2;
+    marker.position.set(origin.x, origin.y + 0.065, origin.z);
+    marker.renderOrder = 40;
+    marker.visible = false;
+
+    const beaconMaterial = new THREE.SpriteMaterial({
+      map: this.markerTexture,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      opacity: 0.82,
+      toneMapped: false
+    });
+    const beacon = new THREE.Sprite(beaconMaterial);
+    beacon.position.set(origin.x, origin.y + 2.25, origin.z);
+    beacon.scale.set(1.15, 1.15, 1);
+    beacon.renderOrder = 41;
+    beacon.visible = false;
+    return { marker, beacon };
   }
 
   private async createBackground(level: DropLevelSpec) {
@@ -166,26 +214,26 @@ export class DropLevelManager {
     const centerX = (level.start.p[0] + end[0]) * 0.5;
     const centerZ = (level.start.p[2] + end[2]) * 0.5;
     const top = level.start.p[1];
-    for (let index = 0; index < Math.min(14, this.cityAssets.length); index += 1) {
+    for (let index = 0; index < Math.min(16, this.cityAssets.length); index += 1) {
       const asset = this.cityAssets[(level.id * 5 + index * 3) % this.cityAssets.length];
       const root = await this.clone(asset);
       const size = this.measure(root);
       if (size.x <= 0.001 || size.y <= 0.001 || size.z <= 0.001) continue;
-      const width = 7 + (index % 5) * 2.1;
+      const width = 7 + (index % 5) * 2.5;
       const scale = width / Math.max(size.x, size.z);
       root.scale.setScalar(scale);
       const box = new THREE.Box3().setFromObject(root);
       const center = box.getCenter(new THREE.Vector3());
       const side = index % 2 === 0 ? -1 : 1;
       const lane = Math.floor(index / 2);
-      const x = centerX - 30 + lane * 9.5 + ((level.id + index) % 3) * 2.2;
-      const z = centerZ + side * (16 + (index % 4) * 5.5);
-      const roofY = Math.max(-4, top - 12 - (index % 6) * 4.2);
+      const x = centerX - 35 + lane * 10.5 + ((level.id + index) % 3) * 2.4;
+      const z = centerZ + side * (18 + (index % 4) * 6.2);
+      const roofY = Math.max(-8, top - 15 - (index % 6) * 5.1);
       root.position.x += x - center.x;
       root.position.z += z - center.z;
       root.position.y += roofY - box.max.y;
       root.rotation.y = side > 0 ? Math.PI : 0;
-      this.decorate(root);
+      this.decorate(root, level.id * 11 + index, false);
       this.scene.add(root);
       this.background.push(root);
     }
@@ -207,7 +255,7 @@ export class DropLevelManager {
   }
 
   private visualHeight(spec: DropSurface) {
-    if (spec.kind === 'roof') return Math.max(7, spec.p[1] + 10);
+    if (spec.kind === 'roof') return Math.max(8, spec.p[1] + 11);
     if (spec.kind === 'pole') return Math.max(5, Math.min(18, spec.p[1] + 8));
     if (spec.kind === 'beam') return Math.max(1.3, Math.min(4, spec.p[1] * 0.12 + 1.5));
     return Math.max(2.2, Math.min(7, spec.p[1] * 0.2 + 2.5));
@@ -235,12 +283,34 @@ export class DropLevelManager {
     return new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());
   }
 
-  private decorate(root: THREE.Object3D) {
+  private decorate(root: THREE.Object3D, paletteIndex: number, route: boolean) {
+    const palette = route ? ROUTE_TONES : CITY_TONES;
+    const tint = new THREE.Color(palette[Math.abs(paletteIndex) % palette.length]);
     root.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
-      child.castShadow = true;
+      child.castShadow = route;
       child.receiveShadow = true;
-      if (child.material instanceof THREE.MeshStandardMaterial) child.material.envMapIntensity = 0.55;
+      const cloneMaterial = (material: THREE.Material) => {
+        const copy = material.clone();
+        if (copy instanceof THREE.MeshStandardMaterial) {
+          copy.color.multiply(tint);
+          copy.roughness = route ? 0.7 : 0.78;
+          copy.metalness = Math.min(copy.metalness, route ? 0.08 : 0.04);
+          copy.envMapIntensity = route ? 0.72 : 0.45;
+        }
+        return copy;
+      };
+      child.material = Array.isArray(child.material)
+        ? child.material.map(cloneMaterial)
+        : cloneMaterial(child.material);
+    });
+  }
+
+  private disposeMaterials(root: THREE.Object3D) {
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of materials) material.dispose();
     });
   }
 }
