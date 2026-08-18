@@ -34,6 +34,7 @@ jobs:
           python3 tools/visual_polish.py
           python3 tools/terrain_polish.py
           python3 tools/final_qa_fixes.py
+          python3 .build/pro_overhaul.py
           node --check src/content.js
           node --check src/main.js
           node --check src/yandex.js
@@ -84,6 +85,9 @@ jobs:
           grep -q "pineSnow" src/content.js
           grep -q "cactus" src/content.js
           grep -q "willow" src/content.js
+          grep -q "buildMacroClusters" src/main.js
+          grep -q "HELD_PROFILES" src/content.js
+          grep -q "qaKills" src/main.js
 
       - name: WebGL QA across contrasting maps
         shell: bash
@@ -96,9 +100,10 @@ jobs:
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           FLAGS='--headless=new --no-sandbox --disable-dev-shm-usage --enable-webgl --ignore-gpu-blocklist --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required'
           BASE='http://127.0.0.1:4173/?autostart=1&debug-fast=1'
-          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=12000 --dump-dom "$BASE&map=sunny_meadow&hero=donut_knight" >/tmp/merry-dom.html || true
+          "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=20000 --dump-dom "$BASE&map=sunny_meadow&hero=donut_knight" >/tmp/merry-dom.html || true
           grep -q 'data-game-ready="true"' /tmp/merry-dom.html
           grep -Eq 'data-game-state="(playing|upgrade|gameover|victory)"' /tmp/merry-dom.html
+          grep -Eq 'data-qa-kills="[1-9][0-9]*"' /tmp/merry-dom.html
           for SPEC in 'sunny-meadow sunny_meadow donut_knight' 'candy-park candy_park candy_witch' 'snow-festival snow_festival snow_penguin' 'rainbow-canyon rainbow_canyon fox_archer' 'firefly-swamp firefly_swamp lightning_bee'; do
             set -- $SPEC; NAME=$1; MAP=$2; HERO=$3
             "$CHROME" $FLAGS --window-size=1280,720 --virtual-time-budget=8500 --screenshot="qa-$NAME.png" "$BASE&map=$MAP&hero=$HERO"
@@ -112,12 +117,12 @@ jobs:
         run: |
           echo package > /tmp/merry-stage
           cd dist
-          zip -9 -r ../vesely-natisk-3d-yandex-v2.0.0.zip .
+          zip -9 -r ../vesely-natisk-3d-yandex-v2.1.0.zip .
           cd ..
-          unzip -t vesely-natisk-3d-yandex-v2.0.0.zip >/dev/null
-          test "$(unzip -Z1 vesely-natisk-3d-yandex-v2.0.0.zip | grep -c '^index\.html$')" -eq 1
-          zip -9 -r vesely-natisk-3d-full-project-v2.0.0.zip index.html package.json vite.config.js README.md src tools public .github/workflows/build-merry-mayhem.yml -x '*.DS_Store'
-          unzip -t vesely-natisk-3d-full-project-v2.0.0.zip >/dev/null
+          unzip -t vesely-natisk-3d-yandex-v2.1.0.zip >/dev/null
+          test "$(unzip -Z1 vesely-natisk-3d-yandex-v2.1.0.zip | grep -c '^index\.html$')" -eq 1
+          zip -9 -r vesely-natisk-3d-full-project-v2.1.0.zip index.html package.json vite.config.js README.md src tools public .github/workflows/build-merry-mayhem.yml -x '*.DS_Store'
+          unzip -t vesely-natisk-3d-full-project-v2.1.0.zip >/dev/null
           rm -rf local-test && mkdir local-test
           cp -a dist/. local-test/
           cat > local-test/START_LOCAL.ps1 <<'POWERSHELL'
@@ -151,38 +156,38 @@ jobs:
           3. Игра откроется в браузере автоматически.
           Не открывайте index.html двойным кликом: WebGL-модули и ассеты должны загружаться через локальный HTTP-сервер.
           TXT
-          cd local-test && zip -9 -r ../vesely-natisk-3d-local-test-v2.0.0.zip . && cd ..
-          unzip -t vesely-natisk-3d-local-test-v2.0.0.zip >/dev/null
+          cd local-test && zip -9 -r ../vesely-natisk-3d-local-test-v2.1.0.zip . && cd ..
+          unzip -t vesely-natisk-3d-local-test-v2.1.0.zip >/dev/null
           ls -lh vesely-natisk-3d-*.zip
 
       - name: Upload Yandex build
         uses: actions/upload-artifact@v4
         with:
-          name: vesely-natisk-3d-yandex-v2.0.0
-          path: vesely-natisk-3d-yandex-v2.0.0.zip
+          name: vesely-natisk-3d-yandex-v2.1.0
+          path: vesely-natisk-3d-yandex-v2.1.0.zip
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload full project
         uses: actions/upload-artifact@v4
         with:
-          name: vesely-natisk-3d-full-project-v2.0.0
-          path: vesely-natisk-3d-full-project-v2.0.0.zip
+          name: vesely-natisk-3d-full-project-v2.1.0
+          path: vesely-natisk-3d-full-project-v2.1.0.zip
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload local tester
         uses: actions/upload-artifact@v4
         with:
-          name: vesely-natisk-3d-local-test-v2.0.0
-          path: vesely-natisk-3d-local-test-v2.0.0.zip
+          name: vesely-natisk-3d-local-test-v2.1.0
+          path: vesely-natisk-3d-local-test-v2.1.0.zip
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload QA screenshots
         uses: actions/upload-artifact@v4
         with:
-          name: merry-mayhem-3d-qa-final
+          name: merry-mayhem-3d-qa-v2.1
           path: |
             qa-sunny-meadow.png
             qa-candy-park.png
