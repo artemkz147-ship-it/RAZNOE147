@@ -176,23 +176,33 @@ export class DropLevelManager {
     const size = this.measure(root);
     if (size.x <= 0.001 || size.y <= 0.001 || size.z <= 0.001) return null;
 
+    const position = this.authoredPosition(levelId, index, spec);
     const width = Math.max(0.7, spec.size[0]);
     const depth = Math.max(0.7, spec.size[1]);
     const desiredHeight = this.visualHeight(spec);
     root.scale.set(width / size.x, desiredHeight / size.y, depth / size.z);
     const scaled = new THREE.Box3().setFromObject(root);
     const center = scaled.getCenter(new THREE.Vector3());
-    root.position.x += spec.p[0] - center.x;
-    root.position.z += spec.p[2] - center.z;
-    root.position.y += spec.p[1] - scaled.max.y;
+    root.position.x += position.x - center.x;
+    root.position.z += position.z - center.z;
+    root.position.y += position.y - scaled.max.y;
     this.decorate(root, levelId * 5 + index, true);
     this.scene.add(root);
 
-    const origin = new THREE.Vector3(...spec.p);
+    const origin = position;
     const { marker, beacon } = this.createMarker(spec, origin);
     if (marker) this.scene.add(marker);
     if (beacon) this.scene.add(beacon);
     return { spec, root, basePosition: root.position.clone(), marker, beacon, origin };
+  }
+
+  private authoredPosition(levelId: number, index: number, spec: DropSurface) {
+    const position = new THREE.Vector3(...spec.p);
+    // The first tutorial targets must be visibly separate buildings, not hidden
+    // inside the start roof footprint. Later authored routes already have enough gap.
+    if (index === 1 && levelId === 1) position.set(9, spec.p[1], -6);
+    if (index === 1 && levelId === 2) position.set(9, spec.p[1], -5);
+    return position;
   }
 
   private createMarker(spec: DropSurface, origin: THREE.Vector3) {
