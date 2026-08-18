@@ -1,12 +1,11 @@
 import './style.css';
-import { Game3D } from './game3d/Game3D';
+import { DropGame3D } from './drop/DropGame3D';
+import type { DropLevelSpec } from './drop/DropTypes';
 import { yandex, type Medal, type ParkourProgress } from './platform/yandex';
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector(selector) as T;
-const MAX_LEVEL = 12;
-const GOLD_TIMES = [22, 27, 35, 33, 34, 38, 43, 50, 51, 55, 62, 72];
+const MAX_LEVEL = 18;
 const MEDAL_RANK: Record<Medal, number> = { bronze: 1, silver: 2, gold: 3 };
-const MEDAL_ICON: Record<Medal, string> = { bronze: '●', silver: '●', gold: '●' };
 const MEDAL_NAME: Record<Medal, string> = { bronze: 'БРОНЗА', silver: 'СЕРЕБРО', gold: 'ЗОЛОТО' };
 
 const gameHost = $('#game');
@@ -16,10 +15,13 @@ const hud = $('#hud');
 const finish = $('#finish');
 const finishTitle = $('#finishTitle');
 const finishStats = $('#finishStats');
-const timeEl = $('#time');
-const speedEl = $('#speed');
-const checkpointEl = $('#checkpoint');
+const scoreEl = $('#score');
+const stageEl = $('#stage');
+const dropEl = $('#drop');
+const comboEl = $('#combo');
 const stateEl = $('#state');
+const targetEl = $('#target');
+const chainEl = $('#chain');
 const tokenEl = $('#tokens');
 const nextButton = $('#next') as HTMLButtonElement;
 const retryButton = $('#retry') as HTMLButtonElement;
@@ -28,11 +30,14 @@ const pauseButton = $('#pause') as HTMLButtonElement;
 const resumeButton = $('#resume') as HTMLButtonElement;
 const pauseOverlay = $('#pauseOverlay');
 
-let game: Game3D;
+let game: DropGame3D;
 let currentLevel = 1;
 let pendingNextLevel = 1;
+let completionCount = 0;
 let progress: ParkourProgress = {
   unlockedLevel: 1,
+  bestScores: {},
+  bestCombos: {},
   bestTimes: {},
   bestMedals: {},
   cleanLevels: [],
@@ -40,16 +45,9 @@ let progress: ParkourProgress = {
   tokens: 0,
   totalFalls: 0
 };
-let completionCount = 0;
 
 function show(element: HTMLElement, visible: boolean) {
   element.classList.toggle('visible', visible);
-}
-
-function formatTime(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds - minutes * 60;
-  return minutes > 0 ? `${minutes}:${rest.toFixed(2).padStart(5, '0')}` : `${rest.toFixed(2)} с`;
 }
 
 function popToast(message: string) {
@@ -60,19 +58,12 @@ function popToast(message: string) {
   toast.classList.add('pop');
 }
 
-function medalFor(levelId: number, seconds: number): Medal | null {
-  const gold = GOLD_TIMES[levelId - 1] ?? 60;
-  if (seconds <= gold) return 'gold';
-  if (seconds <= gold * 1.32) return 'silver';
-  if (seconds <= gold * 1.8) return 'bronze';
+function medalFor(level: DropLevelSpec, score: number): Medal | null {
+  const ratio = score / Math.max(1, level.parScore);
+  if (ratio >= 1.35) return 'gold';
+  if (ratio >= 1.0) return 'silver';
+  if (ratio >= 0.7) return 'bronze';
   return null;
-}
-
-function medalBonus(medal: Medal | null) {
-  if (medal === 'gold') return 60;
-  if (medal === 'silver') return 35;
-  if (medal === 'bronze') return 20;
-  return 0;
 }
 
 function medalClass(medal: Medal | undefined) {
@@ -85,25 +76,22 @@ function renderLevels() {
     const unlocked = level.id <= progress.unlockedLevel;
     const complete = progress.completedLevels.includes(level.id);
     const clean = progress.cleanLevels.includes(level.id);
-    const best = progress.bestTimes[String(level.id)];
+    const best = progress.bestScores[String(level.id)] ?? 0;
     const medal = progress.bestMedals[String(level.id)];
     const button = document.createElement('button');
     button.className = `level-card${complete ? ' complete' : ''}${medalClass(medal)}`;
     button.disabled = !unlocked;
-    const resultMeta = !unlocked
-      ? 'ЗАКРЫТО'
-      : medal
-        ? `<i class="medal-dot">${MEDAL_ICON[medal]}</i>${MEDAL_NAME[medal]}${clean ? ' · ЧИСТО' : ''}`
-        : best
-          ? formatTime(best)
-          : complete
-            ? 'ПРОЙДЕНО'
-            : 'СТАРТ';
+    const meta = !unlocked
+      ? '<b>ЗАКРЫТО</b>'
+      : best
+        ? `<b>${best.toLocaleString('ru-RU')} очк.</b><small>${medal ? MEDAL_NAME[medal] : 'БЕЗ МЕДАЛИ'}${clean ? ' · ЧИСТО' : ''}</small>`
+        : '<b>СТАРТ</b><small>новый спуск</small>';
     button.innerHTML = `
       <span class="level-number">${String(level.id).padStart(2, '0')}</span>
       <span class="level-copy"><b>${level.name}</b><small>${level.subtitle}</small></span>
-      <span class="level-meta">${resultMeta}</span>
+      <span class="level-meta">${meta}</span>
     `;
+    button.title = `Рекомендация: ${level.recommended}`;
     button.addEventListener('click', () => void launch(level.id));
     levelsHost.appendChild(button);
   }
@@ -116,6 +104,7 @@ async function launch(levelId: number) {
   show(finish, false);
   show(pauseOverlay, false);
   show(hud, true);
+  chainEl.textContent = '';
   await game.startLevel(levelId);
   yandex.gameplayStart();
 }
@@ -124,77 +113,80 @@ async function bootstrap() {
   await yandex.init();
   progress = await yandex.loadProgress();
 
-  game = new Game3D(gameHost, {
+  game = new DropGame3D(gameHost, {
     onReady: () => {
       renderLevels();
-      $('#loading').textContent = 'Выбери маршрут. Сложность растёт от широких крыш к точным опорам и финальному шпилю.';
+      $('#loading').textContent = 'Готово. Выбери верхнюю точку и начинай спуск.';
       yandex.ready();
     },
-    onHud: ({ level, time, speed, checkpoint, checkpointCount, breaks, motion }) => {
+    onHud: ({ level, stage, stageCount, score, combo, dropLeft, state, target, chain }) => {
       $('#objective').textContent = `${String(level.id).padStart(2, '0')} · ${level.name}`;
-      timeEl.textContent = formatTime(time);
-      speedEl.textContent = `${Math.round(speed * 3.6)} км/ч`;
-      checkpointEl.textContent = checkpointCount ? `${checkpoint}/${checkpointCount}` : '—';
-      stateEl.textContent = breaks ? `${motion} · ${breaks}×` : motion;
+      scoreEl.textContent = Math.round(score).toLocaleString('ru-RU');
+      stageEl.textContent = `${stage}/${stageCount}`;
+      dropEl.textContent = `${dropLeft.toFixed(1)} м`;
+      comboEl.textContent = `×${combo}`;
+      stateEl.textContent = state;
+      targetEl.textContent = target;
+      chainEl.textContent = chain;
     },
-    onCheckpoint: (index, total) => {
-      popToast(`ЧЕКПОИНТ ${index}/${total}`);
+    onTrick: (event, chain) => {
+      popToast(`${event.label}  +${event.points}`);
+      chainEl.textContent = chain;
     },
-    onParkour: (event) => {
-      popToast(event.label);
-      if (event.type === 'hard-land') {
-        document.body.classList.remove('impact');
-        void document.body.offsetWidth;
-        document.body.classList.add('impact');
-      }
+    onLanding: (result) => {
+      popToast(`${result.label}  +${result.stageScore.toLocaleString('ru-RU')}`);
+      document.body.classList.remove('impact', 'perfect');
+      void document.body.offsetWidth;
+      if (result.grade === 'perfect') document.body.classList.add('perfect');
+      if (result.grade === 'rough') document.body.classList.add('impact');
     },
-    onFall: (falls) => {
+    onMiss: (falls) => {
       progress.totalFalls += 1;
       void yandex.saveProgress(progress);
       document.body.classList.remove('impact');
       void document.body.offsetWidth;
       document.body.classList.add('impact');
-      popToast(falls === 1 ? 'СОРВАЛСЯ · ВОЗВРАТ К ЧЕКПОИНТУ' : `СРЫВ ${falls}`);
+      popToast(falls === 1 ? 'МИМО · −120 · ПОВТОР ТОЧКИ' : `ПРОМАХ ${falls} · −120`);
     },
-    onFinish: async ({ level, time, stats, reward }) => {
+    onFinish: async ({ level, stats, reward }) => {
       yandex.gameplayStop();
       completionCount += 1;
       const key = String(level.id);
-      const previous = progress.bestTimes[key];
-      if (!previous || time < previous) progress.bestTimes[key] = time;
+      const oldBest = progress.bestScores[key] ?? 0;
+      if (stats.score > oldBest) progress.bestScores[key] = stats.score;
+      progress.bestCombos[key] = Math.max(progress.bestCombos[key] ?? 1, stats.bestCombo);
       if (!progress.completedLevels.includes(level.id)) progress.completedLevels.push(level.id);
       progress.unlockedLevel = Math.max(progress.unlockedLevel, Math.min(MAX_LEVEL, level.id + 1));
 
-      const medal = medalFor(level.id, time);
+      const medal = medalFor(level, stats.score);
       const previousMedal = progress.bestMedals[key];
-      const medalImproved = medal && (!previousMedal || MEDAL_RANK[medal] > MEDAL_RANK[previousMedal]);
-      if (medalImproved && medal) progress.bestMedals[key] = medal;
+      if (medal && (!previousMedal || MEDAL_RANK[medal] > MEDAL_RANK[previousMedal])) progress.bestMedals[key] = medal;
       const cleanNow = stats.falls === 0;
-      const firstClean = cleanNow && !progress.cleanLevels.includes(level.id);
-      if (firstClean) progress.cleanLevels.push(level.id);
-
-      const bonus = (medalImproved ? medalBonus(medal) : 0) + (firstClean ? 40 : 0);
-      const totalReward = reward + bonus;
+      if (cleanNow && !progress.cleanLevels.includes(level.id)) progress.cleanLevels.push(level.id);
+      const firstClear = oldBest === 0;
+      const cleanBonus = cleanNow ? 30 : 0;
+      const firstBonus = firstClear ? 25 : 0;
+      const totalReward = reward + cleanBonus + firstBonus;
       progress.tokens += totalReward;
       await yandex.saveProgress(progress);
 
       pendingNextLevel = Math.min(MAX_LEVEL, level.id + 1);
-      const medalLabel = medal ? MEDAL_NAME[medal] : 'БЕЗ МЕДАЛИ';
-      finishTitle.textContent = `${level.name} пройден`;
+      const medalText = medal ? MEDAL_NAME[medal] : 'БЕЗ МЕДАЛИ';
+      finishTitle.textContent = `${level.name}: ${stats.score.toLocaleString('ru-RU')} очков`;
       finishStats.innerHTML = `
-        <b>${formatTime(time)}</b>
-        <span class="result-medal ${medal ? `medal-${medal}` : ''}">${medalLabel}</span>
-        <span>падения: ${stats.falls}${cleanNow ? ' · ЧИСТАЯ ЛИНИЯ' : ''}</span>
-        <span>акробатика: ${stats.parkourMoves}</span>
-        <span>идеальные посадки: ${stats.perfectLandings}</span>
-        <span>разрушено: ${stats.breaks}</span>
-        <span>награда: +${totalReward} ◆${bonus ? ` (+${bonus} бонус)` : ''}</span>
+        <b>${medalText}</b>
+        <span>ориентир: ${level.parScore.toLocaleString('ru-RU')} очк.</span>
+        <span>трюков: ${stats.tricks} · видов: ${stats.uniqueTricks}</span>
+        <span>идеальных посадок: ${stats.perfectLandings}</span>
+        <span>лучшее комбо: ×${stats.bestCombo}</span>
+        <span>спуск: ${stats.totalDrop.toFixed(1)} м</span>
+        <span>промахов: ${stats.falls}${cleanNow ? ' · ЧИСТАЯ ЛИНИЯ' : ''}</span>
+        <span>награда: +${totalReward} ◆</span>
       `;
       nextButton.hidden = level.id >= MAX_LEVEL;
       show(hud, false);
       show(finish, true);
       renderLevels();
-
       if (completionCount % 2 === 0) await yandex.showInterstitial();
     }
   });
@@ -232,6 +224,6 @@ window.addEventListener('platform-resume', () => {
 });
 
 bootstrap().catch((error) => {
-  console.error('3D parkour boot failed', error);
+  console.error('Drop Flow boot failed', error);
   $('#loading').textContent = 'Ошибка запуска. Обнови страницу.';
 });
