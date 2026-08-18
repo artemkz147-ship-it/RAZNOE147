@@ -6,6 +6,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 PUBLIC = os.path.join(ROOT, 'public')
 SOURCE = os.path.join(PUBLIC, 'assets3d')
 VERSION_DIR = 'assets3d_df4_20260818'
+BUILD_ID = 'DF4-20260818-1751'
 TARGET = os.path.join(PUBLIC, VERSION_DIR)
 
 MANIFESTS = [
@@ -15,6 +16,15 @@ MANIFESTS = [
     os.path.join(ROOT, 'src', 'game3d', 'sfx.json'),
     os.path.join(ROOT, 'src', 'drop', 'factory.json'),
 ]
+
+TEXT_FILES = []
+for base, _, files in os.walk(os.path.join(ROOT, 'src')):
+    for name in files:
+        if os.path.splitext(name)[1].lower() in ('.ts', '.tsx', '.js', '.mjs', '.css'):
+            TEXT_FILES.append(os.path.join(base, name))
+TEXT_FILES.extend([
+    os.path.join(ROOT, 'index.html'),
+])
 
 
 def rewrite(value):
@@ -43,7 +53,26 @@ for path in MANIFESTS:
         json.dump(rewrite(data), file, ensure_ascii=False, indent=2)
         file.write('\n')
 
+for path in TEXT_FILES:
+    if not os.path.exists(path):
+        continue
+    with open(path, 'r', encoding='utf-8') as file:
+        text = file.read()
+    updated = text.replace('assets3d/', f'{VERSION_DIR}/')
+    if path.endswith('index.html') and 'id="buildStamp"' not in updated:
+        stamp = (
+            f'    <div id="buildStamp" data-build="{BUILD_ID}" '
+            'style="position:fixed;left:8px;bottom:6px;z-index:9999;pointer-events:none;'
+            'font:700 8px/1.1 Arial,sans-serif;letter-spacing:.12em;color:rgba(255,255,255,.55);'
+            'text-shadow:0 1px 3px rgba(0,0,0,.8)">BUILD DF4</div>\n'
+        )
+        updated = updated.replace('  </body>', stamp + '  </body>')
+    if updated != text:
+        with open(path, 'w', encoding='utf-8') as file:
+            file.write(updated)
+
 with open(os.path.join(PUBLIC, 'build-id.txt'), 'w', encoding='utf-8') as file:
-    file.write('DROP FLOW BUILD DF4-20260818-1751\n')
+    file.write(f'DROP FLOW BUILD {BUILD_ID}\n')
 
 print(f'Cache-busted game assets: assets3d/ -> {VERSION_DIR}/')
+print(f'Build stamp: {BUILD_ID}')
