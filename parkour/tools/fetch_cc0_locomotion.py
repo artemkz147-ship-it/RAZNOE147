@@ -2,14 +2,16 @@ import json
 import os
 import shutil
 import struct
-import tempfile
 import urllib.request
-import zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 OUT = os.path.join(ROOT, 'public', 'assets3d', 'character')
 MANIFEST = os.path.join(ROOT, 'src', 'game3d', 'locomotion.json')
-URL = 'https://opengameart.org/sites/default/files/universal_animation_librarystandard.zip'
+URL = (
+    'https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/'
+    'aa02a4e6d8337a0604d2da131bcbbeb1f01badf0/'
+    'public/assets/vendor/quaternius/universal-animation-library.glb'
+)
 
 os.makedirs(OUT, exist_ok=True)
 
@@ -37,45 +39,24 @@ def write_manifest(asset=None, clips=None):
 
 
 try:
-    with tempfile.TemporaryDirectory(prefix='vertical-locomotion-') as temp:
-        archive = os.path.join(temp, 'locomotion.zip')
-        request = urllib.request.Request(
-            URL,
-            headers={
-                'User-Agent': 'Mozilla/5.0 VerticalParkourBuild/1.0',
-                'Referer': 'https://opengameart.org/content/universal-animation-library',
-            },
-        )
-        print('Downloading Quaternius Universal Animation Library CC0...')
-        with urllib.request.urlopen(request, timeout=60) as response, open(archive, 'wb') as output:
-            shutil.copyfileobj(response, output)
+    request = urllib.request.Request(URL, headers={'User-Agent': 'Mozilla/5.0 DropFlowBuild/2.1'})
+    print('Downloading web-ready CC0 Universal Animation Library...')
+    with urllib.request.urlopen(request, timeout=60) as response:
+        data = response.read()
 
-        candidates = []
-        with zipfile.ZipFile(archive) as package:
-            for name in package.namelist():
-                if not name.lower().endswith('.glb'):
-                    continue
-                data = package.read(name)
-                doc = glb_json(data)
-                if not doc:
-                    continue
-                animations = doc.get('animations', [])
-                clips = [str(item.get('name') or f'clip_{i}') for i, item in enumerate(animations)]
-                meshes = len(doc.get('meshes', []))
-                skins = len(doc.get('skins', []))
-                score = len(clips) * 50 + skins * 25 + meshes * 10
-                candidates.append((score, len(data), name, data, clips, meshes, skins))
+    doc = glb_json(data)
+    if not doc:
+        raise RuntimeError('Downloaded animation library is not a valid GLB')
+    clips = [str(item.get('name') or f'clip_{i}') for i, item in enumerate(doc.get('animations', []))]
+    if not clips:
+        raise RuntimeError('Animation library contains no clips')
 
-        if not candidates:
-            raise RuntimeError('No GLB files found in locomotion archive')
-        candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
-        _, size, name, data, clips, meshes, skins = candidates[0]
-        target = os.path.join(OUT, 'parkour_locomotion.glb')
-        with open(target, 'wb') as file:
-            file.write(data)
-        write_manifest('assets3d/character/parkour_locomotion.glb', clips)
-        print(f'Prepared CC0 locomotion library: {os.path.basename(name)}; {meshes} meshes, {skins} skins, {len(clips)} clips, {size / 1024 / 1024:.1f} MB')
-        print('Locomotion sample: ' + ', '.join(clips[:24]))
+    target = os.path.join(OUT, 'parkour_locomotion.glb')
+    with open(target, 'wb') as file:
+        file.write(data)
+    write_manifest('assets3d/character/parkour_locomotion.glb', clips)
+    print(f'Prepared web-ready CC0 animation library: {len(clips)} clips, {len(data) / 1024 / 1024:.1f} MB')
+    print('Animation sample: ' + ', '.join(clips[:24]))
 except Exception as error:
     print(f'WARNING: CC0 locomotion fetch failed: {error}')
     write_manifest()
