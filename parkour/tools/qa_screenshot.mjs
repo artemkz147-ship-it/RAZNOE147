@@ -1,6 +1,9 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 
+const ASSET_ROOT = '/assets3d_df4_20260818/';
+const BUILD_ID = 'DF4-20260818-1751';
+
 await fs.mkdir('qa', { recursive: true });
 
 const browser = await chromium.launch({
@@ -17,8 +20,9 @@ page.on('console', (message) => {
 
 await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle', timeout: 60_000 });
 await page.waitForFunction(
-  () => document.querySelectorAll('.level-card').length > 0,
-  undefined,
+  (buildId) => document.querySelectorAll('.level-card').length > 0
+    && document.querySelector('#buildStamp')?.getAttribute('data-build') === buildId,
+  BUILD_ID,
   { timeout: 60_000 }
 );
 await page.locator('.level-card').first().click();
@@ -49,7 +53,36 @@ await page.waitForFunction(
   { timeout: 90_000 }
 );
 await page.waitForTimeout(1200);
-await page.screenshot({ path: 'qa/drop-flow-level-01-ready.png' });
+
+const resources = await page.evaluate(() => performance.getEntriesByType('resource').map((entry) => entry.name));
+await fs.writeFile('qa/resource-urls.txt', resources.join('\n'), 'utf8');
+
+const staleAssets = resources.filter((url) => {
+  try {
+    return new URL(url).pathname.includes('/assets3d/');
+  } catch {
+    return false;
+  }
+});
+if (staleAssets.length) {
+  throw new Error(`Stale unversioned assets were requested:\n${staleAssets.join('\n')}`);
+}
+
+const versionedResources = resources.filter((url) => {
+  try {
+    return new URL(url).pathname.includes(ASSET_ROOT);
+  } catch {
+    return false;
+  }
+});
+const required = ['parkour_performer.glb', 'parkour_locomotion.glb', 'rooftop_sunset_1k.hdr', 'landing-target.svg', 'kenney_city_'];
+for (const token of required) {
+  if (!versionedResources.some((url) => url.includes(token))) {
+    throw new Error(`Expected DF4 asset was not requested: ${token}`);
+  }
+}
+
+await page.screenshot({ path: 'qa/drop-flow-df4-level-01-ready.png' });
 
 await page.keyboard.press('Space');
 await page.waitForFunction(
@@ -60,7 +93,7 @@ await page.waitForFunction(
 );
 await page.keyboard.press('Digit1');
 await page.waitForTimeout(340);
-await page.screenshot({ path: 'qa/drop-flow-level-01-air.png' });
+await page.screenshot({ path: 'qa/drop-flow-df4-level-01-air.png' });
 
 await fs.writeFile('qa/browser-errors.txt', errors.join('\n'), 'utf8');
 if (errors.some((line) => /pageerror/i.test(line))) {
