@@ -22,6 +22,7 @@ jobs:
       - name: Materialize full 3D project
         shell: bash
         run: |
+          echo materialize > /tmp/merry-stage
           set -euo pipefail
           cat .build/payload.part* | tr -d '\r\n' | base64 -d > /tmp/merry-payload.tgz
           tar -tzf /tmp/merry-payload.tgz
@@ -45,26 +46,36 @@ jobs:
 
       - name: Install Blender and build tools
         run: |
+          echo blender > /tmp/merry-stage
           sudo apt-get update
           sudo apt-get install -y blender python3-numpy zip unzip
           blender --version | head -1
           blender -b --factory-startup --python-expr "import numpy; print('Blender numpy', numpy.__version__)"
 
       - name: Build CC0 GLB library
-        run: bash tools/build_assets.sh .asset-src
+        run: |
+          echo assets > /tmp/merry-stage
+          bash tools/build_assets.sh .asset-src
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: |
+          echo npm > /tmp/merry-stage
+          npm install --no-audit --no-fund
 
       - name: Production build
-        run: npm run build
+        run: |
+          echo vite > /tmp/merry-stage
+          npm run build
 
       - name: Validate content and Yandex package
-        run: python3 tools/validate_build.py
+        run: |
+          echo validate > /tmp/merry-stage
+          python3 tools/validate_build.py
 
       - name: WebGL QA on desktop and mobile
         shell: bash
         run: |
+          echo webgl > /tmp/merry-stage
           npm run preview -- --host 127.0.0.1 --port 4173 >/tmp/merry-vite.log 2>&1 &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
@@ -83,6 +94,7 @@ jobs:
       - name: Package releases
         shell: bash
         run: |
+          echo package > /tmp/merry-stage
           cd dist
           zip -9 -r ../vesely-natisk-3d-yandex-v2.0.0.zip .
           cd ..
@@ -116,3 +128,16 @@ jobs:
             smoke-mobile.png
           if-no-files-found: error
           retention-days: 14
+
+      - name: Record observable build result
+        if: always()
+        shell: bash
+        run: |
+          STAGE="$(cat /tmp/merry-stage 2>/dev/null || echo checkout)"
+          mkdir -p .build
+          printf '{"status":"%s","stage":"%s","run_id":"%s","sha":"%s"}\n' '${{ job.status }}' "$STAGE" '${{ github.run_id }}' '${{ github.sha }}' > .build/status.json
+          git config user.name 'Merry Mayhem Build Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add .build/status.json
+          git commit -m "Build status: ${{ job.status }} at $STAGE" || true
+          git push origin HEAD:yandex-3d-merry-mayhem || true
