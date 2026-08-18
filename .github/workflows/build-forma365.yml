@@ -7,6 +7,10 @@ on:
     paths:
       - 'forma365/**'
       - '.github/workflows/build-forma365.yml'
+  pull_request:
+    paths:
+      - 'forma365/**'
+      - '.github/workflows/build-forma365.yml'
   workflow_dispatch:
 
 permissions:
