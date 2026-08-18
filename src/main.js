@@ -417,7 +417,7 @@ class MerryMayhem3D {
   upgradeCandidates(){
     const p=this.player,c=[];
     if(p.weapons.length<6)for(const w of WEAPONS)if(!p.weapons.includes(w.id))c.push({kind:'newWeapon',id:w.id,rarity:2});
-    for(const id of p.weapons){const r=p.weaponRanks[id]||1;if(r<8)c.push({kind:'weapon',id,rarity:r>=7?4:2});}
+    for(const id of p.weapons){const r=p.weaponRanks[id]||1,w=weaponById(id),recipeReady=(p.passiveRanks[w.passive]||0)>0;if(r<7||(r===7&&recipeReady))c.push({kind:'weapon',id,rarity:r>=7?4:2});}
     for(const pa of PASSIVES){const r=p.passiveRanks[pa.id]||0;if(r<pa.max)c.push({kind:'passive',id:pa.id,rarity:1});}
     return c;
   }
