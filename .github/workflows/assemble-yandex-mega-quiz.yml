@@ -5,6 +5,7 @@ on:
     branches: [yandex-mega-quiz]
     paths:
       - 'yandex-mega-quiz/*.jsfrag'
+      - 'yandex-mega-quiz/.payload/apply.trigger'
       - '.github/workflows/assemble-yandex-mega-quiz.yml'
 
 permissions:
@@ -23,18 +24,36 @@ jobs:
       - name: Assemble runtime files
         shell: bash
         run: |
-          cat yandex-mega-quiz/questions.part1.jsfrag yandex-mega-quiz/questions.part2.jsfrag yandex-mega-quiz/questions.part3.jsfrag yandex-mega-quiz/questions.part4.jsfrag > yandex-mega-quiz/questions.js
+          if [ -f yandex-mega-quiz/.payload/apply.trigger ]; then
+            cat yandex-mega-quiz/.payload/questions.*.b64 | base64 -d | gzip -dc > yandex-mega-quiz/questions.js
+            cat yandex-mega-quiz/.payload/media.*.b64 | base64 -d | gzip -dc > yandex-mega-quiz/media_data.js
+            cat yandex-mega-quiz/.payload/index.*.b64 | base64 -d | gzip -dc > yandex-mega-quiz/index.html
+            cat yandex-mega-quiz/.payload/readme.*.b64 | base64 -d | gzip -dc > yandex-mega-quiz/README.md
+            python - <<'PY'
+          from pathlib import Path
+          p=Path('yandex-mega-quiz/questions.js')
+          s=p.read_text(encoding='utf-8')
+          n=len(s)
+          cuts=[0,n//4,n//2,(3*n)//4,n]
+          for i in range(4):
+              Path(f'yandex-mega-quiz/questions.part{i+1}.jsfrag').write_text(s[cuts[i]:cuts[i+1]],encoding='utf-8')
+          PY
+            rm -rf yandex-mega-quiz/.payload
+          else
+            cat yandex-mega-quiz/questions.part1.jsfrag yandex-mega-quiz/questions.part2.jsfrag yandex-mega-quiz/questions.part3.jsfrag yandex-mega-quiz/questions.part4.jsfrag > yandex-mega-quiz/questions.js
+          fi
           cat yandex-mega-quiz/game.part1.jsfrag yandex-mega-quiz/game.part2.jsfrag yandex-mega-quiz/game.part3.jsfrag yandex-mega-quiz/game.part4.jsfrag yandex-mega-quiz/game.part5.jsfrag yandex-mega-quiz/game.part6.jsfrag yandex-mega-quiz/game.part7.jsfrag > yandex-mega-quiz/game.js
           node --check yandex-mega-quiz/questions.js
           node --check yandex-mega-quiz/game.js
           node --check yandex-mega-quiz/yandex.js
+          if [ -f yandex-mega-quiz/media_data.js ]; then node --check yandex-mega-quiz/media_data.js; fi
 
       - name: Commit assembled files
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add yandex-mega-quiz/questions.js yandex-mega-quiz/game.js
+          git add -A yandex-mega-quiz
           git diff --cached --quiet && exit 0
-          git commit -m "Assemble Umniversum v2 runtime files"
+          git commit -m "Assemble Umniversum v2.1 media content"
           git push origin yandex-mega-quiz
