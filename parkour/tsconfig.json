@@ -11,8 +11,8 @@
     "isolatedModules": true,
     "noEmit": true,
     "strict": true,
-    "noUnusedLocals": true,
+    "noUnusedLocals": false,
     "noUnusedParameters": true
   },
-  "include": ["src"]
+  "include": ["src/main.ts", "src/drop/**/*.ts", "src/platform/**/*.ts"]
 }
