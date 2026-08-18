@@ -300,8 +300,8 @@ class MerryMayhem3D {
     const meta=this.progress.meta;
     const p={...actor,hero,speed:6.15*(1+(meta.speed||0)*.025),speedMul:1,maxHp:100+(meta.health||0)*10,hp:100+(meta.health||0)*10,damageMul:1+(meta.power||0)*.04,cooldownMul:1-(meta.cooldown||0)*.025,
       damageTaken:1-(meta.armor||0)*.025,areaMul:1+(meta.area||0)*.04,xpMul:1+(meta.xp||0)*.05,pickup:3.2*(1+(meta.pickup||0)*.08),crit:.05+(meta.crit||0)*.02,regen:(meta.regen||0)*.08,extraProjectiles:0,extraPierce:0,duration:1,
-      luck:(meta.luck||0)*.04,dashCd:2.25,dashTimer:0,dashTime:0,invuln:0,slowMul:1,weaponRanks:{},passiveRanks:{},weaponTimers:{},weapons:[],freeRerolls:meta.reroll||0,rerolls:0};
-    const b=hero.bonus||{};p.damageMul*=1+(b.damage||0);p.damageTaken*=1-(b.armor||b.damageReduction||0);p.maxHp*=1+(b.hp||0);p.hp=p.maxHp;p.speed*=1+(b.speed||0);p.cooldownMul*=1-(b.cooldown||0);p.xpMul*=1+(b.xp||0);p.pickup*=1+(b.pickup||0);p.crit+=b.crit||0;p.regen+=b.regen||0;p.extraProjectiles+=b.projectiles||0;p.extraPierce+=b.pierce||0;p.duration*=1+(b.duration||0);p.luck+=b.luck||0;
+      splashMul:1,slowBonus:0,homingBonus:0,projectileSpeedMul:1,dodge:0,knockbackMul:1,luck:(meta.luck||0)*.04,dashCd:2.25,dashTimer:0,dashTime:0,invuln:0,weaponRanks:{},passiveRanks:{},weaponTimers:{},weapons:[],freeRerolls:meta.reroll||0,rerolls:0};
+    const b=hero.bonus||{};p.damageMul*=1+(b.damage||0);p.damageTaken*=1-(b.armor||b.damageReduction||0);p.maxHp*=1+(b.hp||0);p.hp=p.maxHp;p.speed*=1+(b.speed||0);p.cooldownMul*=1-(b.cooldown||0);p.xpMul*=1+(b.xp||0);p.pickup*=1+(b.pickup||0);p.crit+=b.crit||0;p.regen+=b.regen||0;p.extraProjectiles+=b.projectiles||0;p.extraPierce+=b.pierce||0;p.duration*=1+(b.duration||0);p.luck+=b.luck||0;p.splashMul*=1+(b.splash||0);p.slowBonus+=b.slow||0;p.homingBonus+=b.homing||0;p.projectileSpeedMul*=1+(b.projectileSpeed||0);p.dodge+=b.dodge||0;p.knockbackMul*=1+(b.knockback||0);
     p.weapons=[hero.weapon];p.weaponRanks[hero.weapon]=1;this.player=p;this.playActor(p,'idle');this.attachHeldWeapon(p,weaponById(hero.weapon));this.syncLoadoutUI();
   }
 
@@ -314,14 +314,15 @@ class MerryMayhem3D {
   }
 
   updatePlayer(dt){
-    const p=this.player;if(!p)return;p.mixer.update(dt);p.invuln=Math.max(0,p.invuln-dt);p.dashTimer=Math.max(0,p.dashTimer-dt);p.slowMul=1;
-    const map=this.currentMap(),v=this.input.vector();
+    const p=this.player;if(!p)return;p.mixer.update(dt);p.invuln=Math.max(0,p.invuln-dt);p.dashTimer=Math.max(0,p.dashTimer-dt);
+    const map=this.currentMap(),v=this.input.vector();let terrainMul=1;
+    for(const h of this.hazards){const coord=h.axis==='x'?p.root.position.x:p.root.position.z;if(Math.abs(coord-h.at)<h.width*.5)terrainMul*=h.slow;}
     if(this.input.consumeDash()&&p.dashTimer<=0){p.dashTimer=p.dashCd;p.dashTime=.22;p.invuln=.30;this.audio.dash();this.vibrate(18);}
     p.dashTime=Math.max(0,p.dashTime-dt);const mul=p.dashTime>0?2.9:1;
-    if(v.lengthSq()>.02){const dir=new THREE.Vector3(v.x,0,-v.y).normalize();p.root.position.addScaledVector(dir,p.speed*p.speedMul*mul*p.slowMul*dt);p.root.rotation.y=Math.atan2(dir.x,dir.z);this.playActor(p,p.dashTime>0?'run':'run');}else this.playActor(p,'idle');
+    if(v.lengthSq()>.02){const dir=new THREE.Vector3(v.x,0,-v.y).normalize();p.root.position.addScaledVector(dir,p.speed*p.speedMul*mul*terrainMul*dt);p.root.rotation.y=Math.atan2(dir.x,dir.z);this.playActor(p,p.dashTime>0?'run':'run');}else this.playActor(p,'idle');
     const hx=map.width/2-3.3,hz=map.height/2-3.3;p.root.position.x=clamp(p.root.position.x,-hx,hx);p.root.position.z=clamp(p.root.position.z,-hz,hz);
     for(const o of this.obstacles){const dx=p.root.position.x-o.x,dz=p.root.position.z-o.z,d=Math.hypot(dx,dz),min=o.radius+.58;if(d<min&&d>.001){p.root.position.x=o.x+dx/d*min;p.root.position.z=o.z+dz/d*min;}}
-    for(const h of this.hazards){const coord=h.axis==='x'?p.root.position.x:p.root.position.z;if(Math.abs(coord-h.at)<h.width*.5){p.slowMul*=h.slow;if(h.damage&&p.invuln<=0){this.hurtPlayer(h.damage*dt);}}}
+    for(const h of this.hazards){const coord=h.axis==='x'?p.root.position.x:p.root.position.z;if(Math.abs(coord-h.at)<h.width*.5&&h.damage&&p.invuln<=0)this.hurtPlayer(h.damage*dt);}
     if(p.regen>0)p.hp=Math.min(p.maxHp,p.hp+p.regen*dt);
     for(const id of p.weapons)this.updateWeapon(id,dt);
     const dashPct=p.dashTimer<=0?0:p.dashTimer/p.dashCd;$('#dash-cooldown').style.transform=`scaleY(${dashPct})`;
@@ -348,7 +349,8 @@ class MerryMayhem3D {
 
   spawnProjectile(w,from,dir,opts){
     const root=this.cloneVisual(this.assets[w.projectile]||this.assets.gem,w.scale||.25,{shadow:false});root.position.copy(from);root.scale.multiplyScalar(opts.area||1);root.rotation.y=Math.atan2(dir.x,dir.z);this.scene.add(root);
-    this.projectiles.push({root,w,vel:dir.clone().multiplyScalar(w.speed||18),life:(w.range||24)/(w.speed||18)*this.player.duration,damage:opts.damage,pierce:opts.pierce||0,hit:new Set(),homing:opts.homing||0,chain:opts.chain||0,boomerang:opts.boomerang,age:0,mine:opts.mine,slow:w.slow||0,splash:(w.splash||0)*(opts.area||1),knockback:w.knockback||0,crit:(w.crit||0)+this.player.crit});
+    const shotSpeed=(w.speed||18)*this.player.projectileSpeedMul;
+    this.projectiles.push({root,w,vel:dir.clone().multiplyScalar(shotSpeed),life:(w.range||24)/shotSpeed*this.player.duration,damage:opts.damage,pierce:opts.pierce||0,hit:new Set(),homing:(opts.homing||0)+this.player.homingBonus,chain:opts.chain||0,boomerang:opts.boomerang,age:0,mine:opts.mine,slow:Math.min(.8,(w.slow||0)+this.player.slowBonus),splash:(w.splash||0)*(opts.area||1)*this.player.splashMul,knockback:(w.knockback||0)*this.player.knockbackMul,crit:(w.crit||0)+this.player.crit});
   }
 
   updateProjectiles(dt){
@@ -356,9 +358,9 @@ class MerryMayhem3D {
       if(p.homing){const t=this.nearestEnemy(p.root.position,12);if(t){const desired=t.root.position.clone().sub(p.root.position);desired.y=0;desired.normalize().multiplyScalar(p.w.speed||18);p.vel.lerp(desired,clamp(dt*p.homing,0,1));}}
       if(p.boomerang&&p.life<.55){const desired=this.player.root.position.clone().sub(p.root.position);desired.y=0;desired.normalize().multiplyScalar(p.w.speed||18);p.vel.lerp(desired,clamp(dt*5,0,1));}
       p.root.position.addScaledVector(p.vel,dt);p.root.rotation.x+=dt*5;p.root.rotation.z+=dt*3;
-      let remove=p.life<=0;
+      const expired=p.life<=0;let remove=expired;
       for(const e of this.enemies){if(e.dead||p.hit.has(e))continue;const rr=(e.radius||.75)+.38*(p.root.scale.x||1);if(e.root.position.distanceToSquared(p.root.position)<rr*rr){p.hit.add(e);let dmg=p.damage;if(Math.random()<p.crit)dmg*=2;this.damageEnemy(e,dmg,p);if(p.chain>0)this.chainFrom(e,p);if(p.splash>0)this.splashDamage(e.root.position,p.splash,dmg*.62,e);if(p.knockback){const d=e.root.position.clone().sub(this.player.root.position);d.y=0;d.normalize();e.root.position.addScaledVector(d,p.knockback);}p.pierce--;if(p.pierce<0){remove=true;break;}}}
-      if(remove){p.root.removeFromParent();this.projectiles.splice(i,1);}
+      if(remove){if(p.mine&&expired&&p.splash>0)this.splashDamage(p.root.position,p.splash,p.damage*.62,null);p.root.removeFromParent();this.projectiles.splice(i,1);}
     }
   }
   chainFrom(first,p){let prev=first;for(let n=0;n<p.chain;n++){const t=this.nearestEnemy(prev.root.position,p.w.chainRadius||6,prev);if(!t||p.hit.has(t))break;p.hit.add(t);this.damageEnemy(t,p.damage*.72,p);prev=t;}}
@@ -397,7 +399,12 @@ class MerryMayhem3D {
   splashEnemyExplosion(e){const d=e.root.position.distanceTo(this.player.root.position);if(d<4.2)this.hurtPlayer(e.damage*1.35);}
 
   damageEnemy(e,amount,proj){if(e.dead)return;if(e.shield>0){const used=Math.min(e.shield,amount);e.shield-=used;amount-=used;}e.hp-=amount;if(e.hp<=0)this.killEnemy(e,true);}
-  killEnemy(e,reward=true){if(e.dead)return;e.dead=true;this.playActor(e,'death',false,.03);if(reward){this.kills++;this.runCoins+=e.elite?16:1+Math.floor(e.def.xp/2);this.addXp(e.def.xp*(e.elite?7:1));this.spawnPickup(e.root.position,e.elite?'coin':'xp',e.elite?8:1);this.audio.kill();this.progress.daily.kills++;this.progress.career.kills++;if(e.elite)setTimeout(()=>this.openChest(),280);}setTimeout(()=>{e.root.removeFromParent();const i=this.enemies.indexOf(e);if(i>=0)this.enemies.splice(i,1);},240);}
+  killEnemy(e,reward=true){
+    if(e.dead)return;const deathPos=e.root.position.clone(),shouldSplit=reward&&!e.elite&&e.def.behavior==='split';e.dead=true;this.playActor(e,'death',false,.03);
+    if(reward){this.kills++;this.runCoins+=e.elite?16:1+Math.floor(e.def.xp/2);const xpValue=e.def.xp*(e.elite?7:1);this.spawnPickup(deathPos,'xp',xpValue);if(e.elite)this.spawnPickup(deathPos,'coin',8);this.audio.kill();this.progress.daily.kills++;this.progress.career.kills++;if(e.elite)setTimeout(()=>this.openChest(),280);}
+    if(shouldSplit){for(let n=0;n<2;n++){const child=this.spawnEnemy(false,e.def);child.root.position.copy(deathPos).add(new THREE.Vector3(n?1:-1,0,(Math.random()-.5)*1.4));child.root.scale.multiplyScalar(.62);child.radius*=.62;child.hp=Math.max(12,e.maxHp*.26);child.maxHp=child.hp;child.damage*=.72;child.speed*=1.18;child.def={...child.def,behavior:'chase',xp:Math.max(1,Math.floor(e.def.xp*.55))};}}
+    setTimeout(()=>{e.root.removeFromParent();const i=this.enemies.indexOf(e);if(i>=0)this.enemies.splice(i,1);},240);
+  }
 
   spawnPickup(pos,type='xp',value=1){const root=this.cloneVisual(this.assets[type==='coin'?'food_donut':'gem'],type==='coin'?.28:.18,{shadow:false,tint:type==='coin'?0xffd55d:0x78e8ff});root.position.copy(pos);root.position.y=.35;this.scene.add(root);this.pickups.push({root,type,value,phase:Math.random()*TAU});}
   updatePickups(dt){for(let i=this.pickups.length-1;i>=0;i--){const p=this.pickups[i];p.phase+=dt*4;p.root.rotation.y+=dt*3;p.root.position.y=.34+Math.sin(p.phase)*.08;const d=p.root.position.distanceTo(this.player.root.position);if(d<this.player.pickup){const dir=this.player.root.position.clone().sub(p.root.position);dir.y=0;p.root.position.addScaledVector(dir.normalize(),dt*(7+(this.player.pickup-d)*2));}if(d<.9){if(p.type==='xp')this.addXp(p.value);else this.runCoins+=p.value;this.audio.pickup();p.root.removeFromParent();this.pickups.splice(i,1);}}}
@@ -441,7 +448,7 @@ class MerryMayhem3D {
   }
   bossRing(b,count,offset=0){for(let i=0;i<count;i++){const a=i/count*TAU+offset;this.enemyShot(b,new THREE.Vector3(Math.sin(a),0,Math.cos(a)),.8);}}
 
-  hurtPlayer(amount){const p=this.player;if(!p||p.invuln>0)return;p.hp-=amount*p.damageTaken;$('#damage-flash').classList.add('show');setTimeout(()=>$('#damage-flash').classList.remove('show'),70);this.audio.hurt();this.vibrate(25);if(p.hp<=0)this.endRun(false);}
+  hurtPlayer(amount){const p=this.player;if(!p||p.invuln>0)return;if(p.dodge>0&&Math.random()<p.dodge){this.runToast('УКЛОНЕНИЕ');return;}p.hp-=amount*p.damageTaken;$('#damage-flash').classList.add('show');setTimeout(()=>$('#damage-flash').classList.remove('show'),70);this.audio.hurt();this.vibrate(25);if(p.hp<=0)this.endRun(false);}
 
   async endRun(victory){if(this.state==='gameover')return;this.state='gameover';document.body.dataset.gameState=victory?'victory':'gameover';this.bridge.stopGameplay();$('#hud').classList.add('hidden');$('#mobile-controls').classList.add('hidden');$('#boss-wrap').classList.add('hidden');
     const mode=this.currentMode(),coins=Math.floor((this.runCoins+this.kills*.22+this.level*3)*mode.reward);this.runCoins=coins;this.progress.runs++;this.progress.bestTime=Math.max(this.progress.bestTime,this.elapsed);this.progress.bestKills=Math.max(this.progress.bestKills,this.kills);this.progress.coins+=coins;this.progress.career.survive+=Math.floor(this.elapsed);this.progress.daily.survive+=Math.floor(this.elapsed);
