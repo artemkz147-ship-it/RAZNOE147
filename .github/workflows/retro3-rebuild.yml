@@ -25,3 +25,10 @@ jobs:
         with:
           name: retro3-base-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-sign-tools
+          path: |
+            ${{ env.ANDROID_HOME }}/build-tools/35.0.0/apksigner
+            ${{ env.ANDROID_HOME }}/build-tools/35.0.0/zipalign
+            ${{ env.ANDROID_HOME }}/build-tools/35.0.0/lib/apksigner.jar
