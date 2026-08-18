@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import cityManifest from '../game3d/scenery.json';
 import factoryManifest from './factory.json';
+import dressingManifest from './dressing.json';
 import type { DropLevelSpec, DropSurface, SurfaceKind } from './DropTypes';
 
 type FactoryManifest = {
@@ -10,6 +11,12 @@ type FactoryManifest = {
   pole: string[];
   unit: string[];
   all: string[];
+};
+
+type DressingManifest = {
+  roads: string[];
+  street: string[];
+  rooftop: string[];
 };
 
 type SurfaceVisual = {
@@ -29,6 +36,7 @@ export class DropLevelManager {
   private textureLoader = new THREE.TextureLoader();
   private cityAssets = cityManifest as string[];
   private factory = factoryManifest as FactoryManifest;
+  private dressing = dressingManifest as DressingManifest;
   private cache = new Map<string, Promise<THREE.Object3D>>();
   private surfaces: SurfaceVisual[] = [];
   private background: THREE.Object3D[] = [];
@@ -274,7 +282,81 @@ export class DropLevelManager {
         return root;
       })
     );
-    this.background = roots.filter((root): root is THREE.Object3D => root !== null);
+
+    const street = await this.createStreetDressing(centerX, centerZ, level.id);
+    this.background = [
+      ...roots.filter((root): root is THREE.Object3D => root !== null),
+      ...street
+    ];
+  }
+
+  private async createStreetDressing(centerX: number, centerZ: number, levelId: number) {
+    const roots: THREE.Object3D[] = [];
+    if (!this.dressing.roads.length) return roots;
+
+    const tileSize = 11;
+    const tasks: Promise<void>[] = [];
+    for (let gx = -4; gx <= 4; gx += 1) {
+      for (let gz = -4; gz <= 4; gz += 1) {
+        tasks.push((async () => {
+          const selector = Math.abs(gx * 3 + gz * 5 + levelId) % this.dressing.roads.length;
+          const asset = this.dressing.roads[selector];
+          const road = await this.clone(asset);
+          const size = this.measure(road);
+          if (size.x <= 0.001 || size.z <= 0.001) return;
+          const scale = tileSize / Math.max(size.x, size.z);
+          road.scale.setScalar(scale);
+          const box = new THREE.Box3().setFromObject(road);
+          const center = box.getCenter(new THREE.Vector3());
+          const x = centerX + gx * tileSize;
+          const z = centerZ + gz * tileSize;
+          road.position.x += x - center.x;
+          road.position.z += z - center.z;
+          road.position.y += STREET_Y + 0.015 - box.min.y;
+          if ((gx + gz) % 2 !== 0) road.rotation.y = Math.PI * 0.5;
+          road.traverse((child) => {
+            if (!(child instanceof THREE.Mesh)) return;
+            child.receiveShadow = true;
+            child.castShadow = false;
+          });
+          this.scene.add(road);
+          roots.push(road);
+        })());
+      }
+    }
+
+    if (this.dressing.street.length) {
+      for (let i = 0; i < 12; i += 1) {
+        tasks.push((async () => {
+          const asset = this.dressing.street[i % this.dressing.street.length];
+          const prop = await this.clone(asset);
+          const size = this.measure(prop);
+          if (size.y <= 0.001) return;
+          const targetHeight = asset.includes('streetlight') ? 4.2 : asset.includes('dumpster') ? 1.25 : 0.85;
+          const scale = targetHeight / size.y;
+          prop.scale.setScalar(scale);
+          const box = new THREE.Box3().setFromObject(prop);
+          const center = box.getCenter(new THREE.Vector3());
+          const side = i % 2 === 0 ? -1 : 1;
+          const x = centerX - 38 + Math.floor(i / 2) * 15;
+          const z = centerZ + side * (7.2 + (i % 3) * 11);
+          prop.position.x += x - center.x;
+          prop.position.z += z - center.z;
+          prop.position.y += STREET_Y + 0.04 - box.min.y;
+          prop.rotation.y = (i % 4) * Math.PI * 0.5;
+          prop.traverse((child) => {
+            if (!(child instanceof THREE.Mesh)) return;
+            child.castShadow = true;
+            child.receiveShadow = true;
+          });
+          this.scene.add(prop);
+          roots.push(prop);
+        })());
+      }
+    }
+
+    await Promise.all(tasks);
+    return roots;
   }
 
   private assetFor(levelId: number, kind: SurfaceKind, index: number) {
@@ -328,8 +410,6 @@ export class DropLevelManager {
       const cloneMaterial = (material: THREE.Material) => {
         const copy = material.clone();
         if (copy instanceof THREE.MeshStandardMaterial) {
-          // Preserve the authored color/texture. DF5 multiplied every building by a
-          // grey-green tint, which made the whole city look like an untextured mock-up.
           copy.roughness = Math.max(copy.roughness, route ? 0.58 : 0.65);
           copy.metalness = Math.min(copy.metalness, route ? 0.08 : 0.04);
           copy.envMapIntensity = route ? 0.82 : 0.62;
