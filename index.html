@@ -4,157 +4,174 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#0b1114" />
-  <meta name="description" content="Shadowvale Survivor — 3D survival roguelike" />
-  <title>Shadowvale Survivor</title>
+  <meta name="theme-color" content="#172b34" />
+  <meta name="description" content="Весёлый Натиск 3D — survival roguelite для Яндекс Игр" />
+  <title>Весёлый Натиск 3D</title>
   <script src="/sdk.js"></script>
 </head>
 <body>
   <div id="app">
     <canvas id="game"></canvas>
     <div id="damage-flash"></div>
+    <div id="vignette"></div>
 
-    <div id="loading" class="screen screen--visible loading-screen">
-      <div class="brand-mark"><span>SV</span></div>
-      <div class="loading-title" data-i18n="loadingTitle">ПРОБУЖДЕНИЕ ДОЛИНЫ</div>
-      <div class="loading-bar"><div id="loading-fill"></div></div>
-      <div id="loading-text" class="loading-text">0%</div>
-    </div>
+    <section id="loading" class="screen screen--visible loading-screen">
+      <div class="loading-logo">ВН<span>3D</span></div>
+      <h1>ВЕСЁЛЫЙ НАТИСК</h1>
+      <div class="loading-sub">Собираем миры, героев и монстров</div>
+      <div class="loading-bar"><i id="loading-fill"></i></div>
+      <b id="loading-text">0%</b>
+    </section>
 
-    <div id="menu" class="screen menu-screen">
-      <section class="menu-card">
-        <div class="eyebrow">3D SURVIVAL ROGUELIKE</div>
-        <h1>SHADOWVALE<br><span>SURVIVOR</span></h1>
-        <p data-i18n="subtitle">Прорвись через туман, усиливай рыцаря и уничтожь Владыку Долины.</p>
-        <div class="record-grid">
-          <div><span data-i18n="best">Лучшее время</span><strong id="best-time">00:00</strong></div>
-          <div><span data-i18n="bestKills">Рекорд убийств</span><strong id="best-kills">0</strong></div>
-          <div><span data-i18n="souls">Осколки душ</span><strong id="menu-souls">0</strong></div>
+    <section id="menu" class="screen menu-screen">
+      <div class="menu-shell">
+        <header class="menu-title">
+          <div class="eyebrow">3D SURVIVAL ROGUELITE</div>
+          <h1>ВЕСЁЛЫЙ<br><span>НАТИСК</span></h1>
+          <p id="menu-map-line">Солнечный луг · Рыцарь Пончик</p>
+        </header>
+        <div class="menu-main-actions">
+          <button id="start-btn" class="primary big">НАЧАТЬ ЗАБЕГ</button>
+          <div class="menu-row">
+            <button id="hero-btn" class="card-button"><small>ГЕРОЙ</small><b id="menu-hero-name">Рыцарь Пончик</b></button>
+            <button id="map-btn" class="card-button"><small>КАРТА</small><b id="menu-map-name">Солнечный луг</b></button>
+          </div>
+          <div class="menu-row three">
+            <button id="mode-btn" class="secondary"><span>Режим</span><b id="menu-mode-name">Быстрый забег</b></button>
+            <button id="meta-btn" class="secondary">ПРОКАЧКА</button>
+            <button id="quests-btn" class="secondary">КВЕСТЫ</button>
+          </div>
+          <div class="menu-row compact">
+            <button id="collection-btn" class="ghost">КОЛЛЕКЦИЯ</button>
+            <button id="settings-btn" class="ghost">НАСТРОЙКИ</button>
+            <button id="review-btn" class="ghost hidden">ОЦЕНИТЬ</button>
+          </div>
         </div>
-        <button id="start-btn" class="primary" data-i18n="start">НАЧАТЬ ЗАБЕГ</button>
-        <div class="menu-actions">
-          <button id="altar-btn" class="secondary" data-i18n="altar">АЛТАРЬ СИЛЫ</button>
-          <button id="settings-btn" class="secondary" data-i18n="settings">НАСТРОЙКИ</button>
+        <footer class="menu-stats">
+          <span>★ <b id="menu-coins">0</b></span>
+          <span>Победы <b id="menu-wins">0</b></span>
+          <span>Рекорд <b id="menu-best">00:00</b></span>
+          <span class="version">v2.0</span>
+        </footer>
+      </div>
+    </section>
+
+    <section id="hero-panel" class="screen modal-screen overlay-panel">
+      <div class="panel wide-panel">
+        <button class="close" data-close="hero-panel">×</button>
+        <div class="panel-head"><div><div class="eyebrow">15 РАЗНЫХ СТИЛЕЙ</div><h2>ВЫБОР ГЕРОЯ</h2></div><div class="coin-bank">★ <b id="hero-coins">0</b></div></div>
+        <div id="hero-grid" class="hero-grid"></div>
+      </div>
+    </section>
+
+    <section id="map-panel" class="screen modal-screen overlay-panel">
+      <div class="panel wide-panel">
+        <button class="close" data-close="map-panel">×</button>
+        <div class="panel-head"><div><div class="eyebrow">18 БОЛЬШИХ МИРОВ</div><h2>ВЫБОР КАРТЫ</h2></div><div class="small-note">Границы мира — часть окружения</div></div>
+        <div id="map-grid" class="map-grid"></div>
+      </div>
+    </section>
+
+    <section id="mode-panel" class="screen modal-screen overlay-panel">
+      <div class="panel compact-panel">
+        <button class="close" data-close="mode-panel">×</button>
+        <div class="eyebrow">ТЕМП ЗАБЕГА</div><h2>РЕЖИМ</h2>
+        <div id="mode-grid" class="mode-grid"></div>
+      </div>
+    </section>
+
+    <section id="meta-panel" class="screen modal-screen overlay-panel">
+      <div class="panel wide-panel">
+        <button class="close" data-close="meta-panel">×</button>
+        <div class="panel-head"><div><div class="eyebrow">ПОСТОЯННОЕ РАЗВИТИЕ</div><h2>ДРЕВО ПРОКАЧКИ</h2></div><div class="coin-bank">★ <b id="meta-coins">0</b></div></div>
+        <div id="meta-branches" class="meta-branches"></div>
+      </div>
+    </section>
+
+    <section id="quests-panel" class="screen modal-screen overlay-panel">
+      <div class="panel medium-panel">
+        <button class="close" data-close="quests-panel">×</button>
+        <div class="eyebrow">ОБНОВЛЯЮТСЯ КАЖДЫЙ ДЕНЬ</div><h2>КВЕСТЫ</h2>
+        <div id="daily-quests" class="quest-list"></div>
+        <div class="eyebrow divider-title">КАРЬЕРНЫЕ ЦЕЛИ</div>
+        <div id="career-quests" class="quest-list compact-list"></div>
+      </div>
+    </section>
+
+    <section id="collection-panel" class="screen modal-screen overlay-panel">
+      <div class="panel wide-panel">
+        <button class="close" data-close="collection-panel">×</button>
+        <div class="eyebrow">ОТКРЫТЫЙ КОНТЕНТ</div><h2>КОЛЛЕКЦИЯ</h2>
+        <div class="tabs" id="collection-tabs">
+          <button data-tab="heroes" class="active">Герои</button><button data-tab="weapons">Оружие</button><button data-tab="maps">Карты</button><button data-tab="enemies">Враги</button><button data-tab="bosses">Боссы</button>
         </div>
-        <div class="menu-actions compact">
-          <button id="how-btn" class="ghost" data-i18n="controls">УПРАВЛЕНИЕ</button>
-          <button id="review-btn" class="ghost hidden" data-i18n="review">ОЦЕНИТЬ ИГРУ</button>
-        </div>
-        <div class="menu-note" data-i18n="menuNote">WASD / стрелки · Space — рывок · на телефоне — виртуальный джойстик</div>
-        <div class="version">v1.0.1</div>
-      </section>
-    </div>
+        <div id="collection-grid" class="collection-grid"></div>
+      </div>
+    </section>
+
+    <section id="settings-panel" class="screen modal-screen overlay-panel">
+      <div class="panel compact-panel">
+        <button class="close" data-close="settings-panel">×</button>
+        <div class="eyebrow">ПАРАМЕТРЫ</div><h2>НАСТРОЙКИ</h2>
+        <button id="setting-music" class="setting-row"><span>Музыка</span><b id="music-value">ON</b></button>
+        <button id="setting-sfx" class="setting-row"><span>Эффекты</span><b id="sfx-value">ON</b></button>
+        <button id="setting-vibration" class="setting-row"><span>Вибрация</span><b id="vibration-value">ON</b></button>
+        <button id="setting-quality" class="setting-row"><span>Качество</span><b id="quality-value">Авто</b></button>
+        <button id="fullscreen-btn" class="secondary wide">НА ВЕСЬ ЭКРАН</button>
+      </div>
+    </section>
+
+    <section id="upgrade" class="screen modal-screen">
+      <div class="upgrade-panel">
+        <div class="eyebrow">НОВЫЙ УРОВЕНЬ <span id="upgrade-level">2</span></div>
+        <h2>ВЫБЕРИ УСИЛЕНИЕ</h2>
+        <div id="upgrade-cards" class="upgrade-cards"></div>
+        <button id="reroll-btn" class="secondary ad-button"><span>ПЕРЕБРОСИТЬ ВАРИАНТЫ</span><b>▶</b></button>
+      </div>
+    </section>
+
+    <section id="chest-panel" class="screen modal-screen">
+      <div class="chest-card">
+        <div class="eyebrow">СУНДУК ЭЛИТЫ</div><h2 id="chest-title">НОВАЯ СИЛА</h2>
+        <div id="chest-reward" class="chest-reward"></div>
+        <button id="chest-continue" class="primary">ЗАБРАТЬ</button>
+      </div>
+    </section>
+
+    <section id="gameover" class="screen modal-screen">
+      <div class="result-card">
+        <div class="eyebrow" id="result-kicker">ЗАБЕГ ОКОНЧЕН</div><h2 id="result-title">ГЕРОЙ ПАЛ</h2>
+        <div class="result-grid"><div><span>Время</span><b id="result-time">00:00</b></div><div><span>Враги</span><b id="result-kills">0</b></div><div><span>Уровень</span><b id="result-level">1</b></div><div><span>Монеты</span><b id="result-coins">+0</b></div></div>
+        <div class="reward-actions"><button id="revive-btn" class="primary ad-button"><span>ВОЗРОДИТЬСЯ</span><b>▶</b></button><button id="double-btn" class="secondary ad-button"><span>×2 МОНЕТЫ</span><b>▶</b></button></div>
+        <button id="restart-btn" class="secondary wide">НОВЫЙ ЗАБЕГ</button><button id="result-menu-btn" class="ghost wide">ГЛАВНОЕ МЕНЮ</button>
+      </div>
+    </section>
+
+    <section id="pause-panel" class="screen modal-screen">
+      <div class="panel compact-panel pause-card">
+        <div class="eyebrow">ПАУЗА</div><h2>ВЕСЁЛЫЙ НАТИСК</h2>
+        <button id="resume-btn" class="primary wide">ПРОДОЛЖИТЬ</button><button id="pause-settings-btn" class="secondary wide">НАСТРОЙКИ</button><button id="quit-btn" class="ghost wide">В ГЛАВНОЕ МЕНЮ</button>
+      </div>
+    </section>
 
     <div id="hud" class="hud hidden">
       <div class="hud-top">
-        <div class="stat-pill"><span data-i18n="time">Время</span><b id="time">00:00</b></div>
-        <div class="stat-pill"><span data-i18n="level">Ур.</span><b id="level">1</b></div>
-        <div class="stat-pill"><span data-i18n="kills">Враги</span><b id="kills">0</b></div>
+        <div class="stat-pill"><span>ВРЕМЯ</span><b id="time">05:00</b></div><div class="stat-pill"><span>УРОВЕНЬ</span><b id="level">1</b></div><div class="stat-pill"><span>ВРАГИ</span><b id="kills">0</b></div><div class="stat-pill"><span>★</span><b id="run-coins">0</b></div>
       </div>
-      <button id="pause-btn" class="pause-btn" aria-label="Pause">Ⅱ</button>
-      <div id="boss-bar-wrap" class="boss-bar-wrap hidden">
-        <span data-i18n="boss">ВЛАДЫКА ТУМАНА</span><div class="boss-bar"><div id="boss-fill"></div></div>
-      </div>
-      <div class="bars">
-        <div class="bar hp"><div id="hp-fill"></div><span id="hp-text">100 / 100</span></div>
-        <div class="bar xp"><div id="xp-fill"></div></div>
-      </div>
-      <div id="boss-warning" class="boss-warning hidden" data-i18n="bossIncoming">ВЛАДЫКА ТУМАНА ВХОДИТ В ДОЛИНУ</div>
-    </div>
-
-    <div id="upgrade" class="screen modal-screen">
-      <div class="upgrade-panel">
-        <div class="eyebrow" data-i18n="choosePower">ВЫБЕРИ СИЛУ</div>
-        <h2 data-i18n="levelUp">НОВЫЙ УРОВЕНЬ</h2>
-        <div id="upgrade-cards" class="upgrade-cards"></div>
-        <button id="reroll-btn" class="secondary ad-button"><span data-i18n="reroll">Обновить выбор</span><b>▶</b></button>
-      </div>
-    </div>
-
-    <div id="gameover" class="screen modal-screen">
-      <div class="gameover-card">
-        <div class="eyebrow" id="result-kicker">ЗАБЕГ ОКОНЧЕН</div>
-        <h2 id="result-title" data-i18n="fallen">ГЕРОЙ ПАЛ</h2>
-        <div class="result-grid">
-          <div><span data-i18n="time">Время</span><b id="result-time">00:00</b></div>
-          <div><span data-i18n="kills">Враги</span><b id="result-kills">0</b></div>
-          <div><span data-i18n="level">Ур.</span><b id="result-level">1</b></div>
-          <div class="souls-result"><span data-i18n="soulsEarned">Души за забег</span><b id="result-souls">+0</b></div>
-        </div>
-        <div class="reward-actions">
-          <button id="revive-btn" class="primary ad-button"><span data-i18n="revive">ВОЗРОДИТЬСЯ</span><b>▶</b></button>
-          <button id="double-btn" class="secondary ad-button"><span data-i18n="doubleSouls">УДВОИТЬ ДУШИ</span><b>▶</b></button>
-        </div>
-        <button id="restart-btn" class="secondary" data-i18n="again">НОВЫЙ ЗАБЕГ</button>
-        <button id="result-menu-btn" class="ghost wide" data-i18n="toMenu">ГЛАВНОЕ МЕНЮ</button>
-      </div>
-    </div>
-
-    <div id="pause-panel" class="screen modal-screen">
-      <div class="pause-card">
-        <div class="eyebrow" data-i18n="pause">ПАУЗА</div>
-        <h2>SHADOWVALE</h2>
-        <button id="resume-btn" class="primary" data-i18n="resume">ПРОДОЛЖИТЬ</button>
-        <button id="pause-settings-btn" class="secondary" data-i18n="settings">НАСТРОЙКИ</button>
-        <button id="quit-btn" class="ghost wide" data-i18n="quit">В ГЛАВНОЕ МЕНЮ</button>
-      </div>
-    </div>
-
-    <div id="controls-panel" class="screen modal-screen overlay-panel">
-      <div class="info-card">
-        <button id="close-controls" class="close">×</button>
-        <div class="eyebrow" data-i18n="controls">УПРАВЛЕНИЕ</div>
-        <h2>MOVE · DASH · SURVIVE</h2>
-        <p data-i18n="controlsText">Двигайся WASD или стрелками. Рыцарь автоматически атакует ближайших врагов. Space — быстрый рывок с короткой неуязвимостью. На телефоне используй джойстик слева и кнопку рывка справа.</p>
-        <div class="control-chips"><span>WASD</span><span>ARROWS</span><span>SPACE</span><span>TOUCH</span></div>
-      </div>
-    </div>
-
-    <div id="settings-panel" class="screen modal-screen overlay-panel">
-      <div class="settings-card">
-        <button id="close-settings" class="close">×</button>
-        <div class="eyebrow" data-i18n="settings">НАСТРОЙКИ</div>
-        <h2>GAME SETTINGS</h2>
-        <button id="setting-music" class="setting-row"><span data-i18n="music">Музыка</span><b id="music-value">ON</b></button>
-        <button id="setting-sfx" class="setting-row"><span data-i18n="sfx">Эффекты</span><b id="sfx-value">ON</b></button>
-        <button id="setting-vibration" class="setting-row"><span data-i18n="vibration">Вибрация</span><b id="vibration-value">ON</b></button>
-        <button id="setting-quality" class="setting-row"><span data-i18n="quality">Качество</span><b id="quality-value">Авто</b></button>
-        <button id="fullscreen-btn" class="secondary" data-i18n="fullscreen">НА ВЕСЬ ЭКРАН</button>
-      </div>
-    </div>
-
-    <div id="altar-panel" class="screen modal-screen overlay-panel">
-      <div class="altar-card">
-        <button id="close-altar" class="close">×</button>
-        <div class="altar-head">
-          <div><div class="eyebrow" data-i18n="altarTitle">АЛТАРЬ СИЛЫ</div><h2>PERMANENT POWER</h2><p data-i18n="altarHint">Постоянные улучшения сохраняются между забегами.</p></div>
-          <div class="soul-bank"><span data-i18n="souls">Осколки душ</span><b id="altar-souls">0</b></div>
-        </div>
-        <div id="meta-cards" class="meta-cards"></div>
-      </div>
+      <button id="pause-btn" class="pause-btn">Ⅱ</button>
+      <div id="boss-wrap" class="boss-wrap hidden"><div class="boss-label"><span id="boss-name">БОСС</span><b id="boss-phase">I</b></div><div class="boss-bar"><i id="boss-fill"></i></div></div>
+      <div class="bars"><div class="bar hp"><i id="hp-fill"></i><span id="hp-text">100 / 100</span></div><div class="bar xp"><i id="xp-fill"></i><span id="xp-text">0 / 7</span></div></div>
+      <div class="loadout"><div id="weapon-slots" class="slots"></div><div id="passive-slots" class="slots passives"></div></div>
+      <div id="run-toast" class="run-toast"></div>
     </div>
 
     <div id="mobile-controls" class="mobile-controls hidden">
       <div id="joystick" class="joystick"><div id="stick"></div></div>
-      <button id="dash-btn" class="dash-btn"><span>↯</span><small data-i18n="dash">РЫВОК</small></button>
+      <button id="dash-btn" class="dash-btn"><span>↯</span><small>РЫВОК</small><i id="dash-cooldown"></i></button>
     </div>
 
     <div id="toast" class="toast"></div>
   </div>
-  <script>
-    if (location.protocol === 'file:') {
-      document.body.innerHTML = `
-        <main style="min-height:100vh;box-sizing:border-box;display:grid;place-items:center;background:#071014;color:#f4f1e8;font-family:Arial,sans-serif;padding:24px">
-          <section style="max-width:620px;border:1px solid #33454d;background:#0d181d;padding:28px;border-radius:18px;box-shadow:0 24px 70px #0008">
-            <div style="font-size:13px;letter-spacing:.18em;color:#9fb2b9">SHADOWVALE SURVIVOR</div>
-            <h1 style="font-size:30px;margin:10px 0 14px">Локальный запуск</h1>
-            <p style="font-size:17px;line-height:1.55;margin:0 0 12px">Игру нельзя корректно запускать двойным кликом по <b>index.html</b>: браузеры блокируют модульный JavaScript и загрузку 3D-моделей через <b>file://</b>.</p>
-            <p style="font-size:17px;line-height:1.55;margin:0">Для проверки на Windows открой <b>START_LOCAL.bat</b> из локального тестового архива. Для Яндекс Игр загружай ZIP целиком в консоль.</p>
-          </section>
-        </main>`;
-    }
-  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
