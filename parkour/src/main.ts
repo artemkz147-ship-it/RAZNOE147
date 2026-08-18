@@ -88,15 +88,23 @@ async function bootstrap() {
       $('#loading').textContent = 'Выбери маршрут. Сложность растёт от широких крыш к точным опорам и финальному шпилю.';
       yandex.ready();
     },
-    onHud: ({ level, time, speed, checkpoint, checkpointCount, wallRun, breaks }) => {
+    onHud: ({ level, time, speed, checkpoint, checkpointCount, breaks, motion }) => {
       $('#objective').textContent = `${String(level.id).padStart(2, '0')} · ${level.name}`;
       timeEl.textContent = formatTime(time);
       speedEl.textContent = `${Math.round(speed * 3.6)} км/ч`;
       checkpointEl.textContent = checkpointCount ? `${checkpoint}/${checkpointCount}` : '—';
-      stateEl.textContent = wallRun ? 'WALL RUN' : breaks ? `РАЗРУШЕНО ${breaks}` : 'FLOW';
+      stateEl.textContent = breaks ? `${motion} · ${breaks}×` : motion;
     },
     onCheckpoint: (index, total) => {
       popToast(`ЧЕКПОИНТ ${index}/${total}`);
+    },
+    onParkour: (event) => {
+      popToast(event.label);
+      if (event.type === 'hard-land') {
+        document.body.classList.remove('impact');
+        void document.body.offsetWidth;
+        document.body.classList.add('impact');
+      }
     },
     onFall: (falls) => {
       progress.totalFalls += 1;
@@ -119,7 +127,14 @@ async function bootstrap() {
 
       pendingNextLevel = Math.min(MAX_LEVEL, level.id + 1);
       finishTitle.textContent = `${level.name} пройден`;
-      finishStats.innerHTML = `<b>${formatTime(time)}</b><span>падения: ${stats.falls}</span><span>разрушено: ${stats.breaks}</span><span>награда: +${reward} ◆</span>`;
+      finishStats.innerHTML = `
+        <b>${formatTime(time)}</b>
+        <span>падения: ${stats.falls}</span>
+        <span>акробатика: ${stats.parkourMoves}</span>
+        <span>идеальные посадки: ${stats.perfectLandings}</span>
+        <span>разрушено: ${stats.breaks}</span>
+        <span>награда: +${reward} ◆</span>
+      `;
       nextButton.hidden = level.id >= MAX_LEVEL;
       show(hud, false);
       show(finish, true);
