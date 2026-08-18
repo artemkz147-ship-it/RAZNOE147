@@ -115,6 +115,7 @@ jobs:
           zip -9 -r ../vesely-natisk-3d-yandex-v2.0.0.zip .
           cd ..
           unzip -t vesely-natisk-3d-yandex-v2.0.0.zip >/dev/null
+          test "$(unzip -Z1 vesely-natisk-3d-yandex-v2.0.0.zip | grep -c '^index\.html$')" -eq 1
           zip -9 -r vesely-natisk-3d-full-project-v2.0.0.zip index.html package.json vite.config.js README.md src tools public .github/workflows/build-merry-mayhem.yml -x '*.DS_Store'
           unzip -t vesely-natisk-3d-full-project-v2.0.0.zip >/dev/null
           rm -rf local-test && mkdir local-test
@@ -152,7 +153,6 @@ jobs:
           TXT
           cd local-test && zip -9 -r ../vesely-natisk-3d-local-test-v2.0.0.zip . && cd ..
           unzip -t vesely-natisk-3d-local-test-v2.0.0.zip >/dev/null
-          test "$(unzip -Z1 vesely-natisk-3d-yandex-v2.0.0.zip | head -1)" = "index.html"
           ls -lh vesely-natisk-3d-*.zip
 
       - name: Upload Yandex build
