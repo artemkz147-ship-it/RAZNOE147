@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 root=Path('dist')
 assets=[
- 'floor.glb','tree.glb','dead-tree.glb','bush.glb','rock.glb','gem.glb','arch.glb','column.glb','chest.glb','torch.glb','fire.glb','flower.glb','bomb.glb','arrow.glb','star.glb','cloud.glb','snow.glb','bee.glb','mini-robot.glb','food-donut.glb','food-watermelon.glb','food-pancake.glb','food-pumpkin.glb','food-cookie.glb',
+ 'floor.glb','tree.glb','dead-tree.glb','bush.glb','rock.glb','grass.glb','grass-short.glb','snow-rock.glb','pine-snow.glb','birch.glb','birch-autumn.glb','willow.glb','cactus.glb','palm.glb','moss-rock.glb','gem.glb','arch.glb','column.glb','chest.glb','torch.glb','fire.glb','flower.glb','bomb.glb','arrow.glb','star.glb','cloud.glb','snow.glb','bee.glb','mini-robot.glb','food-donut.glb','food-watermelon.glb','food-pancake.glb','food-pumpkin.glb','food-cookie.glb',
  *[f'hero-{i:02}.glb' for i in range(1,16)],*[f'weapon-{i:02}.glb' for i in range(1,16)],*[f'monster-{i:02}.glb' for i in range(1,13)]
 ]
 required=[root/'index.html',*[root/'assets'/n for n in assets]]
@@ -26,3 +26,17 @@ for forbidden in ['BoxGeometry(', 'SphereGeometry(', 'PlaneGeometry(', 'Cylinder
 for marker in ['HEROES','MAPS','WEAPONS','ENEMIES','BOSSES']:
     if marker not in source: raise SystemExit('Content marker missing: '+marker)
 print(f'Validated {len(assets)} imported GLB assets; no procedural gameplay geometry.')
+
+content=Path('src/content.js').read_text(encoding='utf-8')
+checks=[
+    ('Expected 15 heroes', content.count("asset:'hero")>=15),
+    ('Expected 15 weapon models', content.count("model:'weapon")>=15),
+    ('Expected 18 maps', content.count('unlockWins:')>=18),
+    ('Expected 24 enemy definitions', 'Array.from({length:24}' in content),
+    ('Expected 18 bosses', "'Король Фестиваля'" in content),
+    ('Expected expanded daily quests', content.count("id:'daily_")>=9),
+    ('Expected expanded career quests', content.count("id:'career_")>=24),
+]
+for message,ok in checks:
+    if not ok: raise SystemExit(message)
+print('Expanded content counts validated.')

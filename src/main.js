@@ -360,7 +360,7 @@ class MerryMayhem3D {
   }
 
   async startRun(){
-    const map=this.currentMap(),mode=this.currentMode();if(this.progress.wins<map.unlockWins||this.progress.wins<mode.unlockWins)return;
+    const map=this.currentMap(),mode=this.currentMode();if(!(AUTO_START&&DEBUG_MAP)&&(this.progress.wins<map.unlockWins||this.progress.wins<mode.unlockWins))return;
     this.audio.resume();this.audio.startMusic();this.clearWorld();this.menuPreview?.root?.removeFromParent();this.menuPreview=null;this.buildEnvironment(map);this.buildPlayer();
     this.elapsed=0;this.kills=0;this.level=1;this.xp=0;this.nextXp=8;this.runCoins=0;this.spawnClock=0;this.eliteClock=0;this.runWon=false;this.reviveUsed=false;this.doubleUsed=false;this.boss=null;
     this.state='playing';document.body.dataset.gameState='playing';$('#menu').classList.remove('screen--visible');$('#gameover').classList.remove('screen--visible');$('#pause-panel').classList.remove('screen--visible');$('#hud').classList.remove('hidden');
