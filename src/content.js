@@ -13,7 +13,7 @@ export const HEROES = [
   {id:'music_gnome',name:'Музыкальный Гном',asset:'hero12',weapon:'music_wave',cost:3700,desc:'Волновые залпы пробивают большие группы.',bonus:{area:.12,cooldown:.08}},
   {id:'lightning_bee',name:'Пчёлка Молния',asset:'hero13',weapon:'smart_bee',cost:4050,desc:'Очень быстрые самонаводящиеся атаки.',bonus:{speed:.15,cooldown:.08}},
   {id:'snow_penguin',name:'Снежный Пингвин',asset:'hero14',weapon:'snowball',cost:4400,desc:'Замедляет врагов и постепенно лечится.',bonus:{regen:.35,slow:.14}},
-  {id:'pumpkin_jester',name:'Тыквенный Шут',asset:'hero15',weapon:'pumpkin',cost:4750,desc:'Дальние тыквенные мины и цепные взрывы.',bonus:{luck:.12,splash:.12}}
+  {id:'pumpkin_jester',name:'Тыквенный Чародей',asset:'hero15',weapon:'pumpkin',cost:4750,desc:'Дальние тыквенные мины и цепные взрывы.',bonus:{luck:.12,splash:.12}}
 ];
 
 const levelText = (name, evolution) => [
@@ -194,4 +194,4 @@ export const passiveById=id=>PASSIVES.find(p=>p.id===id);
 
 
 export const HELD_PROFILES={
- donut:['food_donut',.34,'throw'],firefly:['gem',.30,'spell'],pirate_bomb:['bomb',.38,'throw'],rainbow_fan:['star',.34,'spell'],flower_burst:['flower',.38,'spell'],amber_comet:['gem',.36,'spell'],blast_bot:['bomb',.34,'spell'],pancake:['food_pancake',.34,'throw'],fox_bow:['bow',.72,'shoot'],cloud_orb:['cloud',.34,'spell'],watermelon:['food_watermelon',.40,'throw'],music_wave:['star',.36,'spell'],smart_bee:['bee',.34,'spell'],snowball:['snow',.34,'throw'],pumpkin:['food_pumpkin',.40,'throw']};
+ donut:['food_donut',.16,'throw'],firefly:['gem',.14,'spell'],pirate_bomb:['bomb',.18,'throw'],rainbow_fan:['star',.16,'spell'],flower_burst:['flower',.17,'spell'],amber_comet:['gem',.15,'spell'],blast_bot:['bomb',.17,'spell'],pancake:['food_pancake',.17,'throw'],fox_bow:['bow',.34,'shoot'],cloud_orb:['cloud',.16,'spell'],watermelon:['food_watermelon',.18,'throw'],music_wave:['star',.16,'spell'],smart_bee:['bee',.16,'spell'],snowball:['snow',.15,'throw'],pumpkin:['food_pumpkin',.16,'throw']};

@@ -161,7 +161,7 @@ class MerryMayhem3D {
   }
 
   prepareGround(gltf,targetSize,tint){
-    const model=cloneSkinned(gltf.scene);model.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(model),s=new THREE.Vector3();box.getSize(s);model.scale.multiplyScalar(targetSize/Math.max(s.x,s.z,.001));model.updateMatrixWorld(true);
+    const model=cloneSkinned(gltf.scene);model.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(model),s=new THREE.Vector3();box.getSize(s);const groundK=targetSize/Math.max(s.x,s.z,.001);model.scale.set(groundK,.18,groundK);model.updateMatrixWorld(true);
     const b=new THREE.Box3().setFromObject(model);model.position.y-=b.max.y;
     model.traverse(o=>{if(!o.isMesh)return;o.receiveShadow=true;o.castShadow=false;if(o.material){o.material=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone();const arr=Array.isArray(o.material)?o.material:[o.material];for(const m of arr){if(m.color)m.color.lerp(new THREE.Color(tint),.58);if('roughness'in m)m.roughness=.92;}}});
     const root=new THREE.Group();root.add(model);return root;
@@ -186,7 +186,7 @@ class MerryMayhem3D {
 
   heldProfile(w){const p=HELD_PROFILES[w?.id]||[w?.projectile||'gem',.34,'spell'];return{asset:p[0],height:p[1],attack:p[2]};}
   playWeaponAttack(a,w){if(!a?.mixer||!a.gltf)return;const k=this.heldProfile(w).attack,t=k==='throw'?['throw','attack','punch','shoot']:k==='shoot'?['shoot','attack','throw','punch']:['spell','cast','attack','punch','shoot'];const clip=this.findClip(a.gltf,t);if(!clip)return;const n=a.mixer.clipAction(clip);n.reset();n.enabled=true;n.setLoop(THREE.LoopOnce,1);n.clampWhenFinished=true;n.fadeIn(.03).play();a.action?.fadeOut(.03);a.action=n;a.kind='attack';}
-  attachHeldWeapon(actor,w){actor.root.userData.weapon?.removeFromParent();const p=this.heldProfile(w),src=this.assets[p.asset]||this.assets[w.projectile]||this.assets.gem,weapon=this.prepareAttachment(src,p.height),hand=this.findRightHand(actor.root);if(hand){hand.add(weapon);weapon.position.set(p.attack==='shoot'?.03:.11,p.attack==='throw'?.02:0,p.attack==='throw'?.02:-.025);weapon.rotation.set(p.attack==='throw'?.10:0,p.attack==='shoot'?1.42:.08,p.attack==='throw'?.42:.10);}else{actor.root.add(weapon);weapon.position.set(.26,1,.12);}actor.root.userData.weapon=weapon;actor.root.userData.weaponHand=hand||null;return weapon;}
+  attachHeldWeapon(actor,w){actor.root.userData.weapon?.removeFromParent();const p=this.heldProfile(w),src=this.assets[p.asset]||this.assets[w.projectile]||this.assets.gem,weapon=this.prepareAttachment(src,p.height),hand=this.findRightHand(actor.root);if(hand){hand.add(weapon);weapon.position.set(p.attack==='shoot'?.025:.095,p.attack==='throw'?.02:0,p.attack==='throw'?.015:-.025);weapon.rotation.set(p.attack==='shoot'?Math.PI/2:p.attack==='throw'?.08:0,p.attack==='shoot'?0:.08,p.attack==='throw'?.38:.08);}else{actor.root.add(weapon);weapon.position.set(.26,1,.12);}actor.root.userData.weapon=weapon;actor.root.userData.weaponHand=hand||null;return weapon;}
   projectileOrigin(a){const v=new THREE.Vector3(),h=a?.root?.userData?.weaponHand;if(h){h.updateWorldMatrix(true,false);h.getWorldPosition(v);v.y=Math.max(.72,v.y);return v;}v.copy(a.root.position);v.y=.95;return v;}
 
 
@@ -513,7 +513,7 @@ class MerryMayhem3D {
 
   updateHUD(){if(!this.player)return;const remain=this.currentMode().id==='endless'?this.elapsed:Math.max(0,this.currentMode().seconds-this.elapsed);$('#time').textContent=this.currentMode().id==='endless'?fmtTime(this.elapsed):fmtTime(remain);$('#level').textContent=this.level;$('#kills').textContent=this.kills;$('#run-coins').textContent=Math.floor(this.runCoins);$('#hp-fill').style.width=`${clamp(this.player.hp/this.player.maxHp,0,1)*100}%`;$('#hp-text').textContent=`${Math.ceil(Math.max(0,this.player.hp))} / ${Math.ceil(this.player.maxHp)}`;$('#xp-fill').style.width=`${clamp(this.xp/this.nextXp,0,1)*100}%`;$('#xp-text').textContent=`${Math.floor(this.xp)} / ${this.nextXp}`;document.body.dataset.qaKills=String(this.kills);document.body.dataset.qaProjectiles=String(this.projectiles.length);}
 
-  updateCamera(dt){if(!this.player)return;const pos=this.player.root.position,target=new THREE.Vector3(pos.x,pos.y+(this.lowPower?9.5:7.7),pos.z+(this.lowPower?11.8:10.5)),look=new THREE.Vector3(pos.x,pos.y+1,pos.z-2.7);this.camera.position.lerp(target,1-Math.exp(-dt*7));const q=new THREE.Quaternion();const m=new THREE.Matrix4().lookAt(this.camera.position,look,new THREE.Vector3(0,1,0));q.setFromRotationMatrix(m);this.camera.quaternion.slerp(q,1-Math.exp(-dt*9));}
+  updateCamera(dt){if(!this.player)return;const pos=this.player.root.position,target=new THREE.Vector3(pos.x,pos.y+(this.lowPower?9.4:7),pos.z+(this.lowPower?11.8:9.3)),look=new THREE.Vector3(pos.x,pos.y+1,pos.z-2.7);this.camera.position.lerp(target,1-Math.exp(-dt*7));const q=new THREE.Quaternion();const m=new THREE.Matrix4().lookAt(this.camera.position,look,new THREE.Vector3(0,1,0));q.setFromRotationMatrix(m);this.camera.quaternion.slerp(q,1-Math.exp(-dt*9));}
   vibrate(ms){if(this.settings.vibration&&navigator.vibrate)navigator.vibrate(ms);}
 
   animate(){
