@@ -1,8 +1,9 @@
 (() => {
   const CATEGORIES = {
     geography:{name:'География',emoji:'🌍'},history:{name:'История',emoji:'🏛️'},science:{name:'Наука',emoji:'🔬'},space:{name:'Космос',emoji:'🪐'},nature:{name:'Природа',emoji:'🌿'},human:{name:'Человек',emoji:'🫀'},
-    literature:{name:'Литература',emoji:'📚'},art:{name:'Искусство',emoji:'🎨'},music:{name:'Музыка',emoji:'🎼'},cinema:{name:'Кино',emoji:'🎬'},technology:{name:'Технологии',emoji:'💻'},sports:{name:'Спорт',emoji:'🏅'},
-    language:{name:'Русский язык',emoji:'✍️'},math:{name:'Математика',emoji:'➗'},logic:{name:'Логика',emoji:'🧩'},culture:{name:'Культура',emoji:'🏺'},food:{name:'Еда',emoji:'🍜'},transport:{name:'Транспорт',emoji:'🚆'},games:{name:'Игры',emoji:'♟️'}
+    literature:{name:'Литература',emoji:'📚'},art:{name:'Искусство',emoji:'🎨'},music:{name:'Музыка',emoji:'🎧'},cinema:{name:'Кино',emoji:'🎬'},series:{name:'Сериалы',emoji:'📺'},animation:{name:'Анимация',emoji:'🎞️'},anime:{name:'Аниме',emoji:'🌸'},
+    internet:{name:'Интернет',emoji:'🌐'},memes:{name:'Мемы',emoji:'😂'},generations:{name:'Поколения',emoji:'🧑‍💻'},media:{name:'Медиа',emoji:'📰'},popscience:{name:'Научпоп',emoji:'🧠'},facts:{name:'Интересные факты',emoji:'✨'},
+    technology:{name:'Технологии',emoji:'💻'},sports:{name:'Спорт',emoji:'🏅'},language:{name:'Русский язык',emoji:'✍️'},logic:{name:'Логика',emoji:'🧩'},culture:{name:'Культура',emoji:'🏺'},food:{name:'Еда',emoji:'🍜'},transport:{name:'Транспорт',emoji:'🚆'},games:{name:'Игры',emoji:'🎮'}
   };
 
   const capitals = [
@@ -120,14 +121,52 @@
     }); return out;
   }
   function addFacts(out,prefix,category,facts,diff='medium',rng){facts.forEach((f,i)=>out.push(makeChoice(`${prefix}-${i}`,category,diff,f[0],f[1],f[2],rng)))}
-  function buildMath(out,rng){
-    let id=0;
-    for(let a=3;a<=42;a+=3){for(let b=2;b<=18;b+=2){const val=a+b;out.push(makeChoice(`math-add-${id++}`,'math','easy',`Сколько будет ${a} + ${b}?`,String(val),shuffle([String(val+1),String(val-1),String(val+2)],rng),rng))}}
-    for(let a=12;a<=60;a+=4){for(let b=2;b<=10;b+=2){const val=a-b;out.push(makeChoice(`math-sub-${id++}`,'math','easy',`Сколько будет ${a} − ${b}?`,String(val),shuffle([String(val+1),String(val-2),String(val+3)],rng),rng))}}
-    for(let a=2;a<=12;a++){for(let b=2;b<=12;b++){const val=a*b;out.push(makeChoice(`math-mul-${id++}`,'math',a>8&&b>8?'medium':'easy',`Сколько будет ${a} × ${b}?`,String(val),shuffle([String(val+a),String(val-b),String(val+1)],rng),rng))}}
-    for(let d=2;d<=12;d++){for(let q=2;q<=12;q++){const n=d*q;out.push(makeChoice(`math-div-${id++}`,'math','medium',`Сколько будет ${n} ÷ ${d}?`,String(q),shuffle([String(q+1),String(Math.max(1,q-1)),String(q+2)],rng),rng))}}
-    for(let n=10;n<=90;n+=10){[10,20,25,50].forEach(p=>{const val=n*p/100; if(Number.isInteger(val)) out.push(makeChoice(`math-pct-${id++}`,'math','medium',`Чему равны ${p}% от ${n}?`,String(val),shuffle([String(val+5),String(Math.max(0,val-5)),String(n-p)],rng),rng))})}
+  function buildMediaTF(out,rng,M){
+    const configs=[
+      ['media-tf-film','cinema',M.cinemaPairs||[],(a,b)=>`Режиссёр фильма «${a}» — ${b}.`],
+      ['media-tf-series','series',M.seriesPairs||[],(a,b)=>`Персонаж ${b} связан с сериалом «${a}».`],
+      ['media-tf-track','music',M.musicPairs||[],(a,b)=>`Трек «${a}» исполняет ${b}.`],
+      ['media-tf-anime','anime',M.animePairs||[],(a,b)=>`Персонаж ${b} связан с аниме «${a}».`],
+      ['media-tf-game','games',M.gamePairs||[],(a,b)=>`Разработчик игры «${a}» — ${b}.`]
+    ];
+    configs.forEach(([prefix,category,rows,text])=>{
+      rows.forEach((r,i)=>{
+        const truth=i%2===0;
+        let value=r[1];
+        if(!truth){
+          for(let step=1;step<rows.length;step++){
+            const candidate=rows[(i+step)%rows.length][1];
+            if(candidate!==r[1]){value=candidate;break;}
+          }
+        }
+        const correct=truth?'Верно':'Неверно';
+        out.push(makeChoice(`${prefix}-${i}`,category,i%5===0?'medium':'easy',text(r[0],value),correct,[truth?'Неверно':'Верно'],rng,'tf'));
+      });
+    });
   }
+
+  function buildMedia(out,rng){
+    const M=window.QUIZ_MEDIA_DATA||{};
+    out.push(...pairedQuestions('media-film','cinema',M.cinemaPairs||[],film=>`Кто режиссёр фильма «${film}»?`,director=>`Какой фильм из списка снял ${director}?`,rng,'medium'));
+    out.push(...pairedQuestions('media-series','series',M.seriesPairs||[],series=>`Какой персонаж связан с сериалом «${series}»?`,character=>`С каким сериалом связан персонаж ${character}?`,rng,'easy'));
+    out.push(...pairedQuestions('media-track','music',M.musicPairs||[],track=>`Кто исполняет трек «${track}»?`,artist=>`Какой трек из списка исполняет ${artist}?`,rng,'easy'));
+    out.push(...pairedQuestions('media-animation','animation',M.animationPairs||[],title=>`Какая студия связана с мультфильмом «${title}»?`,studio=>`Какой мультфильм из списка связан со студией ${studio}?`,rng,'easy'));
+    out.push(...pairedQuestions('media-anime','anime',M.animePairs||[],title=>`Какой персонаж связан с аниме «${title}»?`,character=>`С каким аниме связан персонаж ${character}?`,rng,'easy'));
+    out.push(...pairedQuestions('media-game','games',M.gamePairs||[],title=>`Какая студия разработала игру «${title}»?`,studio=>`Какую игру из списка разработала ${studio}?`,rng,'medium'));
+
+    addFacts(out,'media-net','internet',M.internetFacts||[],'easy',rng);
+    addFacts(out,'media-meme','memes',M.memeFacts||[],'easy',rng);
+    addFacts(out,'media-gen','generations',M.generationFacts||[],'easy',rng);
+    addFacts(out,'media-popscience','popscience',M.popscienceFacts||[],'medium',rng);
+    addFacts(out,'media-wow','facts',M.wowFacts||[],'medium',rng);
+    addFacts(out,'media-media','media',M.mediaFacts||[],'medium',rng);
+    addFacts(out,'media-cinema-f','cinema',M.cinemaFacts||[],'easy',rng);
+    addFacts(out,'media-series-f','series',M.seriesFacts||[],'easy',rng);
+    addFacts(out,'media-music-f','music',M.musicFacts||[],'easy',rng);
+    addFacts(out,'media-game-f','games',M.gameFacts||[],'easy',rng);
+    buildMediaTF(out,rng,M);
+  }
+
   function buildLogic(out,rng){
     let id=0;
     for(let s=1;s<=30;s++){
@@ -181,7 +220,7 @@
     addFacts(out,'hist','history',historyFacts,'medium',rng); addFacts(out,'sci','science',scienceFacts,'medium',rng); addFacts(out,'space','space',spaceFacts,'medium',rng); addFacts(out,'nature','nature',natureFacts,'easy',rng); addFacts(out,'human','human',humanFacts,'medium',rng);
     addFacts(out,'tech','technology',technologyFacts,'medium',rng); addFacts(out,'sport','sports',sportsFacts,'easy',rng); addFacts(out,'lang','language',languageFacts,'medium',rng); addFacts(out,'culture','culture',cultureFacts,'medium',rng); addFacts(out,'food','food',foodFacts,'easy',rng); addFacts(out,'transport','transport',transportFacts,'easy',rng); addFacts(out,'games','games',gamesFacts,'easy',rng); addFacts(out,'cinema','cinema',cinemaFacts,'easy',rng);
     inventions.forEach((r,i)=>{const wrong=shuffle(inventions.filter(x=>x!==r).map(x=>x[1]),rng).slice(0,3);out.push(makeChoice(`inv-${i}`,'technology','hard',`Кого чаще всего связывают с созданием или разработкой: ${r[0]}?`,r[1],wrong,rng))});
-    buildMath(out,rng); buildLogic(out,rng); buildTF(out,rng);
+    buildMedia(out,rng); buildLogic(out,rng); buildTF(out,rng);
     return out;
   }
 
