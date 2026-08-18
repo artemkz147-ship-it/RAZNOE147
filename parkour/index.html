@@ -3,32 +3,48 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#0d1020" />
+    <meta name="theme-color" content="#0b1022" />
     <title>Rooftop Flow</title>
     <script src="/sdk.js"></script>
   </head>
   <body>
     <div id="app">
       <div id="game"></div>
+
       <div id="hud">
-        <div class="hud-card"><span>ДИСТАНЦИЯ</span><b id="distance">0 м</b></div>
-        <div class="hud-card combo"><span>FLOW</span><b id="combo">x1.0</b></div>
-        <button id="pause" aria-label="Пауза">Ⅱ</button>
+        <div class="hud-cluster">
+          <div class="hud-card"><span>ДИСТАНЦИЯ</span><b id="distance">0 м</b></div>
+          <div class="hud-card combo"><span>FLOW</span><b id="combo">x1.0</b></div>
+          <div class="hud-card speed-card"><span>СКОРОСТЬ</span><b id="speed">43 км/ч</b></div>
+        </div>
+        <div id="trick" aria-live="polite"></div>
+        <button id="pause" class="icon-btn" aria-label="Пауза">Ⅱ</button>
       </div>
+
       <div id="touch-controls">
-        <button data-action="slide" class="touch-btn slide">ПОДКАТ</button>
-        <button data-action="jump" class="touch-btn jump">ПРЫЖОК</button>
+        <button data-action="slide" class="touch-btn slide"><span>СВАЙП</span>ПОДКАТ</button>
+        <button data-action="jump" class="touch-btn jump"><span>ТАП</span>ПРЫЖОК</button>
       </div>
+
       <div id="menu" class="overlay visible">
-        <div class="panel">
-          <p class="eyebrow">URBAN PARKOUR</p>
-          <h1>ROOFTOP<br/>FLOW</h1>
-          <p>Держи скорость. Соединяй трюки. Не теряй ритм.</p>
-          <button id="play" class="primary">БЕЖАТЬ</button>
+        <div class="panel hero-panel">
+          <p class="eyebrow">URBAN PARKOUR · FLOW RUN</p>
+          <h1>ROOFTOP<br/><em>FLOW</em></h1>
+          <p class="lead">Держи скорость, перелетай разрывы, проскальзывай под вывесками и забирайся на стены одним непрерывным комбо.</p>
+          <button id="play" class="primary" disabled>БЕЖАТЬ</button>
           <div class="controls-hint">ПК: Space / ↑ — прыжок · ↓ / S — подкат · A/D — коррекция</div>
         </div>
       </div>
-      <div id="gameover" class="overlay">
+
+      <div id="pauseMenu" class="overlay soft">
+        <div class="panel compact">
+          <p class="eyebrow">ПАУЗА</p>
+          <h2>Не теряй ритм</h2>
+          <button id="resume" class="primary">ПРОДОЛЖИТЬ</button>
+        </div>
+      </div>
+
+      <div id="gameover" class="overlay soft">
         <div class="panel compact">
           <p class="eyebrow">ЗАБЕГ ОКОНЧЕН</p>
           <h2 id="scoreTitle">0 м</h2>

@@ -1,0 +1,34 @@
+name: Build Rooftop Flow
+
+on:
+  push:
+    branches: [yandex-parkour]
+    paths:
+      - 'parkour/**'
+      - '.github/workflows/parkour-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: parkour
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Type-check and build
+        run: npm run build
+      - name: Create Yandex Games ZIP
+        run: |
+          cd dist
+          zip -r ../rooftop-flow-yandex.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rooftop-flow-yandex
+          path: parkour/rooftop-flow-yandex.zip
+          if-no-files-found: error
