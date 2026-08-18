@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <style>
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000}
+    #game{position:fixed;inset:0;width:100%;height:100%;background:#000;outline:0}
+    #game canvas{max-width:100%;max-height:100%;background:#000}
+    body.hide-touch .ejs_virtualGamepad_parent{display:none!important}
+    body.stretch #game canvas{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important}
+    .ejs_menu_bar,.ejs_context_menu,.ejs_settings_parent,.ejs_setting_menu,.ejs_virtualGamepad_open{display:none!important;visibility:hidden!important;pointer-events:none!important}
+    .b_speed_fast,.b_speed_slow,.b_speed_rewind{display:none!important}
+    .ejs_message{display:none!important}
+  </style>
+</head>
+<body>
+  <div id="game" tabindex="0"></div>
+  <script>
+  (() => {
+    'use strict';
+    const PARENT_ORIGIN = location.origin;
+    let started = false;
+    let startConfirmed = false;
+    let watchdog = 0;
+
+    function send(type, extra = {}) {
+      try { parent.postMessage({ type, ...extra }, PARENT_ORIGIN); } catch (_) {}
+    }
+
+    function safeMessage(value) {
+      if (value instanceof Error) return value.message || value.name;
+      if (value && typeof value === 'object' && value.message) return String(value.message);
+      return String(value || 'Неизвестная ошибка');
+    }
+
+    function cleanGameName(name) {
+      const value = String(name || 'game');
+      const dot = value.lastIndexOf('.');
+      return (dot > 0 ? value.slice(0, dot) : value).replace(/[^\p{L}\p{N} _().\-]+/gu, '').trim() || 'game';
+    }
+
+    function expectedExtensions(core) {
+      if (core === 'nes') return ['nes','fds','zip','7z'];
+      if (core === 'segaMD') return ['md','smd','gen','bin','zip','7z'];
+      if (core === 'psx') return ['chd','pbp','bin','iso','img','zip','7z'];
+      return [];
+    }
+
+    function verifyConfig(config) {
+      if (!config || typeof config !== 'object') throw new Error('Не получены параметры запуска.');
+      if (!['nes','segaMD','psx'].includes(config.core)) throw new Error('Эта система не поддерживается этой сборкой.');
+      if (typeof config.romUrl !== 'string' || !config.romUrl.startsWith('blob:')) throw new Error('Не удалось подготовить локальный ROM.');
+      if (!config.romName || Number(config.romSize) <= 0) throw new Error('Выбранный файл игры пустой или недоступен.');
+      const ext = String(config.romName).split('.').pop().toLowerCase();
+      if (!expectedExtensions(config.core).includes(ext)) throw new Error(`Формат .${ext || '?'} не подходит для выбранной приставки.`);
+      if (config.biosUrl && (typeof config.biosUrl !== 'string' || !config.biosUrl.startsWith('blob:'))) throw new Error('Не удалось подготовить BIOS.');
+    }
+
+    function hideTechnicalUi() {
+      const style = document.createElement('style');
+      style.textContent = `
+        .ejs_menu_bar,.ejs_context_menu,.ejs_settings_parent,.ejs_setting_menu,.ejs_virtualGamepad_open{display:none!important;visibility:hidden!important;pointer-events:none!important}
+        .b_speed_fast,.b_speed_slow,.b_speed_rewind{display:none!important}
+        .ejs_message{display:none!important}
+      `;
+      document.head.appendChild(style);
+    }
+
+    function start(config) {
+      if (started) return;
+      started = true;
+      try {
+        verifyConfig(config);
+        const settings = config.settings || {};
+        if (!settings.touchControls) document.body.classList.add('hide-touch');
+        if (settings.stretch) document.body.classList.add('stretch');
+        hideTechnicalUi();
+
+        window.EJS_player = '#game';
+        window.EJS_core = config.core;
+        window.EJS_controlScheme = config.core;
+        window.EJS_gameName = cleanGameName(config.romName);
+        window.EJS_gameUrl = config.romUrl;
+        window.EJS_biosUrl = config.biosUrl || '';
+        window.EJS_pathtodata = 'data/';
+        window.EJS_language = 'ru-RU';
+        window.EJS_disableAutoLang = true;
+        window.EJS_volume = Math.max(0, Math.min(1, Number(settings.volume ?? 80) / 100));
+        window.EJS_startOnLoaded = true;
+        window.EJS_fullscreenOnLoaded = false;
+        window.EJS_askBeforeExit = false;
+        window.EJS_browserMode = 'mobile';
+        window.EJS_noAutoFocus = false;
+        window.EJS_defaultOptions = {
+          'save-state-location': 'browser',
+          'menu-bar-button': 'hidden',
+          'rewindEnabled': 'disabled',
+          'fastForward': 'disabled',
+          'slowMotion': 'disabled'
+        };
+        window.EJS_Buttons = {
+          restart: false,
+          pause: false,
+          play: false,
+          mute: false,
+          settings: false,
+          enterFullscreen: false,
+          exitFullscreen: false,
+          saveState: false,
+          loadState: false,
+          screenRecord: false,
+          gamepad: false,
+          cheat: false,
+          volume: false,
+          saveSavFiles: false,
+          loadSavFiles: false,
+          quickSave: false,
+          quickLoad: false,
+          screenshot: false,
+          cacheManager: false,
+          exitEmulation: false
+        };
+
+        window.EJS_ready = () => {
+          hideTechnicalUi();
+          send('retro-emulator-ready');
+        };
+        window.EJS_onGameStart = () => {
+          clearTimeout(watchdog);
+          watchdog = setTimeout(() => {
+            const emu = window.EJS_emulator;
+            const fileName = emu?.fileName;
+            if (!emu?.started || !fileName) {
+              send('retro-error', { message: 'Ядро запустилось, но не смогло открыть выбранный ROM.' });
+              return;
+            }
+            startConfirmed = true;
+            try { document.querySelector('#game')?.focus?.(); } catch (_) {}
+            send('retro-game-start', { fileName: String(fileName) });
+          }, 900);
+        };
+        window.EJS_onExit = () => {
+          if (!startConfirmed) send('retro-error', { message: 'Эмулятор завершил запуск до открытия игры.' });
+          else send('retro-exit');
+        };
+
+        const loader = document.createElement('script');
+        loader.src = 'data/loader.js';
+        loader.async = false;
+        loader.onerror = () => send('retro-error', { message: 'Не удалось загрузить встроенный модуль эмулятора.' });
+        document.body.appendChild(loader);
+
+        watchdog = setTimeout(() => {
+          if (!startConfirmed) send('retro-error', { message: 'Эмулятор не подтвердил запуск игры.' });
+        }, 32000);
+      } catch (error) {
+        send('retro-error', { message: safeMessage(error) });
+      }
+    }
+
+    window.addEventListener('message', event => {
+      if (event.origin !== PARENT_ORIGIN) return;
+      const data = event.data || {};
+      if (data.type === 'retro-start') start(data);
+      else if (data.type === 'retro-stop') {
+        clearTimeout(watchdog);
+        try { window.EJS_emulator?.gameManager?.exit?.(); } catch (_) {}
+      }
+    });
+
+    window.addEventListener('error', event => {
+      if (!started || startConfirmed) return;
+      send('retro-error', { message: event.message || 'Ошибка запуска игры.' });
+    });
+    window.addEventListener('unhandledrejection', event => {
+      if (!started || startConfirmed) return;
+      send('retro-error', { message: safeMessage(event.reason) });
+    });
+
+    send('retro-ready');
+  })();
+  </script>
+</body>
+</html>
