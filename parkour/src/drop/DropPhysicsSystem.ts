@@ -30,12 +30,10 @@ export class DropPhysicsSystem {
     this.world.timestep = 1 / 60;
     this.surfaces = [];
 
-    // Safety street/ground collider. It is intentionally invisible; visible city art
-    // is provided by GLB assets. This only prevents bodies from falling forever.
     this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(120, 0.35, 120)
         .setTranslation(0, GROUND_Y - 0.35, 0)
-        .setFriction(0.92)
+        .setFriction(0.9)
         .setRestitution(0)
     );
 
@@ -62,7 +60,7 @@ export class DropPhysicsSystem {
       const body = this.world!.createRigidBody(bodyDesc);
       this.world!.createCollider(
         RAPIER.ColliderDesc.cuboid(width * 0.5, height * 0.5, depth * 0.5)
-          .setFriction(0.96)
+          .setFriction(0.9)
           .setRestitution(0),
         body
       );
@@ -73,12 +71,12 @@ export class DropPhysicsSystem {
       .setTranslation(origins[0]?.x ?? 0, (origins[0]?.y ?? level.start.p[1]) + PLAYER_HALF_HEIGHT + 0.03, origins[0]?.z ?? 0)
       .setCanSleep(false)
       .setCcdEnabled(true)
-      .setLinearDamping(0.12)
+      .setLinearDamping(0.1)
       .lockRotations();
     this.playerBody = this.world.createRigidBody(playerDesc);
     this.playerCollider = this.world.createCollider(
       RAPIER.ColliderDesc.capsule(0.55, 0.32)
-        .setFriction(0.82)
+        .setFriction(0.24)
         .setRestitution(0)
         .setDensity(1.05),
       this.playerBody
@@ -136,17 +134,27 @@ export class DropPhysicsSystem {
     return target.set(surface.origin.x + offset.x, surface.origin.y, surface.origin.z + offset.z);
   }
 
-  isGroundedOn(surfaceIndex: number, tolerance = 0.12) {
-    if (!this.playerBody) return false;
-    const surface = this.surfaces.find((item) => item.index === surfaceIndex);
-    if (!surface) return false;
+  groundedSurface(tolerance = 0.16) {
+    if (!this.playerBody) return null;
     const foot = this.getFootPosition(new THREE.Vector3());
-    const top = this.getSurfaceTop(surfaceIndex, new THREE.Vector3());
-    const halfX = surface.spec.size[0] * 0.5 + 0.05;
-    const halfZ = surface.spec.size[1] * 0.5 + 0.05;
-    const inside = Math.abs(foot.x - top.x) <= halfX && Math.abs(foot.z - top.z) <= halfZ;
-    const v = this.playerBody.linvel();
-    return inside && Math.abs(foot.y - top.y) <= tolerance && v.y <= 0.8;
+    const velocity = this.playerBody.linvel();
+    if (velocity.y > 0.75) return null;
+
+    let best: { index: number; error: number } | null = null;
+    for (const surface of this.surfaces) {
+      const top = this.getSurfaceTop(surface.index, new THREE.Vector3());
+      const halfX = surface.spec.size[0] * 0.5 + 0.08;
+      const halfZ = surface.spec.size[1] * 0.5 + 0.08;
+      if (Math.abs(foot.x - top.x) > halfX || Math.abs(foot.z - top.z) > halfZ) continue;
+      const error = Math.abs(foot.y - top.y);
+      if (error > tolerance) continue;
+      if (!best || error < best.error) best = { index: surface.index, error };
+    }
+    return best?.index ?? null;
+  }
+
+  isGroundedOn(surfaceIndex: number, tolerance = 0.16) {
+    return this.groundedSurface(tolerance) === surfaceIndex;
   }
 
   private colliderHeight(spec: DropSurface, topY: number) {
