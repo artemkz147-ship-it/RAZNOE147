@@ -39,6 +39,14 @@ function formatTime(seconds: number) {
   return minutes > 0 ? `${minutes}:${rest.toFixed(2).padStart(5, '0')}` : `${rest.toFixed(2)} с`;
 }
 
+function popToast(message: string) {
+  const toast = $('#toast');
+  toast.textContent = message;
+  toast.classList.remove('pop');
+  void toast.offsetWidth;
+  toast.classList.add('pop');
+}
+
 function renderLevels() {
   levelsHost.innerHTML = '';
   for (const level of game.levels) {
@@ -76,6 +84,7 @@ async function bootstrap() {
   game = new Game3D(gameHost, {
     onReady: () => {
       renderLevels();
+      $('#loading').textContent = 'Выбери маршрут. Сложность растёт от широких крыш к точным опорам.';
       yandex.ready();
     },
     onHud: ({ level, time, speed, checkpoint, checkpointCount, wallRun, breaks }) => {
@@ -86,18 +95,15 @@ async function bootstrap() {
       stateEl.textContent = wallRun ? 'WALL RUN' : breaks ? `РАЗРУШЕНО ${breaks}` : 'FLOW';
     },
     onCheckpoint: (index, total) => {
-      const toast = $('#toast');
-      toast.textContent = `ЧЕКПОИНТ ${index}/${total}`;
-      toast.classList.remove('pop');
-      void toast.offsetWidth;
-      toast.classList.add('pop');
+      popToast(`ЧЕКПОИНТ ${index}/${total}`);
     },
     onFall: (falls) => {
       progress.totalFalls += 1;
+      void yandex.saveProgress(progress);
       document.body.classList.remove('impact');
       void document.body.offsetWidth;
       document.body.classList.add('impact');
-      $('#toast').textContent = falls === 1 ? 'СОРВАЛСЯ · ВОЗВРАТ К ЧЕКПОИНТУ' : `СРЫВ ${falls}`;
+      popToast(falls === 1 ? 'СОРВАЛСЯ · ВОЗВРАТ К ЧЕКПОИНТУ' : `СРЫВ ${falls}`);
     },
     onFinish: async ({ level, time, stats, reward }) => {
       yandex.gameplayStop();
@@ -145,8 +151,14 @@ resumeButton.addEventListener('click', () => {
   show(pauseOverlay, false);
 });
 
-window.addEventListener('platform-pause', () => game?.setPaused(true));
-window.addEventListener('platform-resume', () => game?.setPaused(false));
+window.addEventListener('platform-pause', () => {
+  game?.setPaused(true);
+  yandex.gameplayStop();
+});
+window.addEventListener('platform-resume', () => {
+  game?.setPaused(false);
+  if (game?.isRunning()) yandex.gameplayStart();
+});
 
 bootstrap().catch((error) => {
   console.error('3D parkour boot failed', error);
