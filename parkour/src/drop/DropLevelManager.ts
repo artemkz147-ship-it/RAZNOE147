@@ -211,8 +211,8 @@ export class DropLevelManager {
 
   private authoredPosition(levelId: number, index: number, spec: DropSurface) {
     const position = new THREE.Vector3(...spec.p);
-    if (index === 1 && levelId === 1) position.set(9, spec.p[1], -6);
-    if (index === 1 && levelId === 2) position.set(9, spec.p[1], -5);
+    if (index === 1 && levelId === 1) position.set(6.2, spec.p[1], -3.8);
+    if (index === 1 && levelId === 2) position.set(7.0, spec.p[1], -4.2);
     return position;
   }
 
@@ -256,7 +256,7 @@ export class DropLevelManager {
     const centerX = (level.start.p[0] + end[0]) * 0.5;
     const centerZ = (level.start.p[2] + end[2]) * 0.5;
     const top = level.start.p[1];
-    const count = 16;
+    const count = 18;
     const roots = await Promise.all(
       Array.from({ length: count }, async (_, index) => {
         const asset = this.cityAssets[(level.id * 5 + index * 3) % this.cityAssets.length];
@@ -264,19 +264,19 @@ export class DropLevelManager {
         const size = this.measure(root);
         if (size.x <= 0.001 || size.y <= 0.001 || size.z <= 0.001) return null;
 
-        const lane = Math.floor(index / 2);
-        const side = index % 2 === 0 ? -1 : 1;
-        const width = 7.5 + ((index * 3 + level.id) % 5) * 2.1;
-        const roofY = Math.max(6, Math.min(top + 16, 10 + ((index * 7 + level.id * 5) % Math.max(12, Math.round(top + 8)))));
+        const width = 7.5 + ((index * 3 + level.id) % 4) * 2.0;
+        const roofY = Math.max(7, Math.min(top + 15, 11 + ((index * 7 + level.id * 5) % Math.max(13, Math.round(top + 8)))));
         root.scale.set(width / size.x, Math.max(5, roofY - STREET_Y) / size.y, width / size.z);
         const box = new THREE.Box3().setFromObject(root);
         const center = box.getCenter(new THREE.Vector3());
-        const x = centerX - 42 + lane * 12.5 + ((level.id + index) % 3) * 2.2;
-        const z = centerZ + side * (20 + (index % 4) * 6.8);
+        const angle = (index / count) * Math.PI * 2 + level.id * 0.17;
+        const radius = 39 + (index % 4) * 6.5;
+        const x = centerX + Math.cos(angle) * radius;
+        const z = centerZ + Math.sin(angle) * radius;
         root.position.x += x - center.x;
         root.position.z += z - center.z;
         root.position.y += STREET_Y - box.min.y;
-        root.rotation.y = side > 0 ? Math.PI : 0;
+        root.rotation.y = -angle + Math.PI * 0.5;
         this.prepareMaterials(root, false);
         this.scene.add(root);
         return root;
