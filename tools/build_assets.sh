@@ -15,8 +15,8 @@ fetch_zip(){
 fetch_zip 'https://opengameart.org/sites/default/files/ultimate_animated_character_pack_by_quaternius.zip' characters
 fetch_zip 'https://opengameart.org/sites/default/files/ultimate_gun_pack_by_quaternius.zip' guns
 fetch_zip 'https://opengameart.org/sites/default/files/cute_animated_monsters_-_aug_2020.zip' cute_monsters
-fetch_zip 'https://opengameart.org/sites/default/files/ultimate_nature_pack_by_quaternius.zip' nature
-fetch_zip 'https://opengameart.org/sites/default/files/ultimate_rpg_items_pack_by_quaternius.zip' rpg
+fetch_zip 'https://opengameart.org/sites/default/files/ultimate_nature_pack_by_quaternius_1.zip' nature
+fetch_zip 'https://opengameart.org/sites/default/files/ultimate_rpg_items_pack_by_quaternius_0.zip' rpg
 fetch_zip 'https://opengameart.org/sites/default/files/Updated%20Modular%20Dungeon%20-%20May%202019.zip' dungeon
 fetch_zip 'https://opengameart.org/sites/default/files/ultimate_food_pack_by_quaternius.zip' food
 fetch_zip 'https://opengameart.org/sites/default/files/Medieval%20Weapons%20Pack%20-%20Sept%202018.zip' medieval
