@@ -1,4 +1,4 @@
-name: Build Vertical 3D Parkour
+name: Build Drop Flow
 
 on:
   push:
@@ -27,18 +27,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install 3D asset builder
+      - name: Install asset builder
         run: python -m pip install -r requirements-assets.txt
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Type-check, bake GLB assets and build
+      - name: Build vertical drop game
         run: npm run build
       - name: Create Yandex Games ZIP
         run: |
           cd dist
-          zip -r ../vertical-3d-parkour-yandex.zip .
+          zip -r ../drop-flow-yandex.zip .
       - uses: actions/upload-artifact@v4
         with:
-          name: vertical-3d-parkour-yandex
-          path: parkour/vertical-3d-parkour-yandex.zip
+          name: drop-flow-yandex
+          path: parkour/drop-flow-yandex.zip
           if-no-files-found: error
