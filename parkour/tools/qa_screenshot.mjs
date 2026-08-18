@@ -73,15 +73,20 @@ const versionedResources = resources.filter((url) => {
     return false;
   }
 });
-const required = ['parkour_performer.glb', 'parkour_locomotion.glb', 'rooftop_sunset_1k.hdr', 'landing-target.svg', 'kenney_city_'];
+const required = [
+  'parkour_performer.glb',
+  'parkour_locomotion.glb',
+  'rooftop_sunset_1k.hdr',
+  'landing-target.svg',
+  'kenney_city_',
+  'kaykit_road_'
+];
 for (const token of required) {
   if (!versionedResources.some((url) => url.includes(token))) throw new Error(`Expected DF6 asset was not requested: ${token}`);
 }
 
 await page.screenshot({ path: 'qa/drop-flow-df6-level-01-ready.png' });
 
-// Exercise orbit camera, zoom and real grounded walking. The player must remain on
-// the start roof instead of hovering or accidentally leaving the collider.
 const canvas = page.locator('#game canvas');
 const box = await canvas.boundingBox();
 if (!box) throw new Error('Gameplay canvas not found');
@@ -102,8 +107,6 @@ if (!(await page.locator('#state').textContent())?.includes('ГОТОВ К ПР�
   throw new Error('Grounded walking left the roof or changed gameplay state before jump');
 }
 
-// A complete real physics cycle is now mandatory for release: takeoff -> air ->
-// frontflip -> physical contact with the target -> scored landing -> finish.
 await page.keyboard.press('Space');
 await page.waitForFunction(
   () => (document.querySelector('#state')?.textContent ?? '').includes('В ПОЛЁТЕ')
