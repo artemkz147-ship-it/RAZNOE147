@@ -120,9 +120,10 @@ export class PlayerController {
     let horizontalWall: THREE.Vector3 | null = null;
     for (let i = 0; i < this.controller.numComputedCollisions(); i += 1) {
       const hit = this.controller.computedCollision(i);
+      if (!hit) continue;
       const normal = new THREE.Vector3(hit.normal1.x, hit.normal1.y, hit.normal1.z);
       if (Math.abs(normal.y) < 0.35) horizontalWall = normal;
-      this.onHit(hit.collider, Math.hypot(this.speed, this.verticalVelocity), normal);
+      if (hit.collider) this.onHit(hit.collider, Math.hypot(this.speed, this.verticalVelocity), normal);
     }
 
     if (!this.grounded && horizontalWall && input.moveZ > 0.22 && this.speed > 4.7) {
