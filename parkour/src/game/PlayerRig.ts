@@ -13,7 +13,7 @@ export class PlayerRig extends Phaser.GameObjects.Container {
   private armFront: Phaser.GameObjects.Container;
   private legBack: Phaser.GameObjects.Container;
   private legFront: Phaser.GameObjects.Container;
-  private state: RigState = 'run';
+  private rigState: RigState = 'run';
   private stateTime = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
@@ -43,14 +43,14 @@ export class PlayerRig extends Phaser.GameObjects.Container {
     this.resetPose();
   }
 
-  setState(next: RigState) {
-    if (this.state === next) return;
-    this.state = next;
+  setRigState(next: RigState) {
+    if (this.rigState === next) return;
+    this.rigState = next;
     this.stateTime = 0;
   }
 
-  getState() {
-    return this.state;
+  getRigState() {
+    return this.rigState;
   }
 
   update(delta: number, speedRatio = 1) {
@@ -58,7 +58,7 @@ export class PlayerRig extends Phaser.GameObjects.Container {
     const t = this.stateTime;
     this.resetPose();
 
-    if (this.state === 'run') {
+    if (this.rigState === 'run') {
       const cycle = t * (9.5 + speedRatio * 3.5);
       const swing = Math.sin(cycle) * 0.92;
       const bounce = Math.abs(Math.sin(cycle)) * 2.2;
@@ -71,7 +71,7 @@ export class PlayerRig extends Phaser.GameObjects.Container {
       this.head.y += bounce * 0.35;
       this.art.rotation = Math.sin(cycle * 0.5) * 0.022;
       this.art.x = Math.sin(cycle) * 0.7;
-    } else if (this.state === 'jump') {
+    } else if (this.rigState === 'jump') {
       const p = Phaser.Math.Clamp(t / 0.28, 0, 1);
       this.art.rotation = Phaser.Math.Linear(-0.16, 0.08, p);
       this.armFront.rotation = Phaser.Math.Linear(-1.55, -0.55, p);
@@ -79,14 +79,14 @@ export class PlayerRig extends Phaser.GameObjects.Container {
       this.legFront.rotation = Phaser.Math.Linear(0.78, 0.2, p);
       this.legBack.rotation = Phaser.Math.Linear(-0.78, -0.25, p);
       this.head.rotation = -0.05;
-    } else if (this.state === 'fall') {
+    } else if (this.rigState === 'fall') {
       const drift = Math.sin(t * 5) * 0.08;
       this.art.rotation = 0.1 + drift;
       this.armFront.rotation = -0.58 + drift;
       this.armBack.rotation = -1.05 - drift;
       this.legFront.rotation = 0.34;
       this.legBack.rotation = -0.32;
-    } else if (this.state === 'slide') {
+    } else if (this.rigState === 'slide') {
       this.art.rotation = -0.18;
       this.art.y = 18;
       this.art.x = 8;
@@ -96,7 +96,7 @@ export class PlayerRig extends Phaser.GameObjects.Container {
       this.armBack.rotation = 0.82;
       this.legFront.rotation = 1.32;
       this.legBack.rotation = 1.72;
-    } else if (this.state === 'wall') {
+    } else if (this.rigState === 'wall') {
       const stride = Math.sin(t * 12) * 0.58;
       this.art.rotation = -0.27;
       this.art.x = 5;
@@ -105,14 +105,14 @@ export class PlayerRig extends Phaser.GameObjects.Container {
       this.legFront.rotation = 0.82 + stride;
       this.legBack.rotation = 0.2 - stride;
       this.head.rotation = 0.08;
-    } else if (this.state === 'wallJump') {
+    } else if (this.rigState === 'wallJump') {
       const p = Phaser.Math.Clamp(t / 0.28, 0, 1);
       this.art.rotation = Phaser.Math.Linear(-0.55, 0.12, p);
       this.armFront.rotation = -1.4;
       this.armBack.rotation = -0.9;
       this.legFront.rotation = 0.9;
       this.legBack.rotation = -0.82;
-    } else if (this.state === 'vault') {
+    } else if (this.rigState === 'vault') {
       const p = Phaser.Math.Clamp(t / 0.34, 0, 1);
       const arc = Math.sin(p * Math.PI);
       this.art.rotation = -0.2 + arc * 0.34;
@@ -121,7 +121,7 @@ export class PlayerRig extends Phaser.GameObjects.Container {
       this.armBack.rotation = -0.82 + p * 0.55;
       this.legFront.rotation = 1.05 - p * 0.25;
       this.legBack.rotation = -0.72 + p * 0.35;
-    } else if (this.state === 'land') {
+    } else if (this.rigState === 'land') {
       const p = Phaser.Math.Clamp(t / 0.18, 0, 1);
       const crouch = Math.sin(p * Math.PI) * 9;
       this.art.y = crouch;
