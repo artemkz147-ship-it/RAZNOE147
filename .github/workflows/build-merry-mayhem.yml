@@ -31,6 +31,7 @@ jobs:
           python3 tools/post_materialize_fixes.py
           python3 tools/fix_animation_checker.py
           python3 tools/expand_progression.py
+          python3 tools/visual_polish.py
           node --check src/content.js
           node --check src/main.js
           node --check src/yandex.js
