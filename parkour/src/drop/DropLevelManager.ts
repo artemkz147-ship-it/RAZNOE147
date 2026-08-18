@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import cityManifest from '../game3d/scenery.json';
 import factoryManifest from './factory.json';
 import type { DropLevelSpec, DropSurface, SurfaceKind } from './DropTypes';
@@ -33,6 +34,7 @@ export class DropLevelManager {
   private surfaces: SurfaceVisual[] = [];
   private background: THREE.Object3D[] = [];
   private markerTexture: THREE.Texture | null = null;
+  private skyTexture: THREE.Texture | null = null;
   private activeTarget = 0;
   private time = 0;
 
@@ -41,12 +43,27 @@ export class DropLevelManager {
   }
 
   async init() {
-    try {
-      this.markerTexture = await this.textureLoader.loadAsync('assets3d/ui/landing-target.svg');
-      this.markerTexture.colorSpace = THREE.SRGBColorSpace;
-    } catch (error) {
-      console.warn('Landing target texture failed to load', error);
-    }
+    const marker = this.textureLoader.loadAsync('assets3d/ui/landing-target.svg')
+      .then((texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        this.markerTexture = texture;
+      })
+      .catch((error) => console.warn('Landing target texture failed to load', error));
+
+    const sky = new RGBELoader().loadAsync('assets3d/environment/rooftop_sunset_1k.hdr')
+      .then((texture) => {
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        this.skyTexture = texture;
+        this.scene.background = texture;
+        this.scene.environment = texture;
+      })
+      .catch((error) => console.warn('Rooftop HDR environment failed to load', error));
+
+    await Promise.all([marker, sky]);
+  }
+
+  hasSky() {
+    return this.skyTexture !== null;
   }
 
   async load(level: DropLevelSpec) {
