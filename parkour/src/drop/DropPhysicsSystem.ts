@@ -118,7 +118,16 @@ export class DropPhysicsSystem {
   }
 
   setVelocity(x: number, y: number, z: number) {
-    this.playerBody?.setLinvel({ x, y, z }, true);
+    if (!this.playerBody) return;
+    const current = this.playerBody.linvel();
+    const groundedTakeoff = y > 1.0
+      && Math.abs(current.y) < 0.35
+      && this.groundedSurface(0.22) !== null;
+    // The game computes the direction and physically plausible ballistic arc. Give
+    // only the grounded takeoff a short parkour push-off; once airborne, velocities
+    // are never boosted again and gravity/contacts are entirely Rapier-driven.
+    const push = groundedTakeoff ? 1.13 : 1;
+    this.playerBody.setLinvel({ x: x * push, y, z: z * push }, true);
   }
 
   setHorizontalVelocity(x: number, z: number) {
