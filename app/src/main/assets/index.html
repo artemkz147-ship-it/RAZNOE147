@@ -12,63 +12,126 @@
     <header class="topbar">
       <div class="brand" aria-label="Ретро 3 в 1">
         <span class="brand-mark">3×1</span>
-        <span><strong>РЕТРО</strong><small>три приставки · одно меню</small></span>
+        <span><strong>РЕТРО</strong><small>Dendy · Sega · PlayStation</small></span>
       </div>
       <div class="top-actions">
-        <button class="status-pill focusable" id="gamepadStatus" data-action="bluetooth" aria-label="Открыть настройки Bluetooth">
+        <button class="status-pill focusable" id="gamepadStatus" data-action="bluetooth" aria-label="Статус геймпада">
           <span class="status-dot"></span><span id="gamepadText">Геймпад не подключён</span>
         </button>
-        <button class="icon-button focusable" data-action="settings" aria-label="Настройки">⚙</button>
+        <button class="icon-button focusable" data-action="settings" aria-label="Настройки">
+          <span class="gear-icon" aria-hidden="true">⚙</span>
+        </button>
       </div>
     </header>
 
     <section class="hero-copy">
       <p class="eyebrow">ВЫБЕРИТЕ ПРИСТАВКУ</p>
       <h1>Во что играем?</h1>
-      <p>Подключите Bluetooth или USB‑геймпад, выберите систему и откройте файл игры.</p>
+      <p>Выберите систему, затем ROM. Архивы распаковываются внутри приложения.</p>
     </section>
 
     <section class="console-grid" aria-label="Игровые системы">
-      <button class="console-card nes focusable selected" data-action="console" data-core="nes" data-system="Dendy / NES" data-extensions="NES, FDS, ZIP, 7Z">
-        <span class="console-number">01</span><span class="console-art"><span class="pixel-blocks"><i></i><i></i><i></i><i></i><i></i></span><span class="console-short">8 BIT</span></span>
-        <span class="console-info"><small>DENDY · FAMICOM</small><strong>DENDY / NES</strong><span class="format-line">.nes · .fds · архивы</span></span><span class="play-arrow">→</span>
+      <button class="console-card nes focusable selected" data-action="console" data-core="nes" data-system="Dendy / NES" data-extensions="NES, UNIF, UNF, ZIP, 7Z, RAR">
+        <span class="console-number">01</span>
+        <span class="console-icon nes-icon" aria-hidden="true"><b>8</b><small>BIT</small></span>
+        <span class="console-info"><small>DENDY · FAMICOM · NES</small><strong>DENDY / NES</strong><span class="format-line">.nes · .unif · .unf · архивы</span></span>
+        <span class="play-arrow">→</span>
       </button>
-      <button class="console-card sega focusable" data-action="console" data-core="segaMD" data-system="Sega Mega Drive 2" data-extensions="MD, SMD, GEN, BIN, ZIP, 7Z">
-        <span class="console-number">02</span><span class="console-art"><span class="orbit"><i></i></span><span class="console-short">16 BIT</span></span>
-        <span class="console-info"><small>SEGA · GENESIS</small><strong>MEGA DRIVE 2</strong><span class="format-line">.md · .smd · .gen · архивы</span></span><span class="play-arrow">→</span>
+
+      <button class="console-card sega focusable" data-action="console" data-core="segaMD" data-system="Sega Mega Drive" data-extensions="MD, SMD, GEN, BIN, MDX, 68K, SGD, SMS, GG, SG, BMS, ZIP, 7Z, RAR">
+        <span class="console-number">02</span>
+        <span class="console-icon sega-icon" aria-hidden="true"><b>16</b><small>BIT</small></span>
+        <span class="console-info"><small>MEGA DRIVE · GENESIS · MASTER SYSTEM</small><strong>SEGA</strong><span class="format-line">.md · .smd · .gen · .sms · .gg · архивы</span></span>
+        <span class="play-arrow">→</span>
       </button>
-      <button class="console-card psx focusable" data-action="console" data-core="psx" data-system="Sony PlayStation 1" data-extensions="CHD, PBP, BIN, ISO, ZIP, 7Z">
-        <span class="console-number">03</span><span class="console-art"><span class="disc"><i></i></span><span class="console-short">32 BIT</span></span>
-        <span class="console-info"><small>SONY · PS ONE</small><strong>PLAYSTATION 1</strong><span class="format-line">.chd · .pbp · .bin · .iso</span></span><span class="play-arrow">→</span>
+
+      <button class="console-card psx focusable" data-action="console" data-core="psx" data-system="Sony PlayStation 1" data-extensions="CHD, PBP, BIN, ISO, IMG, EXE, ZIP, 7Z, RAR">
+        <span class="console-number">03</span>
+        <span class="console-icon ps-icon" aria-hidden="true"><b>PS</b><small>ONE</small></span>
+        <span class="console-info"><small>SONY · PLAYSTATION</small><strong>PLAYSTATION 1</strong><span class="format-line">.chd · .pbp · .bin · .iso · архивы</span></span>
+        <span class="play-arrow">→</span>
       </button>
     </section>
 
-    <footer class="footer-hints"><span><kbd>✚</kbd> выбор</span><span><kbd>A</kbd> открыть</span><span><kbd>B</kbd> назад</span><span><kbd>START</kbd> запуск</span><span class="legal">Используйте только собственные копии игр и BIOS.</span></footer>
+    <footer class="footer-hints">
+      <span><kbd>✚</kbd> выбор</span><span><kbd>A</kbd> открыть</span><span><kbd>B</kbd> назад</span>
+      <span class="legal">ROM и BIOS остаются на устройстве.</span>
+    </footer>
   </main>
 
   <div class="modal-backdrop" id="launchModal" hidden>
     <section class="modal console-modal" role="dialog" aria-modal="true" aria-labelledby="launchTitle">
       <button class="modal-close focusable" data-action="close" aria-label="Закрыть">×</button>
-      <p class="eyebrow" id="launchKicker">СИСТЕМА 01</p><h2 id="launchTitle">Dendy / NES</h2>
-      <p class="modal-lead">Выберите файл игры в памяти устройства. Файл никуда не отправляется.</p>
-      <div class="file-format" id="fileFormats">Поддерживаются: NES, FDS, ZIP, 7Z</div>
-      <div class="bios-row" id="biosRow" hidden><span><strong>BIOS PlayStation</strong><small id="biosState">Не выбран — можно добавить для лучшей совместимости</small></span><button class="secondary-button focusable" data-action="bios">Выбрать BIOS</button></div>
+      <p class="eyebrow" id="launchKicker">СИСТЕМА 01</p>
+      <h2 id="launchTitle">Dendy / NES</h2>
+      <p class="modal-lead">Выберите игру в памяти устройства. Архив ZIP / 7Z / RAR можно выбирать как обычный ROM.</p>
+      <div class="file-format" id="fileFormats">Поддерживаются: NES, UNIF, UNF, ZIP, 7Z, RAR</div>
+
+      <div class="bios-panel" id="biosRow" hidden>
+        <div class="bios-heading">
+          <span><strong>BIOS PlayStation 1</strong><small id="biosState">Не выбран — можно добавить несколько регионов</small></span>
+          <button class="secondary-button focusable" data-action="bios">+ Добавить</button>
+        </div>
+        <div class="bios-list" id="biosList"></div>
+        <button class="text-button focusable" id="biosClear" data-action="bios-clear" hidden>Очистить BIOS</button>
+      </div>
+
       <button class="primary-button focusable" data-action="rom"><span>Выбрать игру</span><b>→</b></button>
-      <p class="privacy-note">ROM и сохранения хранятся только на этом устройстве.</p>
+      <p class="privacy-note">Для PS1 приложение автоматически выберет подходящий BIOS из добавленных.</p>
     </section>
   </div>
 
   <div class="modal-backdrop" id="settingsModal" hidden>
     <section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <button class="modal-close focusable" data-action="close-settings" aria-label="Закрыть">×</button>
-      <p class="eyebrow">ЕДИНЫЕ ДЛЯ ВСЕХ СИСТЕМ</p><h2 id="settingsTitle">Простые настройки</h2>
+      <p class="eyebrow">ДЛЯ ВСЕХ ЭМУЛЯТОРОВ</p>
+      <h2 id="settingsTitle">Настройки</h2>
+
       <div class="setting-list">
-        <label class="setting-row focusable range-row"><span><strong>Громкость</strong><small>Общая для всех игр</small></span><input id="volume" type="range" min="0" max="100" step="5" value="80" aria-label="Громкость"><output id="volumeValue">80%</output></label>
-        <label class="setting-row focusable"><span><strong>Экранные кнопки</strong><small>Показывать, если геймпад не подключён</small></span><input class="switch" id="touchControls" type="checkbox" checked></label>
-        <label class="setting-row focusable"><span><strong>Растянуть изображение</strong><small>Иначе сохраняется формат 4:3</small></span><input class="switch" id="stretch" type="checkbox"></label>
-        <label class="setting-row focusable"><span><strong>Вибрация интерфейса</strong><small>Короткий отклик при выборе</small></span><input class="switch" id="vibration" type="checkbox" checked></label>
+        <label class="setting-row focusable range-row">
+          <span><strong>Громкость</strong><small>Общая громкость игр</small></span>
+          <input id="volume" type="range" min="0" max="100" step="5" value="80" aria-label="Громкость">
+          <output id="volumeValue">80%</output>
+        </label>
+
+        <label class="setting-row focusable">
+          <span><strong>Экранные кнопки</strong><small>Можно выключить при использовании геймпада</small></span>
+          <input class="switch" id="touchControls" type="checkbox" checked>
+        </label>
+
+        <label class="setting-row focusable">
+          <span><strong>Растянуть изображение</strong><small>Заполнить экран вместо исходных пропорций</small></span>
+          <input class="switch" id="stretch" type="checkbox">
+        </label>
+
+        <label class="setting-row focusable select-row">
+          <span><strong>Dendy / Sega — движение</strong><small>Вид управления слева</small></span>
+          <select id="virtual8" aria-label="Управление Dendy и Sega">
+            <option value="dpad">Крестовина</option>
+            <option value="stick">Стик</option>
+          </select>
+        </label>
+
+        <label class="setting-row focusable select-row">
+          <span><strong>PS1 — движение</strong><small>Можно оставить крестовину и аналоговый стик вместе</small></span>
+          <select id="virtualPs" aria-label="Управление PlayStation">
+            <option value="both">Крестовина + стик</option>
+            <option value="dpad">Только крестовина</option>
+            <option value="stick">Только стик</option>
+          </select>
+        </label>
+
+        <label class="setting-row focusable">
+          <span><strong>Вибрация интерфейса</strong><small>Короткий отклик меню</small></span>
+          <input class="switch" id="vibration" type="checkbox" checked>
+        </label>
       </div>
-      <div class="controller-box"><div><strong>Bluetooth‑геймпад</strong><small id="settingsPadState">Не подключён</small></div><button class="secondary-button focusable" data-action="bluetooth">Подключить</button></div>
+
+      <div class="controller-box">
+        <div><strong>Клавиши и быстрые сохранения</strong><small>Настраиваются кнопкой ⚙ прямо во время игры</small></div>
+        <span class="settings-badge">SAVE · LOAD · KEYS</span>
+      </div>
+
       <button class="primary-button focusable" data-action="save-settings"><span>Готово</span><b>✓</b></button>
     </section>
   </div>
