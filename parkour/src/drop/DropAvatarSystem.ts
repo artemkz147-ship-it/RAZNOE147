@@ -33,43 +33,62 @@ export class DropAvatarSystem {
     if (!avatar.asset) return;
 
     try {
-      const gltf = await this.loader.loadAsync(avatar.asset);
-      this.model = gltf.scene;
-      this.model.name = 'DropParkourPerformer';
+      const [character, animationLibrary] = await Promise.all([
+        this.loader.loadAsync(avatar.asset),
+        locomotion.asset ? this.loader.loadAsync(locomotion.asset) : Promise.resolve(null)
+      ]);
+
+      this.model = character.scene;
+      this.model.name = 'DropFlowHumanPerformer';
+      this.model.rotation.y = Math.PI;
       this.model.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-          child.frustumCulled = false;
-        }
+        if (!(child instanceof THREE.Mesh)) return;
+        child.castShadow = true;
+        child.receiveShadow = true;
+        child.frustumCulled = false;
+        const cloneMaterial = (material: THREE.Material) => {
+          const copy = material.clone();
+          if (copy instanceof THREE.MeshStandardMaterial) {
+            copy.roughness = Math.max(0.46, copy.roughness);
+            copy.metalness = Math.min(0.12, copy.metalness);
+          }
+          return copy;
+        };
+        child.material = Array.isArray(child.material)
+          ? child.material.map(cloneMaterial)
+          : cloneMaterial(child.material);
       });
 
-      const initial = new THREE.Box3().setFromObject(this.model);
-      const size = initial.getSize(new THREE.Vector3());
-      if (size.y > 0.01) this.model.scale.setScalar(1.76 / size.y);
-      const scaled = new THREE.Box3().setFromObject(this.model);
-      const center = scaled.getCenter(new THREE.Vector3());
-      const minY = scaled.min.y;
-      this.model.position.set(-center.x, -0.9 - minY, -center.z);
+      // The web-ready Universal Base Character is already authored in human-sized units.
+      // Do NOT normalize a skinned mesh via Box3: its bind-pose bounds can produce giant characters.
+      this.model.scale.setScalar(1);
+      const bounds = new THREE.Box3().setFromObject(this.model);
+      const center = bounds.getCenter(new THREE.Vector3());
+      this.model.position.set(-center.x, -0.9 - bounds.min.y, -center.z);
       this.pivot.position.y = 0.9;
       this.pivot.add(this.model);
 
-      this.clips = [...gltf.animations];
-      if (locomotion.asset) {
-        try {
-          const lib = await this.loader.loadAsync(locomotion.asset);
-          const names = new Set(this.clips.map((clip) => clip.name));
-          for (const clip of lib.animations) if (!names.has(clip.name)) this.clips.push(clip);
-        } catch (error) {
-          console.warn('Drop locomotion library failed', error);
-        }
+      this.clips = animationLibrary ? [...animationLibrary.animations] : [...character.animations];
+      if (animationLibrary) {
+        animationLibrary.scene.traverse((child) => {
+          if (!(child instanceof THREE.Mesh)) return;
+          child.geometry.dispose();
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          for (const material of materials) material.dispose();
+        });
       }
 
       this.mixer = new THREE.AnimationMixer(this.model);
-      this.ready = true;
+      this.ready = this.clips.length > 0;
+      if (!this.ready) {
+        this.model.visible = false;
+        console.warn('Drop Flow human character loaded, but animation library has no clips.');
+        return;
+      }
       this.setState('idle');
     } catch (error) {
-      console.warn('Drop performer failed to load', error);
+      console.warn('Drop Flow human performer failed to load', error);
+      if (this.model) this.model.visible = false;
     }
   }
 
@@ -108,29 +127,39 @@ export class DropAvatarSystem {
 
     const previous = this.currentAction;
     this.currentAction = action;
-    const oneShot = state === 'jump' || state === 'land' || state === 'roll' || state === 'fail';
+    const oneShot = state === 'jump' || state === 'land' || state === 'fail';
     action.reset().setEffectiveWeight(1).setEffectiveTimeScale(1);
     action.setLoop(oneShot ? THREE.LoopOnce : THREE.LoopRepeat, oneShot ? 1 : Infinity);
     action.clampWhenFinished = oneShot;
-    action.fadeIn(previous ? 0.09 : 0.01).play();
-    if (previous) previous.fadeOut(0.09);
+    action.fadeIn(previous ? 0.08 : 0.01).play();
+    if (previous) previous.fadeOut(0.08);
   }
 
   private pickClip(state: AvatarState) {
+    const priorities: Record<AvatarState, string[]> = {
+      idle: ['Idle_Loop', 'Idle_No_Loop'],
+      jump: ['Jump_Start', 'Jump_Loop'],
+      air: ['Jump_Loop', 'Fall_Loop', 'Jump_Start'],
+      land: ['Jump_Land', 'ClimbUp_1m'],
+      roll: ['Crouch_Fwd_Loop', 'Dodge_Roll', 'Jump_Land'],
+      fail: ['Hit_Chest', 'Hit_Head', 'Death01']
+    };
+    for (const preferred of priorities[state]) {
+      const exact = this.clips.find((clip) => clip.name.toLowerCase() === preferred.toLowerCase());
+      if (exact) return exact;
+    }
     const patterns: Record<AvatarState, RegExp[]> = {
-      idle: [/^idle_loop$/i, /^idle_no_loop$/i, /idle.*loop/i, /^idle/i, /tpose/i],
-      jump: [/^jump_start$/i, /jump.*start/i, /jump/i],
-      air: [/^jump_loop$/i, /fall.*loop/i, /jump.*loop/i, /^fall/i, /^jump/i],
-      land: [/^jump_land$/i, /jump.*land/i, /land/i, /climbup_1m/i],
-      roll: [/roll/i, /dodge/i, /crouch.*fwd/i, /climbup_1m/i],
-      fail: [/hit_knockback/i, /hit.*chest/i, /hit.*head/i, /death/i]
+      idle: [/^idle.*loop/i, /^idle/i],
+      jump: [/jump.*start/i, /^jump/i],
+      air: [/jump.*loop/i, /fall.*loop/i, /^fall/i],
+      land: [/jump.*land/i, /land/i],
+      roll: [/roll/i, /dodge/i, /crouch.*fwd/i],
+      fail: [/hit.*chest/i, /hit.*head/i, /death/i]
     };
     for (const pattern of patterns[state]) {
-      const clean = this.clips.find((clip) => pattern.test(clip.name) && !/_rm$/i.test(clip.name));
-      if (clean) return clean;
-      const any = this.clips.find((clip) => pattern.test(clip.name));
-      if (any) return any;
+      const clip = this.clips.find((item) => pattern.test(item.name) && !/_rm$/i.test(item.name));
+      if (clip) return clip;
     }
-    return this.clips[0];
+    return this.clips.find((clip) => /idle/i.test(clip.name));
   }
 }
