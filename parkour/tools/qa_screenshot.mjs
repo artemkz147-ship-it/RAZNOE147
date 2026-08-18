@@ -18,14 +18,26 @@ page.on('console', (message) => {
 await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle', timeout: 60_000 });
 await page.waitForFunction(() => document.querySelectorAll('.level-card').length > 0, { timeout: 60_000 });
 await page.locator('.level-card').first().click();
-await page.waitForSelector('#hud.visible', { timeout: 60_000 });
-await page.waitForTimeout(4500);
+
+await page.waitForFunction(() => {
+  const hud = document.querySelector('#hud');
+  const state = document.querySelector('#state')?.textContent ?? '';
+  const target = document.querySelector('#target')?.textContent ?? '';
+  const drop = Number.parseFloat(document.querySelector('#drop')?.textContent ?? '0');
+  return hud?.classList.contains('visible')
+    && state.includes('ГОТОВ К ПРЫЖКУ')
+    && target !== 'ЦЕЛЬ'
+    && target.length > 2
+    && Number.isFinite(drop)
+    && drop > 0.5;
+}, { timeout: 90_000 });
+await page.waitForTimeout(1200);
 await page.screenshot({ path: 'qa/drop-flow-level-01-ready.png' });
 
 await page.keyboard.press('Space');
-await page.waitForTimeout(520);
+await page.waitForFunction(() => (document.querySelector('#state')?.textContent ?? '').includes('В ПОЛЁТЕ'), { timeout: 10_000 });
 await page.keyboard.press('Digit1');
-await page.waitForTimeout(420);
+await page.waitForTimeout(340);
 await page.screenshot({ path: 'qa/drop-flow-level-01-air.png' });
 
 await fs.writeFile('qa/browser-errors.txt', errors.join('\n'), 'utf8');
