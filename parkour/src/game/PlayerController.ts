@@ -68,7 +68,7 @@ export class PlayerController {
     this.body.setGravityY(1950);
     this.body.setSize(42, 96, true);
     this.body.setVelocity(this.speed, 0);
-    this.rig.setVisible(true).setPosition(x, y + 2).setState('run');
+    this.rig.setVisible(true).setPosition(x, y + 2).setRigState('run');
   }
 
   stop() {
@@ -80,7 +80,7 @@ export class PlayerController {
     const retainedSpeed = this.speed;
     this.reset(x, y, retainedSpeed);
     this.body.setVelocityY(-140);
-    this.rig.setState('jump');
+    this.rig.setRigState('jump');
   }
 
   setCorrection(value: number) {
@@ -117,7 +117,7 @@ export class PlayerController {
     this.jumpBufferMs = 0;
     this.body.setVelocityY(-500);
     this.body.setVelocityX(this.speed * 1.08);
-    this.rig.setState('vault');
+    this.rig.setRigState('vault');
     this.onTrick('VAULT', 0.38);
     return true;
   }
@@ -176,7 +176,7 @@ export class PlayerController {
       this.coyoteMs = 0;
       this.body.setVelocityY(-780);
       this.landMs = 0;
-      this.rig.setState('jump');
+      this.rig.setRigState('jump');
     }
 
     if (!grounded && this.body.blocked.right && this.wallCooldownMs <= 0 && this.wallJumpMs <= 0 && !this.wallTrickLatched) {
@@ -188,7 +188,7 @@ export class PlayerController {
       const wallRise = this.jumpHeld ? -315 : -245;
       if (this.body.velocity.y > wallRise) this.body.setVelocityY(wallRise);
       this.body.setVelocityX(Math.max(80, this.speed * 0.28));
-      this.rig.setState('wall');
+      this.rig.setRigState('wall');
     } else {
       this.body.setGravityY(1950);
       if (this.wallJumpMs <= 0) {
@@ -211,7 +211,7 @@ export class PlayerController {
     }
 
     const state = this.pickRigState(grounded);
-    this.rig.setState(state);
+    this.rig.setRigState(state);
     this.rig.update(delta, Phaser.Math.Clamp(this.speed / 620, 0.65, 1.25));
     this.wasGrounded = grounded;
   }
@@ -243,7 +243,7 @@ export class PlayerController {
     this.body.setGravityY(1950);
     this.body.setVelocity(-230, -820);
     this.host.x -= 8;
-    this.rig.setState('wallJump');
+    this.rig.setRigState('wallJump');
     this.onTrick('WALL KICK', 0.5);
   }
 
