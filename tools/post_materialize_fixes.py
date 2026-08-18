@@ -51,4 +51,13 @@ if "this.runToast('УКЛОНЕНИЕ')" not in s:
     s = s.replace('hurtPlayer(amount){const p=this.player;if(!p||p.invuln>0)return;p.hp-=amount*p.damageTaken;', "hurtPlayer(amount){const p=this.player;if(!p||p.invuln>0)return;if(p.dodge>0&&Math.random()<p.dodge){this.runToast('УКЛОНЕНИЕ');return;}p.hp-=amount*p.damageTaken;")
 
 p.write_text(s, encoding='utf-8')
-print('post-materialize gameplay fixes applied')
+
+# The payload is intentionally reproducible, but two historical OpenGameArt
+# filenames changed. Normalize them before Blender tries to download assets.
+bp = Path('tools/build_assets.sh')
+bs = bp.read_text(encoding='utf-8')
+bs = bs.replace('ultimate_nature_pack_by_quaternius_1.zip', 'ultimate_nature_pack_by_quaternius.zip')
+bs = bs.replace('RPG%20Pack.zip', 'ultimate_rpg_items_pack_by_quaternius.zip')
+bp.write_text(bs, encoding='utf-8')
+
+print('post-materialize gameplay and asset fixes applied')
