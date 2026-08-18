@@ -26,6 +26,7 @@ export class DestructionSystem {
   private fragmentTemplates = new Map<string, THREE.Object3D>();
   private ownedBodies: RAPIER.RigidBody[] = [];
   private onBreak: (reward: number) => void;
+  private clock = 0;
 
   constructor(scene: THREE.Scene, world: RAPIER.World, onBreak: (reward: number) => void) {
     this.scene = scene;
@@ -59,9 +60,14 @@ export class DestructionSystem {
     this.scene.add(root);
 
     const size = this.colliderSizeFor(spec.asset);
-    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(...spec.p));
+    const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(...spec.p);
+    if (spec.r) {
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(...spec.r));
+      bodyDesc.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
+    }
+    const body = this.world.createRigidBody(bodyDesc);
     const collider = this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2),
+      RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2).setFriction(0.72),
       body
     );
     const entry: Breakable = { spec, root, collider, body, broken: false };
@@ -77,6 +83,7 @@ export class DestructionSystem {
   }
 
   update(time: number) {
+    this.clock = time;
     for (const fragment of this.fragments) {
       const p = fragment.body.translation();
       const q = fragment.body.rotation();
@@ -105,6 +112,7 @@ export class DestructionSystem {
     this.breakables.clear();
     this.fragments = [];
     this.ownedBodies = [];
+    this.clock = 0;
   }
 
   private break(entry: Breakable, normal: THREE.Vector3, impactSpeed: number) {
@@ -114,11 +122,16 @@ export class DestructionSystem {
     this.world.removeRigidBody(entry.body);
     this.ownedBodies = this.ownedBodies.filter((body) => body.handle !== entry.body.handle);
 
-    const kind = entry.spec.asset.includes('glass') ? 'glass' : entry.spec.asset.includes('barrier') || entry.spec.asset.includes('crate') ? 'wood' : 'metal';
+    const kind = entry.spec.asset.includes('glass')
+      ? 'glass'
+      : entry.spec.asset.includes('barrier') || entry.spec.asset.includes('crate')
+        ? 'wood'
+        : 'metal';
     const template = this.fragmentTemplates.get(kind);
     if (!template) return;
 
-    for (let i = 0; i < 7; i += 1) {
+    const fragmentCount = entry.spec.asset.includes('fragile_roof') ? 11 : 7;
+    for (let i = 0; i < fragmentCount; i += 1) {
       const object = template.clone(true);
       object.position.set(entry.spec.p[0], entry.spec.p[1] + (i % 3) * 0.12, entry.spec.p[2]);
       object.scale.setScalar(0.72 + (i % 3) * 0.14);
@@ -138,17 +151,18 @@ export class DestructionSystem {
       );
       this.world.createCollider(RAPIER.ColliderDesc.cuboid(0.28, 0.09, 0.18).setDensity(0.5), body);
       body.setLinvel({
-        x: -normal.x * impactSpeed * 0.45 + (i - 3) * 0.32,
+        x: -normal.x * impactSpeed * 0.45 + (i - fragmentCount / 2) * 0.28,
         y: 1.6 + (i % 4) * 0.65,
         z: -normal.z * impactSpeed * 0.45 + ((i * 3) % 5 - 2) * 0.35
       }, true);
       body.setAngvel({ x: i * 0.8, y: 1.7 + i * 0.35, z: -0.7 * i }, true);
-      this.fragments.push({ object, body, born: performance.now() / 1000 });
+      this.fragments.push({ object, body, born: this.clock });
     }
     this.onBreak(entry.spec.reward);
   }
 
   private colliderSizeFor(asset: string) {
+    if (asset.includes('fragile_roof')) return new THREE.Vector3(3.2, 0.22, 3.2);
     if (asset.includes('glass')) return new THREE.Vector3(2.5, 1.8, 0.18);
     if (asset.includes('barrier')) return new THREE.Vector3(2.8, 1.5, 0.5);
     if (asset.includes('crate')) return new THREE.Vector3(1.4, 1.4, 1.4);
