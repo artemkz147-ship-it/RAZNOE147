@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import levelsJson from './levels.json';
+import { AudioSystem } from './AudioSystem';
+import { AvatarSystem } from './AvatarSystem';
 import { Input } from './Input';
 import { LevelManager } from './LevelManager';
 import { PlayerController, type ParkourEvent } from './PlayerController';
@@ -35,10 +37,13 @@ export class Game3D {
   private world!: RAPIER.World;
   private player!: PlayerController;
   private levelManager!: LevelManager;
+  private avatar!: AvatarSystem;
+  private audio = new AudioSystem();
   private input!: Input;
   private currentLevel!: LevelSpec;
   private running = false;
   private paused = false;
+  private thirdPerson = true;
   private elapsed = 0;
   private simTime = 0;
   private accumulator = 0;
@@ -49,6 +54,9 @@ export class Game3D {
   private stats: RunStats = { falls: 0, breaks: 0, checkpoints: 0, parkourMoves: 0, perfectLandings: 0 };
   private tmpFoot = new THREE.Vector3();
   private tmpEye = new THREE.Vector3();
+  private tmpDirection = new THREE.Vector3();
+  private tmpCameraDesired = new THREE.Vector3();
+  private tmpCameraTarget = new THREE.Vector3();
 
   constructor(host: HTMLElement, callbacks: GameCallbacks) {
     this.host = host;
@@ -74,6 +82,7 @@ export class Game3D {
     this.levelManager = new LevelManager(this.scene, this.world, () => {
       this.stats.breaks += 1;
       this.cameraKick = Math.min(1, this.cameraKick + 0.5);
+      this.audio.breakObject();
     });
     await this.levelManager.init();
 
@@ -87,7 +96,18 @@ export class Game3D {
       (event) => this.handleParkourEvent(event)
     );
 
+    this.avatar = new AvatarSystem(this.scene);
+    await this.avatar.init();
+
     addEventListener('resize', () => this.resize());
+    addEventListener('keydown', (event) => {
+      if (event.code !== 'KeyV' || event.repeat) return;
+      this.thirdPerson = !this.thirdPerson;
+      this.avatar.setVisible(this.thirdPerson);
+      window.dispatchEvent(new CustomEvent('parkour-camera', {
+        detail: { mode: this.thirdPerson ? 'ТРЕТЬЕ ЛИЦО' : 'ПЕРВОЕ ЛИЦО' }
+      }));
+    });
     document.addEventListener('visibilitychange', () => this.setPaused(document.hidden));
     this.resize();
     this.renderer.setAnimationLoop(() => this.frame());
@@ -110,6 +130,8 @@ export class Game3D {
     this.player.setRespawn(spawn);
     this.input.yaw = -Math.PI / 2;
     this.input.pitch = -0.08;
+    this.avatar.setVisible(this.thirdPerson);
+    this.audio.startAmbient();
     this.running = true;
     this.lastFrame = performance.now();
     this.emitHud(true);
@@ -122,6 +144,8 @@ export class Game3D {
 
   setPaused(value: boolean) {
     this.paused = value;
+    if (value) this.audio.stopAmbient();
+    else if (this.running) this.audio.startAmbient();
   }
 
   isRunning() {
@@ -145,6 +169,10 @@ export class Game3D {
         this.accumulator -= this.fixedDt;
       }
       this.postSimulation(dt);
+      const foot = this.player.getFootPosition(this.tmpFoot);
+      const motion = this.player.getMotionState();
+      this.avatar.update(dt, foot, this.input.yaw, motion, this.player.getSpeed(), this.thirdPerson);
+      this.audio.update(dt, this.player.getSpeed(), this.player.isGrounded(), motion);
     }
 
     this.updateCamera(dt);
@@ -169,6 +197,7 @@ export class Game3D {
 
     if (this.levelManager.reachedFinish(foot)) {
       this.running = false;
+      this.audio.stopAmbient();
       const reward = Math.max(
         20,
         120
@@ -190,16 +219,42 @@ export class Game3D {
   private updateCamera(dt: number) {
     if (!this.player) return;
     const eye = this.player.getEyePosition(this.tmpEye);
-    this.camera.position.lerp(eye, 1 - Math.exp(-20 * dt));
     this.cameraKick = Math.max(0, this.cameraKick - dt * 3.5);
     const kickPitch = Math.sin(performance.now() * 0.034) * this.cameraKick * 0.012;
-    this.camera.rotation.set(
-      this.input.pitch + kickPitch,
-      this.input.yaw,
-      this.player.getCameraRoll(this.input),
-      'YXZ'
-    );
-    const desiredFov = 72
+    const pitch = this.input.pitch + kickPitch;
+    const roll = this.player.getCameraRoll(this.input) * (this.thirdPerson ? 0.45 : 1);
+
+    if (this.thirdPerson) {
+      const foot = this.player.getFootPosition(this.tmpFoot);
+      const target = this.tmpCameraTarget.set(foot.x, foot.y + 1.18, foot.z);
+      const horizontalForward = this.tmpDirection.set(-Math.sin(this.input.yaw), 0, -Math.cos(this.input.yaw)).normalize();
+      const desired = this.tmpCameraDesired
+        .copy(target)
+        .addScaledVector(horizontalForward, -4.45)
+        .add(new THREE.Vector3(0, 1.25 + Math.max(0, -pitch) * 0.7, 0));
+
+      const rayDirection = desired.clone().sub(target);
+      const maxDistance = rayDirection.length();
+      if (maxDistance > 0.01) {
+        rayDirection.normalize();
+        const ray = new RAPIER.Ray(
+          { x: target.x, y: target.y, z: target.z },
+          { x: rayDirection.x, y: rayDirection.y, z: rayDirection.z }
+        );
+        const hit = this.world.castRay(ray, maxDistance, true, undefined, undefined, this.player.collider);
+        if (hit) {
+          const safeDistance = Math.max(0.55, hit.timeOfImpact - 0.22);
+          desired.copy(target).addScaledVector(rayDirection, safeDistance);
+        }
+      }
+      this.camera.position.lerp(desired, 1 - Math.exp(-10 * dt));
+      this.camera.rotation.set(pitch * 0.68, this.input.yaw, roll, 'YXZ');
+    } else {
+      this.camera.position.lerp(eye, 1 - Math.exp(-20 * dt));
+      this.camera.rotation.set(pitch, this.input.yaw, roll, 'YXZ');
+    }
+
+    const desiredFov = (this.thirdPerson ? 68 : 72)
       + Math.min(10, Math.max(0, this.player.getSpeed() - 4.5) * 1.6)
       + (this.player.isWallRunning() ? 3 : 0)
       + (this.player.isSliding() ? 2 : 0);
@@ -225,6 +280,7 @@ export class Game3D {
     if (event.type !== 'hard-land') this.stats.parkourMoves += 1;
     if (event.type === 'perfect-land') this.stats.perfectLandings += 1;
     this.cameraKick = Math.min(1, this.cameraKick + event.intensity * 0.42);
+    this.audio.parkour(event);
     this.callbacks.onParkour(event);
   }
 
