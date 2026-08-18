@@ -179,7 +179,7 @@ export class PlayerController {
       this.rig.setState('jump');
     }
 
-    if (!grounded && this.body.blocked.right && this.wallCooldownMs <= 0 && this.wallJumpMs <= 0) {
+    if (!grounded && this.body.blocked.right && this.wallCooldownMs <= 0 && this.wallJumpMs <= 0 && !this.wallTrickLatched) {
       this.startWallRun();
     }
 
