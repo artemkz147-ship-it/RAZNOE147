@@ -108,7 +108,7 @@ jobs:
             'real shots telemetry':'qaShots' in main,
             'real hits telemetry':'qaHits' in main,
             'real kills telemetry':'qaKills' in main,
-            'legacy CC0 RPG staff pack':'RPG%20Pack.zip' in build,
+            'legacy CC0 RPG staff pack':'rpg_old' in build and "'Staff'" in build,
             'headless portrait render':'xvfb-run -a blender' in build,
             'no modern gun download':'ultimate_gun_pack' not in build and '$ROOT/guns' not in build,
           }
