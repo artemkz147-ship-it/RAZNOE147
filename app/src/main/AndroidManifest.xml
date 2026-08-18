@@ -3,6 +3,8 @@
     <application
         android:allowBackup="true"
         android:hardwareAccelerated="true"
+        android:icon="@drawable/ic_launcher_retro"
+        android:roundIcon="@drawable/ic_launcher_retro"
         android:label="Ретро 3 в 1"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">
