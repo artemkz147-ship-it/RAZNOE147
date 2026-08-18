@@ -1,4 +1,4 @@
-name: Build Drop Flow
+name: Build Drop Flow DF4
 
 on:
   push:
@@ -31,8 +31,14 @@ jobs:
         run: python -m pip install -r requirements-assets.txt
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build vertical drop game
+      - name: Build cache-safe DF4 game
         run: npm run build
+      - name: Verify DF4 asset namespace
+        run: |
+          test -d dist/assets3d_df4_20260818
+          test ! -d dist/assets3d
+          grep -q 'DROP FLOW BUILD DF4-20260818-1751' dist/build-id.txt
+          grep -q 'assets3d_df4_20260818/ui/landing-target.svg' dist/index.html
       - name: Install Chromium for visual QA
         run: |
           npm install --no-save playwright@1.62.1
@@ -47,19 +53,19 @@ jobs:
             sleep 1
           done
           node tools/qa_screenshot.mjs
-      - name: Upload gameplay QA
+      - name: Upload DF4 gameplay QA
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: drop-flow-visual-qa
+          name: drop-flow-df4-visual-qa
           path: parkour/qa
           if-no-files-found: warn
-      - name: Create Yandex Games ZIP
+      - name: Create DF4 Yandex Games ZIP
         run: |
           cd dist
-          zip -r ../drop-flow-yandex.zip .
+          zip -r ../drop-flow-df4-yandex.zip .
       - uses: actions/upload-artifact@v4
         with:
-          name: drop-flow-yandex
-          path: parkour/drop-flow-yandex.zip
+          name: drop-flow-df4-yandex
+          path: parkour/drop-flow-df4-yandex.zip
           if-no-files-found: error
