@@ -78,7 +78,7 @@ const required = [
   'parkour_locomotion.glb',
   'rooftop_sunset_1k.hdr',
   'landing-target.svg',
-  'kenney_city_',
+  'kaykit_city_',
   'kaykit_road_'
 ];
 for (const token of required) {
