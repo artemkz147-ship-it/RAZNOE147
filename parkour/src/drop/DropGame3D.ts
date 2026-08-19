@@ -159,6 +159,20 @@ export class DropGame3D {
     this.physics.load(level, origins);
 
     this.levelManager.getStartPosition(this.playerPos);
+    // A roof-parkour run should begin near the takeoff edge, not at the middle of a
+    // ten-metre roof. Keep a safe inset so the player is visibly grounded and can
+    // still walk in any direction before committing to the drop.
+    if (level.targets.length) {
+      const firstTarget = this.levelManager.getTargetPosition(0, this.tmpTarget);
+      this.tmpDirection.copy(firstTarget).sub(this.playerPos);
+      this.tmpDirection.y = 0;
+      if (this.tmpDirection.lengthSq() > 0.0001) {
+        this.tmpDirection.normalize();
+        const halfSpan = Math.min(level.start.size[0], level.start.size[1]) * 0.5;
+        const launchOffset = Math.max(0, halfSpan - 1.55);
+        this.playerPos.addScaledVector(this.tmpDirection, launchOffset);
+      }
+    }
     this.playerPos.y += 0.035;
     this.physics.teleportFoot(this.playerPos);
     this.physics.getFootPosition(this.playerPos);
@@ -279,10 +293,6 @@ export class DropGame3D {
         return;
       }
 
-      // Rapier may report the launch roof for a few solver frames after takeoff.
-      // That is expected contact separation, not a wrong landing. Only a different
-      // surface can fail the jump immediately. Returning to the launch surface later
-      // still counts as a miss.
       if (groundedSurface !== null && groundedSurface !== this.standingSurface && this.stageAirTime > 0.32) {
         this.miss();
         return;
@@ -559,8 +569,21 @@ export class DropGame3D {
   }
 
   private respawnStanding(playSound = false) {
-    if (this.standingSurface < 0) this.levelManager.getStartPosition(this.tmpStanding);
-    else this.levelManager.getStandingPosition(this.standingSurface, this.tmpStanding);
+    if (this.standingSurface < 0) {
+      this.levelManager.getStartPosition(this.tmpStanding);
+      if (this.currentLevel?.targets.length) {
+        const target = this.levelManager.getTargetPosition(0, this.tmpTarget);
+        this.tmpDirection.copy(target).sub(this.tmpStanding);
+        this.tmpDirection.y = 0;
+        if (this.tmpDirection.lengthSq() > 0.0001) {
+          this.tmpDirection.normalize();
+          const halfSpan = Math.min(this.currentLevel.start.size[0], this.currentLevel.start.size[1]) * 0.5;
+          this.tmpStanding.addScaledVector(this.tmpDirection, Math.max(0, halfSpan - 1.55));
+        }
+      }
+    } else {
+      this.levelManager.getStandingPosition(this.standingSurface, this.tmpStanding);
+    }
     this.tmpStanding.y += 0.035;
     this.physics.teleportFoot(this.tmpStanding);
     this.physics.getFootPosition(this.playerPos);
