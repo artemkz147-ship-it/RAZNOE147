@@ -1,0 +1,4 @@
+lighter-sdk @ git+https://github.com/elliottech/lighter-python.git@v1.1.0
+python-telegram-bot[job-queue]>=22.0,<23.0
+python-dotenv>=1.0,<2.0
+pytest>=8.0,<9.0
