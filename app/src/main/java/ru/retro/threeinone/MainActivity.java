@@ -70,10 +70,23 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private void focusWebView() {
+        try {
+            if (webView != null) {
+                webView.setFocusable(true);
+                webView.setFocusableInTouchMode(true);
+                webView.requestFocus(View.FOCUS_DOWN);
+            }
+        } catch (Throwable ignored) {}
+    }
+
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus && root != null) root.post(this::enterImmersiveSafely);
+        if (hasFocus && root != null) {
+            root.post(this::enterImmersiveSafely);
+            root.post(this::focusWebView);
+        }
     }
 
     private void createWebView() {
@@ -85,6 +98,8 @@ public final class MainActivity extends Activity {
 
             webView = new WebView(this);
             webView.setBackgroundColor(Color.rgb(8, 9, 12));
+            webView.setFocusable(true);
+            webView.setFocusableInTouchMode(true);
             root.addView(webView, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT));
@@ -143,6 +158,12 @@ public final class MainActivity extends Activity {
                 }
 
                 @Override
+                public void onPageFinished(WebView view, String url) {
+                    super.onPageFinished(view, url);
+                    focusWebView();
+                }
+
+                @Override
                 public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
                     showRendererRecovery();
                     return true;
@@ -150,6 +171,7 @@ public final class MainActivity extends Activity {
             });
 
             webView.loadUrl(START_URL);
+            root.post(this::focusWebView);
         } catch (Throwable failure) {
             showFatalError("Не удалось создать системный WebView: " + failure.getClass().getSimpleName());
         }
@@ -196,6 +218,7 @@ public final class MainActivity extends Activity {
         Uri[] result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
         fileCallback.onReceiveValue(result);
         fileCallback = null;
+        if (root != null) root.post(this::focusWebView);
     }
 
     @Override
@@ -217,7 +240,10 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (webView != null) webView.onResume();
-        if (root != null) root.post(this::enterImmersiveSafely);
+        if (root != null) {
+            root.post(this::enterImmersiveSafely);
+            root.post(this::focusWebView);
+        }
     }
 
     @Override
