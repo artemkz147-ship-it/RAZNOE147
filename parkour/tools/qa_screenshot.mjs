@@ -1,8 +1,8 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 
-const ASSET_ROOT = '/assets3d_df6_20260818/';
-const BUILD_ID = 'DF6-20260818-1903';
+const ASSET_ROOT = '/assets3d_df7_20260819/';
+const BUILD_ID = 'DF7-20260819-A';
 
 await fs.mkdir('qa', { recursive: true });
 
@@ -59,12 +59,13 @@ await fs.writeFile('qa/resource-urls.txt', resources.join('\n'), 'utf8');
 
 const staleAssets = resources.filter((url) => {
   try {
-    return new URL(url).pathname.includes('/assets3d/');
+    const path = new URL(url).pathname;
+    return path.includes('/assets3d/') || path.includes('/assets3d_df6_20260818/');
   } catch {
     return false;
   }
 });
-if (staleAssets.length) throw new Error(`Stale unversioned assets were requested:\n${staleAssets.join('\n')}`);
+if (staleAssets.length) throw new Error(`Stale pre-DF7 assets were requested:\n${staleAssets.join('\n')}`);
 
 const versionedResources = resources.filter((url) => {
   try {
@@ -84,10 +85,10 @@ const required = [
   'kaykit_road_'
 ];
 for (const token of required) {
-  if (!versionedResources.some((url) => url.includes(token))) throw new Error(`Expected DF6 asset was not requested: ${token}`);
+  if (!versionedResources.some((url) => url.includes(token))) throw new Error(`Expected DF7 asset was not requested: ${token}`);
 }
 
-await page.screenshot({ path: 'qa/drop-flow-df6-level-01-ready.png' });
+await page.screenshot({ path: 'qa/drop-flow-df7-level-01-ready.png' });
 
 const canvas = page.locator('#game canvas');
 const box = await canvas.boundingBox();
@@ -104,7 +105,7 @@ await page.keyboard.down('KeyW');
 await page.waitForTimeout(350);
 await page.keyboard.up('KeyW');
 await page.waitForTimeout(220);
-await page.screenshot({ path: 'qa/drop-flow-df6-level-01-grounded-walk.png' });
+await page.screenshot({ path: 'qa/drop-flow-df7-level-01-grounded-walk.png' });
 if (!(await page.locator('#state').textContent())?.includes('ГОТОВ К ПРЫЖКУ')) {
   throw new Error('Grounded walking left the roof or changed gameplay state before jump');
 }
@@ -131,7 +132,7 @@ await page.waitForFunction(
   { timeout: 4_000 }
 );
 await page.waitForTimeout(330);
-await page.screenshot({ path: 'qa/drop-flow-df6-level-01-air.png' });
+await page.screenshot({ path: 'qa/drop-flow-df7-level-01-air.png' });
 
 const trajectory = [];
 let landed = false;
@@ -162,22 +163,18 @@ for (let i = 0; i < 75; i += 1) {
 await fs.writeFile('qa/physics-trajectory.json', JSON.stringify(trajectory, null, 2), 'utf8');
 
 if (!landed) {
-  await page.screenshot({ path: 'qa/drop-flow-df6-level-01-no-contact.png' });
+  await page.screenshot({ path: 'qa/drop-flow-df7-level-01-no-contact.png' });
   const last = trajectory.at(-1);
   throw new Error(`Physical landing did not score. Last sample: ${JSON.stringify(last)}`);
 }
 
-await page.screenshot({ path: 'qa/drop-flow-df6-level-01-contact.png' });
-// SwiftShader can render the scene far below real-time even though gameplay is
-// correct. Give the landing animation enough wall-clock time to advance through
-// its fixed simulation frames; this remains a strict requirement that the result
-// overlay actually appears.
+await page.screenshot({ path: 'qa/drop-flow-df7-level-01-contact.png' });
 await page.waitForFunction(
   () => document.querySelector('#finish')?.classList.contains('visible'),
   undefined,
   { timeout: 20_000 }
 );
-await page.screenshot({ path: 'qa/drop-flow-df6-level-01-finish.png' });
+await page.screenshot({ path: 'qa/drop-flow-df7-level-01-finish.png' });
 
 await fs.writeFile('qa/browser-errors.txt', errors.join('\n'), 'utf8');
 if (errors.some((line) => /pageerror/i.test(line))) {
