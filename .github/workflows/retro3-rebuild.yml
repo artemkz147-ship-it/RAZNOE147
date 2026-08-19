@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Apply Retro 3 startup hotfix
+        run: python3 tools/retro3_v261_hotfix.py
       - name: Validate launcher JavaScript
         run: node --check app/src/main/assets/launcher.js
       - name: Validate emulator inline JavaScript
