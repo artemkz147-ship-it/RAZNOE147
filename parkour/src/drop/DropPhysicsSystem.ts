@@ -98,6 +98,10 @@ export class DropPhysicsSystem {
     }
     this.world.timestep = Math.max(1 / 240, Math.min(1 / 30, dt));
     this.world.step();
+
+    // Lightweight QA telemetry. It is not rendered and has no gameplay effect.
+    const snapshot = this.debugSnapshot();
+    document.documentElement.dataset.dropPhysics = JSON.stringify(snapshot);
   }
 
   teleportFoot(foot: THREE.Vector3) {
@@ -146,8 +150,6 @@ export class DropPhysicsSystem {
     const velocity = this.playerBody.linvel();
     if (velocity.y > 0.8) return null;
 
-    // Primary source of truth: an actual Rapier shape contact with an upward
-    // surface normal. A wall hit therefore never becomes a fake landing.
     let bestContact: { index: number; distance: number } | null = null;
     const prediction = Math.max(0.055, tolerance);
     for (const surface of this.surfaces) {
@@ -161,9 +163,6 @@ export class DropPhysicsSystem {
     }
     if (bestContact) return bestContact.index;
 
-    // Small geometric fallback for the frame immediately before/after solver
-    // contact. It is deliberately tight and only accepts a nearly stationary
-    // or descending player directly above the authored top surface.
     const foot = this.getFootPosition(new THREE.Vector3());
     let bestFallback: { index: number; error: number } | null = null;
     for (const surface of this.surfaces) {
