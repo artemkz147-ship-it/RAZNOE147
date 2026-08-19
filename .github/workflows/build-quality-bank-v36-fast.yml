@@ -6,6 +6,12 @@ on:
     paths:
       - 'tools/build_quality_bank_v36_fast.py'
       - '.github/workflows/build-quality-bank-v36-fast.yml'
+  pull_request:
+    branches: [yandex-mega-quiz]
+    paths:
+      - 'tools/build_quality_bank_v36_fast.py'
+      - '.github/workflows/build-quality-bank-v36-fast.yml'
+      - 'tools/trigger_quality_bank_v36_fast.txt'
   workflow_dispatch:
 
 permissions:
@@ -46,6 +52,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Commit generated bank
+        if: github.event_name != 'pull_request'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
