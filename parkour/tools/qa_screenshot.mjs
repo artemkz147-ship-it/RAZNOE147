@@ -100,8 +100,6 @@ await page.mouse.move(startX - 170, startY + 62, { steps: 12 });
 await page.mouse.up({ button: 'left' });
 await page.mouse.wheel(0, -220);
 
-// Verify real grounded walking without dragging the tutorial launch all the way
-// back to the centre of its large roof.
 await page.keyboard.down('KeyW');
 await page.waitForTimeout(350);
 await page.keyboard.up('KeyW');
@@ -170,11 +168,16 @@ if (!landed) {
 }
 
 await page.screenshot({ path: 'qa/drop-flow-df6-level-01-contact.png' });
+// SwiftShader can render the scene far below real-time even though gameplay is
+// correct. Give the landing animation enough wall-clock time to advance through
+// its fixed simulation frames; this remains a strict requirement that the result
+// overlay actually appears.
 await page.waitForFunction(
   () => document.querySelector('#finish')?.classList.contains('visible'),
   undefined,
-  { timeout: 5_000 }
+  { timeout: 20_000 }
 );
+await page.screenshot({ path: 'qa/drop-flow-df6-level-01-finish.png' });
 
 await fs.writeFile('qa/browser-errors.txt', errors.join('\n'), 'utf8');
 if (errors.some((line) => /pageerror/i.test(line))) {
