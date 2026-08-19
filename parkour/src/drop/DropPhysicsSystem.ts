@@ -10,6 +10,7 @@ type PhysicalSurface = {
   spec: DropSurface;
   origin: THREE.Vector3;
   body: RAPIER.RigidBody;
+  collider: RAPIER.Collider;
   height: number;
 };
 
@@ -58,13 +59,13 @@ export class DropPhysicsSystem {
         .setTranslation(origin.x, centerY, origin.z)
         .setUserData({ surfaceIndex: index });
       const body = this.world!.createRigidBody(bodyDesc);
-      this.world!.createCollider(
+      const collider = this.world!.createCollider(
         RAPIER.ColliderDesc.cuboid(width * 0.5, height * 0.5, depth * 0.5)
-          .setFriction(0.9)
+          .setFriction(0.92)
           .setRestitution(0),
         body
       );
-      this.surfaces.push({ index, spec, origin, body, height });
+      this.surfaces.push({ index, spec, origin, body, collider, height });
     });
 
     const playerDesc = RAPIER.RigidBodyDesc.dynamic()
@@ -76,7 +77,7 @@ export class DropPhysicsSystem {
     this.playerBody = this.world.createRigidBody(playerDesc);
     this.playerCollider = this.world.createCollider(
       RAPIER.ColliderDesc.capsule(0.55, 0.32)
-        .setFriction(0.24)
+        .setFriction(0.22)
         .setRestitution(0)
         .setDensity(1.05),
       this.playerBody
@@ -123,9 +124,6 @@ export class DropPhysicsSystem {
     const groundedTakeoff = y > 1.0
       && Math.abs(current.y) < 0.35
       && this.groundedSurface(0.22) !== null;
-    // The game computes the direction and physically plausible ballistic arc. Give
-    // only the grounded takeoff a short parkour push-off; once airborne, velocities
-    // are never boosted again and gravity/contacts are entirely Rapier-driven.
     const push = groundedTakeoff ? 1.13 : 1;
     this.playerBody.setLinvel({ x: x * push, y, z: z * push }, true);
   }
@@ -144,26 +142,54 @@ export class DropPhysicsSystem {
   }
 
   groundedSurface(tolerance = 0.16) {
-    if (!this.playerBody) return null;
-    const foot = this.getFootPosition(new THREE.Vector3());
+    if (!this.playerBody || !this.playerCollider) return null;
     const velocity = this.playerBody.linvel();
-    if (velocity.y > 0.75) return null;
+    if (velocity.y > 0.8) return null;
 
-    let best: { index: number; error: number } | null = null;
+    // Primary source of truth: an actual Rapier shape contact with an upward
+    // surface normal. A wall hit therefore never becomes a fake landing.
+    let bestContact: { index: number; distance: number } | null = null;
+    const prediction = Math.max(0.055, tolerance);
+    for (const surface of this.surfaces) {
+      const contact = this.playerCollider.contactCollider(surface.collider, prediction);
+      if (!contact) continue;
+      if (contact.normal2.y < 0.42) continue;
+      if (contact.distance > prediction) continue;
+      if (!bestContact || contact.distance < bestContact.distance) {
+        bestContact = { index: surface.index, distance: contact.distance };
+      }
+    }
+    if (bestContact) return bestContact.index;
+
+    // Small geometric fallback for the frame immediately before/after solver
+    // contact. It is deliberately tight and only accepts a nearly stationary
+    // or descending player directly above the authored top surface.
+    const foot = this.getFootPosition(new THREE.Vector3());
+    let bestFallback: { index: number; error: number } | null = null;
     for (const surface of this.surfaces) {
       const top = this.getSurfaceTop(surface.index, new THREE.Vector3());
-      const halfX = surface.spec.size[0] * 0.5 + 0.08;
-      const halfZ = surface.spec.size[1] * 0.5 + 0.08;
+      const halfX = surface.spec.size[0] * 0.5 + 0.05;
+      const halfZ = surface.spec.size[1] * 0.5 + 0.05;
       if (Math.abs(foot.x - top.x) > halfX || Math.abs(foot.z - top.z) > halfZ) continue;
       const error = Math.abs(foot.y - top.y);
-      if (error > tolerance) continue;
-      if (!best || error < best.error) best = { index: surface.index, error };
+      if (error > Math.max(0.24, tolerance)) continue;
+      if (!bestFallback || error < bestFallback.error) bestFallback = { index: surface.index, error };
     }
-    return best?.index ?? null;
+    return bestFallback?.index ?? null;
   }
 
   isGroundedOn(surfaceIndex: number, tolerance = 0.16) {
     return this.groundedSurface(tolerance) === surfaceIndex;
+  }
+
+  debugSnapshot() {
+    const foot = this.getFootPosition(new THREE.Vector3());
+    const velocity = this.getVelocity(new THREE.Vector3());
+    return {
+      foot: { x: foot.x, y: foot.y, z: foot.z },
+      velocity: { x: velocity.x, y: velocity.y, z: velocity.z },
+      groundedSurface: this.groundedSurface(0.24)
+    };
   }
 
   private colliderHeight(spec: DropSurface, topY: number) {
