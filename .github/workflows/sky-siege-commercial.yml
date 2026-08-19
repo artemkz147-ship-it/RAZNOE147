@@ -1,0 +1,52 @@
+name: Build Sky Siege 3D commercial
+on:
+  push:
+    branches: [game/sky-siege-3d-commercial]
+    paths:
+      - 'sky-siege-3d-commercial/**'
+      - '.github/workflows/sky-siege-commercial.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sky-siege-3d-commercial
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Expand source bundle
+        run: tar -xzf source.tgz
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate, vendor CC0 assets and build
+        run: npm run release
+      - name: Install Chromium for browser QA
+        run: npx playwright install --with-deps chromium
+      - name: Browser smoke test — desktop and mobile
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/sky-siege-vite.log 2>&1 &
+          pid=$!
+          trap 'kill $pid || true' EXIT
+          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          npx playwright test
+      - name: Package Yandex ZIP
+        run: cd dist && zip -9 -r ../Sky-Siege-3D-Yandex.zip .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sky-Siege-3D-QA
+          path: |
+            sky-siege-3d-commercial/playwright-report
+            sky-siege-3d-commercial/test-results
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: Sky-Siege-3D-Yandex
+          path: sky-siege-3d-commercial/Sky-Siege-3D-Yandex.zip
+          retention-days: 30
