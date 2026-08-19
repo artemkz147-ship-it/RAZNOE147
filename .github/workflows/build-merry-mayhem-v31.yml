@@ -9,19 +9,20 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: merry-mayhem-v31-${{ github.ref }}-${{ github.actor }}
+  group: merry-mayhem-v31-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 35
     steps:
-      - name: Checkout v3.1 materialized source
+      - name: Checkout current v3.1 source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -31,25 +32,35 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install Blender and QA tools
-        shell: bash
-        run: |
-          echo tools > /tmp/v31-stage
-          sudo apt-get update
-          sudo apt-get install -y blender python3-numpy zip unzip xvfb xauth libegl1 libgl1 libgl1-mesa-dri libgles2
-          blender --version | head -1
+      - name: Reuse validated v3 production art library
+        uses: actions/download-artifact@v4
+        with:
+          name: vesely-natisk-3d-full-project-v3.0.0
+          path: .baseline
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: 32190130269
 
-      - name: Build v3.1 CC0 art library
+      - name: Materialize cached CC0 art and v3.1 weapon correction
         shell: bash
         run: |
           echo assets > /tmp/v31-stage
           set -euo pipefail
-          chmod +x tools/build_assets.sh
-          bash tools/build_assets.sh .asset-src
-          test "$(find public/assets -name '*.glb' | wc -l)" -ge 90
-          test "$(find public/portraits -name '*.png' | wc -l)" -eq 30
-          test -s public/assets/weapon-08.glb
-          test -s public/portraits/weapon-08.png
+          mkdir -p .baseline/project
+          unzip -q .baseline/vesely-natisk-3d-full-project-v3.0.0.zip -d .baseline/project
+          rm -rf public/assets public/portraits
+          mkdir -p public
+          cp -a .baseline/project/public/assets public/assets
+          cp -a .baseline/project/public/portraits public/portraits
+          # v3.1 removes the frying pan from the combat roster. Reuse the already
+          # validated fantasy torch model from the same CC0 library as weapon 08.
+          cp public/assets/torch.glb public/assets/weapon-08.glb
+          # Keep the UI coherent too: the old pan portrait is replaced by an
+          # existing staff portrait from the same rendered CC0 portrait set.
+          cp public/portraits/weapon-10.png public/portraits/weapon-08.png
+          test "$(find public/assets -maxdepth 1 -name '*.glb' | wc -l)" -ge 90
+          test "$(find public/portraits -maxdepth 1 -name '*.png' | wc -l)" -eq 30
+          cmp -s public/assets/weapon-08.glb public/assets/torch.glb
 
       - name: Validate v3.1 source contract
         shell: bash
@@ -104,7 +115,7 @@ jobs:
           assert 'src="/assets/' not in html and 'href="/assets/' not in html
           total=sum(p.stat().st_size for p in Path('dist').rglob('*') if p.is_file())
           assert total < 100*1024*1024, total
-          print(f'v3.1 package validated: {len(glb)} GLB, {total/1024/1024:.2f} MiB')
+          print(f'v3.1 package validated: {len(glb)} GLB, {len(hp)} hero portraits, {len(wp)} weapon portraits, {total/1024/1024:.2f} MiB')
           PY
 
       - name: Real-time WebGL combat and visual QA
@@ -122,17 +133,15 @@ jobs:
           for f in qa-heroes.png qa-sunny-meadow.png qa-candy-park.png qa-snow-festival.png qa-rainbow-canyon.png qa-firefly-swamp.png qa-mobile-festival.png; do test -s "$f"; done
           test "$(find . -maxdepth 1 -name 'qa-hero-*.png' | wc -l)" -eq 15
 
-      - name: Package v3.1 releases
+      - name: Package v3.1 final releases
         shell: bash
         run: |
           echo package > /tmp/v31-stage
           set -euo pipefail
-          cd dist
-          zip -9 -r ../vesely-natisk-3d-yandex-v3.1.0.zip .
-          cd ..
+          cd dist && zip -9 -r ../vesely-natisk-3d-yandex-v3.1.0.zip . >/dev/null && cd ..
           unzip -t vesely-natisk-3d-yandex-v3.1.0.zip >/dev/null
           test "$(unzip -Z1 vesely-natisk-3d-yandex-v3.1.0.zip | grep -c '^index\.html$')" -eq 1
-          zip -9 -r vesely-natisk-3d-full-project-v3.1.0.zip index.html package.json vite.config.js README.md docs src tools public .github/workflows/build-merry-mayhem-v31.yml .build/v3_1_quality_pass.py .build/browser_qa.mjs -x '*.DS_Store'
+          zip -9 -r vesely-natisk-3d-full-project-v3.1.0.zip index.html package.json vite.config.js README.md docs src tools public .github/workflows/build-merry-mayhem-v31.yml .build/v3_1_quality_pass.py .build/browser_qa.mjs >/dev/null
           unzip -t vesely-natisk-3d-full-project-v3.1.0.zip >/dev/null
           rm -rf local-test && mkdir local-test
           cp -a dist/. local-test/
@@ -168,7 +177,7 @@ jobs:
           3. Игра откроется через локальный HTTP-сервер.
           Не запускайте index.html двойным кликом.
           TXT
-          cd local-test && zip -9 -r ../vesely-natisk-3d-local-test-v3.1.0.zip . && cd ..
+          cd local-test && zip -9 -r ../vesely-natisk-3d-local-test-v3.1.0.zip . >/dev/null && cd ..
           unzip -t vesely-natisk-3d-local-test-v3.1.0.zip >/dev/null
 
       - name: Upload Yandex v3.1
