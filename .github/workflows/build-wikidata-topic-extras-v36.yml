@@ -1,0 +1,39 @@
+name: Build Wikidata extras v3.6
+on:
+  push:
+    branches: [yandex-mega-quiz]
+    paths: ['tools/build_wikidata_topic_extras_v36.py','.github/workflows/build-wikidata-topic-extras-v36.yml']
+  pull_request:
+    branches: [yandex-mega-quiz]
+    paths: ['tools/build_wikidata_topic_extras_v36.py','.github/workflows/build-wikidata-topic-extras-v36.yml','tools/trigger_wikidata_extras_v36.txt']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: yandex-mega-quiz
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check requests
+      - run: python tools/build_wikidata_topic_extras_v36.py
+      - name: Validate
+        run: |
+          test -s quality-bank-v36-wikidata-extras/extras.js
+          python - <<'PY'
+          import json
+          r=json.load(open('quality-bank-v36-wikidata-extras/report.json',encoding='utf8'))
+          print(json.dumps(r,ensure_ascii=False,indent=2))
+          assert min(r[l]['total'] for l in ('ru','en','kk')) >= 900
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wikidata-extras-v36
+          path: quality-bank-v36-wikidata-extras/
+          if-no-files-found: error
+          retention-days: 7
