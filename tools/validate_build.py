@@ -33,20 +33,22 @@ map_match=re.search(r"const maps\s*=\s*\[(.*?)\n\];",content,re.S)
 if not map_match:
     raise SystemExit('Map definition table not found')
 map_ids=re.findall(r"^\s*\['([^']+)'",map_match.group(1),re.M)
+boss_match=re.search(r"export const BOSSES\s*=\s*\[(.*?)\n\]\.map",content,re.S)
+boss_names=re.findall(r"'([^']+)'",boss_match.group(1)) if boss_match else []
 checks=[
     ('Expected 15 heroes', content.count("asset:'hero")>=15),
     ('Expected 15 weapon models', content.count("model:'weapon")>=15),
     ('Expected 18 unique maps', len(map_ids)==18 and len(set(map_ids))==18),
     ('Expected 24 enemy definitions', 'Array.from({length:24}' in content),
-    ('Expected 18 bosses', "'Король Фестиваля'" in content),
+    ('Expected 18 bosses', len(boss_names)==18 and len(set(boss_names))==18),
     ('Expected expanded daily quests', content.count("id:'daily_")>=9),
     ('Expected expanded career quests', content.count("id:'career_")>=24),
 ]
 for message,ok in checks:
     if not ok: raise SystemExit(message)
-print(f'Expanded content counts validated ({len(map_ids)} maps).')
+print(f'Expanded content counts validated ({len(map_ids)} maps, {len(boss_names)} bosses).')
 
 build_script=Path('tools/build_assets.sh').read_text(encoding='utf-8')
 if 'ultimate_gun_pack' in build_script or '$ROOT/guns' in build_script: raise SystemExit('Modern gun asset pack must not ship in v3')
 if len(list((root/'portraits').glob('hero-*.png')))!=15 or len(list((root/'portraits').glob('weapon-*.png')))!=15: raise SystemExit('Expected 15 hero and 15 weapon portraits')
-print('V3 art validation passed: thematic weapons, portraits, expanded environment.')
+print('V3.1 art validation passed: thematic weapons, portraits, expanded environment.')
