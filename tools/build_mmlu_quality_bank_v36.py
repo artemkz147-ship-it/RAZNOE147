@@ -10,10 +10,10 @@ URLS={
 'ru':'https://huggingface.co/datasets/issai/MMLU-Pro_Kazakh_Russian/resolve/main/russian/test-00000-of-00001.parquet?download=true',
 'kk':'https://huggingface.co/datasets/issai/MMLU-Pro_Kazakh_Russian/resolve/main/kazakh/test-00000-of-00001.parquet?download=true',
 }
-# No mathematics in this game. Other categories are mapped into the existing quiz taxonomy.
+# No mathematics in this game. Business/economics/law stay as general facts rather than pretending to be brands/culture.
 MAP={
-'biology':'science','business':'brands','chemistry':'chemistry','computer science':'technology','computer_science':'technology',
-'economics':'facts','engineering':'technology','health':'medicine','history':'history','law':'culture','other':'facts',
+'biology':'science','business':'facts','chemistry':'chemistry','computer science':'technology','computer_science':'technology',
+'economics':'facts','engineering':'technology','health':'medicine','history':'history','law':'facts','other':'facts',
 'philosophy':'logic','physics':'physics','psychology':'human'
 }
 BANNED_CATEGORIES={'math','mathematics'}
@@ -33,23 +33,21 @@ def clean_text(s): return re.sub(r'\s+',' ',str(s or '').strip())
 def bad_text(q,opts,lang,cat):
     qn=norm(q)
     if cat in BANNED_CATEGORIES: return True
-    if len(q)<18 or len(q)>330: return True
+    if len(q)<18 or len(q)>520: return True
     if any(x in qn for x in DYNAMIC[lang]): return True
     if any(x in qn for x in ['porn','sexual intercourse','suicide method','onlyfans']): return True
-    # Remove benchmark/instruction remnants and heavy equation exercises that feel like math even under other labels.
+    # Math is removed even when a benchmark item is filed under another discipline.
     if any(x in qn for x in ['which of the following is the value of','solve for x','calculate the value','what is the integral','what is the derivative']): return True
-    if q.count('\\')>2 or q.count('$')>4: return True
+    if q.count('\\')>2 or q.count('$')>5: return True
     if len(opts)<4: return True
-    if any(not x or len(x)>170 for x in opts): return True
-    # Questions whose choices are giant paragraphs do not work in this UI.
-    if sum(len(x) for x in opts)>520: return True
+    if any(not x or len(x)>260 for x in opts): return True
     return False
 
 def deterministic_four(options,correct_idx,seed):
     correct=options[correct_idx]
-    pool=[(i,x) for i,x in enumerate(options) if i!=correct_idx and norm(x)!=norm(correct)]
     unique=[]; seen={norm(correct)}
-    for i,x in pool:
+    for i,x in enumerate(options):
+        if i==correct_idx: continue
         nx=norm(x)
         if not nx or nx in seen: continue
         seen.add(nx); unique.append(x)
@@ -67,7 +65,7 @@ def main():
     for lang,url in URLS.items():
         print('read',lang,flush=True)
         df=pd.read_parquet(url)
-        arr=[]; seen=set(); cats=Counter(); srcs=Counter(); rejected=Counter()
+        arr=[]; seen=set(); cats=Counter(); rejected=Counter()
         for _,r in df.iterrows():
             q=clean_text(r.get('question'))
             rawcat=norm(r.get('category')).replace('_',' ')
@@ -86,9 +84,9 @@ def main():
             if not pack: rejected['options']+=1; continue
             answers,correct=pack
             seen.add(nq)
-            family='mmlupro-'+hashlib.sha1((str(r.get('question_id'))+'|'+norm(df.iloc[0].get('category',''))).encode()).hexdigest()[:16]
-            item={'id':family+'-'+lang,'family':family,'rootFamily':family,'category':cat,'q':q,'answers':answers,'correct':correct,'difficulty':difficulty(cat,q),'type':'choice','local':False,'source':'MMLU-Pro'}
-            arr.append(item); cats[cat]+=1; srcs[str(r.get('src') or '')]+=1
+            family='mmlupro-'+hashlib.sha1((str(r.get('question_id'))+'|'+rawcat).encode()).hexdigest()[:16]
+            arr.append({'id':family+'-'+lang,'family':family,'rootFamily':family,'category':cat,'q':q,'answers':answers,'correct':correct,'difficulty':difficulty(cat,q),'type':'choice','local':False,'source':'MMLU-Pro'})
+            cats[cat]+=1
         banks[lang]=arr
         report[lang]={'total':len(arr),'byCategory':dict(sorted(cats.items())),'rejected':dict(rejected)}
         print(lang,len(arr),dict(cats),flush=True)
