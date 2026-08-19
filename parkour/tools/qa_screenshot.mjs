@@ -98,7 +98,6 @@ await page.mouse.move(startX - 170, startY + 62, { steps: 12 });
 await page.mouse.up({ button: 'left' });
 await page.mouse.wheel(0, -220);
 
-// Walk toward an edge and verify the dynamic capsule remains grounded.
 await page.keyboard.down('KeyW');
 await page.waitForTimeout(800);
 await page.keyboard.up('KeyW');
@@ -108,7 +107,6 @@ if (!(await page.locator('#state').textContent())?.includes('ГОТОВ К ПР�
   throw new Error('Grounded walking left the roof or changed gameplay state before jump');
 }
 
-// Return to a neutral launch area. Edge safety and jump reach are separate checks.
 await page.keyboard.down('KeyS');
 await page.waitForTimeout(800);
 await page.keyboard.up('KeyS');
@@ -117,7 +115,6 @@ if (!(await page.locator('#state').textContent())?.includes('ГОТОВ К ПР�
   throw new Error('Player did not remain grounded after walking back from the edge');
 }
 
-// Standard physical takeoff -> flight -> physical target contact -> scored landing.
 await page.keyboard.press('Space');
 await page.waitForFunction(
   () => (document.querySelector('#state')?.textContent ?? '').includes('В ПОЛЁТЕ')
@@ -129,11 +126,39 @@ await page.keyboard.press('Digit1');
 await page.waitForTimeout(330);
 await page.screenshot({ path: 'qa/drop-flow-df6-level-01-air.png' });
 
-await page.waitForFunction(
-  () => Number.parseInt(document.querySelector('#score')?.textContent ?? '0', 10) > 0,
-  undefined,
-  { timeout: 12_000 }
-);
+const trajectory = [];
+let landed = false;
+for (let i = 0; i < 75; i += 1) {
+  const sample = await page.evaluate(() => {
+    let physics = null;
+    try {
+      physics = JSON.parse(document.documentElement.dataset.dropPhysics ?? 'null');
+    } catch {
+      physics = null;
+    }
+    return {
+      time: performance.now(),
+      state: document.querySelector('#state')?.textContent ?? '',
+      score: Number.parseInt(document.querySelector('#score')?.textContent ?? '0', 10),
+      drop: Number.parseFloat(document.querySelector('#drop')?.textContent ?? '0'),
+      physics
+    };
+  });
+  trajectory.push(sample);
+  if (sample.score > 0) {
+    landed = true;
+    break;
+  }
+  await page.waitForTimeout(80);
+}
+await fs.writeFile('qa/physics-trajectory.json', JSON.stringify(trajectory, null, 2), 'utf8');
+
+if (!landed) {
+  await page.screenshot({ path: 'qa/drop-flow-df6-level-01-no-contact.png' });
+  const last = trajectory.at(-1);
+  throw new Error(`Physical landing did not score. Last sample: ${JSON.stringify(last)}`);
+}
+
 await page.screenshot({ path: 'qa/drop-flow-df6-level-01-contact.png' });
 await page.waitForFunction(
   () => document.querySelector('#finish')?.classList.contains('visible'),
