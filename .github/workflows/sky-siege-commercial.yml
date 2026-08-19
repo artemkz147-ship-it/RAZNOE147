@@ -28,10 +28,11 @@ jobs:
           cat source.part-00 source.part-01 source.part-02 source.part-03 > source.tgz
           gzip -t source.tgz
           tar -xzf source.tgz
-      - name: Patch Kenney Nature Kit GLB fallback
+      - name: Patch legacy asset and build verification rules
         run: |
           python - <<'PY'
           from pathlib import Path
+
           p = Path('scripts/vendor-assets.mjs')
           s = p.read_text(encoding='utf-8')
           needle = "const r=await fetch(url,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(!r.ok)throw new Error(`HTTP ${r.status}: ${url}`);"
@@ -39,8 +40,18 @@ jobs:
           if needle not in s:
               raise SystemExit('Expected vendor download code was not found')
           p.write_text(s.replace(needle, replacement, 1), encoding='utf-8')
-          print('Kenney Nature Kit fallback patched: GLB + legacy names + terminal decorative fallback')
+
+          v = Path('scripts/verify-build.mjs')
+          vs = v.read_text(encoding='utf-8')
+          old = r"if(/https?:\/\/.*(?:three|rapier|cdn\.jsdelivr|unpkg)/i.test(s))"
+          new = r"if(/(?:import\s*\(|from\s+|src=)\s*[\"'`]https?:\/\/[^\"'`]*(?:three|rapier|cdn\.jsdelivr|unpkg)/i.test(s))"
+          if old not in vs:
+              raise SystemExit('Expected verifier dependency regex was not found')
+          v.write_text(vs.replace(old, new, 1), encoding='utf-8')
+          print('Patched legacy Kenney URLs and precise external-runtime verification')
           PY
+          node --check scripts/vendor-assets.mjs
+          node --check scripts/verify-build.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Validate, vendor CC0 assets and build
