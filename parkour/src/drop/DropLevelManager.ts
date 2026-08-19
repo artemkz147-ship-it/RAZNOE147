@@ -4,6 +4,7 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import cityManifest from '../game3d/scenery.json';
 import factoryManifest from './factory.json';
 import dressingManifest from './dressing.json';
+import cityDeckManifest from './city_decks.json';
 import type { DropLevelSpec, DropSurface, SurfaceKind } from './DropTypes';
 
 type FactoryManifest = {
@@ -17,6 +18,11 @@ type DressingManifest = {
   roads: string[];
   street: string[];
   rooftop: string[];
+};
+
+type CityDeckEntry = {
+  asset: string;
+  deckRatio: number;
 };
 
 type SurfaceVisual = {
@@ -37,6 +43,9 @@ export class DropLevelManager {
   private loader = new GLTFLoader();
   private textureLoader = new THREE.TextureLoader();
   private cityAssets = cityManifest as string[];
+  private cityDeckRatios = new Map(
+    (cityDeckManifest as CityDeckEntry[]).map((entry) => [entry.asset, entry.deckRatio])
+  );
   private factory = factoryManifest as FactoryManifest;
   private dressing = dressingManifest as DressingManifest;
   private cache = new Map<string, Promise<THREE.Object3D>>();
@@ -194,14 +203,30 @@ export class DropLevelManager {
     const position = this.authoredPosition(levelId, index, spec);
     const width = Math.max(0.7, spec.size[0]);
     const depth = Math.max(0.7, spec.size[1]);
-    const roofCap = this.roofCap(spec);
-    const desiredHeight = this.visualHeight(spec, position.y) + roofCap;
-    root.scale.set(width / size.x, desiredHeight / size.y, depth / size.z);
-    const scaled = new THREE.Box3().setFromObject(root);
-    const center = scaled.getCenter(new THREE.Vector3());
-    root.position.x += position.x - center.x;
-    root.position.z += position.z - center.z;
-    root.position.y += position.y + roofCap - scaled.max.y;
+
+    if (spec.kind === 'roof' && !spec.moving) {
+      const deckRatio = THREE.MathUtils.clamp(this.cityDeckRatios.get(asset) ?? 0.78, 0.5, 0.985);
+      const deckHeight = Math.max(1.2, position.y - STREET_Y);
+      const totalVisualHeight = deckHeight / deckRatio;
+      root.scale.set(width / size.x, totalVisualHeight / size.y, depth / size.z);
+      const scaled = new THREE.Box3().setFromObject(root);
+      const center = scaled.getCenter(new THREE.Vector3());
+      root.position.x += position.x - center.x;
+      root.position.z += position.z - center.z;
+      // Put the authored model base at street level. Because scaleY was solved from
+      // measured deckRatio, its dominant walkable roof plane now lands exactly at
+      // authored route Y, matching the Rapier collider instead of floating below it.
+      root.position.y += STREET_Y - scaled.min.y;
+    } else {
+      const desiredHeight = this.visualHeight(spec, position.y);
+      root.scale.set(width / size.x, desiredHeight / size.y, depth / size.z);
+      const scaled = new THREE.Box3().setFromObject(root);
+      const center = scaled.getCenter(new THREE.Vector3());
+      root.position.x += position.x - center.x;
+      root.position.z += position.z - center.z;
+      root.position.y += position.y - scaled.max.y;
+    }
+
     this.prepareMaterials(root, true, levelId * 13 + index * 3);
     this.scene.add(root);
 
@@ -214,8 +239,6 @@ export class DropLevelManager {
 
   private authoredPosition(levelId: number, index: number, spec: DropSurface) {
     const position = new THREE.Vector3(...spec.p);
-    // Separate the first rooftops visibly. Their large playable decks still make
-    // the physical gap beginner-friendly, but the player can clearly see air below.
     if (index === 1 && levelId === 1) position.set(12.0, spec.p[1], -6.0);
     if (index === 1 && levelId === 2) position.set(13.0, spec.p[1], -6.0);
     return position;
@@ -260,9 +283,6 @@ export class DropLevelManager {
     const end = level.targets[level.targets.length - 1]?.p ?? level.start.p;
     const centerX = (level.start.p[0] + end[0]) * 0.5;
     const centerZ = (level.start.p[2] + end[2]) * 0.5;
-
-    // The real HDR rooftop skyline is now the distant city. Previous duplicate
-    // low-poly towers looked like floating toy blocks and added unnecessary draws.
     const roots: THREE.Object3D[] = [];
     const street = await this.createStreetDressing(centerX, centerZ, level.id);
     this.background = [...roots, ...street];
@@ -350,11 +370,6 @@ export class DropLevelManager {
     if (pool?.length) return pool[(levelId * 3 + index * 7) % pool.length];
     if (this.cityAssets.length) return this.cityAssets[(levelId + index) % this.cityAssets.length];
     return null;
-  }
-
-  private roofCap(spec: DropSurface) {
-    if (spec.moving || spec.kind !== 'roof') return 0;
-    return 0.78;
   }
 
   private visualHeight(spec: DropSurface, topY: number) {
