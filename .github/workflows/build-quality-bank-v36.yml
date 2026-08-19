@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -44,3 +44,11 @@ jobs:
           path: quality-bank-v36/
           if-no-files-found: error
           retention-days: 7
+      - name: Commit generated bank to project branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add quality-bank-v36/
+          git diff --cached --quiet && exit 0
+          git commit -m "Generate v3.6 quality question bank"
+          git push origin HEAD:yandex-mega-quiz
