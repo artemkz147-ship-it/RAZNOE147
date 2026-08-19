@@ -43,7 +43,7 @@ jobs:
       - name: Install Chromium for visual QA
         run: |
           npm install --no-save playwright@1.62.1
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
       - name: Physics and visual gameplay QA
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 >/tmp/drop-flow-preview.log 2>&1 &
