@@ -279,7 +279,19 @@ export class DropGame3D {
         return;
       }
 
-      if (groundedSurface !== null && this.stageAirTime > 0.32) {
+      // Rapier may report the launch roof for a few solver frames after takeoff.
+      // That is expected contact separation, not a wrong landing. Only a different
+      // surface can fail the jump immediately. Returning to the launch surface later
+      // still counts as a miss.
+      if (groundedSurface !== null && groundedSurface !== this.standingSurface && this.stageAirTime > 0.32) {
+        this.miss();
+        return;
+      }
+      if (
+        groundedSurface === this.standingSurface
+        && this.stageAirTime > 0.78
+        && this.preStepVelocity.y < -0.25
+      ) {
         this.miss();
         return;
       }
@@ -467,8 +479,6 @@ export class DropGame3D {
     const spec = this.levelManager.getTargetSpec(this.targetIndex);
     if (!spec) return;
 
-    // Keep the exact physical contact position. Do not snap/teleport to the target
-    // center: precision must be visible and the collision must feel like the cause.
     this.physics.getFootPosition(this.playerPos);
     this.physics.setVelocity(0, 0, 0);
 
