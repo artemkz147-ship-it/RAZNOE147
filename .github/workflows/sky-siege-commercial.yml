@@ -5,6 +5,10 @@ on:
     paths:
       - 'sky-siege-3d-commercial/**'
       - '.github/workflows/sky-siege-commercial.yml'
+  pull_request:
+    paths:
+      - 'sky-siege-3d-commercial/**'
+      - '.github/workflows/sky-siege-commercial.yml'
   workflow_dispatch:
 permissions:
   contents: read
