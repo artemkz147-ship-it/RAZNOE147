@@ -1,0 +1,39 @@
+name: Build meme subject v3.6
+on:
+  push:
+    branches: [yandex-mega-quiz]
+    paths: ['tools/build_memes_subject_v36.py','.github/workflows/build-memes-subject-v36.yml']
+  pull_request:
+    branches: [yandex-mega-quiz]
+    paths: ['tools/build_memes_subject_v36.py','.github/workflows/build-memes-subject-v36.yml','tools/trigger_memes_subject_v36.txt']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: yandex-mega-quiz
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check requests
+      - run: python tools/build_memes_subject_v36.py
+      - name: Validate
+        run: |
+          test -s quality-bank-v36-memes/memes.js
+          python - <<'PY'
+          import json
+          r=json.load(open('quality-bank-v36-memes/report.json'))
+          print(r)
+          assert min(r.values()) >= 35
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wikidata-memes-v36
+          path: quality-bank-v36-memes/
+          if-no-files-found: error
+          retention-days: 7
