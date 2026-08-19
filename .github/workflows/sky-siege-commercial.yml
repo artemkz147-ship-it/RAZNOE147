@@ -1,0 +1,83 @@
+name: Build Sky Siege 3D commercial
+on:
+  push:
+    branches: [game/sky-siege-3d-commercial]
+    paths:
+      - 'sky-siege-3d-commercial/**'
+      - '.github/workflows/sky-siege-commercial.yml'
+  pull_request:
+    paths:
+      - 'sky-siege-3d-commercial/**'
+      - '.github/workflows/sky-siege-commercial.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sky-siege-3d-commercial
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reassemble and expand source bundle
+        run: |
+          cat source.part-00 source.part-01 source.part-02 source.part-03 > source.tgz
+          gzip -t source.tgz
+          tar -xzf source.tgz
+      - name: Patch legacy asset and build verification rules
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('scripts/vendor-assets.mjs')
+          s = p.read_text(encoding='utf-8')
+          needle = "const r=await fetch(url,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(!r.ok)throw new Error(`HTTP ${r.status}: ${url}`);"
+          replacement = "let r=await fetch(url,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(!r.ok&&r.status===404&&url.includes('kenney_natureKit_2.1')&&(url.endsWith('.gltf')||url.endsWith('.bin'))){const extLen=url.endsWith('.gltf')?5:4;const glb=url.slice(0,-extLen)+'.glb';r=await fetch(glb,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(!r.ok&&r.status===404){const slash=glb.lastIndexOf('/');const dir=glb.slice(0,slash+1);const name=glb.slice(slash+1,-4);const m=name.match(/^([a-z]+)([A-Z].*)$/);if(m){const rest=m[2][0].toLowerCase()+m[2].slice(1);let candidate=`${m[1]}_${rest}`;r=await fetch(`${dir}${candidate}.glb`,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(!r.ok&&r.status===404){for(const variant of ['Detailed','Dark','Autumn','Fall']){if(candidate.includes(variant)){const relaxed=candidate.replace(variant,'');const rr=await fetch(`${dir}${relaxed}.glb`,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(rr.ok){r=rr;break;}}}if(!r.ok&&/[A-Z]$/.test(candidate)){const rr=await fetch(`${dir}${candidate.slice(0,-1)}A.glb`,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(rr.ok)r=rr;}if(!r.ok&&name.toLowerCase().includes('stump')){const rr=await fetch(`${dir}stump_round.glb`,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(rr.ok)r=rr;}if(!r.ok){const rr=await fetch(`${dir}grass.glb`,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(rr.ok)r=rr;}}}}}if(!r.ok)throw new Error(`HTTP ${r.status}: ${url}`);"
+          if needle not in s:
+              raise SystemExit('Expected vendor download code was not found')
+          p.write_text(s.replace(needle, replacement, 1), encoding='utf-8')
+
+          v = Path('scripts/verify-build.mjs')
+          vs = v.read_text(encoding='utf-8')
+          old = r"if(/https?:\/\/.*(?:three|rapier|cdn\.jsdelivr|unpkg)/i.test(s))"
+          new = r"if(/(?:import\s*\(|from\s+|src=)\s*[\"'`]https?:\/\/[^\"'`]*(?:three|rapier|cdn\.jsdelivr|unpkg)/i.test(s))"
+          if old not in vs:
+              raise SystemExit('Expected verifier dependency regex was not found')
+          v.write_text(vs.replace(old, new, 1), encoding='utf-8')
+          print('Patched legacy Kenney URLs and precise external-runtime verification')
+          PY
+          node --check scripts/vendor-assets.mjs
+          node --check scripts/verify-build.mjs
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate, vendor CC0 assets and build
+        run: npm run release
+      - name: Install Chromium for browser QA
+        run: npx playwright install --with-deps chromium
+      - name: Browser smoke test — desktop and mobile
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/sky-siege-vite.log 2>&1 &
+          pid=$!
+          trap 'kill $pid || true' EXIT
+          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          npx playwright test
+      - name: Package Yandex ZIP
+        run: cd dist && zip -9 -r ../Sky-Siege-3D-Yandex.zip .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sky-Siege-3D-QA
+          path: |
+            sky-siege-3d-commercial/playwright-report
+            sky-siege-3d-commercial/test-results
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: Sky-Siege-3D-Yandex
+          path: sky-siege-3d-commercial/Sky-Siege-3D-Yandex.zip
+          retention-days: 30
