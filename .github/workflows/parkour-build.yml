@@ -1,4 +1,4 @@
-name: Build Drop Flow DF6
+name: Build Drop Flow DF7
 
 on:
   push:
@@ -31,15 +31,16 @@ jobs:
         run: python -m pip install -r requirements-assets.txt
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build DF6 physics game
+      - name: Build DF7 physics game
         run: npm run build
-      - name: Verify DF6 asset namespace
+      - name: Verify DF7 asset namespace
         run: |
-          test -d dist/assets3d_df6_20260818
+          test -d dist/assets3d_df7_20260819
           test ! -d dist/assets3d
-          grep -q 'DROP FLOW BUILD DF6-20260818-1903' dist/build-id.txt
-          grep -q 'assets3d_df6_20260818/ui/landing-target.svg' dist/index.html
-          grep -q 'BUILD DF6' dist/index.html
+          test ! -d dist/assets3d_df6_20260818
+          grep -q 'DROP FLOW BUILD DF7-20260819-A' dist/build-id.txt
+          grep -q 'assets3d_df7_20260819/ui/landing-target.svg' dist/index.html
+          grep -q 'BUILD DF7' dist/index.html
       - name: Install Chromium for visual QA
         run: |
           npm install --no-save playwright@1.62.1
@@ -54,19 +55,19 @@ jobs:
             sleep 1
           done
           node tools/qa_screenshot.mjs
-      - name: Upload DF6 gameplay QA
+      - name: Upload DF7 gameplay QA
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: drop-flow-df6-visual-qa
+          name: drop-flow-df7-visual-qa
           path: parkour/qa
           if-no-files-found: warn
-      - name: Create DF6 Yandex Games ZIP
+      - name: Create DF7 Yandex Games ZIP
         run: |
           cd dist
-          zip -r ../drop-flow-df6-yandex.zip .
+          zip -r ../drop-flow-df7-yandex.zip .
       - uses: actions/upload-artifact@v4
         with:
-          name: drop-flow-df6-yandex
-          path: parkour/drop-flow-df6-yandex.zip
+          name: drop-flow-df7-yandex
+          path: parkour/drop-flow-df7-yandex.zip
           if-no-files-found: error
