@@ -1,0 +1,50 @@
+name: Build Wikidata topic bank v3.6
+
+on:
+  push:
+    branches: [yandex-mega-quiz]
+    paths:
+      - 'tools/build_wikidata_topic_bank_v36.py'
+      - '.github/workflows/build-wikidata-topic-bank-v36.yml'
+  pull_request:
+    branches: [yandex-mega-quiz]
+    paths:
+      - 'tools/build_wikidata_topic_bank_v36.py'
+      - '.github/workflows/build-wikidata-topic-bank-v36.yml'
+      - 'tools/trigger_wikidata_topic_v36.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: yandex-mega-quiz
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Build topic bank
+        run: python tools/build_wikidata_topic_bank_v36.py
+      - name: Validate
+        run: |
+          test -s quality-bank-v36-wikidata/wikidata_topic_bank_v36.js
+          python - <<'PY'
+          import json
+          r=json.load(open('quality-bank-v36-wikidata/wikidata_topic_report.json',encoding='utf-8'))
+          print(json.dumps(r,ensure_ascii=False,indent=2))
+          for lang in ('ru','en','kk'):
+              assert r[lang]['total'] >= 1500
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wikidata-topic-bank-v36
+          path: quality-bank-v36-wikidata/
+          if-no-files-found: error
+          retention-days: 7
