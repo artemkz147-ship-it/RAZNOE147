@@ -35,11 +35,11 @@ jobs:
           p = Path('scripts/vendor-assets.mjs')
           s = p.read_text(encoding='utf-8')
           needle = "const r=await fetch(url,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(!r.ok)throw new Error(`HTTP ${r.status}: ${url}`);"
-          replacement = "let r=await fetch(url,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(!r.ok&&r.status===404&&url.includes('kenney_natureKit_2.1')&&url.endsWith('.gltf')){const fallback=url.slice(0,-5)+'.glb';r=await fetch(fallback,{headers:{'User-Agent':'Sky-Siege-3D-build'}});}if(!r.ok)throw new Error(`HTTP ${r.status}: ${url}`);"
+          replacement = "let r=await fetch(url,{headers:{'User-Agent':'Sky-Siege-3D-build'}});if(!r.ok&&r.status===404&&url.includes('kenney_natureKit_2.1')&&(url.endsWith('.gltf')||url.endsWith('.bin'))){const fallback=url.endsWith('.gltf')?url.slice(0,-5)+'.glb':url.slice(0,-4)+'.glb';r=await fetch(fallback,{headers:{'User-Agent':'Sky-Siege-3D-build'}});}if(!r.ok)throw new Error(`HTTP ${r.status}: ${url}`);"
           if needle not in s:
               raise SystemExit('Expected vendor download code was not found')
           p.write_text(s.replace(needle, replacement, 1), encoding='utf-8')
-          print('Kenney Nature Kit fallback patched: .gltf -> .glb on 404')
+          print('Kenney Nature Kit fallback patched: .gltf/.bin -> .glb on 404')
           PY
       - name: Install dependencies
         run: npm install --no-audit --no-fund
