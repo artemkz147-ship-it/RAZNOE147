@@ -201,7 +201,6 @@ export class DropLevelManager {
     const center = scaled.getCenter(new THREE.Vector3());
     root.position.x += position.x - center.x;
     root.position.z += position.z - center.z;
-    // Route Y is the walkable deck, not the tallest parapet/antenna vertex.
     root.position.y += position.y + roofCap - scaled.max.y;
     this.prepareMaterials(root, true, levelId * 13 + index * 3);
     this.scene.add(root);
@@ -215,8 +214,6 @@ export class DropLevelManager {
 
   private authoredPosition(levelId: number, index: number, spec: DropSurface) {
     const position = new THREE.Vector3(...spec.p);
-    // Tutorial buildings must be visibly separate, while still reachable with a
-    // strong parkour jump and four metres of vertical drop.
     if (index === 1 && levelId === 1) position.set(8.5, spec.p[1], -4.0);
     if (index === 1 && levelId === 2) position.set(9.0, spec.p[1], -4.5);
     return position;
@@ -261,8 +258,7 @@ export class DropLevelManager {
     const end = level.targets[level.targets.length - 1]?.p ?? level.start.p;
     const centerX = (level.start.p[0] + end[0]) * 0.5;
     const centerZ = (level.start.p[2] + end[2]) * 0.5;
-    const top = level.start.p[1];
-    const count = 18;
+    const count = 8;
     const roots = await Promise.all(
       Array.from({ length: count }, async (_, index) => {
         const asset = this.cityAssets[(level.id * 5 + index * 3) % this.cityAssets.length];
@@ -270,13 +266,15 @@ export class DropLevelManager {
         const size = this.measure(root);
         if (size.x <= 0.001 || size.y <= 0.001 || size.z <= 0.001) return null;
 
-        const width = 7.5 + ((index * 3 + level.id) % 4) * 2.0;
-        const roofY = Math.max(7, Math.min(top + 15, 11 + ((index * 7 + level.id * 5) % Math.max(13, Math.round(top + 8)))));
-        root.scale.set(width / size.x, Math.max(5, roofY - STREET_Y) / size.y, width / size.z);
+        // Preserve the authored building proportions. The old build independently
+        // stretched X/Y/Z and turned normal houses into cheap-looking towers.
+        const desiredFootprint = 7.5 + ((index * 3 + level.id) % 4) * 1.6;
+        const uniformScale = desiredFootprint / Math.max(size.x, size.z);
+        root.scale.setScalar(uniformScale);
         const box = new THREE.Box3().setFromObject(root);
         const center = box.getCenter(new THREE.Vector3());
         const angle = (index / count) * Math.PI * 2 + level.id * 0.17;
-        const radius = 42 + (index % 4) * 7.0;
+        const radius = 58 + (index % 3) * 8;
         const x = centerX + Math.cos(angle) * radius;
         const z = centerZ + Math.sin(angle) * radius;
         root.position.x += x - center.x;
@@ -302,8 +300,8 @@ export class DropLevelManager {
 
     const tileSize = 11;
     const tasks: Promise<void>[] = [];
-    for (let gx = -4; gx <= 4; gx += 1) {
-      for (let gz = -4; gz <= 4; gz += 1) {
+    for (let gx = -2; gx <= 2; gx += 1) {
+      for (let gz = -2; gz <= 2; gz += 1) {
         tasks.push((async () => {
           const selector = Math.abs(gx * 3 + gz * 5 + levelId) % this.dressing.roads.length;
           const asset = this.dressing.roads[selector];
@@ -322,7 +320,7 @@ export class DropLevelManager {
           if ((gx + gz) % 2 !== 0) road.rotation.y = Math.PI * 0.5;
           road.traverse((child) => {
             if (!(child instanceof THREE.Mesh)) return;
-            child.receiveShadow = true;
+            child.receiveShadow = false;
             child.castShadow = false;
           });
           this.scene.add(road);
@@ -332,28 +330,28 @@ export class DropLevelManager {
     }
 
     if (this.dressing.street.length) {
-      for (let i = 0; i < 12; i += 1) {
+      for (let i = 0; i < 8; i += 1) {
         tasks.push((async () => {
           const asset = this.dressing.street[i % this.dressing.street.length];
           const prop = await this.clone(asset);
           const size = this.measure(prop);
           if (size.y <= 0.001) return;
-          const targetHeight = asset.includes('streetlight') ? 4.2 : asset.includes('dumpster') ? 1.25 : 0.85;
+          const targetHeight = asset.includes('streetlight') ? 4.0 : asset.includes('dumpster') ? 1.2 : 0.82;
           const scale = targetHeight / size.y;
           prop.scale.setScalar(scale);
           const box = new THREE.Box3().setFromObject(prop);
           const center = box.getCenter(new THREE.Vector3());
           const side = i % 2 === 0 ? -1 : 1;
-          const x = centerX - 38 + Math.floor(i / 2) * 15;
-          const z = centerZ + side * (7.2 + (i % 3) * 11);
+          const x = centerX - 22 + Math.floor(i / 2) * 14;
+          const z = centerZ + side * (7.0 + (i % 2) * 9.5);
           prop.position.x += x - center.x;
           prop.position.z += z - center.z;
           prop.position.y += STREET_Y + 0.04 - box.min.y;
           prop.rotation.y = (i % 4) * Math.PI * 0.5;
           prop.traverse((child) => {
             if (!(child instanceof THREE.Mesh)) return;
-            child.castShadow = true;
-            child.receiveShadow = true;
+            child.castShadow = false;
+            child.receiveShadow = false;
           });
           this.scene.add(prop);
           roots.push(prop);
@@ -419,16 +417,16 @@ export class DropLevelManager {
     root.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       child.castShadow = route;
-      child.receiveShadow = true;
+      child.receiveShadow = route;
       const cloneMaterial = (material: THREE.Material) => {
         const copy = material.clone();
         if (copy instanceof THREE.MeshStandardMaterial) {
-          // Keep authored maps, but give otherwise white low-poly buildings a restrained
-          // city palette instead of the washed-out all-white DF5/DF6 prototype look.
-          copy.color.lerp(tint, route ? 0.58 : 0.38);
-          copy.roughness = Math.max(copy.roughness, route ? 0.58 : 0.66);
-          copy.metalness = Math.min(copy.metalness, route ? 0.07 : 0.035);
-          copy.envMapIntensity = route ? 0.72 : 0.52;
+          // Preserve authored color textures. Tint only genuinely untextured meshes.
+          if (copy.map) copy.color.set(0xffffff);
+          else copy.color.lerp(tint, route ? 0.44 : 0.28);
+          copy.roughness = Math.max(copy.roughness, route ? 0.58 : 0.68);
+          copy.metalness = Math.min(copy.metalness, route ? 0.07 : 0.03);
+          copy.envMapIntensity = route ? 0.72 : 0.45;
         }
         return copy;
       };
