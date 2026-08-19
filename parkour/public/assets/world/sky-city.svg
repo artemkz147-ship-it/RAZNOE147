@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#111632"/><stop offset=".42" stop-color="#3c2f67"/><stop offset=".72" stop-color="#c25379"/><stop offset="1" stop-color="#f5a060"/></linearGradient><radialGradient id="sun" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff6c9"/><stop offset=".55" stop-color="#ffd67c"/><stop offset="1" stop-color="#ff9b68" stop-opacity="0"/></radialGradient><linearGradient id="haze" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#ffd3a4" stop-opacity="0"/><stop offset="1" stop-color="#ffb18b" stop-opacity=".34"/></linearGradient></defs>
+<rect width="1600" height="900" fill="url(#sky)"/><circle cx="1210" cy="260" r="190" fill="url(#sun)" opacity=".82"/><circle cx="1210" cy="260" r="78" fill="#ffd98a" opacity=".88"/>
+<path d="M0 505Q240 438 430 478T830 464T1210 470T1600 448V900H0Z" fill="url(#haze)"/>
+<g fill="#f3d7e2" opacity=".16"><path d="M110 210c80-32 162-19 223 24-72 1-148 4-223 10-49 4-80-16-88-31 22-1 54-1 88-3Z"/><path d="M520 315c92-38 180-22 252 31-84-2-175 2-252 12-58 8-98-13-109-31 31-2 69-3 109-12Z"/><path d="M1035 135c72-27 135-13 193 24-64 0-127 3-193 9-44 5-77-9-88-23 24-2 52-3 88-10Z"/></g>
+<g opacity=".22" fill="#fff"><circle cx="180" cy="160" r="2"/><circle cx="250" cy="95" r="1.5"/><circle cx="390" cy="170" r="1.8"/><circle cx="660" cy="110" r="1.5"/><circle cx="820" cy="190" r="2"/><circle cx="980" cy="90" r="1.4"/><circle cx="1420" cy="145" r="1.8"/></g>
+</svg>
