@@ -198,8 +198,9 @@ async function bootstrap() {
       const firstBonus = firstClear ? 25 : 0;
       const totalReward = reward + cleanBonus + firstBonus;
       progress.tokens += totalReward;
-      await yandex.saveProgress(progress);
 
+      // UI must never wait for a cloud/network save. Show the result immediately,
+      // then persist the already-updated progress in the background.
       pendingNextLevel = Math.min(MAX_LEVEL, level.id + 1);
       const medalText = medal ? MEDAL_NAME[medal] : 'БЕЗ МЕДАЛИ';
       finishTitle.textContent = `${level.name}: ${stats.score.toLocaleString('ru-RU')} очков`;
@@ -217,6 +218,12 @@ async function bootstrap() {
       show(hud, false);
       show(finish, true);
       renderLevels();
+
+      try {
+        await yandex.saveProgress(progress);
+      } catch (error) {
+        console.warn('Drop Flow progress save failed after finish UI was shown', error);
+      }
       if (completionCount % 2 === 0) await yandex.showInterstitial();
     }
   });
