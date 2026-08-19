@@ -214,8 +214,10 @@ export class DropLevelManager {
 
   private authoredPosition(levelId: number, index: number, spec: DropSurface) {
     const position = new THREE.Vector3(...spec.p);
-    if (index === 1 && levelId === 1) position.set(8.5, spec.p[1], -4.0);
-    if (index === 1 && levelId === 2) position.set(9.0, spec.p[1], -4.5);
+    // Separate the first rooftops visibly. Their large playable decks still make
+    // the physical gap beginner-friendly, but the player can clearly see air below.
+    if (index === 1 && levelId === 1) position.set(12.0, spec.p[1], -6.0);
+    if (index === 1 && levelId === 2) position.set(13.0, spec.p[1], -6.0);
     return position;
   }
 
@@ -258,40 +260,12 @@ export class DropLevelManager {
     const end = level.targets[level.targets.length - 1]?.p ?? level.start.p;
     const centerX = (level.start.p[0] + end[0]) * 0.5;
     const centerZ = (level.start.p[2] + end[2]) * 0.5;
-    const count = 8;
-    const roots = await Promise.all(
-      Array.from({ length: count }, async (_, index) => {
-        const asset = this.cityAssets[(level.id * 5 + index * 3) % this.cityAssets.length];
-        const root = await this.clone(asset);
-        const size = this.measure(root);
-        if (size.x <= 0.001 || size.y <= 0.001 || size.z <= 0.001) return null;
 
-        // Preserve the authored building proportions. The old build independently
-        // stretched X/Y/Z and turned normal houses into cheap-looking towers.
-        const desiredFootprint = 7.5 + ((index * 3 + level.id) % 4) * 1.6;
-        const uniformScale = desiredFootprint / Math.max(size.x, size.z);
-        root.scale.setScalar(uniformScale);
-        const box = new THREE.Box3().setFromObject(root);
-        const center = box.getCenter(new THREE.Vector3());
-        const angle = (index / count) * Math.PI * 2 + level.id * 0.17;
-        const radius = 58 + (index % 3) * 8;
-        const x = centerX + Math.cos(angle) * radius;
-        const z = centerZ + Math.sin(angle) * radius;
-        root.position.x += x - center.x;
-        root.position.z += z - center.z;
-        root.position.y += STREET_Y - box.min.y;
-        root.rotation.y = -angle + Math.PI * 0.5;
-        this.prepareMaterials(root, false, level.id * 19 + index * 5);
-        this.scene.add(root);
-        return root;
-      })
-    );
-
+    // The real HDR rooftop skyline is now the distant city. Previous duplicate
+    // low-poly towers looked like floating toy blocks and added unnecessary draws.
+    const roots: THREE.Object3D[] = [];
     const street = await this.createStreetDressing(centerX, centerZ, level.id);
-    this.background = [
-      ...roots.filter((root): root is THREE.Object3D => root !== null),
-      ...street
-    ];
+    this.background = [...roots, ...street];
   }
 
   private async createStreetDressing(centerX: number, centerZ: number, levelId: number) {
@@ -421,7 +395,6 @@ export class DropLevelManager {
       const cloneMaterial = (material: THREE.Material) => {
         const copy = material.clone();
         if (copy instanceof THREE.MeshStandardMaterial) {
-          // Preserve authored color textures. Tint only genuinely untextured meshes.
           if (copy.map) copy.color.set(0xffffff);
           else copy.color.lerp(tint, route ? 0.44 : 0.28);
           copy.roughness = Math.max(copy.roughness, route ? 0.58 : 0.68);
