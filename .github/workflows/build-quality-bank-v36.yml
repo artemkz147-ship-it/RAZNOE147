@@ -1,0 +1,46 @@
+name: Build quality bank v3.6
+
+on:
+  push:
+    branches: [yandex-mega-quiz]
+    paths:
+      - 'tools/build_quality_bank_v36.py'
+      - '.github/workflows/build-quality-bank-v36.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: yandex-mega-quiz
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Build quality bank
+        run: python tools/build_quality_bank_v36.py
+      - name: Verify output
+        run: |
+          test -s quality-bank-v36/quality_bank_v36.js
+          test -s quality-bank-v36/quality_bank_report.json
+          python - <<'PY'
+          import json
+          r=json.load(open('quality-bank-v36/quality_bank_report.json',encoding='utf-8'))
+          print(json.dumps(r,ensure_ascii=False,indent=2))
+          assert r['en']['total'] >= 5600
+          assert r['ru']['total'] >= 5600
+          assert r['kk']['total'] >= 6000
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quality-bank-v36
+          path: quality-bank-v36/
+          if-no-files-found: error
+          retention-days: 7
