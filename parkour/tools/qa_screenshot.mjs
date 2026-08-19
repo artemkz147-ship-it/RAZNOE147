@@ -76,9 +76,11 @@ const versionedResources = resources.filter((url) => {
 const required = [
   'parkour_performer.glb',
   'parkour_locomotion.glb',
+  'parkour_tricks.glb',
   'rooftop_sunset_1k.hdr',
   'landing-target.svg',
   'kaykit_city_',
+  'citybits_texture.png',
   'kaykit_road_'
 ];
 for (const token of required) {
@@ -123,6 +125,11 @@ await page.waitForFunction(
   { timeout: 10_000 }
 );
 await page.keyboard.press('Digit1');
+await page.waitForFunction(
+  () => /NinjaJump|flip|somersault/i.test(document.documentElement.dataset.dropTrickClip ?? ''),
+  undefined,
+  { timeout: 4_000 }
+);
 await page.waitForTimeout(330);
 await page.screenshot({ path: 'qa/drop-flow-df6-level-01-air.png' });
 
@@ -141,6 +148,7 @@ for (let i = 0; i < 75; i += 1) {
       state: document.querySelector('#state')?.textContent ?? '',
       score: Number.parseInt(document.querySelector('#score')?.textContent ?? '0', 10),
       drop: Number.parseFloat(document.querySelector('#drop')?.textContent ?? '0'),
+      trickClip: document.documentElement.dataset.dropTrickClip ?? '',
       physics
     };
   });
