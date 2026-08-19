@@ -14,6 +14,23 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate launcher JavaScript
+        run: node --check app/src/main/assets/launcher.js
+      - name: Validate emulator inline JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          src = Path('app/src/main/assets/game.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', src, flags=re.S | re.I)
+          if not scripts:
+              raise SystemExit('No inline JavaScript found in game.html')
+          Path('/tmp/retro-game-inline.js').write_text('\n'.join(scripts), encoding='utf-8')
+          PY
+          node --check /tmp/retro-game-inline.js
       - uses: android-actions/setup-android@v3
       - run: yes | sdkmanager --licenses >/dev/null || true
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
