@@ -5,8 +5,8 @@ import shutil
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 PUBLIC = os.path.join(ROOT, 'public')
 SOURCE = os.path.join(PUBLIC, 'assets3d')
-VERSION_DIR = 'assets3d_df6_20260818'
-BUILD_ID = 'DF6-20260818-1903'
+VERSION_DIR = 'assets3d_df7_20260819'
+BUILD_ID = 'DF7-20260819-A'
 TARGET = os.path.join(PUBLIC, VERSION_DIR)
 
 MANIFESTS = [
@@ -67,7 +67,7 @@ for path in TEXT_FILES:
             f'    <div id="buildStamp" data-build="{BUILD_ID}" '
             'style="position:fixed;left:8px;bottom:6px;z-index:9999;pointer-events:none;'
             'font:700 8px/1.1 Arial,sans-serif;letter-spacing:.12em;color:rgba(255,255,255,.55);'
-            'text-shadow:0 1px 3px rgba(0,0,0,.8)">BUILD DF6</div>\n'
+            'text-shadow:0 1px 3px rgba(0,0,0,.8)">BUILD DF7</div>\n'
         )
         updated = updated.replace('  </body>', stamp + '  </body>')
     if updated != text:
