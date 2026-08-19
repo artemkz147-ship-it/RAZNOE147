@@ -16,6 +16,7 @@ MANIFESTS = [
     os.path.join(ROOT, 'src', 'game3d', 'sfx.json'),
     os.path.join(ROOT, 'src', 'drop', 'factory.json'),
     os.path.join(ROOT, 'src', 'drop', 'dressing.json'),
+    os.path.join(ROOT, 'src', 'drop', 'tricks.json'),
 ]
 
 TEXT_FILES = []
