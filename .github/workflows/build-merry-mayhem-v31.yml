@@ -5,10 +5,11 @@ on:
     branches: [yandex-3d-merry-mayhem]
     paths-ignore:
       - '.build/v31-status.json'
+      - '.build/status.json'
   workflow_dispatch:
 
 concurrency:
-  group: merry-mayhem-v31-${{ github.ref }}
+  group: merry-mayhem-v31-${{ github.ref }}-${{ github.actor }}
   cancel-in-progress: true
 
 permissions:
