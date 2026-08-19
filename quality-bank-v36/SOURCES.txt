@@ -1,0 +1,2 @@
+MKQA: https://github.com/apple/ml-mkqa
+KazQAD: https://github.com/IS2AI/KazQAD
