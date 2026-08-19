@@ -117,10 +117,10 @@ export class DropAvatarSystem {
     this.anchor.position.copy(foot);
     this.anchor.rotation.set(0, yaw, 0);
 
-    // A real UAL2 trick clip already contains its own body rotation and limb pose.
-    // Do not rotate the whole model a second time while that clip is active.
-    if (this.activeTrickAction) this.pivot.rotation.set(0, 0, 0);
-    else this.pivot.rotation.set(trickRotation.x, trickRotation.y, trickRotation.z, 'YXZ');
+    // UAL2 supplies a believable tucked/parkour body pose. The authored clip does
+    // not contain a full somersault, so the gameplay pivot still performs the exact
+    // scored front/back/side/twist rotation around the character's centre of mass.
+    this.pivot.rotation.set(trickRotation.x, trickRotation.y, trickRotation.z, 'YXZ');
 
     if (!this.ready || !this.mixer) return;
     if (!this.activeTrickAction && state !== this.currentState) this.setState(state);
@@ -159,6 +159,7 @@ export class DropAvatarSystem {
     action.clampWhenFinished = true;
     action.fadeIn(previous ? 0.07 : 0.01).play();
     if (previous && previous !== action) previous.fadeOut(0.07);
+    document.documentElement.dataset.dropTrickClip = clip.name;
   }
 
   private setState(state: AvatarState) {
@@ -191,25 +192,32 @@ export class DropAvatarSystem {
         /front.*somersault/i,
         /somersault.*front/i,
         /parkour.*flip/i,
-        /dive.*roll/i
+        /ninjajump.*idle/i,
+        /ninjajump.*start/i
       ],
       back: [
         /back.*flip/i,
         /flip.*back/i,
         /back.*somersault/i,
-        /somersault.*back/i
+        /somersault.*back/i,
+        /ninjajump.*idle/i,
+        /ninjajump.*start/i
       ],
       side: [
         /side.*flip/i,
         /flip.*side/i,
         /aerial/i,
-        /cartwheel/i
+        /cartwheel/i,
+        /ninjajump.*idle/i,
+        /ninjajump.*start/i
       ],
       twist: [
         /twist/i,
         /jump.*spin/i,
         /spin.*jump/i,
-        /360/i
+        /360/i,
+        /ninjajump.*idle/i,
+        /ninjajump.*start/i
       ]
     };
     for (const pattern of patterns[kind]) {
@@ -221,9 +229,7 @@ export class DropAvatarSystem {
 
   private trickTimeScale(clip: THREE.AnimationClip) {
     if (clip.duration <= 0.01) return 1;
-    // Keep the expressive pose but fit long authored moves into a typical rooftop
-    // flight window instead of freezing the player halfway through a clip.
-    return THREE.MathUtils.clamp(clip.duration / 0.9, 0.9, 1.9);
+    return THREE.MathUtils.clamp(clip.duration / 0.82, 0.9, 2.1);
   }
 
   private pickClip(state: AvatarState) {
