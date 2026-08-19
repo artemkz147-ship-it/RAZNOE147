@@ -159,6 +159,7 @@ async function bootstrap() {
       chainEl.textContent = chain;
     },
     onTrick: (event, chain) => {
+      window.dispatchEvent(new CustomEvent('drop-avatar-trick', { detail: { kind: event.kind } }));
       popToast(`${event.label}  +${event.points}`);
       chainEl.textContent = chain;
     },
