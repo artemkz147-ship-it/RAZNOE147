@@ -19,6 +19,13 @@ jobs:
           node-version: '22'
       - name: Apply Retro 3 startup hotfix
         run: python3 tools/retro3_v261_hotfix.py
+      - name: Apply Retro 3 v2.7 patch
+        run: python3 tools/retro3_v270.py
+      - name: Fetch secondary NES core
+        run: |
+          mkdir -p app/src/main/assets/data/cores
+          curl -fL --retry 3 --retry-delay 2 https://cdn.emulatorjs.org/4.2.3/data/cores/nestopia-wasm.data -o app/src/main/assets/data/cores/nestopia-wasm.data
+          curl -fL --retry 3 --retry-delay 2 https://cdn.emulatorjs.org/4.2.3/data/cores/nestopia-legacy-wasm.data -o app/src/main/assets/data/cores/nestopia-legacy-wasm.data
       - name: Validate launcher JavaScript
         run: node --check app/src/main/assets/launcher.js
       - name: Validate emulator inline JavaScript
