@@ -23,6 +23,8 @@ jobs:
         run: python3 tools/retro3_v270.py
       - name: Apply Retro 3 v2.7.1 input/layout fix
         run: python3 tools/retro3_v271.py
+      - name: Apply Retro 3 v2.7.2 raw ROM picker fix
+        run: python3 tools/retro3_v272.py
       - name: Fetch secondary NES core
         run: |
           mkdir -p app/src/main/assets/data/cores
