@@ -20,15 +20,16 @@ s = must_replace(
 # v2.7 accidentally dropped these helpers. Restore them and explicitly attach NES port 1
 # to a standard Libretro joypad. This is intentionally NES-only: Sega/PS1 startup stays untouched.
 needle = "const INPUT_DEFAULTS={"
-helpers = """function quickSave(slot){const emu=window.EJS_emulator;try{const s=String(Math.max(1,Math.min(9,Number(slot||1))));emu?.changeSettingOption?.('save-state-slot',s);const ok=!!emu?.gameManager?.quickSave?.(s);send('retro-quick-result',{ok,message:ok?`Сохранено в слот ${s}`:'Не удалось быстро сохранить.'})}catch(e){send('retro-quick-result',{ok:false,message:safeMessage(e)})}}\nfunction quickLoad(slot){const emu=window.EJS_emulator;try{const s=String(Math.max(1,Math.min(9,Number(slot||1))));emu?.changeSettingOption?.('save-state-slot',s);emu?.gameManager?.quickLoad?.(s);send('retro-quick-result',{ok:true,message:`Загружен слот ${s}`})}catch(e){send('retro-quick-result',{ok:false,message:safeMessage(e)})}}\nfunction manualInput(index,value){try{if(currentCore==='nes')ensureNesJoypad();document.querySelector('#game')?.focus?.();window.EJS_emulator?.gameManager?.simulateInput?.(0,Number(index),value?1:0)}catch(_){}}\nfunction ensureNesJoypad(){if(currentCore!=='nes')return;const emu=window.EJS_emulator,gm=emu?.gameManager;if(!gm)return;try{gm.setControllerPortDevice?.(0,1)}catch(_){}try{gm.functions?.setControllerPortDevice?.(0,1)}catch(_){}try{const pad=emu?.gamepad?.gamepads?.find?.(Boolean);if(pad){let sel=emu.getGamepadSelectionValue?.(pad.index)||`${pad.id}_${pad.index}`;if(!Array.isArray(emu.gamepadSelection))emu.gamepadSelection=['','','',''];while(emu.gamepadSelection.length<4)emu.gamepadSelection.push('');emu.gamepadSelection[0]=sel}}catch(_){}}\n"""
+helpers = """function quickSave(slot){const emu=window.EJS_emulator;try{const s=String(Math.max(1,Math.min(9,Number(slot||1))));emu?.changeSettingOption?.('save-state-slot',s);const ok=!!emu?.gameManager?.quickSave?.(s);send('retro-quick-result',{ok,message:ok?`Сохранено в слот ${s}`:'Не удалось быстро сохранить.'})}catch(e){send('retro-quick-result',{ok:false,message:safeMessage(e)})}}\nfunction quickLoad(slot){const emu=window.EJS_emulator;try{const s=String(Math.max(1,Math.min(9,Number(slot||1))));emu?.changeSettingOption?.('save-state-slot',s);emu?.gameManager?.quickLoad?.(s);send('retro-quick-result',{ok:true,message:`Загружен слот ${s}`})}catch(e){send('retro-quick-result',{ok:false,message:safeMessage(e)})}}\nfunction manualInput(index,value){try{if(currentCore==='nes')ensureNesGamepadSelection();document.querySelector('#game')?.focus?.();window.EJS_emulator?.gameManager?.simulateInput?.(0,Number(index),value?1:0)}catch(_){}}\nfunction ensureNesGamepadSelection(){if(currentCore!=='nes')return;const emu=window.EJS_emulator;if(!emu)return;try{const pad=emu?.gamepad?.gamepads?.find?.(Boolean);if(pad){let sel=emu.getGamepadSelectionValue?.(pad.index)||`${pad.id}_${pad.index}`;if(!Array.isArray(emu.gamepadSelection))emu.gamepadSelection=['','','',''];while(emu.gamepadSelection.length<4)emu.gamepadSelection.push('');emu.gamepadSelection[0]=sel}}catch(_){}}\nfunction configureNesJoypad(){if(currentCore!=='nes')return;const gm=window.EJS_emulator?.gameManager;if(!gm)return;try{gm.setControllerPortDevice?.(0,1)}catch(_){}try{gm.functions?.setControllerPortDevice?.(0,1)}catch(_){}ensureNesGamepadSelection()}\n"""
 s = must_replace(s, needle, helpers + needle, 'restore input helpers')
 
 # Keep EmulatorJS' native gamepad path alive for NES. Our extra loop remains only as a
-# compatibility bridge and also maps the left analog stick to the D-pad.
+# compatibility bridge and also maps the left analog stick to the D-pad. Do not reconfigure
+# the Libretro controller port every animation frame: that can clear live input state.
 s = must_replace(
     s,
     "try{window.EJS_emulator.gamepadSelection=[]}catch(_){}const loop=()=>{const gm=window.EJS_emulator?.gameManager;if(gm&&startConfirmed&&!layoutEditing){",
-    "if(currentCore!=='nes')try{window.EJS_emulator.gamepadSelection=[]}catch(_){}else ensureNesJoypad();const loop=()=>{const gm=window.EJS_emulator?.gameManager;if(gm&&startConfirmed&&!layoutEditing){if(currentCore==='nes')ensureNesJoypad();",
+    "if(currentCore!=='nes')try{window.EJS_emulator.gamepadSelection=[]}catch(_){}else ensureNesGamepadSelection();const loop=()=>{const gm=window.EJS_emulator?.gameManager;if(gm&&startConfirmed&&!layoutEditing){if(currentCore==='nes')ensureNesGamepadSelection();",
     'keep native NES gamepad active',
 )
 
@@ -58,7 +59,7 @@ s = must_replace(
 s = must_replace(
     s,
     "startConfirmed=true;applySettings(currentSettings);if(currentProfile)applyControlProfile(currentProfile);startUnifiedInputBridge();",
-    "startConfirmed=true;captureDefaultLayout(true);setTimeout(()=>{if(!defaultLayoutStyles.length)captureDefaultLayout(true)},20);if(currentCore==='nes'){ensureNesJoypad();setTimeout(ensureNesJoypad,80);setTimeout(ensureNesJoypad,300)}applySettings(currentSettings);if(currentProfile)applyControlProfile(currentProfile);startUnifiedInputBridge();",
+    "startConfirmed=true;captureDefaultLayout(true);setTimeout(()=>{if(!defaultLayoutStyles.length)captureDefaultLayout(true)},20);if(currentCore==='nes'){configureNesJoypad();setTimeout(configureNesJoypad,80);setTimeout(configureNesJoypad,300)}applySettings(currentSettings);if(currentProfile)applyControlProfile(currentProfile);startUnifiedInputBridge();",
     'NES P1 activation and factory layout snapshot',
 )
 
