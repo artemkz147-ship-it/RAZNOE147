@@ -25,11 +25,55 @@ jobs:
         run: python3 tools/retro3_v271.py
       - name: Apply Retro 3 v2.7.2 raw ROM picker fix
         run: python3 tools/retro3_v272.py
-      - name: Fetch secondary NES core
+      - name: Apply Retro 3 v2.7.3 payload fix
+        run: python3 tools/retro3_v273.py
+      - name: Fetch complete offline EmulatorJS payload
         run: |
-          mkdir -p app/src/main/assets/data/cores
-          curl -fL --retry 3 --retry-delay 2 https://cdn.emulatorjs.org/4.2.3/data/cores/nestopia-wasm.data -o app/src/main/assets/data/cores/nestopia-wasm.data
-          curl -fL --retry 3 --retry-delay 2 https://cdn.emulatorjs.org/4.2.3/data/cores/nestopia-legacy-wasm.data -o app/src/main/assets/data/cores/nestopia-legacy-wasm.data
+          set -euo pipefail
+          BASE=https://cdn.emulatorjs.org/4.2.3/data
+          mkdir -p app/src/main/assets/data/cores app/src/main/assets/data/compression app/src/main/assets/data/localization
+          fetch() { curl -fL --retry 3 --retry-delay 2 "$BASE/$1" -o "app/src/main/assets/data/$1"; }
+          fetch loader.js
+          fetch emulator.min.js
+          fetch emulator.min.css
+          fetch version.json
+          fetch cores/cores.json
+          fetch localization/retroarch.json
+          fetch localization/ru-RU.json
+          fetch compression/extract7z.js
+          fetch compression/extractzip.js
+          fetch compression/libunrar.js
+          fetch compression/libunrar.wasm
+          fetch cores/fceumm-wasm.data
+          fetch cores/fceumm-legacy-wasm.data
+          fetch cores/nestopia-wasm.data
+          fetch cores/nestopia-legacy-wasm.data
+          fetch cores/genesis_plus_gx-wasm.data
+          fetch cores/genesis_plus_gx-legacy-wasm.data
+          fetch cores/pcsx_rearmed-wasm.data
+          fetch cores/pcsx_rearmed-legacy-wasm.data
+      - name: Validate complete emulator payload
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          required = [
+            'loader.js','emulator.min.js','emulator.min.css','version.json','cores/cores.json',
+            'localization/retroarch.json','localization/ru-RU.json',
+            'compression/extract7z.js','compression/extractzip.js','compression/libunrar.js','compression/libunrar.wasm',
+            'cores/fceumm-wasm.data','cores/fceumm-legacy-wasm.data',
+            'cores/nestopia-wasm.data','cores/nestopia-legacy-wasm.data',
+            'cores/genesis_plus_gx-wasm.data','cores/genesis_plus_gx-legacy-wasm.data',
+            'cores/pcsx_rearmed-wasm.data','cores/pcsx_rearmed-legacy-wasm.data',
+          ]
+          base = Path('app/src/main/assets/data')
+          missing = [p for p in required if not (base/p).is_file() or (base/p).stat().st_size == 0]
+          if missing:
+              raise SystemExit('Missing EmulatorJS assets: ' + ', '.join(missing))
+          total = sum((base/p).stat().st_size for p in required)
+          print('Offline EmulatorJS payload OK:', len(required), 'files,', total, 'bytes')
+          if total < 9_000_000:
+              raise SystemExit(f'Payload unexpectedly small: {total} bytes')
+          PY
       - name: Validate launcher JavaScript
         run: node --check app/src/main/assets/launcher.js
       - name: Validate emulator inline JavaScript
