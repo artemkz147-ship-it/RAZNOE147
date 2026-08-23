@@ -6,59 +6,91 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import java.io.File;
 import java.io.FileOutputStream;
 
 public class SignatureActivity extends AppCompatActivity {
+    private static final int BG = Color.rgb(247, 248, 252);
+    private static final int TEXT = Color.rgb(25, 28, 36);
+    private static final int MUTED = Color.rgb(93, 99, 112);
+    private static final int BLUE = Color.rgb(49, 87, 213);
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(20), dp(20), dp(20));
+        root.setPadding(dp(16), dp(12), dp(16), dp(18));
+        root.setBackgroundColor(BG);
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets safe = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+            v.setPadding(dp(16), dp(12) + safe.top, dp(16), dp(18) + safe.bottom);
+            return insets;
+        });
 
-        TextView title = new TextView(this);
-        title.setText("Нарисуйте подпись");
-        title.setTextSize(24);
-        title.setTextColor(Color.rgb(25, 28, 36));
-        title.setPadding(0, 0, 0, dp(12));
-        root.addView(title);
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        TextView back = label("←", 30, TEXT, false);
+        back.setGravity(Gravity.CENTER);
+        back.setOnClickListener(v -> finish());
+        top.addView(back, new LinearLayout.LayoutParams(dp(52), dp(52)));
 
-        TextView hint = new TextView(this);
-        hint.setText("Подпись будет добавлена на последнюю страницу PDF внизу справа.");
-        hint.setTextSize(15);
-        hint.setTextColor(Color.DKGRAY);
-        hint.setPadding(0, 0, 0, dp(18));
+        LinearLayout names = new LinearLayout(this);
+        names.setOrientation(LinearLayout.VERTICAL);
+        names.addView(label("Рукописная подпись", 25, TEXT, true));
+        TextView small = label("Нарисуйте подпись пальцем", 14, MUTED, false);
+        small.setPadding(0, dp(2), 0, 0);
+        names.addView(small);
+        top.addView(names, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        root.addView(top);
+
+        TextView hint = label("Подпись будет размещена на последней странице PDF внизу справа.", 14, MUTED, false);
+        hint.setPadding(dp(4), dp(8), dp(4), dp(14));
         root.addView(hint);
 
         SignatureView pad = new SignatureView(this);
-        pad.setBackgroundColor(Color.WHITE);
+        GradientDrawable padBg = rounded(Color.WHITE, dp(18));
+        padBg.setStroke(dp(1), Color.rgb(222, 225, 234));
+        pad.setBackground(padBg);
+        pad.setPadding(dp(10), dp(10), dp(10), dp(10));
         LinearLayout.LayoutParams padParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
+        padParams.setMargins(0, 0, 0, dp(14));
         root.addView(pad, padParams);
 
         LinearLayout actions = new LinearLayout(this);
-        actions.setGravity(Gravity.END);
-        actions.setPadding(0, dp(16), 0, 0);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
 
-        Button clear = new Button(this);
-        clear.setText("Очистить");
+        TextView clear = action("Очистить", Color.WHITE, TEXT, Color.rgb(227, 230, 237));
         clear.setOnClickListener(v -> pad.clear());
-        actions.addView(clear);
+        LinearLayout.LayoutParams left = new LinearLayout.LayoutParams(0, dp(54), 1f);
+        left.setMargins(0, 0, dp(6), 0);
+        actions.addView(clear, left);
 
-        Button save = new Button(this);
-        save.setText("Подписать");
+        TextView save = action("Подписать PDF", BLUE, Color.WHITE, BLUE);
         save.setOnClickListener(v -> {
+            if (!pad.hasInk()) {
+                Toast.makeText(this, "Сначала нарисуйте подпись", Toast.LENGTH_SHORT).show();
+                return;
+            }
             try {
                 File out = File.createTempFile("signature_", ".png", getCacheDir());
                 Bitmap bitmap = pad.toBitmap();
@@ -71,14 +103,42 @@ public class SignatureActivity extends AppCompatActivity {
                 setResult(RESULT_OK, result);
                 finish();
             } catch (Exception e) {
-                setResult(RESULT_CANCELED);
-                finish();
+                Toast.makeText(this, "Не удалось сохранить подпись", Toast.LENGTH_LONG).show();
             }
         });
-        actions.addView(save);
+        LinearLayout.LayoutParams right = new LinearLayout.LayoutParams(0, dp(54), 1.35f);
+        right.setMargins(dp(6), 0, 0, 0);
+        actions.addView(save, right);
         root.addView(actions);
 
         setContentView(root);
+    }
+
+    private TextView action(String value, int bg, int fg, int stroke) {
+        TextView v = label(value, 15, fg, true);
+        v.setGravity(Gravity.CENTER);
+        GradientDrawable shape = rounded(bg, dp(15));
+        shape.setStroke(dp(1), stroke);
+        v.setBackground(shape);
+        v.setClickable(true);
+        v.setFocusable(true);
+        return v;
+    }
+
+    private TextView label(String value, int sp, int color, boolean bold) {
+        TextView v = new TextView(this);
+        v.setText(value);
+        v.setTextSize(sp);
+        v.setTextColor(color);
+        if (bold) v.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        return v;
+    }
+
+    private GradientDrawable rounded(int color, int radius) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(radius);
+        return g;
     }
 
     private int dp(int value) {
@@ -88,6 +148,7 @@ public class SignatureActivity extends AppCompatActivity {
     static class SignatureView extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path path = new Path();
+        private boolean hasInk;
 
         SignatureView(android.content.Context context) {
             super(context);
@@ -95,7 +156,7 @@ public class SignatureActivity extends AppCompatActivity {
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeCap(Paint.Cap.ROUND);
             paint.setStrokeJoin(Paint.Join.ROUND);
-            paint.setStrokeWidth(6f * getResources().getDisplayMetrics().density);
+            paint.setStrokeWidth(5f * getResources().getDisplayMetrics().density);
         }
 
         @Override
@@ -111,6 +172,7 @@ public class SignatureActivity extends AppCompatActivity {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN -> {
                     path.moveTo(x, y);
+                    hasInk = true;
                     invalidate();
                     return true;
                 }
@@ -130,8 +192,11 @@ public class SignatureActivity extends AppCompatActivity {
 
         void clear() {
             path.reset();
+            hasInk = false;
             invalidate();
         }
+
+        boolean hasInk() { return hasInk; }
 
         Bitmap toBitmap() {
             int w = Math.max(getWidth(), 1);
