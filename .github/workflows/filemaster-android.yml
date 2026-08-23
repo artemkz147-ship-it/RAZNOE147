@@ -3,6 +3,8 @@ name: FileMaster Android
 on:
   push:
     branches: [ filemaster-offline ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
