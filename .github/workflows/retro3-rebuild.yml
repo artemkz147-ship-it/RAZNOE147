@@ -31,6 +31,8 @@ jobs:
         run: python3 tools/retro3_v274.py
       - name: Apply Retro 3 v2.7.5 NES dpad geometry fix
         run: python3 tools/retro3_v275.py
+      - name: Apply Retro 3 v2.7.6 NES input arbitration fix
+        run: python3 tools/retro3_v276.py
       - name: Fetch complete offline EmulatorJS payload
         run: |
           set -euo pipefail
