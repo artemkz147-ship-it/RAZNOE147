@@ -39,6 +39,7 @@ public class MainActivity extends AppCompatActivity {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private String action = "";
     private Uri pendingPdf;
+    private Uri pendingCryptoPdf;
     private Uri cameraUri;
 
     @Override
@@ -62,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
         scroll.addView(root);
 
         root.addView(text("ФайлМастер", 30, Color.rgb(25, 28, 36), true));
-        TextView subtitle = text("PDF • Документы • Таблицы • Фото • OCR • Подпись • Архивы", 15, Color.DKGRAY, false);
+        TextView subtitle = text("PDF • Word • Excel • PowerPoint • ODT • Фото • OCR • Подписи • Архивы", 15, Color.DKGRAY, false);
         subtitle.setPadding(0, dp(4), 0, dp(14));
         root.addView(subtitle);
 
@@ -71,11 +72,13 @@ public class MainActivity extends AppCompatActivity {
         offline.setBackground(rounded(Color.rgb(235, 250, 245), dp(12)));
         root.addView(offline);
 
-        root.addView(section("Сканер"));
+        root.addView(section("Сканер и OCR"));
         root.addView(tool("Сканировать камерой", "Фото документа → автообрезка/контраст → JPG + PDF", v -> captureScan()));
         root.addView(tool("Улучшить фото документа", "Автообрезка полей, Ч/Б и повышение контраста", v -> pick(false, "image/*", "scan_photo")));
+        root.addView(tool("OCR фото RU + EN", "Фото → TXT. Обе модели уже внутри APK", v -> pick(false, "image/*", "ocr")));
+        root.addView(tool("OCR целого PDF RU + EN", "Каждая страница рендерится и распознаётся локально", v -> pick(false, "application/pdf", "ocr_pdf")));
 
-        root.addView(section("PDF"));
+        root.addView(section("PDF — страницы и конвертация"));
         root.addView(tool("Объединить PDF", "Склеить несколько PDF в один", v -> pick(true, "application/pdf", "merge_pdf")));
         root.addView(tool("Разделить PDF", "Каждая страница — отдельный PDF", v -> pick(false, "application/pdf", "split_pdf")));
         root.addView(tool("Извлечь страницы", "Например: 1,3,5-8", v -> pick(false, "application/pdf", "extract_pages")));
@@ -83,18 +86,37 @@ public class MainActivity extends AppCompatActivity {
         root.addView(tool("Повернуть PDF на 90°", "Повернуть все страницы", v -> pick(false, "application/pdf", "rotate_pdf")));
         root.addView(tool("Обратный порядок страниц", "Последняя страница станет первой", v -> pick(false, "application/pdf", "reverse_pdf")));
         root.addView(tool("Добавить номера страниц", "Нумерация по центру снизу", v -> pick(false, "application/pdf", "page_numbers")));
-        root.addView(tool("PDF → TXT", "Извлечь встроенный текст без OCR", v -> pick(false, "application/pdf", "pdf_text")));
         root.addView(tool("Фото → PDF", "Несколько JPG/PNG в один документ", v -> pick(true, "image/*", "images_pdf")));
         root.addView(tool("PDF → JPG", "Экспорт всех страниц в изображения", v -> pick(false, "application/pdf", "pdf_jpg")));
-        root.addView(tool("Подписать PDF", "Нарисовать подпись пальцем и встроить в документ", v -> pick(false, "application/pdf", "sign_pdf")));
+        root.addView(tool("PDF → TXT", "Извлечь встроенный текст без OCR", v -> pick(false, "application/pdf", "pdf_text")));
+
+        root.addView(section("PDF — обработка"));
+        root.addView(tool("Сжать PDF", "3 уровня. Для сильного сжатия страницы пересобираются в JPEG", v -> pick(false, "application/pdf", "compress_pdf")));
+        root.addView(tool("Пересобрать / восстановить PDF", "Повторно разобрать структуру и сохранить новый файл", v -> pick(false, "application/pdf", "repair_pdf")));
+        root.addView(tool("Водяной знак", "Текст на каждой странице, включая кириллицу", v -> pick(false, "application/pdf", "watermark_pdf")));
+        root.addView(tool("Очистить метаданные PDF", "Удалить свойства документа и XMP-метаданные", v -> pick(false, "application/pdf", "clean_metadata")));
+        root.addView(tool("Сравнить два PDF", "Текстовое сравнение и отчёт о различиях", v -> pick(true, "application/pdf", "compare_pdf")));
         root.addView(tool("Защитить PDF паролем", "Локальное 128-битное шифрование PDF", v -> pick(false, "application/pdf", "protect_pdf")));
         root.addView(tool("Снять известный пароль PDF", "Нужен действующий пароль документа", v -> pick(false, "application/pdf", "unlock_pdf")));
+
+        root.addView(section("Подпись PDF"));
+        root.addView(tool("Рукописная подпись", "Нарисовать пальцем и встроить видимую подпись", v -> pick(false, "application/pdf", "sign_pdf")));
+        root.addView(tool("Электронная подпись PKCS#12", "PDF + .p12/.pfx + пароль → CMS/PKCS#7 подпись", v -> pick(false, "application/pdf", "crypto_sign_pdf")));
+        root.addView(tool("Проверить электронные подписи", "Локальная криптографическая проверка CMS внутри PDF", v -> pick(false, "application/pdf", "verify_signatures")));
 
         root.addView(section("Документы и текст"));
         root.addView(tool("DOCX → TXT", "Извлечение текста Word полностью офлайн", v -> pick(false, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx_txt")));
         root.addView(tool("DOCX → PDF", "Текстовый экспорт с Unicode; сложная верстка упрощается", v -> pick(false, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx_pdf")));
+        root.addView(tool("ODT → TXT", "Извлечь текст OpenDocument", v -> pick(false, "application/vnd.oasis.opendocument.text", "odt_txt")));
+        root.addView(tool("ODT → PDF", "Локальный текстовый экспорт OpenDocument", v -> pick(false, "application/vnd.oasis.opendocument.text", "odt_pdf")));
         root.addView(tool("TXT / HTML / Markdown / RTF → PDF", "Локальная печать текста в PDF", v -> pick(false, "*/*", "text_pdf")));
         root.addView(tool("HTML / Markdown / RTF → TXT", "Очистить разметку и сохранить текст", v -> pick(false, "*/*", "text_txt")));
+        root.addView(tool("TXT / Markdown / HTML → DOCX", "Создать обычный Word-документ без облака", v -> pick(false, "*/*", "text_docx")));
+        root.addView(tool("TXT / Markdown / HTML → ODT", "Создать OpenDocument Text", v -> pick(false, "*/*", "text_odt")));
+
+        root.addView(section("Презентации"));
+        root.addView(tool("PPTX → TXT", "Извлечь текст по слайдам", v -> pick(false, "application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx_txt")));
+        root.addView(tool("PPTX → PDF", "Текст слайдов → PDF; визуальная верстка упрощается", v -> pick(false, "application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx_pdf")));
 
         root.addView(section("Таблицы"));
         root.addView(tool("XLSX → CSV", "Первый лист → UTF-8 CSV", v -> pick(false, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx_csv")));
@@ -107,9 +129,6 @@ public class MainActivity extends AppCompatActivity {
         root.addView(tool("Повернуть на 90°", "Сохранить новую копию", v -> pick(false, "image/*", "image_rotate")));
         root.addView(tool("Сделать Ч/Б", "Локальная конвертация в оттенки серого", v -> pick(false, "image/*", "image_gray")));
 
-        root.addView(section("OCR"));
-        root.addView(tool("Распознать текст RU + EN", "Фото → текст. Обе модели уже внутри APK", v -> pick(false, "image/*", "ocr")));
-
         root.addView(section("Архиватор"));
         root.addView(tool("Создать ZIP", "Упаковать несколько файлов", v -> pick(true, "*/*", "zip")));
         root.addView(tool("ZIP с паролем AES-256", "Защищённый архив без внешних сервисов", v -> pick(true, "*/*", "zip_password")));
@@ -117,9 +136,10 @@ public class MainActivity extends AppCompatActivity {
         root.addView(tool("Создать TAR.GZ", "Совместимый gzip-архив", v -> pick(true, "*/*", "targz")));
         root.addView(tool("Распаковать ZIP / 7Z / RAR", "Распаковка в Загрузки/ФайлМастер", v -> pick(false, "*/*", "extract")));
         root.addView(tool("Распаковать ZIP с паролем", "AES/ZipCrypto при известном пароле", v -> pick(false, "application/zip", "extract_zip_password")));
+        root.addView(tool("Распаковать TAR / GZ / BZ2 / XZ", "Также TAR.GZ, TAR.BZ2, TAR.XZ и короткие варианты", v -> pick(false, "*/*", "extract_extra")));
 
-        root.addView(section("Дальше"));
-        TextView roadmap = text("В следующем слое: более точная коррекция перспективы сканов, визуальный редактор/организатор страниц PDF, формы и аннотации, PPTX, продвинутая работа с несколькими листами XLSX и криптографическая подпись сертификатами.", 15, Color.DKGRAY, false);
+        root.addView(section("Следующие улучшения"));
+        TextView roadmap = text("Дальше остаются прежде всего визуальный редактор PDF/форм, ручная коррекция четырёх углов скана, полноценное сохранение сложной верстки Office и работа со всеми листами XLSX. Базовые операции уже выполняются полностью на устройстве.", 15, Color.DKGRAY, false);
         roadmap.setPadding(dp(4), 0, dp(4), dp(20));
         root.addView(roadmap);
 
@@ -139,9 +159,7 @@ public class MainActivity extends AppCompatActivity {
             intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
             if (intent.resolveActivity(getPackageManager()) == null) throw new IllegalStateException("На устройстве не найдено приложение камеры");
             startActivityForResult(intent, CAMERA_CAPTURE);
-        } catch (Exception e) {
-            showError(e);
-        }
+        } catch (Exception e) { showError(e); }
     }
 
     private void pick(boolean multi, String mime, String nextAction) {
@@ -199,10 +217,24 @@ public class MainActivity extends AppCompatActivity {
                 case "pdf_text" -> runTask("Извлекаю текст…", () -> PdfTools.extractText(this, first), "TXT сохранён");
                 case "images_pdf" -> runTask("Создаю PDF…", () -> PdfTools.imagesToPdf(this, uris), "PDF создан");
                 case "pdf_jpg" -> runTask("Экспортирую страницы…", () -> PdfTools.pdfToJpeg(this, first), "Страницы сохранены как JPG");
+                case "compress_pdf" -> chooseCompression(first);
+                case "repair_pdf" -> runTask("Пересобираю PDF…", () -> PdfExtraTools.repair(this, first), "Новый PDF сохранён");
+                case "watermark_pdf" -> ask("Текст водяного знака", "Например: КОПИЯ", false, value -> runTask("Добавляю водяной знак…", () -> PdfExtraTools.watermark(this, first, value), "Водяной знак добавлен"));
+                case "clean_metadata" -> runTask("Удаляю метаданные…", () -> PdfExtraTools.removeMetadata(this, first), "PDF без метаданных сохранён");
+                case "compare_pdf" -> runTask("Сравниваю PDF…", () -> PdfExtraTools.compareText(this, uris), "Отчёт сравнения сохранён");
                 case "protect_pdf" -> ask("Пароль для PDF", "Минимум 4 символа", true, value -> runTask("Шифрую PDF…", () -> PdfTools.protect(this, first, value), "Защищённый PDF сохранён"));
                 case "unlock_pdf" -> ask("Текущий пароль PDF", "Введите известный пароль", true, value -> runTask("Снимаю защиту…", () -> PdfTools.unlock(this, first, value), "PDF без пароля сохранён"));
                 case "sign_pdf" -> { pendingPdf = first; startActivityForResult(new Intent(this, SignatureActivity.class), DRAW_SIGNATURE); }
+                case "crypto_sign_pdf" -> { pendingCryptoPdf = first; pick(false, "*/*", "crypto_pick_cert"); }
+                case "crypto_pick_cert" -> {
+                    Uri pdf = pendingCryptoPdf;
+                    Uri cert = first;
+                    if (pdf == null) throw new IllegalStateException("Сначала выберите PDF");
+                    ask("Пароль сертификата", "Пароль .p12/.pfx", true, value -> runTask("Создаю электронную подпись…", () -> DigitalSignatureTools.signPdf(this, pdf, cert, value), "Электронно подписанный PDF сохранён"));
+                }
+                case "verify_signatures" -> runTask("Проверяю электронные подписи…", () -> DigitalSignatureTools.verifyPdf(this, first), "Отчёт проверки сохранён");
                 case "ocr" -> runOcr(first);
+                case "ocr_pdf" -> runTask("Распознаю страницы PDF…", () -> OcrTools.recognizePdfToTxt(this, first), "OCR PDF сохранён в TXT");
                 case "scan_photo" -> runTask("Улучшаю документ…", () -> ImageTools.enhanceDocument(this, first), "Улучшенный скан сохранён");
                 case "image_compress" -> runTask("Сжимаю изображение…", () -> ImageTools.compress(this, first, 78), "Сжатая копия сохранена");
                 case "image_rotate" -> runTask("Поворачиваю изображение…", () -> ImageTools.rotate90(this, first), "Повернутая копия сохранена");
@@ -216,8 +248,14 @@ public class MainActivity extends AppCompatActivity {
                 });
                 case "docx_txt" -> runTask("Извлекаю текст DOCX…", () -> DocxTools.toTxt(this, first), "TXT сохранён");
                 case "docx_pdf" -> runTask("Создаю PDF из DOCX…", () -> DocxTools.toPdf(this, first), "PDF сохранён");
+                case "odt_txt" -> runTask("Извлекаю текст ODT…", () -> OpenDocumentTools.odtToTxt(this, first), "TXT сохранён");
+                case "odt_pdf" -> runTask("Создаю PDF из ODT…", () -> OpenDocumentTools.odtToPdf(this, first), "PDF сохранён");
                 case "text_pdf" -> runTask("Создаю PDF…", () -> TextTools.toPdf(this, first), "PDF сохранён");
                 case "text_txt" -> runTask("Извлекаю текст…", () -> TextTools.toTxt(this, first), "TXT сохранён");
+                case "text_docx" -> runTask("Создаю DOCX…", () -> OfficeCreateTools.textToDocx(this, first), "DOCX сохранён");
+                case "text_odt" -> runTask("Создаю ODT…", () -> OfficeCreateTools.textToOdt(this, first), "ODT сохранён");
+                case "pptx_txt" -> runTask("Извлекаю текст PPTX…", () -> PresentationTools.toTxt(this, first), "TXT сохранён");
+                case "pptx_pdf" -> runTask("Создаю PDF из PPTX…", () -> PresentationTools.toPdf(this, first), "PDF сохранён");
                 case "xlsx_csv" -> runTask("Конвертирую XLSX…", () -> SheetTools.xlsxToCsv(this, first), "CSV сохранён");
                 case "csv_xlsx" -> runTask("Создаю XLSX…", () -> SheetTools.csvToXlsx(this, first), "XLSX сохранён");
                 case "xlsx_pdf" -> runTask("Создаю PDF таблицы…", () -> SheetTools.xlsxToPdf(this, first), "PDF сохранён");
@@ -227,10 +265,19 @@ public class MainActivity extends AppCompatActivity {
                 case "targz" -> runTask("Создаю TAR.GZ…", () -> ArchiveTools.createTarGz(this, uris), "TAR.GZ создан");
                 case "extract" -> runTask("Распаковываю архив…", () -> ArchiveTools.extract(this, first), "Архив распакован");
                 case "extract_zip_password" -> ask("Пароль ZIP", "Введите пароль архива", true, value -> runTask("Распаковываю ZIP…", () -> ArchiveTools.extractEncryptedZip(this, first, value), "Архив распакован"));
+                case "extract_extra" -> runTask("Распаковываю архив…", () -> ArchiveExtraTools.extract(this, first), "Архив распакован");
             }
-        } catch (Exception e) {
-            showError(e);
-        }
+        } catch (Exception e) { showError(e); }
+    }
+
+    private void chooseCompression(Uri uri) {
+        String[] modes = {"Сильное — 90 DPI / JPEG 55%", "Среднее — 120 DPI / JPEG 70%", "Бережное — 150 DPI / JPEG 82%"};
+        new AlertDialog.Builder(this).setTitle("Уровень сжатия")
+                .setItems(modes, (d, which) -> {
+                    int dpi = which == 0 ? 90 : which == 1 ? 120 : 150;
+                    float quality = which == 0 ? 0.55f : which == 1 ? 0.70f : 0.82f;
+                    runTask("Сжимаю PDF…", () -> PdfExtraTools.compressRaster(this, uri, dpi, quality), "Сжатый PDF сохранён");
+                }).setNegativeButton("Отмена", null).show();
     }
 
     private void runOcr(Uri uri) {
@@ -268,9 +315,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void ask(String title, String hint, boolean password, InputCallback callback) {
         EditText edit = new EditText(this);
-        edit.setHint(hint);
-        edit.setSingleLine(true);
-        edit.setPadding(dp(16), dp(8), dp(16), dp(8));
+        edit.setHint(hint); edit.setSingleLine(true); edit.setPadding(dp(16), dp(8), dp(16), dp(8));
         if (password) edit.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         new AlertDialog.Builder(this).setTitle(title).setView(edit)
                 .setPositiveButton("Продолжить", (d, w) -> callback.onValue(edit.getText().toString()))
@@ -287,14 +332,16 @@ public class MainActivity extends AppCompatActivity {
 
     private void showPdfQuickActions(Uri uri) {
         new AlertDialog.Builder(this).setTitle("PDF открыт в ФайлМастер")
-                .setItems(new String[]{"Подписать", "Разделить", "PDF → JPG", "Повернуть 90°", "PDF → TXT", "Защитить паролем"}, (d, which) -> {
+                .setItems(new String[]{"Подписать пальцем", "Электронная подпись", "Сжать", "Разделить", "PDF → JPG", "PDF → TXT", "OCR PDF", "Проверить подписи"}, (d, which) -> {
                     pendingPdf = uri;
                     if (which == 0) startActivityForResult(new Intent(this, SignatureActivity.class), DRAW_SIGNATURE);
-                    else if (which == 1) runTask("Разделяю PDF…", () -> PdfTools.split(this, uri), "Страницы сохранены");
-                    else if (which == 2) runTask("Экспортирую страницы…", () -> PdfTools.pdfToJpeg(this, uri), "JPG сохранены");
-                    else if (which == 3) runTask("Поворачиваю…", () -> PdfTools.rotateAll(this, uri, 90), "PDF повёрнут");
-                    else if (which == 4) runTask("Извлекаю текст…", () -> PdfTools.extractText(this, uri), "TXT сохранён");
-                    else ask("Пароль для PDF", "Минимум 4 символа", true, value -> runTask("Шифрую PDF…", () -> PdfTools.protect(this, uri, value), "PDF защищён"));
+                    else if (which == 1) { pendingCryptoPdf = uri; pick(false, "*/*", "crypto_pick_cert"); }
+                    else if (which == 2) chooseCompression(uri);
+                    else if (which == 3) runTask("Разделяю PDF…", () -> PdfTools.split(this, uri), "Страницы сохранены");
+                    else if (which == 4) runTask("Экспортирую страницы…", () -> PdfTools.pdfToJpeg(this, uri), "JPG сохранены");
+                    else if (which == 5) runTask("Извлекаю текст…", () -> PdfTools.extractText(this, uri), "TXT сохранён");
+                    else if (which == 6) runTask("Распознаю PDF…", () -> OcrTools.recognizePdfToTxt(this, uri), "OCR сохранён");
+                    else runTask("Проверяю подписи…", () -> DigitalSignatureTools.verifyPdf(this, uri), "Отчёт сохранён");
                 }).setNegativeButton("Закрыть", null).show();
     }
 
@@ -306,32 +353,23 @@ public class MainActivity extends AppCompatActivity {
 
     private TextView section(String value) {
         TextView v = text(value, 21, Color.rgb(25, 28, 36), true);
-        v.setPadding(0, dp(26), 0, dp(10));
-        return v;
+        v.setPadding(0, dp(26), 0, dp(10)); return v;
     }
 
     private View tool(String title, String subtitle, View.OnClickListener listener) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(16), dp(14), dp(16), dp(14));
-        box.setBackground(rounded(Color.WHITE, dp(15)));
-        box.setElevation(dp(2));
-        box.setOnClickListener(listener);
+        box.setBackground(rounded(Color.WHITE, dp(15))); box.setElevation(dp(2)); box.setOnClickListener(listener);
         box.addView(text(title, 17, Color.rgb(25, 28, 36), true));
-        TextView s = text(subtitle, 14, Color.DKGRAY, false);
-        s.setPadding(0, dp(3), 0, 0);
-        box.addView(s);
+        TextView s = text(subtitle, 14, Color.DKGRAY, false); s.setPadding(0, dp(3), 0, 0); box.addView(s);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 0, 0, dp(10));
-        box.setLayoutParams(lp);
-        return box;
+        lp.setMargins(0, 0, 0, dp(10)); box.setLayoutParams(lp); return box;
     }
 
     private TextView text(String value, int sp, int color, boolean bold) {
-        TextView v = new TextView(this);
-        v.setText(value); v.setTextSize(sp); v.setTextColor(color);
-        if (bold) v.setTypeface(v.getTypeface(), android.graphics.Typeface.BOLD);
-        return v;
+        TextView v = new TextView(this); v.setText(value); v.setTextSize(sp); v.setTextColor(color);
+        if (bold) v.setTypeface(v.getTypeface(), android.graphics.Typeface.BOLD); return v;
     }
 
     private GradientDrawable rounded(int color, int radius) {
