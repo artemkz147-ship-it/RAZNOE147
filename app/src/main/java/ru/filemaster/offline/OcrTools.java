@@ -35,7 +35,7 @@ final class OcrTools {
             String text = api.getUTF8Text();
             return text == null ? "" : text.trim();
         } finally {
-            api.end();
+            api.recycle();
             bitmap.recycle();
         }
     }
