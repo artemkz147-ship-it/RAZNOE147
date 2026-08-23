@@ -33,6 +33,8 @@ jobs:
         run: python3 tools/retro3_v275.py
       - name: Apply Retro 3 v2.7.6 NES input arbitration fix
         run: python3 tools/retro3_v276.py
+      - name: Apply Retro 3 v2.7.7 persistent save states
+        run: python3 tools/retro3_v277.py
       - name: Fetch complete offline EmulatorJS payload
         run: |
           set -euo pipefail
@@ -94,6 +96,11 @@ jobs:
           Path('/tmp/retro-game-inline.js').write_text('\n'.join(scripts), encoding='utf-8')
           PY
           node --check /tmp/retro-game-inline.js
+      - name: Validate persistent save-state wiring
+        run: |
+          grep -q "retro3-save-states" app/src/main/assets/game.html
+          grep -q "stateKey:opts.libraryId||gameId(selected.core,file)" app/src/main/assets/launcher.js
+          grep -q "versionName '2.7.7'" app/build.gradle
       - uses: android-actions/setup-android@v3
       - run: yes | sdkmanager --licenses >/dev/null || true
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
