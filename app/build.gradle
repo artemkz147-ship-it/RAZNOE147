@@ -10,8 +10,8 @@ android {
         applicationId 'ru.filemaster.offline'
         minSdk 29
         targetSdk 36
-        versionCode 1
-        versionName '0.1.0-alpha'
+        versionCode 2
+        versionName '0.2.0-alpha'
     }
 
     buildTypes {
@@ -50,4 +50,5 @@ dependencies {
     implementation 'org.tukaani:xz:1.10'
     implementation 'com.github.junrar:junrar:8.1.0'
     implementation 'cz.adaptech.tesseract4android:tesseract4android:4.9.0'
+    implementation 'net.lingala.zip4j:zip4j:2.11.6'
 }
