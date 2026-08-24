@@ -8,10 +8,11 @@ final class InputSafety {
     static String safeTempSuffix(String displayName, String fallbackExt) {
         String fallback = normalizeFallback(fallbackExt);
         if (displayName == null) return fallback;
+        if (displayName.contains("/") || displayName.contains("\\") || displayName.contains("..")) return fallback;
         int dot = displayName.lastIndexOf('.');
         if (dot < 0 || dot >= displayName.length() - 1) return fallback;
-        String ext = displayName.substring(dot + 1).replaceAll("[^A-Za-z0-9]", "");
-        if (ext.isEmpty() || ext.length() > 12) return fallback;
+        String ext = displayName.substring(dot + 1);
+        if (ext.length() > 12 || !ext.matches("[A-Za-z0-9]+")) return fallback;
         return "." + ext.toLowerCase(java.util.Locale.ROOT);
     }
 
@@ -32,10 +33,11 @@ final class InputSafety {
     }
 
     private static String normalizeFallback(String fallbackExt) {
-        String raw = fallbackExt == null ? ".bin" : fallbackExt.trim();
+        if (fallbackExt == null) return ".bin";
+        String raw = fallbackExt.trim();
+        if (raw.contains("/") || raw.contains("\\") || raw.contains("..")) return ".bin";
         if (raw.startsWith(".")) raw = raw.substring(1);
-        raw = raw.replaceAll("[^A-Za-z0-9]", "");
-        if (raw.isEmpty() || raw.length() > 12) raw = "bin";
+        if (raw.isEmpty() || raw.length() > 12 || !raw.matches("[A-Za-z0-9]+")) return ".bin";
         return "." + raw.toLowerCase(java.util.Locale.ROOT);
     }
 }
