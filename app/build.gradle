@@ -10,8 +10,8 @@ android {
         applicationId 'ru.filemaster.offline'
         minSdk 29
         targetSdk 36
-        versionCode 10
-        versionName '1.0.0-rc1'
+        versionCode 11
+        versionName '1.0.0-rc2'
     }
 
     buildTypes {
@@ -66,4 +66,6 @@ dependencies {
     // Pure Java/Kotlin image decoders bundled into the APK; no runtime downloads.
     implementation 'com.caverock:androidsvg-aar:1.4'
     implementation 'dev.jaeyoung:fileloom-tiff-bitmap-factory:0.1.1'
+
+    testImplementation 'junit:junit:4.13.2'
 }
