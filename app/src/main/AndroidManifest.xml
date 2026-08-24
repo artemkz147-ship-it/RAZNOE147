@@ -9,6 +9,14 @@
         android:theme="@style/Theme.FileMaster">
 
         <activity
+            android:name=".PdfFormActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".PdfRedactActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".PdfAnnotateActivity"
             android:exported="false" />
 
