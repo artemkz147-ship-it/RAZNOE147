@@ -62,4 +62,8 @@ dependencies {
     implementation 'com.github.junrar:junrar:8.1.0'
     implementation 'cz.adaptech.tesseract4android:tesseract4android:4.9.0'
     implementation 'net.lingala.zip4j:zip4j:2.11.6'
+
+    // Pure Java/Kotlin image decoders bundled into the APK; no runtime downloads.
+    implementation 'com.caverock:androidsvg-aar:1.4'
+    implementation 'dev.jaeyoung:fileloom-tiff-bitmap-factory:0.1.1'
 }
