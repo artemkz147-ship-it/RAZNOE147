@@ -51,6 +51,7 @@ final class FileStore {
         ContentValues done = new ContentValues();
         done.put(MediaStore.MediaColumns.IS_PENDING, 0);
         resolver.update(uri, done, null, null);
+        RecentStore.add(context, uri, displayName, mime);
         return uri;
     }
 
@@ -72,6 +73,7 @@ final class FileStore {
         ContentValues done = new ContentValues();
         done.put(MediaStore.MediaColumns.IS_PENDING, 0);
         resolver.update(uri, done, null, null);
+        RecentStore.add(context, uri, displayName, mime);
         return uri;
     }
 
