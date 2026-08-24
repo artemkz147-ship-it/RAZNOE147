@@ -41,6 +41,8 @@ jobs:
         run: python3 tools/retro3_v279.py
       - name: Apply Retro 3 v2.8.0 native focus and mapper fix
         run: python3 tools/retro3_v280.py
+      - name: Apply Retro 3 v2.8.1 PS1 native system buttons and layout fix
+        run: python3 tools/retro3_v281.py
       - name: Fetch complete offline EmulatorJS payload
         run: |
           set -euo pipefail
@@ -109,9 +111,11 @@ jobs:
           grep -q "NES_MIN_PRESS_MS=55" app/src/main/assets/game.html
           grep -q "nesSystemPulse" app/src/main/assets/game.html
           grep -q "setDefaultFocusHighlightEnabled(false)" app/src/main/java/ru/retro/threeinone/MainActivity.java
-          grep -q "__retroNativePad" app/src/main/assets/launcher.js
-          grep -q "nativePadLabel" app/src/main/java/ru/retro/threeinone/MainActivity.java
-          grep -q "versionName '2.8.0'" app/build.gradle
+          grep -q "ANDROID_KEY_" app/src/main/assets/launcher.js
+          grep -q "isNativeGamepadKey" app/src/main/java/ru/retro/threeinone/MainActivity.java
+          grep -q "applyPsFactoryLayout" app/src/main/assets/game.html
+          grep -q "retro-ps1-native-system-v281" app/src/main/assets/launcher.js
+          grep -q "versionName '2.8.1'" app/build.gradle
       - uses: android-actions/setup-android@v3
       - run: yes | sdkmanager --licenses >/dev/null || true
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
