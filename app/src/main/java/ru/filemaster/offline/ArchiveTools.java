@@ -3,7 +3,9 @@ package ru.filemaster.offline;
 import android.content.Context;
 import android.net.Uri;
 
+import com.github.junrar.Archive;
 import com.github.junrar.Junrar;
+import com.github.junrar.rarfile.FileHeader;
 
 import net.lingala.zip4j.model.ZipParameters;
 import net.lingala.zip4j.model.enums.AesKeyStrength;
@@ -25,7 +27,6 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 final class ArchiveTools {
@@ -118,6 +119,59 @@ final class ArchiveTools {
         finally { out.delete(); }
     }
 
+    static String listContents(Context ctx, Uri archiveUri) throws Exception {
+        String originalName = FileStore.displayName(ctx, archiveUri);
+        String name = originalName.toLowerCase();
+        File archive = FileStore.copyUriToTemp(ctx, archiveUri, extension(name));
+        StringBuilder out = new StringBuilder();
+        out.append(originalName).append("\n\n");
+        int count = 0;
+        long total = 0L;
+        try {
+            if (name.endsWith(".zip")) {
+                net.lingala.zip4j.ZipFile zip = new net.lingala.zip4j.ZipFile(archive);
+                if (zip.isEncrypted()) out.append("🔒 Архив защищён паролем\n\n");
+                for (net.lingala.zip4j.model.FileHeader h : zip.getFileHeaders()) {
+                    count++;
+                    long size = Math.max(0L, h.getUncompressedSize());
+                    total += size;
+                    out.append(h.isDirectory() ? "📁 " : "• ").append(h.getFileName());
+                    if (!h.isDirectory()) out.append("  —  ").append(humanSize(size));
+                    out.append('\n');
+                }
+            } else if (name.endsWith(".7z")) {
+                try (SevenZFile seven = new SevenZFile(archive)) {
+                    SevenZArchiveEntry e;
+                    while ((e = seven.getNextEntry()) != null) {
+                        count++;
+                        long size = Math.max(0L, e.getSize());
+                        total += size;
+                        out.append(e.isDirectory() ? "📁 " : "• ").append(e.getName());
+                        if (!e.isDirectory()) out.append("  —  ").append(humanSize(size));
+                        out.append('\n');
+                    }
+                }
+            } else if (name.endsWith(".rar")) {
+                try (Archive rar = new Archive(archive, (String) null)) {
+                    if (rar.isPasswordProtected()) out.append("🔒 Архив защищён паролем\n\n");
+                    for (FileHeader h : rar.getFileHeaders()) {
+                        count++;
+                        long size = Math.max(0L, h.getUnpSize());
+                        total += size;
+                        out.append(h.isDirectory() ? "📁 " : "• ").append(h.getFileName());
+                        if (!h.isDirectory()) out.append("  —  ").append(humanSize(size));
+                        out.append('\n');
+                    }
+                }
+            } else {
+                throw new IllegalArgumentException("Просмотр содержимого поддерживает ZIP, 7Z и RAR");
+            }
+        } finally { archive.delete(); }
+        out.insert(originalName.length() + 2, "Файлов и папок: " + count + "\nОбщий размер: " + humanSize(total) + "\n\n");
+        if (count == 0) out.append("Архив пуст или список недоступен без пароля.");
+        return out.toString();
+    }
+
     static int extract(Context ctx, Uri archiveUri) throws Exception {
         String name = FileStore.displayName(ctx, archiveUri).toLowerCase();
         File archive = FileStore.copyUriToTemp(ctx, archiveUri, extension(name));
@@ -186,6 +240,15 @@ final class ArchiveTools {
             }
         }
         return count;
+    }
+
+    private static String humanSize(long bytes) {
+        if (bytes < 1024) return bytes + " Б";
+        double kb = bytes / 1024.0;
+        if (kb < 1024) return String.format(java.util.Locale.US, "%.1f КБ", kb);
+        double mb = kb / 1024.0;
+        if (mb < 1024) return String.format(java.util.Locale.US, "%.1f МБ", mb);
+        return String.format(java.util.Locale.US, "%.2f ГБ", mb / 1024.0);
     }
 
     private static String safeName(String name) { return name.replace('\\', '_').replace('/', '_'); }
