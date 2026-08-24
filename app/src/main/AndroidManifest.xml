@@ -8,34 +8,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FileMaster">
 
-        <activity
-            android:name=".PdfFormActivity"
-            android:exported="false" />
+        <activity android:name=".ManualCropActivity" android:exported="false" />
+        <activity android:name=".PdfFormActivity" android:exported="false" />
+        <activity android:name=".PdfRedactActivity" android:exported="false" />
+        <activity android:name=".PdfAnnotateActivity" android:exported="false" />
+        <activity android:name=".ResultsActivity" android:exported="false" />
+        <activity android:name=".ScanSessionActivity" android:exported="false" />
+        <activity android:name=".SignatureActivity" android:exported="false" android:screenOrientation="portrait" />
 
-        <activity
-            android:name=".PdfRedactActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".PdfAnnotateActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ResultsActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ScanSessionActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".SignatureActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
