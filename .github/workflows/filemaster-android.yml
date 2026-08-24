@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -40,8 +40,33 @@ jobs:
           test -s app/src/main/assets/tessdata/rus.traineddata
           test -s app/src/main/assets/tessdata/eng.traineddata
 
+      - name: Unit tests
+        run: gradle :app:testDebugUnitTest --stacktrace
+
+      - name: Android lint
+        run: gradle :app:lintDebug --stacktrace
+
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify APK package
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK" >/dev/null
+          unzip -Z1 "$APK" | grep -q '^assets/tessdata/rus.traineddata$'
+          unzip -Z1 "$APK" | grep -q '^assets/tessdata/eng.traineddata$'
+          DEX_COUNT=$(unzip -Z1 "$APK" | grep -Ec '^classes([0-9]+)?\.dex$')
+          test "$DEX_COUNT" -ge 1
+          echo "Verified APK with $DEX_COUNT dex file(s)"
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FileMaster-lint-report
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
