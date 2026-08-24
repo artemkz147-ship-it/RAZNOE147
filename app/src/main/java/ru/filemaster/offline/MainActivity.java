@@ -115,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
         addRecent(root);
 
         root.addView(section("Все инструменты", "Разложено по понятным категориям"));
-        root.addView(category("PDF", "PDF", "Страницы, разметка, crop, защита", "20 инструментов", Color.rgb(235, 239, 255), BLUE, v -> renderCategory("pdf")));
+        root.addView(category("PDF", "PDF", "Редактор, формы, страницы и защита", "22 инструмента", Color.rgb(235, 239, 255), BLUE, v -> renderCategory("pdf")));
         root.addView(category("SCAN", "Сканер и OCR", "Камера и распознавание текста", "5 инструментов", Color.rgb(231, 249, 244), GREEN, v -> renderCategory("scan")));
         root.addView(category("SIGN", "Подписи PDF", "Рукописная и электронная подпись", "3 инструмента", Color.rgb(255, 244, 227), Color.rgb(199, 116, 0), v -> renderCategory("sign")));
         root.addView(category("DOC", "Документы и текст", "Word, ODT, TXT, HTML, Markdown", "8 инструментов", Color.rgb(236, 245, 255), Color.rgb(28, 105, 184), v -> renderCategory("docs")));
@@ -205,7 +205,7 @@ public class MainActivity extends AppCompatActivity {
             case "slides" -> { title = "Презентации"; subtitle = "Извлечение текста и экспорт PPTX"; }
             case "images" -> { title = "Изображения"; subtitle = "Сжатие, crop, flip, convert и batch"; }
             case "archives" -> { title = "Архиватор"; subtitle = "Создание, просмотр и распаковка архивов"; }
-            default -> { title = "PDF"; subtitle = "Страницы, визуальная разметка, crop и защита"; }
+            default -> { title = "PDF"; subtitle = "Разметка, формы, страницы, crop и защита"; }
         }
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
@@ -249,8 +249,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addPdfTools(LinearLayout root) {
-        root.addView(section("Визуально", null));
+        root.addView(section("Визуально и формы", null));
         root.addView(tool("Ручка / маркер по PDF", "Выберите страницу и рисуйте пальцем", v -> pick(false, "application/pdf", "annotate_pdf")));
+        root.addView(tool("Надёжно скрыть область", "Выделить прямоугольники и уничтожить данные под ними", v -> pick(false, "application/pdf", "redact_pdf")));
+        root.addView(tool("Заполнить PDF-форму", "Редактировать существующие текстовые поля AcroForm", v -> pick(false, "application/pdf", "fill_pdf_form")));
         root.addView(section("Страницы и конвертация", null));
         root.addView(tool("Объединить PDF", "Склеить несколько PDF", v -> pick(true, "application/pdf", "merge_pdf")));
         root.addView(tool("Разделить PDF", "Каждая страница — отдельный PDF", v -> pick(false, "application/pdf", "split_pdf")));
@@ -465,16 +467,13 @@ public class MainActivity extends AppCompatActivity {
         Uri first = uris.get(0);
         try {
             switch (action) {
-                case "annotate_pdf" -> ask("Номер страницы", "Например: 1", false, value -> {
-                    try {
-                        int page = Integer.parseInt(value.trim());
-                        if (page < 1) throw new NumberFormatException();
-                        Intent editor = new Intent(this, PdfAnnotateActivity.class);
-                        editor.putExtra("pdf_uri", first.toString());
-                        editor.putExtra("page", page);
-                        startActivity(editor);
-                    } catch (NumberFormatException e) { showError(new IllegalArgumentException("Введите номер страницы от 1")); }
-                });
+                case "annotate_pdf" -> launchPagedPdfActivity(first, PdfAnnotateActivity.class, "Номер страницы для рисования");
+                case "redact_pdf" -> launchPagedPdfActivity(first, PdfRedactActivity.class, "Номер страницы для скрытия данных");
+                case "fill_pdf_form" -> {
+                    Intent form = new Intent(this, PdfFormActivity.class);
+                    form.putExtra("pdf_uri", first.toString());
+                    startActivity(form);
+                }
                 case "merge_pdf" -> runTask("Объединяю PDF…", () -> PdfTools.merge(this, uris), "PDF объединён");
                 case "split_pdf" -> runTask("Разделяю PDF…", () -> PdfTools.split(this, first), "Страницы сохранены");
                 case "extract_pages" -> ask("Какие страницы извлечь?", "Например: 1,3,5-8", false, value -> runTask("Извлекаю страницы…", () -> PdfTools.extractPages(this, first, value), "Новый PDF создан"));
@@ -559,6 +558,19 @@ public class MainActivity extends AppCompatActivity {
                 case "extract_extra" -> runTask("Распаковываю архив…", () -> ArchiveExtraTools.extract(this, first), "Архив распакован");
             }
         } catch (Exception e) { showError(e); }
+    }
+
+    private void launchPagedPdfActivity(Uri uri, Class<?> activityClass, String title) {
+        ask(title, "Например: 1", false, value -> {
+            try {
+                int page = Integer.parseInt(value.trim());
+                if (page < 1) throw new NumberFormatException();
+                Intent editor = new Intent(this, activityClass);
+                editor.putExtra("pdf_uri", uri.toString());
+                editor.putExtra("page", page);
+                startActivity(editor);
+            } catch (NumberFormatException e) { showError(new IllegalArgumentException("Введите номер страницы от 1")); }
+        });
     }
 
     private void chooseImageFormat(boolean batch, List<Uri> uris) {
@@ -694,39 +706,35 @@ public class MainActivity extends AppCompatActivity {
 
     private void showPdfQuickActions(Uri uri) {
         new AlertDialog.Builder(this).setTitle("Что сделать с PDF?")
-                .setItems(new String[]{"Рисовать / маркер", "Подписать пальцем", "Электронная подпись", "Сжать", "Обрезать поля", "Извлечь картинки", "Разделить", "PDF → JPG", "OCR PDF", "Проверить подписи"}, (d, which) -> {
+                .setItems(new String[]{"Рисовать / маркер", "Скрыть область", "Заполнить форму", "Подписать пальцем", "Электронная подпись", "Сжать", "Обрезать поля", "Извлечь картинки", "Разделить", "PDF → JPG", "OCR PDF", "Проверить подписи"}, (d, which) -> {
                     pendingPdf = uri;
-                    if (which == 0) {
-                        ask("Номер страницы", "Например: 1", false, value -> {
-                            try {
-                                int page = Integer.parseInt(value.trim());
-                                if (page < 1) throw new NumberFormatException();
-                                Intent editor = new Intent(this, PdfAnnotateActivity.class);
-                                editor.putExtra("pdf_uri", uri.toString());
-                                editor.putExtra("page", page);
-                                startActivity(editor);
-                            } catch (NumberFormatException e) { showError(new IllegalArgumentException("Введите номер страницы от 1")); }
-                        });
-                    } else if (which == 1) startActivityForResult(new Intent(this, SignatureActivity.class), DRAW_SIGNATURE);
-                    else if (which == 2) { pendingCryptoPdf = uri; pick(false, "*/*", "crypto_pick_cert"); }
-                    else if (which == 3) chooseCompression(uri);
-                    else if (which == 4) ask("Обрезать поля на сколько %?", "Например: 5", false, value -> {
+                    if (which == 0) launchPagedPdfActivity(uri, PdfAnnotateActivity.class, "Номер страницы для рисования");
+                    else if (which == 1) launchPagedPdfActivity(uri, PdfRedactActivity.class, "Номер страницы для скрытия данных");
+                    else if (which == 2) {
+                        Intent form = new Intent(this, PdfFormActivity.class);
+                        form.putExtra("pdf_uri", uri.toString());
+                        startActivity(form);
+                    }
+                    else if (which == 3) startActivityForResult(new Intent(this, SignatureActivity.class), DRAW_SIGNATURE);
+                    else if (which == 4) { pendingCryptoPdf = uri; pick(false, "*/*", "crypto_pick_cert"); }
+                    else if (which == 5) chooseCompression(uri);
+                    else if (which == 6) ask("Обрезать поля на сколько %?", "Например: 5", false, value -> {
                         try {
                             float p = Float.parseFloat(value.trim().replace(',', '.'));
                             runTask("Обрезаю поля…", () -> PdfExtraTools.cropMargins(this, uri, p), "PDF обрезан");
                         } catch (Exception e) { showError(new IllegalArgumentException("Введите число от 1 до 34")); }
                     });
-                    else if (which == 5) runTask("Извлекаю изображения…", () -> PdfExtraTools.extractEmbeddedImages(this, uri), "Изображения сохранены");
-                    else if (which == 6) runTask("Разделяю PDF…", () -> PdfTools.split(this, uri), "Страницы сохранены");
-                    else if (which == 7) runTask("Экспортирую страницы…", () -> PdfTools.pdfToJpeg(this, uri), "JPG сохранены");
-                    else if (which == 8) runTask("Распознаю PDF…", () -> OcrTools.recognizePdfToTxt(this, uri), "OCR сохранён");
+                    else if (which == 7) runTask("Извлекаю изображения…", () -> PdfExtraTools.extractEmbeddedImages(this, uri), "Изображения сохранены");
+                    else if (which == 8) runTask("Разделяю PDF…", () -> PdfTools.split(this, uri), "Страницы сохранены");
+                    else if (which == 9) runTask("Экспортирую страницы…", () -> PdfTools.pdfToJpeg(this, uri), "JPG сохранены");
+                    else if (which == 10) runTask("Распознаю PDF…", () -> OcrTools.recognizePdfToTxt(this, uri), "OCR сохранён");
                     else runTask("Проверяю подписи…", () -> DigitalSignatureTools.verifyPdf(this, uri), "Отчёт сохранён");
                 }).setNegativeButton("Закрыть", null).show();
     }
 
     private void showAbout() {
-        new AlertDialog.Builder(this).setTitle("ФайлМастер 0.6")
-                .setMessage("Основные операции выполняются локально. Файлы не загружаются на сервер. OCR русского и английского языков уже находится внутри APK.\n\nМногостраничный скан собирает несколько снимков в один PDF. Разметка PDF позволяет рисовать ручкой и маркером по выбранной странице.\n\nРезультаты: Загрузки / ФайлМастер")
+        new AlertDialog.Builder(this).setTitle("ФайлМастер 0.7")
+                .setMessage("Основные операции выполняются локально. Файлы не загружаются на сервер. OCR русского и английского языков уже находится внутри APK.\n\nPDF: ручка/маркер, разрушительное скрытие областей, заполнение существующих текстовых форм, подписи, страницы, конвертация и защита.\n\nРезультаты: Загрузки / ФайлМастер")
                 .setPositiveButton("Понятно", null).show();
     }
 
