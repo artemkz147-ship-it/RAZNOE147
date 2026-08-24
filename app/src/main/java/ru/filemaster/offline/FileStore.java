@@ -1,5 +1,6 @@
 package ru.filemaster.offline;
 
+import android.app.Application;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
@@ -52,6 +53,7 @@ final class FileStore {
             copy(in, out);
             finishPending(resolver, uri);
             RecentStore.add(context, uri, displayName, mime);
+            recordCompletedOutput(context);
             ok = true;
             return uri;
         } finally {
@@ -72,12 +74,20 @@ final class FileStore {
             out.write(data);
             finishPending(resolver, uri);
             RecentStore.add(context, uri, displayName, mime);
+            recordCompletedOutput(context);
             ok = true;
             return uri;
         } finally {
             if (!ok) {
                 try { resolver.delete(uri, null, null); } catch (Exception ignored) {}
             }
+        }
+    }
+
+    private static void recordCompletedOutput(Context context) {
+        Context applicationContext = context.getApplicationContext();
+        if (applicationContext instanceof Application) {
+            AdsManager.get((Application) applicationContext).recordOutputCreated();
         }
     }
 
