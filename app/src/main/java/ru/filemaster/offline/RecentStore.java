@@ -5,7 +5,6 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 final class RecentStore {
@@ -57,6 +56,14 @@ final class RecentStore {
             } catch (Exception ignored) {}
         }
         return out;
+    }
+
+    static synchronized void removeUri(Context ctx, Uri uri) {
+        if (uri == null) return;
+        List<Entry> items = list(ctx);
+        String target = uri.toString();
+        items.removeIf(e -> e.uri.toString().equals(target));
+        save(ctx, items);
     }
 
     static synchronized void clear(Context ctx) {
