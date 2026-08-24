@@ -47,6 +47,8 @@ jobs:
         run: python3 tools/retro3_v282.py
       - name: Apply Retro 3 v2.8.3 persistent BIOS, ads, Premium and raw gamepad buttons
         run: python3 tools/retro3_v283.py
+      - name: Apply Retro 3 v2.8.4 PS1 virtual touch repair
+        run: python3 tools/retro3_v284.py
       - name: Fetch complete offline EmulatorJS payload
         run: |
           set -euo pipefail
@@ -117,13 +119,14 @@ jobs:
           grep -q "setDefaultFocusHighlightEnabled(false)" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "ANDROID_SCAN_" app/src/main/assets/launcher.js
           grep -q "isNativeGamepadKey" app/src/main/java/ru/retro/threeinone/MainActivity.java
-          grep -q "applyPsFactoryLayout" app/src/main/assets/game.html
+          grep -q "migratePsTouchLayout284" app/src/main/assets/game.html
+          ! grep -q "applyPsFactoryLayout" app/src/main/assets/game.html
           grep -q "BIOS_STORE='bios'" app/src/main/assets/launcher.js
           grep -q "3v1prem147" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "R-M-19800317-1" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "RuStorePayClient" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "InterstitialAdLoader" app/src/main/java/ru/retro/threeinone/MainActivity.java
-          grep -q "versionName '2.8.3'" app/build.gradle
+          grep -q "versionName '2.8.4'" app/build.gradle
       - uses: android-actions/setup-android@v3
       - run: yes | sdkmanager --licenses >/dev/null || true
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
