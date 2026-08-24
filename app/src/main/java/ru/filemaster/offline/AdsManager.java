@@ -342,8 +342,6 @@ final class AdsManager {
                     }
 
                     @Override public void onAdClicked() {}
-                    @Override public void onLeftApplication() {}
-                    @Override public void onReturnedToApplication() {}
                     @Override public void onImpression(ImpressionData impressionData) {}
                 });
             }
