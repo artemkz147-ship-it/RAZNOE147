@@ -62,7 +62,6 @@ public class MainActivity extends AppCompatActivity {
         PDFBoxResourceLoader.init(getApplicationContext());
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         renderHome();
-
         Intent incoming = getIntent();
         if (Intent.ACTION_VIEW.equals(incoming.getAction()) && incoming.getData() != null) {
             pendingPdf = incoming.getData();
@@ -82,12 +81,10 @@ public class MainActivity extends AppCompatActivity {
         hero.setBackground(gradient(new int[]{Color.rgb(42, 76, 194), Color.rgb(91, 111, 232)}, dp(22)));
         hero.setElevation(dp(2));
         root.addView(hero, marginParams(0, 0, 0, 18));
-
         hero.addView(text("ФайлМастер", 30, Color.WHITE, true));
-        TextView tagline = text("Документы, PDF, сканы и архивы — прямо на телефоне", 15, Color.rgb(234, 238, 255), false);
+        TextView tagline = text("PDF, документы, фото, подписи и архивы — без сервера", 15, Color.rgb(234, 238, 255), false);
         tagline.setPadding(0, dp(5), 0, dp(14));
         hero.addView(tagline);
-
         TextView offline = text("✓  Работает офлайн   •   файлы никуда не отправляются", 13, Color.WHITE, true);
         offline.setPadding(dp(12), dp(9), dp(12), dp(9));
         GradientDrawable offlineBg = rounded(Color.argb(42, 255, 255, 255), dp(12));
@@ -105,28 +102,79 @@ public class MainActivity extends AppCompatActivity {
                 quick("Создать ZIP", "Несколько файлов", v -> pick(true, "*/*", "zip"))
         ));
 
-        root.addView(section("Все инструменты", "Разложено по понятным категориям"));
-        root.addView(category("PDF", "Страницы, сжатие, защита, конвертация", "17 инструментов", Color.rgb(235, 239, 255), BLUE, v -> renderCategory("pdf")));
-        root.addView(category("SCAN", "Сканер и OCR", "4 инструмента", Color.rgb(231, 249, 244), GREEN, v -> renderCategory("scan")));
-        root.addView(category("SIGN", "Подписи PDF", "3 инструмента", Color.rgb(255, 244, 227), Color.rgb(199, 116, 0), v -> renderCategory("sign")));
-        root.addView(category("DOC", "Word, ODT и текст", "8 инструментов", Color.rgb(236, 245, 255), Color.rgb(28, 105, 184), v -> renderCategory("docs")));
-        root.addView(category("XLS", "Таблицы", "3 инструмента", Color.rgb(232, 248, 238), Color.rgb(36, 132, 72), v -> renderCategory("sheets")));
-        root.addView(category("PPT", "Презентации", "2 инструмента", Color.rgb(255, 239, 231), Color.rgb(204, 83, 26), v -> renderCategory("slides")));
-        root.addView(category("IMG", "Изображения", "4 инструмента", Color.rgb(245, 237, 255), Color.rgb(126, 68, 187), v -> renderCategory("images")));
-        root.addView(category("ZIP", "Архиватор", "7 инструментов", Color.rgb(241, 243, 246), Color.rgb(82, 91, 107), v -> renderCategory("archives")));
+        addRecent(root);
 
-        TextView where = text("Результаты сохраняются в «Загрузки / ФайлМастер»", 13, MUTED, false);
+        root.addView(section("Все инструменты", "Разложено по понятным категориям"));
+        root.addView(category("PDF", "PDF", "Страницы, crop, картинки, защита", "19 инструментов", Color.rgb(235, 239, 255), BLUE, v -> renderCategory("pdf")));
+        root.addView(category("SCAN", "Сканер и OCR", "Камера и распознавание текста", "4 инструмента", Color.rgb(231, 249, 244), GREEN, v -> renderCategory("scan")));
+        root.addView(category("SIGN", "Подписи PDF", "Рукописная и электронная подпись", "3 инструмента", Color.rgb(255, 244, 227), Color.rgb(199, 116, 0), v -> renderCategory("sign")));
+        root.addView(category("DOC", "Документы и текст", "Word, ODT, TXT, HTML, Markdown", "8 инструментов", Color.rgb(236, 245, 255), Color.rgb(28, 105, 184), v -> renderCategory("docs")));
+        root.addView(category("XLS", "Таблицы", "XLSX, CSV и TSV", "3 инструмента", Color.rgb(232, 248, 238), Color.rgb(36, 132, 72), v -> renderCategory("sheets")));
+        root.addView(category("PPT", "Презентации", "PPTX → TXT/PDF", "2 инструмента", Color.rgb(255, 239, 231), Color.rgb(204, 83, 26), v -> renderCategory("slides")));
+        root.addView(category("IMG", "Изображения", "Crop, flip, convert и batch", "9 инструментов", Color.rgb(245, 237, 255), Color.rgb(126, 68, 187), v -> renderCategory("images")));
+        root.addView(category("ZIP", "Архиватор", "ZIP, 7Z, RAR, TAR и пароли", "8 инструментов", Color.rgb(241, 243, 246), Color.rgb(82, 91, 107), v -> renderCategory("archives")));
+
+        TextView where = text("Результаты: «Загрузки / ФайлМастер»", 13, MUTED, false);
         where.setGravity(Gravity.CENTER);
         where.setPadding(dp(8), dp(12), dp(8), dp(8));
         root.addView(where);
-
         TextView about = text("О приложении и приватности", 14, BLUE, true);
         about.setGravity(Gravity.CENTER);
         about.setPadding(dp(10), dp(12), dp(10), dp(18));
         about.setOnClickListener(v -> showAbout());
         root.addView(about);
-
         setContentView(scroll);
+    }
+
+    private void addRecent(LinearLayout root) {
+        List<RecentStore.Entry> recent = RecentStore.list(this);
+        if (recent.isEmpty()) return;
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        titleRow.addView((View) section("Недавние файлы", "Последние результаты приложения"), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView clear = text("Очистить", 13, BLUE, true);
+        clear.setPadding(dp(8), dp(14), 0, dp(8));
+        clear.setOnClickListener(v -> {
+            RecentStore.clear(this);
+            renderHome();
+        });
+        titleRow.addView(clear);
+        root.addView(titleRow);
+        int max = Math.min(4, recent.size());
+        for (int i = 0; i < max; i++) {
+            RecentStore.Entry e = recent.get(i);
+            root.addView(recentRow(e));
+        }
+    }
+
+    private View recentRow(RecentStore.Entry entry) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.HORIZONTAL);
+        box.setGravity(Gravity.CENTER_VERTICAL);
+        box.setPadding(dp(14), dp(12), dp(12), dp(12));
+        GradientDrawable bg = rounded(Color.WHITE, dp(15));
+        bg.setStroke(dp(1), Color.rgb(231, 233, 240));
+        box.setBackground(bg);
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.addView(text(entry.name.isBlank() ? "Файл" : entry.name, 15, TEXT, true));
+        TextView sub = text(entry.mime.isBlank() ? "Результат" : entry.mime, 12, MUTED, false);
+        sub.setPadding(0, dp(2), 0, 0);
+        copy.addView(sub);
+        box.addView(copy, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView menu = text("⋮", 26, BLUE, true);
+        menu.setGravity(Gravity.CENTER);
+        box.addView(menu, new LinearLayout.LayoutParams(dp(42), dp(46)));
+        box.setOnClickListener(v -> showRecentActions(entry));
+        box.setLayoutParams(marginParams(0, 0, 0, 8));
+        return box;
+    }
+
+    private void showRecentActions(RecentStore.Entry entry) {
+        new AlertDialog.Builder(this).setTitle(entry.name)
+                .setItems(new String[]{"Открыть", "Поделиться"}, (d, which) -> {
+                    if (which == 0) openResult(entry.uri); else shareResult(entry.uri);
+                }).setNegativeButton("Закрыть", null).show();
     }
 
     private void renderCategory(String id) {
@@ -134,27 +182,24 @@ public class MainActivity extends AppCompatActivity {
         ScrollView scroll = baseScroll();
         LinearLayout root = contentRoot();
         scroll.addView(root);
-
         String title;
         String subtitle;
         switch (id) {
-            case "scan" -> { title = "Сканер и OCR"; subtitle = "Сканируйте и распознавайте текст полностью на устройстве"; }
-            case "sign" -> { title = "Подписи PDF"; subtitle = "Рукописная и электронная подпись, плюс проверка"; }
+            case "scan" -> { title = "Сканер и OCR"; subtitle = "Сканирование и распознавание на устройстве"; }
+            case "sign" -> { title = "Подписи PDF"; subtitle = "Рукописная и электронная подпись"; }
             case "docs" -> { title = "Документы и текст"; subtitle = "Word, ODT, TXT, HTML, Markdown и RTF"; }
             case "sheets" -> { title = "Таблицы"; subtitle = "XLSX, CSV и TSV"; }
             case "slides" -> { title = "Презентации"; subtitle = "Извлечение текста и экспорт PPTX"; }
-            case "images" -> { title = "Изображения"; subtitle = "Сжатие, размер, поворот и Ч/Б"; }
-            case "archives" -> { title = "Архиватор"; subtitle = "ZIP, 7Z, TAR и защищённые архивы"; }
-            default -> { title = "PDF"; subtitle = "Страницы, конвертация, сжатие и защита"; }
+            case "images" -> { title = "Изображения"; subtitle = "Сжатие, crop, flip, convert и batch"; }
+            case "archives" -> { title = "Архиватор"; subtitle = "Создание, просмотр и распаковка архивов"; }
+            default -> { title = "PDF"; subtitle = "Страницы, crop, изображения, сжатие и защита"; }
         }
-
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setPadding(0, dp(4), 0, dp(10));
         TextView back = text("←", 30, TEXT, false);
         back.setGravity(Gravity.CENTER);
-        back.setPadding(dp(2), dp(4), dp(16), dp(4));
         back.setOnClickListener(v -> renderHome());
         top.addView(back, new LinearLayout.LayoutParams(dp(54), dp(54)));
         LinearLayout names = new LinearLayout(this);
@@ -165,12 +210,10 @@ public class MainActivity extends AppCompatActivity {
         names.addView(sub);
         top.addView(names, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         root.addView(top);
-
         TextView local = text("✓  Без загрузки файлов в интернет", 13, GREEN, true);
         local.setPadding(dp(12), dp(9), dp(12), dp(9));
         local.setBackground(rounded(Color.rgb(233, 249, 244), dp(12)));
         root.addView(local, marginParams(0, 0, 0, 16));
-
         switch (id) {
             case "scan" -> addScanTools(root);
             case "sign" -> addSignTools(root);
@@ -186,77 +229,86 @@ public class MainActivity extends AppCompatActivity {
 
     private void addScanTools(LinearLayout root) {
         root.addView(tool("Сканировать камерой", "Фото документа → улучшение → JPG + PDF", v -> captureScan()));
-        root.addView(tool("Улучшить фото документа", "Автообрезка полей, Ч/Б и повышение контраста", v -> pick(false, "image/*", "scan_photo")));
-        root.addView(tool("OCR фото RU + EN", "Фото → TXT. Обе языковые модели уже внутри APK", v -> pick(false, "image/*", "ocr")));
-        root.addView(tool("OCR целого PDF RU + EN", "Распознать текст на каждой странице PDF", v -> pick(false, "application/pdf", "ocr_pdf")));
+        root.addView(tool("Улучшить фото документа", "Автообрезка полей, Ч/Б и контраст", v -> pick(false, "image/*", "scan_photo")));
+        root.addView(tool("OCR фото RU + EN", "Фото → TXT, модели внутри APK", v -> pick(false, "image/*", "ocr")));
+        root.addView(tool("OCR целого PDF RU + EN", "Распознать каждую страницу PDF", v -> pick(false, "application/pdf", "ocr_pdf")));
     }
 
     private void addPdfTools(LinearLayout root) {
         root.addView(section("Страницы и конвертация", null));
-        root.addView(tool("Объединить PDF", "Склеить несколько PDF в один", v -> pick(true, "application/pdf", "merge_pdf")));
+        root.addView(tool("Объединить PDF", "Склеить несколько PDF", v -> pick(true, "application/pdf", "merge_pdf")));
         root.addView(tool("Разделить PDF", "Каждая страница — отдельный PDF", v -> pick(false, "application/pdf", "split_pdf")));
         root.addView(tool("Извлечь страницы", "Например: 1,3,5-8", v -> pick(false, "application/pdf", "extract_pages")));
-        root.addView(tool("Удалить страницы", "Удалить выбранные номера или диапазоны", v -> pick(false, "application/pdf", "remove_pages")));
+        root.addView(tool("Удалить страницы", "Удалить номера или диапазоны", v -> pick(false, "application/pdf", "remove_pages")));
         root.addView(tool("Повернуть PDF на 90°", "Повернуть все страницы", v -> pick(false, "application/pdf", "rotate_pdf")));
-        root.addView(tool("Обратный порядок страниц", "Последняя страница станет первой", v -> pick(false, "application/pdf", "reverse_pdf")));
-        root.addView(tool("Добавить номера страниц", "Нумерация по центру снизу", v -> pick(false, "application/pdf", "page_numbers")));
+        root.addView(tool("Обратный порядок страниц", "Последняя станет первой", v -> pick(false, "application/pdf", "reverse_pdf")));
+        root.addView(tool("Добавить номера страниц", "По центру снизу", v -> pick(false, "application/pdf", "page_numbers")));
+        root.addView(tool("Обрезать поля PDF", "Убрать одинаковый процент со всех краёв", v -> pick(false, "application/pdf", "crop_pdf")));
+        root.addView(tool("Извлечь встроенные изображения", "Сохранить картинки из PDF как PNG", v -> pick(false, "application/pdf", "extract_pdf_images")));
         root.addView(tool("Фото → PDF", "Несколько JPG/PNG в один документ", v -> pick(true, "image/*", "images_pdf")));
-        root.addView(tool("PDF → JPG", "Экспорт всех страниц в изображения", v -> pick(false, "application/pdf", "pdf_jpg")));
-        root.addView(tool("PDF → TXT", "Извлечь встроенный текст без OCR", v -> pick(false, "application/pdf", "pdf_text")));
-
+        root.addView(tool("PDF → JPG", "Экспорт всех страниц", v -> pick(false, "application/pdf", "pdf_jpg")));
+        root.addView(tool("PDF → TXT", "Извлечь встроенный текст", v -> pick(false, "application/pdf", "pdf_text")));
         root.addView(section("Обработка и защита", null));
         root.addView(tool("Сжать PDF", "Три уровня сжатия", v -> pick(false, "application/pdf", "compress_pdf")));
-        root.addView(tool("Пересобрать / восстановить PDF", "Повторно разобрать структуру и сохранить новый файл", v -> pick(false, "application/pdf", "repair_pdf")));
-        root.addView(tool("Водяной знак", "Текст на каждой странице, включая кириллицу", v -> pick(false, "application/pdf", "watermark_pdf")));
-        root.addView(tool("Очистить метаданные PDF", "Удалить свойства документа и XMP-метаданные", v -> pick(false, "application/pdf", "clean_metadata")));
-        root.addView(tool("Сравнить два PDF", "Текстовое сравнение и отчёт о различиях", v -> pick(true, "application/pdf", "compare_pdf")));
-        root.addView(tool("Защитить PDF паролем", "Локальное 128-битное шифрование PDF", v -> pick(false, "application/pdf", "protect_pdf")));
-        root.addView(tool("Снять известный пароль PDF", "Нужен действующий пароль документа", v -> pick(false, "application/pdf", "unlock_pdf")));
+        root.addView(tool("Пересобрать / восстановить PDF", "Повторно сохранить структуру", v -> pick(false, "application/pdf", "repair_pdf")));
+        root.addView(tool("Водяной знак", "Текст на каждой странице", v -> pick(false, "application/pdf", "watermark_pdf")));
+        root.addView(tool("Очистить метаданные", "Удалить свойства и XMP", v -> pick(false, "application/pdf", "clean_metadata")));
+        root.addView(tool("Сравнить два PDF", "Текстовый отчёт различий", v -> pick(true, "application/pdf", "compare_pdf")));
+        root.addView(tool("Защитить PDF паролем", "Локальное шифрование", v -> pick(false, "application/pdf", "protect_pdf")));
+        root.addView(tool("Снять известный пароль", "Нужен действующий пароль", v -> pick(false, "application/pdf", "unlock_pdf")));
     }
 
     private void addSignTools(LinearLayout root) {
-        root.addView(tool("Рукописная подпись", "Нарисовать пальцем и встроить видимую подпись", v -> pick(false, "application/pdf", "sign_pdf")));
-        root.addView(tool("Электронная подпись PKCS#12", "PDF + .p12/.pfx + пароль → CMS/PKCS#7 подпись", v -> pick(false, "application/pdf", "crypto_sign_pdf")));
-        root.addView(tool("Проверить электронные подписи", "Локальная криптографическая проверка CMS внутри PDF", v -> pick(false, "application/pdf", "verify_signatures")));
+        root.addView(tool("Рукописная подпись", "Нарисовать пальцем и встроить в PDF", v -> pick(false, "application/pdf", "sign_pdf")));
+        root.addView(tool("Электронная подпись PKCS#12", ".p12/.pfx + пароль → CMS/PKCS#7", v -> pick(false, "application/pdf", "crypto_sign_pdf")));
+        root.addView(tool("Проверить электронные подписи", "Локальная криптографическая проверка", v -> pick(false, "application/pdf", "verify_signatures")));
     }
 
     private void addDocumentTools(LinearLayout root) {
-        root.addView(tool("DOCX → TXT", "Извлечение текста Word полностью офлайн", v -> pick(false, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx_txt")));
+        root.addView(tool("DOCX → TXT", "Извлечь текст Word", v -> pick(false, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx_txt")));
         root.addView(tool("DOCX → PDF", "Текстовый экспорт; сложная верстка упрощается", v -> pick(false, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx_pdf")));
         root.addView(tool("ODT → TXT", "Извлечь текст OpenDocument", v -> pick(false, "application/vnd.oasis.opendocument.text", "odt_txt")));
-        root.addView(tool("ODT → PDF", "Локальный текстовый экспорт OpenDocument", v -> pick(false, "application/vnd.oasis.opendocument.text", "odt_pdf")));
-        root.addView(tool("TXT / HTML / Markdown / RTF → PDF", "Создать PDF из текста без облака", v -> pick(false, "*/*", "text_pdf")));
-        root.addView(tool("HTML / Markdown / RTF → TXT", "Очистить разметку и сохранить текст", v -> pick(false, "*/*", "text_txt")));
-        root.addView(tool("TXT / Markdown / HTML → DOCX", "Создать обычный Word-документ", v -> pick(false, "*/*", "text_docx")));
+        root.addView(tool("ODT → PDF", "Локальный текстовый экспорт", v -> pick(false, "application/vnd.oasis.opendocument.text", "odt_pdf")));
+        root.addView(tool("TXT / HTML / Markdown / RTF → PDF", "Создать PDF из текста", v -> pick(false, "*/*", "text_pdf")));
+        root.addView(tool("HTML / Markdown / RTF → TXT", "Очистить разметку", v -> pick(false, "*/*", "text_txt")));
+        root.addView(tool("TXT / Markdown / HTML → DOCX", "Создать Word-документ", v -> pick(false, "*/*", "text_docx")));
         root.addView(tool("TXT / Markdown / HTML → ODT", "Создать OpenDocument Text", v -> pick(false, "*/*", "text_odt")));
     }
 
     private void addPresentationTools(LinearLayout root) {
         root.addView(tool("PPTX → TXT", "Извлечь текст по слайдам", v -> pick(false, "application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx_txt")));
-        root.addView(tool("PPTX → PDF", "Текст слайдов → PDF; визуальная верстка упрощается", v -> pick(false, "application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx_pdf")));
+        root.addView(tool("PPTX → PDF", "Текст слайдов → PDF", v -> pick(false, "application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx_pdf")));
     }
 
     private void addSheetTools(LinearLayout root) {
         root.addView(tool("XLSX → CSV", "Первый лист → UTF-8 CSV", v -> pick(false, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx_csv")));
-        root.addView(tool("CSV / TSV → XLSX", "Автоопределение запятой, ; или табуляции", v -> pick(false, "*/*", "csv_xlsx")));
-        root.addView(tool("XLSX → PDF", "Первый лист → читаемый текстовый PDF", v -> pick(false, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx_pdf")));
+        root.addView(tool("CSV / TSV → XLSX", "Автоопределение разделителя", v -> pick(false, "*/*", "csv_xlsx")));
+        root.addView(tool("XLSX → PDF", "Первый лист → PDF", v -> pick(false, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx_pdf")));
     }
 
     private void addImageTools(LinearLayout root) {
-        root.addView(tool("Сжать изображение", "JPEG 78% для быстрой отправки", v -> pick(false, "image/*", "image_compress")));
-        root.addView(tool("Изменить размер", "Указать максимальную сторону в пикселях", v -> pick(false, "image/*", "image_resize")));
+        root.addView(section("Один файл", null));
+        root.addView(tool("Сжать изображение", "JPEG 78%", v -> pick(false, "image/*", "image_compress")));
+        root.addView(tool("Изменить размер", "Указать максимальную сторону", v -> pick(false, "image/*", "image_resize")));
+        root.addView(tool("Обрезать края", "Убрать одинаковый процент со всех сторон", v -> pick(false, "image/*", "image_crop")));
         root.addView(tool("Повернуть на 90°", "Сохранить новую копию", v -> pick(false, "image/*", "image_rotate")));
-        root.addView(tool("Сделать Ч/Б", "Локальная конвертация в оттенки серого", v -> pick(false, "image/*", "image_gray")));
+        root.addView(tool("Отразить по горизонтали", "Зеркальная копия", v -> pick(false, "image/*", "image_flip")));
+        root.addView(tool("Сделать Ч/Б", "Оттенки серого", v -> pick(false, "image/*", "image_gray")));
+        root.addView(tool("Конвертировать JPG / PNG / WebP", "Выбрать выходной формат", v -> pick(false, "image/*", "image_convert")));
+        root.addView(section("Пакетно", null));
+        root.addView(tool("Сжать несколько изображений", "Обработать выбранные файлы подряд", v -> pick(true, "image/*", "image_batch_compress")));
+        root.addView(tool("Конвертировать несколько", "JPG / PNG / WebP", v -> pick(true, "image/*", "image_batch_convert")));
     }
 
     private void addArchiveTools(LinearLayout root) {
+        root.addView(tool("Посмотреть содержимое ZIP / 7Z / RAR", "Список файлов без распаковки", v -> pick(false, "*/*", "archive_list")));
         root.addView(section("Создать архив", null));
         root.addView(tool("Создать ZIP", "Упаковать несколько файлов", v -> pick(true, "*/*", "zip")));
-        root.addView(tool("ZIP с паролем AES-256", "Защищённый архив без внешних сервисов", v -> pick(true, "*/*", "zip_password")));
+        root.addView(tool("ZIP с паролем AES-256", "Защищённый архив", v -> pick(true, "*/*", "zip_password")));
         root.addView(tool("Создать 7Z", "Локальное LZMA2-сжатие", v -> pick(true, "*/*", "7z")));
         root.addView(tool("Создать TAR.GZ", "Совместимый gzip-архив", v -> pick(true, "*/*", "targz")));
         root.addView(section("Распаковать", null));
-        root.addView(tool("Распаковать ZIP / 7Z / RAR", "Распаковка в Загрузки/ФайлМастер", v -> pick(false, "*/*", "extract")));
+        root.addView(tool("Распаковать ZIP / 7Z / RAR", "В Загрузки/ФайлМастер", v -> pick(false, "*/*", "extract")));
         root.addView(tool("Распаковать ZIP с паролем", "AES/ZipCrypto при известном пароле", v -> pick(false, "application/zip", "extract_zip_password")));
         root.addView(tool("Распаковать TAR / GZ / BZ2 / XZ", "Также TAR.GZ, TAR.BZ2 и TAR.XZ", v -> pick(false, "*/*", "extract_extra")));
     }
@@ -302,8 +354,6 @@ public class MainActivity extends AppCompatActivity {
         bg.setStroke(dp(1), Color.rgb(230, 232, 239));
         box.setBackground(bg);
         box.setOnClickListener(listener);
-        box.setClickable(true);
-        box.setFocusable(true);
         box.addView(text(title, 16, TEXT, true));
         TextView s = text(subtitle, 13, MUTED, false);
         s.setPadding(0, dp(3), 0, 0);
@@ -311,7 +361,7 @@ public class MainActivity extends AppCompatActivity {
         return box;
     }
 
-    private View category(String badge, String title, String subtitle, int tint, int accent, View.OnClickListener listener) {
+    private View category(String badge, String title, String subtitle, String count, int tint, int accent, View.OnClickListener listener) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.HORIZONTAL);
         box.setGravity(Gravity.CENTER_VERTICAL);
@@ -320,27 +370,22 @@ public class MainActivity extends AppCompatActivity {
         bg.setStroke(dp(1), Color.rgb(231, 233, 240));
         box.setBackground(bg);
         box.setOnClickListener(listener);
-        box.setClickable(true);
-        box.setFocusable(true);
-
         TextView icon = text(badge, badge.length() > 3 ? 11 : 12, accent, true);
         icon.setGravity(Gravity.CENTER);
         icon.setBackground(rounded(tint, dp(14)));
         box.addView(icon, new LinearLayout.LayoutParams(dp(54), dp(54)));
-
         LinearLayout names = new LinearLayout(this);
         names.setOrientation(LinearLayout.VERTICAL);
         names.setPadding(dp(13), 0, dp(8), 0);
         names.addView(text(title, 17, TEXT, true));
         TextView s = text(subtitle, 13, MUTED, false);
-        s.setPadding(0, dp(3), 0, 0);
+        s.setPadding(0, dp(2), 0, 0);
         names.addView(s);
+        names.addView(text(count, 11, accent, true));
         box.addView(names, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
         TextView arrow = text("›", 29, Color.rgb(160, 165, 177), false);
         arrow.setGravity(Gravity.CENTER);
         box.addView(arrow, new LinearLayout.LayoutParams(dp(28), dp(54)));
-
         box.setLayoutParams(marginParams(0, 0, 0, 10));
         return box;
     }
@@ -373,7 +418,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-
         if (requestCode == CAMERA_CAPTURE) {
             if (resultCode == RESULT_OK && cameraUri != null) {
                 Uri raw = cameraUri;
@@ -390,7 +434,6 @@ public class MainActivity extends AppCompatActivity {
             cameraUri = null;
             return;
         }
-
         if (resultCode != RESULT_OK || data == null) return;
         if (requestCode == DRAW_SIGNATURE) {
             String path = data.getStringExtra("signature_path");
@@ -400,7 +443,6 @@ public class MainActivity extends AppCompatActivity {
             }
             return;
         }
-
         List<Uri> uris = collectUris(data);
         if (uris.isEmpty()) return;
         Uri first = uris.get(0);
@@ -413,6 +455,13 @@ public class MainActivity extends AppCompatActivity {
                 case "rotate_pdf" -> runTask("Поворачиваю страницы…", () -> PdfTools.rotateAll(this, first, 90), "PDF повёрнут");
                 case "reverse_pdf" -> runTask("Меняю порядок…", () -> PdfTools.reversePages(this, first), "Порядок страниц изменён");
                 case "page_numbers" -> runTask("Добавляю номера…", () -> PdfTools.addPageNumbers(this, first), "Номера страниц добавлены");
+                case "crop_pdf" -> ask("Обрезать поля на сколько %?", "Например: 5", false, value -> {
+                    try {
+                        float p = Float.parseFloat(value.trim().replace(',', '.'));
+                        runTask("Обрезаю поля PDF…", () -> PdfExtraTools.cropMargins(this, first, p), "PDF обрезан");
+                    } catch (NumberFormatException e) { showError(new IllegalArgumentException("Введите число от 1 до 34")); }
+                });
+                case "extract_pdf_images" -> runTask("Извлекаю изображения…", () -> PdfExtraTools.extractEmbeddedImages(this, first), "Изображения сохранены");
                 case "pdf_text" -> runTask("Извлекаю текст…", () -> PdfTools.extractText(this, first), "TXT сохранён");
                 case "images_pdf" -> runTask("Создаю PDF…", () -> PdfTools.imagesToPdf(this, uris), "PDF создан");
                 case "pdf_jpg" -> runTask("Экспортирую страницы…", () -> PdfTools.pdfToJpeg(this, first), "Страницы сохранены как JPG");
@@ -427,17 +476,24 @@ public class MainActivity extends AppCompatActivity {
                 case "crypto_sign_pdf" -> { pendingCryptoPdf = first; pick(false, "*/*", "crypto_pick_cert"); }
                 case "crypto_pick_cert" -> {
                     Uri pdf = pendingCryptoPdf;
-                    Uri cert = first;
                     if (pdf == null) throw new IllegalStateException("Сначала выберите PDF");
-                    ask("Пароль сертификата", "Пароль .p12/.pfx", true, value -> runTask("Создаю электронную подпись…", () -> DigitalSignatureTools.signPdf(this, pdf, cert, value), "Электронно подписанный PDF сохранён"));
+                    ask("Пароль сертификата", "Пароль .p12/.pfx", true, value -> runTask("Создаю электронную подпись…", () -> DigitalSignatureTools.signPdf(this, pdf, first, value), "Электронно подписанный PDF сохранён"));
                 }
-                case "verify_signatures" -> runTask("Проверяю электронные подписи…", () -> DigitalSignatureTools.verifyPdf(this, first), "Отчёт проверки сохранён");
+                case "verify_signatures" -> runTask("Проверяю подписи…", () -> DigitalSignatureTools.verifyPdf(this, first), "Отчёт проверки сохранён");
                 case "ocr" -> runOcr(first);
                 case "ocr_pdf" -> runTask("Распознаю страницы PDF…", () -> OcrTools.recognizePdfToTxt(this, first), "OCR PDF сохранён в TXT");
                 case "scan_photo" -> runTask("Улучшаю документ…", () -> ImageTools.enhanceDocument(this, first), "Улучшенный скан сохранён");
                 case "image_compress" -> runTask("Сжимаю изображение…", () -> ImageTools.compress(this, first, 78), "Сжатая копия сохранена");
+                case "image_batch_compress" -> runTask("Сжимаю изображения…", () -> ImageTools.compressBatch(this, uris, 78), "Изображения сжаты");
                 case "image_rotate" -> runTask("Поворачиваю изображение…", () -> ImageTools.rotate90(this, first), "Повернутая копия сохранена");
+                case "image_flip" -> runTask("Отражаю изображение…", () -> ImageTools.flipHorizontal(this, first), "Зеркальная копия сохранена");
                 case "image_gray" -> runTask("Преобразую изображение…", () -> ImageTools.grayscale(this, first), "Ч/Б копия сохранена");
+                case "image_crop" -> ask("Обрезать края на сколько %?", "Например: 10", false, value -> {
+                    try {
+                        int p = Integer.parseInt(value.trim());
+                        runTask("Обрезаю изображение…", () -> ImageTools.cropMargins(this, first, p), "Обрезанная копия сохранена");
+                    } catch (NumberFormatException e) { showError(new IllegalArgumentException("Введите число от 1 до 35")); }
+                });
                 case "image_resize" -> ask("Максимальная сторона", "Например: 1600", false, value -> {
                     try {
                         int size = Integer.parseInt(value.trim());
@@ -445,6 +501,8 @@ public class MainActivity extends AppCompatActivity {
                         runTask("Меняю размер…", () -> ImageTools.resize(this, first, size), "Изображение сохранено");
                     } catch (NumberFormatException e) { showError(new IllegalArgumentException("Введите число от 320 до 8000")); }
                 });
+                case "image_convert" -> chooseImageFormat(false, uris);
+                case "image_batch_convert" -> chooseImageFormat(true, uris);
                 case "docx_txt" -> runTask("Извлекаю текст DOCX…", () -> DocxTools.toTxt(this, first), "TXT сохранён");
                 case "docx_pdf" -> runTask("Создаю PDF из DOCX…", () -> DocxTools.toPdf(this, first), "PDF сохранён");
                 case "odt_txt" -> runTask("Извлекаю текст ODT…", () -> OpenDocumentTools.odtToTxt(this, first), "TXT сохранён");
@@ -458,6 +516,7 @@ public class MainActivity extends AppCompatActivity {
                 case "xlsx_csv" -> runTask("Конвертирую XLSX…", () -> SheetTools.xlsxToCsv(this, first), "CSV сохранён");
                 case "csv_xlsx" -> runTask("Создаю XLSX…", () -> SheetTools.csvToXlsx(this, first), "XLSX сохранён");
                 case "xlsx_pdf" -> runTask("Создаю PDF таблицы…", () -> SheetTools.xlsxToPdf(this, first), "PDF сохранён");
+                case "archive_list" -> runTextTask("Читаю архив…", () -> ArchiveTools.listContents(this, first), "Содержимое архива");
                 case "zip" -> runTask("Создаю ZIP…", () -> ArchiveTools.createZip(this, uris), "ZIP создан");
                 case "zip_password" -> ask("Пароль ZIP", "AES-256, минимум 4 символа", true, value -> runTask("Создаю защищённый ZIP…", () -> ArchiveTools.createEncryptedZip(this, uris, value), "Защищённый ZIP создан"));
                 case "7z" -> runTask("Создаю 7Z…", () -> ArchiveTools.create7z(this, uris), "7Z создан");
@@ -467,6 +526,16 @@ public class MainActivity extends AppCompatActivity {
                 case "extract_extra" -> runTask("Распаковываю архив…", () -> ArchiveExtraTools.extract(this, first), "Архив распакован");
             }
         } catch (Exception e) { showError(e); }
+    }
+
+    private void chooseImageFormat(boolean batch, List<Uri> uris) {
+        String[] labels = {"JPG", "PNG", "WebP"};
+        String[] formats = {"jpg", "png", "webp"};
+        new AlertDialog.Builder(this).setTitle("Выходной формат")
+                .setItems(labels, (d, which) -> {
+                    if (batch) runTask("Конвертирую изображения…", () -> ImageTools.convertBatch(this, uris, formats[which]), "Изображения конвертированы");
+                    else runTask("Конвертирую изображение…", () -> ImageTools.convert(this, uris.get(0), formats[which]), "Изображение конвертировано");
+                }).setNegativeButton("Отмена", null).show();
     }
 
     private void chooseCompression(Uri uri) {
@@ -487,19 +556,18 @@ public class MainActivity extends AppCompatActivity {
                 Uri out = FileStore.publishBytes(this, result.getBytes(StandardCharsets.UTF_8), "OCR_" + System.currentTimeMillis() + ".txt", "text/plain", null);
                 runOnUiThread(() -> {
                     dialog.dismiss();
-                    AlertDialog shown = new AlertDialog.Builder(this).setTitle("Распознанный текст")
+                    new AlertDialog.Builder(this).setTitle("Распознанный текст")
                             .setMessage(result.isBlank() ? "Текст не найден" : result)
                             .setPositiveButton("Готово", null)
                             .setNeutralButton("Копировать", (d, w) -> copyText(result))
-                            .setNegativeButton("Открыть TXT", (d, w) -> openResult(out))
-                            .create();
-                    shown.show();
+                            .setNegativeButton("Открыть TXT", (d, w) -> openResult(out)).show();
                 });
             } catch (Exception e) { runOnUiThread(() -> { dialog.dismiss(); showError(e); }); }
         });
     }
 
     private interface Work { Object run() throws Exception; }
+    private interface TextWork { String run() throws Exception; }
     private interface InputCallback { void onValue(String value); }
 
     private void runTask(String label, Work work, String success) {
@@ -519,14 +587,27 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void runTextTask(String label, TextWork work, String title) {
+        ProgressDialog dialog = ProgressDialog.show(this, "ФайлМастер", label, true, false);
+        worker.submit(() -> {
+            try {
+                String result = work.run();
+                runOnUiThread(() -> {
+                    dialog.dismiss();
+                    new AlertDialog.Builder(this).setTitle(title).setMessage(result)
+                            .setPositiveButton("Закрыть", null)
+                            .setNeutralButton("Копировать", (d, w) -> copyText(result)).show();
+                });
+            } catch (Exception e) { runOnUiThread(() -> { dialog.dismiss(); showError(e); }); }
+        });
+    }
+
     private void showSuccess(String success, Uri uri) {
-        new AlertDialog.Builder(this)
-                .setTitle("Готово")
+        new AlertDialog.Builder(this).setTitle("Готово")
                 .setMessage(success + "\n\nФайл находится в «Загрузки / ФайлМастер».")
                 .setPositiveButton("Открыть", (d, w) -> openResult(uri))
                 .setNeutralButton("Поделиться", (d, w) -> shareResult(uri))
-                .setNegativeButton("Закрыть", null)
-                .show();
+                .setNegativeButton("Закрыть", null).show();
     }
 
     private void openResult(Uri uri) {
@@ -536,9 +617,7 @@ public class MainActivity extends AppCompatActivity {
             i.setDataAndType(uri, mime == null ? "*/*" : mime);
             i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(Intent.createChooser(i, "Открыть файл"));
-        } catch (Exception e) {
-            Toast.makeText(this, "Файл сохранён в Загрузки/ФайлМастер", Toast.LENGTH_LONG).show();
-        }
+        } catch (Exception e) { Toast.makeText(this, "Файл недоступен или был удалён", Toast.LENGTH_LONG).show(); }
     }
 
     private void shareResult(Uri uri) {
@@ -549,15 +628,13 @@ public class MainActivity extends AppCompatActivity {
             i.putExtra(Intent.EXTRA_STREAM, uri);
             i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(Intent.createChooser(i, "Поделиться файлом"));
-        } catch (Exception e) {
-            showError(new IllegalStateException("Не удалось открыть меню отправки"));
-        }
+        } catch (Exception e) { showError(new IllegalStateException("Не удалось открыть меню отправки")); }
     }
 
     private void copyText(String value) {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("OCR", value));
-        Toast.makeText(this, "Текст скопирован", Toast.LENGTH_SHORT).show();
+        clipboard.setPrimaryClip(ClipData.newPlainText("ФайлМастер", value));
+        Toast.makeText(this, "Скопировано", Toast.LENGTH_SHORT).show();
     }
 
     private void ask(String title, String hint, boolean password, InputCallback callback) {
@@ -571,8 +648,7 @@ public class MainActivity extends AppCompatActivity {
                     String value = edit.getText().toString();
                     if (value.isBlank()) showError(new IllegalArgumentException("Поле не должно быть пустым"));
                     else callback.onValue(value);
-                })
-                .setNegativeButton("Отмена", null).show();
+                }).setNegativeButton("Отмена", null).show();
     }
 
     private List<Uri> collectUris(Intent data) {
@@ -585,25 +661,27 @@ public class MainActivity extends AppCompatActivity {
 
     private void showPdfQuickActions(Uri uri) {
         new AlertDialog.Builder(this).setTitle("Что сделать с PDF?")
-                .setItems(new String[]{"Подписать пальцем", "Электронная подпись", "Сжать", "Разделить", "PDF → JPG", "PDF → TXT", "OCR PDF", "Проверить подписи"}, (d, which) -> {
+                .setItems(new String[]{"Подписать пальцем", "Электронная подпись", "Сжать", "Обрезать поля", "Извлечь картинки", "Разделить", "PDF → JPG", "OCR PDF", "Проверить подписи"}, (d, which) -> {
                     pendingPdf = uri;
                     if (which == 0) startActivityForResult(new Intent(this, SignatureActivity.class), DRAW_SIGNATURE);
                     else if (which == 1) { pendingCryptoPdf = uri; pick(false, "*/*", "crypto_pick_cert"); }
                     else if (which == 2) chooseCompression(uri);
-                    else if (which == 3) runTask("Разделяю PDF…", () -> PdfTools.split(this, uri), "Страницы сохранены");
-                    else if (which == 4) runTask("Экспортирую страницы…", () -> PdfTools.pdfToJpeg(this, uri), "JPG сохранены");
-                    else if (which == 5) runTask("Извлекаю текст…", () -> PdfTools.extractText(this, uri), "TXT сохранён");
-                    else if (which == 6) runTask("Распознаю PDF…", () -> OcrTools.recognizePdfToTxt(this, uri), "OCR сохранён");
+                    else if (which == 3) ask("Обрезать поля на сколько %?", "Например: 5", false, value -> {
+                        try { float p = Float.parseFloat(value.trim().replace(',', '.')); runTask("Обрезаю поля…", () -> PdfExtraTools.cropMargins(this, uri, p), "PDF обрезан"); }
+                        catch (Exception e) { showError(new IllegalArgumentException("Введите число от 1 до 34")); }
+                    });
+                    else if (which == 4) runTask("Извлекаю изображения…", () -> PdfExtraTools.extractEmbeddedImages(this, uri), "Изображения сохранены");
+                    else if (which == 5) runTask("Разделяю PDF…", () -> PdfTools.split(this, uri), "Страницы сохранены");
+                    else if (which == 6) runTask("Экспортирую страницы…", () -> PdfTools.pdfToJpeg(this, uri), "JPG сохранены");
+                    else if (which == 7) runTask("Распознаю PDF…", () -> OcrTools.recognizePdfToTxt(this, uri), "OCR сохранён");
                     else runTask("Проверяю подписи…", () -> DigitalSignatureTools.verifyPdf(this, uri), "Отчёт сохранён");
                 }).setNegativeButton("Закрыть", null).show();
     }
 
     private void showAbout() {
-        new AlertDialog.Builder(this)
-                .setTitle("ФайлМастер")
-                .setMessage("Все основные операции выполняются локально на устройстве. Файлы не загружаются на сервер. OCR-модели русского и английского языков находятся внутри APK.\n\nРезультаты: Загрузки / ФайлМастер")
-                .setPositiveButton("Понятно", null)
-                .show();
+        new AlertDialog.Builder(this).setTitle("ФайлМастер 0.5")
+                .setMessage("Основные операции выполняются локально. Файлы не загружаются на сервер. OCR русского и английского языков уже находится внутри APK.\n\nРезультаты: Загрузки / ФайлМастер")
+                .setPositiveButton("Понятно", null).show();
     }
 
     private void showError(Exception e) {
@@ -634,9 +712,6 @@ public class MainActivity extends AppCompatActivity {
         bg.setStroke(dp(1), Color.rgb(231, 233, 240));
         box.setBackground(bg);
         box.setOnClickListener(listener);
-        box.setClickable(true);
-        box.setFocusable(true);
-
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
         copy.addView(text(title, 16, TEXT, true));
@@ -644,7 +719,6 @@ public class MainActivity extends AppCompatActivity {
         s.setPadding(0, dp(3), 0, 0);
         copy.addView(s);
         box.addView(copy, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
         TextView arrow = text("›", 28, Color.rgb(166, 171, 183), false);
         arrow.setGravity(Gravity.CENTER);
         box.addView(arrow, new LinearLayout.LayoutParams(dp(26), dp(48)));
@@ -685,8 +759,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (categoryOpen) renderHome();
-        else super.onBackPressed();
+        if (categoryOpen) renderHome(); else super.onBackPressed();
     }
 
     @Override
