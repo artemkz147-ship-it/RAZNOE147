@@ -108,7 +108,7 @@ public class PdfFormActivity extends AppCompatActivity {
             try {
                 input = FileStore.copyUriToTemp(this, pdfUri, ".pdf");
                 List<FieldInfo> fields = new ArrayList<>();
-                int[] unsupported = {0};
+                int unsupported = 0;
                 try (PDDocument doc = PDDocument.load(input)) {
                     PDAcroForm form = doc.getDocumentCatalog().getAcroForm();
                     if (form == null) throw new IllegalArgumentException("В этом PDF нет интерактивной формы");
@@ -118,17 +118,17 @@ public class PdfFormActivity extends AppCompatActivity {
                             if (name == null || name.isBlank()) name = "Поле " + (fields.size() + 1);
                             String value = field.getValueAsString();
                             fields.add(new FieldInfo(name, value == null ? "" : value));
-                        } else if (field.getKids() == null || field.getKids().isEmpty()) {
-                            unsupported[0]++;
+                        } else {
+                            unsupported++;
                         }
                     }
                 }
                 if (fields.isEmpty()) {
-                    throw new IllegalArgumentException(unsupported[0] > 0
-                            ? "Текстовых полей нет. Найдены только другие типы полей: " + unsupported[0]
+                    throw new IllegalArgumentException(unsupported > 0
+                            ? "Текстовых полей нет. Найдены только другие типы полей: " + unsupported
                             : "Текстовые поля формы не найдены");
                 }
-                int other = unsupported[0];
+                int other = unsupported;
                 runOnUiThread(() -> showFields(fields, other));
             } catch (Exception e) {
                 runOnUiThread(() -> showLoadError(e));
