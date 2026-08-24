@@ -163,7 +163,7 @@ final class SheetTools {
         try (InputStream in = ctx.getContentResolver().openInputStream(uri); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             if (in == null) throw new IllegalArgumentException("Не удалось открыть таблицу");
             FileStore.copy(in, out);
-            return out.toString(StandardCharsets.UTF_8);
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
         }
     }
 
