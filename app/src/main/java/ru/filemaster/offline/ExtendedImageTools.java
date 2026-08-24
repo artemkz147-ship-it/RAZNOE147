@@ -30,10 +30,12 @@ final class ExtendedImageTools {
         }
         if (svg == null) throw new IllegalArgumentException("Некорректный SVG");
         float w = svg.getDocumentWidth(), h = svg.getDocumentHeight();
+        // AndroidSVG 1.4 exposes the viewBox through an internal Box type, so Java
+        // callers cannot safely depend on it. SVG files without explicit width/height
+        // are rendered onto a neutral 1024x1024 canvas instead.
         if (!(w > 0) || !(h > 0) || Float.isNaN(w) || Float.isNaN(h)) {
-            com.caverock.androidsvg.SVG.Box box = svg.getDocumentViewBox();
-            if (box != null && box.width > 0 && box.height > 0) { w = box.width; h = box.height; }
-            else { w = 1024; h = 1024; }
+            w = 1024f;
+            h = 1024f;
         }
         float scale = Math.min(1f, 4096f / Math.max(w, h));
         int width = Math.max(1, Math.round(w * scale)), height = Math.max(1, Math.round(h * scale));
