@@ -10,6 +10,7 @@
 
         <activity android:name=".ManualCropActivity" android:exported="false" />
         <activity android:name=".PdfVisualEditorActivity" android:exported="false" />
+        <activity android:name=".PdfFormDesignerActivity" android:exported="false" />
         <activity android:name=".PdfFormActivity" android:exported="false" />
         <activity android:name=".PdfRedactActivity" android:exported="false" />
         <activity android:name=".PdfAnnotateActivity" android:exported="false" />
