@@ -10,6 +10,7 @@ import android.net.Uri;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.List;
 
 final class ImageTools {
     private ImageTools() {}
@@ -17,17 +18,25 @@ final class ImageTools {
     static Uri compress(Context ctx, Uri uri, int quality) throws Exception {
         Bitmap bmp = loadScaled(ctx, uri, 3200);
         try {
-            return publishJpeg(ctx, bmp, quality, "Сжатое_" + System.currentTimeMillis() + ".jpg");
-        } finally {
-            bmp.recycle();
+            return publishBitmap(ctx, bmp, Bitmap.CompressFormat.JPEG, quality, "Сжатое_" + System.currentTimeMillis() + ".jpg", "image/jpeg");
+        } finally { bmp.recycle(); }
+    }
+
+    static int compressBatch(Context ctx, List<Uri> uris, int quality) throws Exception {
+        if (uris == null || uris.isEmpty()) throw new IllegalArgumentException("Не выбраны изображения");
+        int done = 0;
+        for (Uri uri : uris) {
+            compress(ctx, uri, quality);
+            done++;
         }
+        return done;
     }
 
     static Uri resize(Context ctx, Uri uri, int maxSide) throws Exception {
         Bitmap bmp = loadScaled(ctx, uri, Math.max(320, maxSide));
         Bitmap scaled = scaleToMax(bmp, maxSide);
         try {
-            return publishJpeg(ctx, scaled, 90, "Размер_" + maxSide + "_" + System.currentTimeMillis() + ".jpg");
+            return publishBitmap(ctx, scaled, Bitmap.CompressFormat.JPEG, 90, "Размер_" + maxSide + "_" + System.currentTimeMillis() + ".jpg", "image/jpeg");
         } finally {
             if (scaled != bmp) scaled.recycle();
             bmp.recycle();
@@ -40,9 +49,43 @@ final class ImageTools {
         matrix.postRotate(90f);
         Bitmap out = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), matrix, true);
         try {
-            return publishJpeg(ctx, out, 92, "Поворот_" + System.currentTimeMillis() + ".jpg");
+            return publishBitmap(ctx, out, Bitmap.CompressFormat.JPEG, 92, "Поворот_" + System.currentTimeMillis() + ".jpg", "image/jpeg");
         } finally {
-            out.recycle();
+            if (out != bmp) out.recycle();
+            bmp.recycle();
+        }
+    }
+
+    static Uri flipHorizontal(Context ctx, Uri uri) throws Exception {
+        Bitmap bmp = loadScaled(ctx, uri, 3200);
+        Matrix matrix = new Matrix();
+        matrix.setScale(-1f, 1f);
+        matrix.postTranslate(bmp.getWidth(), 0f);
+        Bitmap out = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), matrix, true);
+        try {
+            return publishBitmap(ctx, out, Bitmap.CompressFormat.JPEG, 92, "Отражение_" + System.currentTimeMillis() + ".jpg", "image/jpeg");
+        } finally {
+            if (out != bmp) out.recycle();
+            bmp.recycle();
+        }
+    }
+
+    static Uri cropMargins(Context ctx, Uri uri, int percent) throws Exception {
+        if (percent < 1 || percent > 35) throw new IllegalArgumentException("Укажите от 1 до 35 процентов");
+        Bitmap bmp = loadScaled(ctx, uri, 4000);
+        int dx = Math.round(bmp.getWidth() * percent / 100f);
+        int dy = Math.round(bmp.getHeight() * percent / 100f);
+        int width = bmp.getWidth() - dx * 2;
+        int height = bmp.getHeight() - dy * 2;
+        if (width < 64 || height < 64) {
+            bmp.recycle();
+            throw new IllegalArgumentException("После обрезки изображение получится слишком маленьким");
+        }
+        Bitmap out = Bitmap.createBitmap(bmp, dx, dy, width, height);
+        try {
+            return publishBitmap(ctx, out, Bitmap.CompressFormat.JPEG, 94, "Обрезанное_" + System.currentTimeMillis() + ".jpg", "image/jpeg");
+        } finally {
+            if (out != bmp) out.recycle();
             bmp.recycle();
         }
     }
@@ -51,11 +94,39 @@ final class ImageTools {
         Bitmap bmp = loadScaled(ctx, uri, 3200);
         Bitmap out = toGrayContrast(bmp, false);
         try {
-            return publishJpeg(ctx, out, 92, "ЧБ_" + System.currentTimeMillis() + ".jpg");
+            return publishBitmap(ctx, out, Bitmap.CompressFormat.JPEG, 92, "ЧБ_" + System.currentTimeMillis() + ".jpg", "image/jpeg");
         } finally {
             out.recycle();
             bmp.recycle();
         }
+    }
+
+    static Uri convert(Context ctx, Uri uri, String format) throws Exception {
+        if (format == null) throw new IllegalArgumentException("Не выбран формат");
+        Bitmap bmp = loadScaled(ctx, uri, 4096);
+        String f = format.trim().toLowerCase();
+        try {
+            if (f.equals("png")) {
+                return publishBitmap(ctx, bmp, Bitmap.CompressFormat.PNG, 100, "Конвертировано_" + System.currentTimeMillis() + ".png", "image/png");
+            }
+            if (f.equals("webp")) {
+                return publishBitmap(ctx, bmp, Bitmap.CompressFormat.WEBP, 92, "Конвертировано_" + System.currentTimeMillis() + ".webp", "image/webp");
+            }
+            if (f.equals("jpg") || f.equals("jpeg")) {
+                return publishBitmap(ctx, bmp, Bitmap.CompressFormat.JPEG, 92, "Конвертировано_" + System.currentTimeMillis() + ".jpg", "image/jpeg");
+            }
+            throw new IllegalArgumentException("Поддерживаются JPG, PNG и WebP");
+        } finally { bmp.recycle(); }
+    }
+
+    static int convertBatch(Context ctx, List<Uri> uris, String format) throws Exception {
+        if (uris == null || uris.isEmpty()) throw new IllegalArgumentException("Не выбраны изображения");
+        int done = 0;
+        for (Uri uri : uris) {
+            convert(ctx, uri, format);
+            done++;
+        }
+        return done;
     }
 
     static Uri enhanceDocument(Context ctx, Uri uri) throws Exception {
@@ -63,7 +134,7 @@ final class ImageTools {
         Bitmap cropped = autoCropDocument(bmp);
         Bitmap enhanced = toGrayContrast(cropped, true);
         try {
-            return publishJpeg(ctx, enhanced, 90, "Скан_" + System.currentTimeMillis() + ".jpg");
+            return publishBitmap(ctx, enhanced, Bitmap.CompressFormat.JPEG, 90, "Скан_" + System.currentTimeMillis() + ".jpg", "image/jpeg");
         } finally {
             enhanced.recycle();
             if (cropped != bmp) cropped.recycle();
@@ -98,7 +169,9 @@ final class ImageTools {
         int largest = Math.max(w, h);
         if (largest <= maxSide) return bmp;
         float s = maxSide / (float) largest;
-        return Bitmap.createScaledBitmap(bmp, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), true);
+        Bitmap out = Bitmap.createScaledBitmap(bmp, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), true);
+        if (out != bmp) bmp.recycle();
+        return out;
     }
 
     private static Bitmap autoCropDocument(Bitmap src) {
@@ -152,17 +225,16 @@ final class ImageTools {
         return out;
     }
 
-    private static Uri publishJpeg(Context ctx, Bitmap bmp, int quality, String name) throws Exception {
-        File out = File.createTempFile("fm_img_", ".jpg", ctx.getCacheDir());
+    private static Uri publishBitmap(Context ctx, Bitmap bmp, Bitmap.CompressFormat format, int quality, String name, String mime) throws Exception {
+        String suffix = name.toLowerCase().endsWith(".png") ? ".png" : name.toLowerCase().endsWith(".webp") ? ".webp" : ".jpg";
+        File out = File.createTempFile("fm_img_", suffix, ctx.getCacheDir());
         try (FileOutputStream fos = new FileOutputStream(out)) {
-            if (!bmp.compress(Bitmap.CompressFormat.JPEG, Math.max(20, Math.min(100, quality)), fos)) {
+            if (!bmp.compress(format, Math.max(20, Math.min(100, quality)), fos)) {
                 throw new IllegalStateException("Не удалось сохранить изображение");
             }
         }
         try {
-            return FileStore.publishFile(ctx, out, name, "image/jpeg", null);
-        } finally {
-            out.delete();
-        }
+            return FileStore.publishFile(ctx, out, name, mime, null);
+        } finally { out.delete(); }
     }
 }
