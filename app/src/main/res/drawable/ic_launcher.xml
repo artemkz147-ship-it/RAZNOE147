@@ -1,8 +1,45 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#3157D5" android:pathData="M0,0h108v108h-108z"/>
-    <path android:fillColor="#FFFFFF" android:pathData="M28,18h35l17,17v55h-52z"/>
-    <path android:fillColor="#DDE5FF" android:pathData="M63,18v18h17z"/>
-    <path android:fillColor="#3157D5" android:pathData="M38,48h32v5h-32zM38,60h32v5h-32zM38,72h24v5h-24z"/>
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Deep blue app field -->
+    <path android:fillColor="#0B5FE8" android:pathData="M0,0h108v108h-108z"/>
+    <path android:fillColor="#1679F2" android:pathData="M0,68C24,49 44,58 60,44C77,29 92,26 108,18V108H0Z"/>
+
+    <!-- Back sheets -->
+    <path android:fillColor="#BFD9FF" android:pathData="M22,18h43l15,15v49H22z"/>
+    <path android:fillColor="#DDEBFF" android:pathData="M27,14h43l15,15v51H27z"/>
+
+    <!-- Main document -->
+    <path android:fillColor="#FFFFFF" android:pathData="M32,10h39l17,17v55H32z"/>
+    <path android:fillColor="#B9D8FF" android:pathData="M71,10v18h17z"/>
+    <path android:fillColor="#6FB0F5" android:pathData="M40,35h36v4H40zM40,44h31v4H40z"/>
+
+    <!-- Mini tool tiles -->
+    <path android:fillColor="#FF4136" android:pathData="M39,54h11v11H39z"/>
+    <path android:fillColor="#23C767" android:pathData="M53,54h11v11H53z"/>
+    <path android:fillColor="#176FF0" android:pathData="M67,54h11v11H67z"/>
+    <path android:fillColor="#FFBA17" android:pathData="M81,54h7v11H81z"/>
+
+    <!-- PDF page mark -->
+    <path android:fillColor="#FFFFFF" android:pathData="M42,56h5v7h-5zM43,58h3v1h-3zM43,60h3v1h-3z"/>
+    <!-- Spreadsheet grid -->
+    <path android:fillColor="#FFFFFF" android:pathData="M55,56h7v7h-7z"/>
+    <path android:fillColor="#23C767" android:pathData="M58,56v7h1v-7zM55,59h7v1h-7z"/>
+    <!-- Image mountain -->
+    <path android:fillColor="#FFFFFF" android:pathData="M69,62l2.3,-3l1.7,2l1.7,-2l2.3,3z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M75,56.7a1.2,1.2 0,1 0,0.1 0"/>
+    <!-- Archive zipper -->
+    <path android:fillColor="#FFFFFF" android:pathData="M83,55h2v2h-2zM85,57h2v2h-2zM83,59h2v2h-2zM85,61h2v2h-2z"/>
+
+    <!-- Foreground folder -->
+    <path android:fillColor="#0759D8" android:pathData="M18,67h26l6,6h40v24H18z"/>
+    <path android:fillColor="#1D8AF6" android:pathData="M18,72h72l-5,25H23z"/>
+
+    <!-- Small document emblem on folder -->
+    <path android:fillColor="#FFFFFF" android:pathData="M48,76h14l7,7v11H48z"/>
+    <path android:fillColor="#BFD9FF" android:pathData="M62,76v7h7z"/>
+    <path android:fillColor="#1679F2" android:pathData="M52,85h12v2H52zM52,89h9v2H52z"/>
 </vector>
