@@ -4,14 +4,18 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.Uri;
 
+import com.tom_roush.pdfbox.cos.COSName;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
 import com.tom_roush.pdfbox.pdmodel.PDDocumentInformation;
 import com.tom_roush.pdfbox.pdmodel.PDPage;
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream;
+import com.tom_roush.pdfbox.pdmodel.PDResources;
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle;
 import com.tom_roush.pdfbox.pdmodel.font.PDFont;
 import com.tom_roush.pdfbox.pdmodel.font.PDType0Font;
 import com.tom_roush.pdfbox.pdmodel.font.PDType1Font;
+import com.tom_roush.pdfbox.pdmodel.graphics.PDXObject;
+import com.tom_roush.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory;
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import com.tom_roush.pdfbox.rendering.ImageType;
@@ -20,9 +24,12 @@ import com.tom_roush.pdfbox.text.PDFTextStripper;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 final class PdfExtraTools {
     private PdfExtraTools() {}
@@ -69,6 +76,68 @@ final class PdfExtraTools {
         try {
             return FileStore.publishFile(ctx, out, "Восстановлен_" + System.currentTimeMillis() + ".pdf", "application/pdf", null);
         } finally { out.delete(); }
+    }
+
+    static Uri cropMargins(Context ctx, Uri uri, float percent) throws Exception {
+        if (percent <= 0f || percent >= 35f) throw new IllegalArgumentException("Укажите от 1 до 34 процентов");
+        File input = FileStore.copyUriToTemp(ctx, uri, ".pdf");
+        File out = File.createTempFile("cropped_", ".pdf", ctx.getCacheDir());
+        try (PDDocument doc = PDDocument.load(input)) {
+            for (PDPage page : doc.getPages()) {
+                PDRectangle box = page.getCropBox();
+                float dx = box.getWidth() * percent / 100f;
+                float dy = box.getHeight() * percent / 100f;
+                float width = box.getWidth() - dx * 2f;
+                float height = box.getHeight() - dy * 2f;
+                if (width < 72f || height < 72f) throw new IllegalArgumentException("Слишком большое обрезание для этой страницы");
+                PDRectangle cropped = new PDRectangle(box.getLowerLeftX() + dx, box.getLowerLeftY() + dy, width, height);
+                page.setCropBox(cropped);
+            }
+            doc.save(out);
+        } finally { input.delete(); }
+        try {
+            return FileStore.publishFile(ctx, out, "Обрезанный_PDF_" + System.currentTimeMillis() + ".pdf", "application/pdf", null);
+        } finally { out.delete(); }
+    }
+
+    static int extractEmbeddedImages(Context ctx, Uri uri) throws Exception {
+        File input = FileStore.copyUriToTemp(ctx, uri, ".pdf");
+        int[] number = {0};
+        Set<Integer> visited = new HashSet<>();
+        try (PDDocument doc = PDDocument.load(input)) {
+            for (int i = 0; i < doc.getNumberOfPages(); i++) {
+                PDResources resources = doc.getPage(i).getResources();
+                if (resources != null) extractImagesFromResources(ctx, resources, i + 1, number, visited);
+            }
+        } finally { input.delete(); }
+        if (number[0] == 0) throw new IllegalArgumentException("Встроенные изображения в PDF не найдены");
+        return number[0];
+    }
+
+    private static void extractImagesFromResources(Context ctx, PDResources resources, int page, int[] number, Set<Integer> visited) throws Exception {
+        for (COSName name : resources.getXObjectNames()) {
+            PDXObject xObject = resources.getXObject(name);
+            if (xObject == null) continue;
+            int identity = System.identityHashCode(xObject.getCOSObject());
+            if (!visited.add(identity)) continue;
+            if (xObject instanceof PDImageXObject image) {
+                Bitmap bitmap = image.getImage();
+                if (bitmap == null) continue;
+                File temp = File.createTempFile("pdf_image_", ".png", ctx.getCacheDir());
+                try {
+                    try (FileOutputStream out = new FileOutputStream(temp)) {
+                        if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) throw new IllegalStateException("Не удалось сохранить изображение из PDF");
+                    }
+                    number[0]++;
+                    FileStore.publishFile(ctx, temp, "PDF_страница_" + page + "_изображение_" + number[0] + ".png", "image/png", "Изображения_PDF");
+                } finally {
+                    temp.delete();
+                    bitmap.recycle();
+                }
+            } else if (xObject instanceof PDFormXObject form && form.getResources() != null) {
+                extractImagesFromResources(ctx, form.getResources(), page, number, visited);
+            }
+        }
     }
 
     static Uri removeMetadata(Context ctx, Uri uri) throws Exception {
