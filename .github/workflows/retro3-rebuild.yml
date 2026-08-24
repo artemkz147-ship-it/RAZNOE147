@@ -43,6 +43,8 @@ jobs:
         run: python3 tools/retro3_v280.py
       - name: Apply Retro 3 v2.8.1 PS1 native system buttons and layout fix
         run: python3 tools/retro3_v281.py
+      - name: Apply Retro 3 v2.8.2 standard gamepad auto mapping
+        run: python3 tools/retro3_v282.py
       - name: Fetch complete offline EmulatorJS payload
         run: |
           set -euo pipefail
@@ -115,7 +117,9 @@ jobs:
           grep -q "isNativeGamepadKey" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "applyPsFactoryLayout" app/src/main/assets/game.html
           grep -q "retro-ps1-native-system-v281" app/src/main/assets/launcher.js
-          grep -q "versionName '2.8.1'" app/build.gradle
+          grep -q "auto(2,109)" app/src/main/assets/launcher.js
+          grep -q "auto(3,108)" app/src/main/assets/launcher.js
+          grep -q "versionName '2.8.2'" app/build.gradle
       - uses: android-actions/setup-android@v3
       - run: yes | sdkmanager --licenses >/dev/null || true
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
