@@ -49,6 +49,8 @@ jobs:
         run: python3 tools/retro3_v283.py
       - name: Apply Retro 3 v2.8.4 PS1 virtual touch repair
         run: python3 tools/retro3_v284.py
+      - name: Apply Retro 3 v2.8.5 PS1 proven control geometry
+        run: python3 tools/retro3_v285.py
       - name: Fetch complete offline EmulatorJS payload
         run: |
           set -euo pipefail
@@ -106,7 +108,7 @@ jobs:
           src = Path('app/src/main/assets/game.html').read_text(encoding='utf-8')
           scripts = re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', src, flags=re.S | re.I)
           if not scripts:
-            raise SystemExit('No inline JavaScript found in game.html')
+              raise SystemExit('No inline JavaScript found in game.html')
           Path('/tmp/retro-game-inline.js').write_text('\n'.join(scripts), encoding='utf-8')
           PY
           node --check /tmp/retro-game-inline.js
@@ -119,14 +121,16 @@ jobs:
           grep -q "setDefaultFocusHighlightEnabled(false)" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "ANDROID_SCAN_" app/src/main/assets/launcher.js
           grep -q "isNativeGamepadKey" app/src/main/java/ru/retro/threeinone/MainActivity.java
-          grep -q "migratePsTouchLayout284" app/src/main/assets/game.html
+          grep -q "retro-ps1-touch-layout-v285" app/src/main/assets/game.html
+          grep -q "top:'0%',joystickInput:false,inputValues:\[4,5,6,7\]" app/src/main/assets/game.html
+          grep -q "top:'100%',color:'#e8edf5',joystickInput:true,inputValues:\[16,17,18,19\]" app/src/main/assets/game.html
           ! grep -q "applyPsFactoryLayout" app/src/main/assets/game.html
           grep -q "BIOS_STORE='bios'" app/src/main/assets/launcher.js
           grep -q "3v1prem147" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "R-M-19800317-1" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "RuStorePayClient" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "InterstitialAdLoader" app/src/main/java/ru/retro/threeinone/MainActivity.java
-          grep -q "versionName '2.8.4'" app/build.gradle
+          grep -q "versionName '2.8.5'" app/build.gradle
       - uses: android-actions/setup-android@v3
       - run: yes | sdkmanager --licenses >/dev/null || true
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
