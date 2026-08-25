@@ -22,7 +22,6 @@
             </intent-filter>
         </activity>
 
-        <!-- One Android VIEW entry point, so the system shows a single clean “Доки” option. -->
         <activity android:name=".DokiViewerActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -50,12 +49,14 @@
         </activity>
 
         <activity android:name=".PdfPageOrganizerActivity" android:exported="false" />
+        <activity android:name=".PdfPagePreviewActivity" android:exported="false" />
         <activity android:name=".PptxSlideOrganizerActivity" android:exported="false" />
         <activity android:name=".ImageCompressionActivity" android:exported="false" />
         <activity android:name=".ImageResizeActivity" android:exported="false" />
         <activity android:name=".ImageCropActivity" android:exported="false" />
         <activity android:name=".BackgroundRemovalActivity" android:exported="false" />
         <activity android:name=".SignatureFlowActivity" android:exported="false" />
+        <activity android:name=".SignatureLibraryActivity" android:exported="false" />
         <activity android:name=".SignaturePlacementActivity" android:exported="false" />
 
         <activity android:name=".ManualCropActivity" android:exported="false" />
