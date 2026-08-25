@@ -51,6 +51,8 @@ jobs:
         run: python3 tools/retro3_v284.py
       - name: Apply Retro 3 v2.8.5 PS1 proven control geometry
         run: python3 tools/retro3_v285.py
+      - name: Apply Retro 3 v2.8.6 PS1 DualShock controller fix
+        run: python3 tools/retro3_v286.py
       - name: Fetch complete offline EmulatorJS payload
         run: |
           set -euo pipefail
@@ -121,16 +123,19 @@ jobs:
           grep -q "setDefaultFocusHighlightEnabled(false)" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "ANDROID_SCAN_" app/src/main/assets/launcher.js
           grep -q "isNativeGamepadKey" app/src/main/java/ru/retro/threeinone/MainActivity.java
-          grep -q "retro-ps1-touch-layout-v285" app/src/main/assets/game.html
-          grep -q "top:'0%',joystickInput:false,inputValues:\[4,5,6,7\]" app/src/main/assets/game.html
-          grep -q "top:'100%',color:'#e8edf5',joystickInput:true,inputValues:\[16,17,18,19\]" app/src/main/assets/game.html
+          grep -q "retro-ps1-touch-layout-v286" app/src/main/assets/game.html
+          grep -q "retro_lstick" app/src/main/assets/game.html
+          grep -q "retro_rstick" app/src/main/assets/game.html
+          grep -q "pcsx_rearmed_pad1type':'dualshock" app/src/main/assets/game.html
+          grep -q "configurePsxDualShock" app/src/main/assets/game.html
+          grep -q "analog?32767:1" app/src/main/assets/game.html
           ! grep -q "applyPsFactoryLayout" app/src/main/assets/game.html
           grep -q "BIOS_STORE='bios'" app/src/main/assets/launcher.js
           grep -q "3v1prem147" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "R-M-19800317-1" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "RuStorePayClient" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "InterstitialAdLoader" app/src/main/java/ru/retro/threeinone/MainActivity.java
-          grep -q "versionName '2.8.5'" app/build.gradle
+          grep -q "versionName '2.8.6'" app/build.gradle
       - uses: android-actions/setup-android@v3
       - run: yes | sdkmanager --licenses >/dev/null || true
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
