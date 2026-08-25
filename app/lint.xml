@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- MainActivity intentionally uses legacy onBackPressed while the app opts out of
+         predictive back in the manifest. This keeps category navigation identical on
+         Android 10–16 until the UI is migrated as one unit to OnBackPressedDispatcher. -->
+    <issue id="GestureBackNavigation">
+        <ignore path="src/main/java/ru/filemaster/offline/MainActivity.java" />
+    </issue>
+</lint>

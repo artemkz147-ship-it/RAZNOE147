@@ -1,0 +1,4 @@
+-keep class com.tom_roush.** { *; }
+-keep class com.github.junrar.** { *; }
+-keep class cz.adaptech.tesseract4android.** { *; }
+-dontwarn org.apache.commons.compress.**

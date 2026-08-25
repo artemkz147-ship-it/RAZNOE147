@@ -1,0 +1,94 @@
+plugins {
+    id 'com.android.application'
+}
+
+def releaseKeystorePath = System.getenv('DOKI_KEYSTORE_PATH')
+def releaseStorePassword = System.getenv('DOKI_STORE_PASSWORD')
+def releaseKeyAlias = System.getenv('DOKI_KEY_ALIAS')
+def releaseKeyPassword = System.getenv('DOKI_KEY_PASSWORD')
+def releaseSigningReady = releaseKeystorePath && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+
+android {
+    namespace 'ru.filemaster.offline'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'ru.filemaster.offline'
+        minSdk 29
+        targetSdk 36
+        versionCode 15
+        versionName '1.2.0'
+    }
+
+    signingConfigs {
+        if (releaseSigningReady) {
+            release {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (releaseSigningReady) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packaging {
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES',
+                'META-INF/LICENSE*',
+                'META-INF/NOTICE*',
+                'META-INF/INDEX.LIST',
+                'META-INF/*.SF',
+                'META-INF/*.DSA',
+                'META-INF/*.RSA'
+            ]
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'com.google.android.material:material:1.12.0'
+
+    implementation('com.tom-roush:pdfbox-android:2.0.27.0') {
+        exclude group: 'org.bouncycastle', module: 'bcprov-jdk15on'
+        exclude group: 'org.bouncycastle', module: 'bcpkix-jdk15on'
+        exclude group: 'org.bouncycastle', module: 'bcutil-jdk15on'
+        exclude group: 'org.bouncycastle', module: 'bcprov-jdk15to18'
+        exclude group: 'org.bouncycastle', module: 'bcpkix-jdk15to18'
+        exclude group: 'org.bouncycastle', module: 'bcutil-jdk15to18'
+    }
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.85'
+    implementation 'org.bouncycastle:bcpkix-jdk18on:1.85'
+    implementation 'org.bouncycastle:bcutil-jdk18on:1.85'
+
+    implementation 'org.apache.commons:commons-compress:1.28.0'
+    implementation 'org.tukaani:xz:1.10'
+    implementation 'com.github.junrar:junrar:8.1.0'
+    implementation 'cz.adaptech.tesseract4android:tesseract4android:4.9.0'
+    implementation 'net.lingala.zip4j:zip4j:2.11.6'
+
+    // Pure Java/Kotlin image decoders bundled into the APK; no runtime downloads.
+    implementation 'com.caverock:androidsvg-aar:1.4'
+    implementation 'dev.jaeyoung:fileloom-tiff-bitmap-factory:0.1.1'
+
+    // Yandex Mobile Ads SDK. Document processing itself remains local on the device.
+    implementation 'com.yandex.android:mobileads:8.2.0'
+
+    testImplementation 'junit:junit:4.13.2'
+}
