@@ -11,11 +11,11 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.AppCompatImageView;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -93,7 +93,7 @@ public class PdfPagePreviewActivity extends AppCompatActivity {
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
     @Override protected void onDestroy() { super.onDestroy(); worker.shutdownNow(); if (image != null) image.release(); }
 
-    static final class ZoomImageView extends ImageView {
+    static final class ZoomImageView extends AppCompatImageView {
         private final Matrix matrix = new Matrix();
         private final ScaleGestureDetector scaleDetector;
         private Bitmap bitmap;
