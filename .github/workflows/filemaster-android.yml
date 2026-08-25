@@ -54,14 +54,14 @@ jobs:
           BT="$ANDROID_HOME/build-tools/36.0.0"
           if [ ! -x "$BT/zipalign" ]; then BT="$ANDROID_SDK_ROOT/build-tools/36.0.0"; fi
           test -s app/build/outputs/apk/release/app-release-unsigned.apk
-          "$BT/zipalign" -P 16 -f 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/Doki-1.1.0-release-aligned-unsigned.apk
-          "$BT/zipalign" -c -P 16 4 app/build/outputs/apk/release/Doki-1.1.0-release-aligned-unsigned.apk
+          "$BT/zipalign" -P 16 -f 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/Doki-1.2.0-release-aligned-unsigned.apk
+          "$BT/zipalign" -c -P 16 4 app/build/outputs/apk/release/Doki-1.2.0-release-aligned-unsigned.apk
           test -s "$BT/lib/apksigner.jar"
           cp "$BT/lib/apksigner.jar" app/build/outputs/apksigner-36.jar
 
       - name: Verify release package
         run: |
-          APK=app/build/outputs/apk/release/Doki-1.1.0-release-aligned-unsigned.apk
+          APK=app/build/outputs/apk/release/Doki-1.2.0-release-aligned-unsigned.apk
           AAB=app/build/outputs/bundle/release/app-release.aab
           test -s "$APK"
           test -s "$AAB"
@@ -84,14 +84,14 @@ jobs:
       - name: Upload unsigned aligned release APK
         uses: actions/upload-artifact@v4
         with:
-          name: Doki-1.1.0-release-unsigned-apk
-          path: app/build/outputs/apk/release/Doki-1.1.0-release-aligned-unsigned.apk
+          name: Doki-1.2.0-release-unsigned-apk
+          path: app/build/outputs/apk/release/Doki-1.2.0-release-aligned-unsigned.apk
           if-no-files-found: error
 
       - name: Upload unsigned release AAB
         uses: actions/upload-artifact@v4
         with:
-          name: Doki-1.1.0-release-unsigned-aab
+          name: Doki-1.2.0-release-unsigned-aab
           path: app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
