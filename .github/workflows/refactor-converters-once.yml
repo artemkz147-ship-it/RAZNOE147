@@ -1,0 +1,28 @@
+name: Refactor converters once
+
+on:
+  push:
+    branches: [filemaster-offline]
+    paths:
+      - '.github/workflows/refactor-converters-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: filemaster-offline
+      - name: Move converter tools to dedicated tab
+        run: python scripts/refactor_converters.py
+      - name: Commit refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ru/filemaster/offline/MainActivity.java app/src/main/java/ru/filemaster/offline/ConvertersActivity.java
+          git diff --cached --check
+          git commit -m "Move converters to dedicated tab"
+          git push origin HEAD:filemaster-offline
