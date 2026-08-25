@@ -2,6 +2,12 @@ plugins {
     id 'com.android.application'
 }
 
+def releaseKeystorePath = System.getenv('DOKI_KEYSTORE_PATH')
+def releaseStorePassword = System.getenv('DOKI_STORE_PASSWORD')
+def releaseKeyAlias = System.getenv('DOKI_KEY_ALIAS')
+def releaseKeyPassword = System.getenv('DOKI_KEY_PASSWORD')
+def releaseSigningReady = releaseKeystorePath && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+
 android {
     namespace 'ru.filemaster.offline'
     compileSdk 36
@@ -14,8 +20,22 @@ android {
         versionName '1.1.0'
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            release {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseSigningReady) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
