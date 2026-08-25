@@ -10,8 +10,8 @@ android {
         applicationId 'ru.filemaster.offline'
         minSdk 29
         targetSdk 36
-        versionCode 12
-        versionName '1.0.0-rc3'
+        versionCode 13
+        versionName '1.1.0-rc1'
     }
 
     buildTypes {
@@ -67,8 +67,7 @@ dependencies {
     implementation 'com.caverock:androidsvg-aar:1.4'
     implementation 'dev.jaeyoung:fileloom-tiff-bitmap-factory:0.1.1'
 
-    // Yandex Mobile Ads SDK 8. Ad requests use only the configured ad-unit IDs;
-    // document processing itself remains local on the device.
+    // Yandex Mobile Ads SDK. Document processing itself remains local on the device.
     implementation 'com.yandex.android:mobileads:8.2.0'
 
     testImplementation 'junit:junit:4.13.2'
