@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#08090c">
+  <title>Ретро 3 в 1</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand" aria-label="Ретро 3 в 1">
+        <span class="brand-mark">3×1</span>
+        <span><strong>РЕТРО</strong><small>Dendy · Mega Drive · PlayStation</small></span>
+      </div>
+      <div class="top-actions">
+        <button class="status-pill focusable" id="gamepadStatus" data-action="bluetooth" aria-label="Статус геймпада">
+          <span class="status-dot"></span><span id="gamepadText">Геймпад не подключён</span>
+        </button>
+        <button class="icon-button focusable" data-action="settings" aria-label="Настройки">⚙</button>
+      </div>
+    </header>
+
+    <section class="hero-copy">
+      <p class="eyebrow">ВЫБЕРИТЕ ПРИСТАВКУ</p>
+      <h1>Во что играем?</h1>
+      <p>Выберите систему, затем ROM. Архивы распаковываются внутри приложения.</p>
+    </section>
+
+    <section class="console-grid" aria-label="Игровые системы">
+      <button class="console-card nes focusable selected" data-action="console" data-core="nes" data-system="Dendy / NES" data-extensions="NES, UNIF, UNF, ZIP, 7Z, RAR">
+        <span class="console-number">01</span>
+        <span class="console-icon console-dendy" aria-hidden="true">
+          <svg viewBox="0 0 96 96" role="img">
+            <rect x="15" y="26" width="66" height="44" rx="8" class="case"/>
+            <rect x="26" y="17" width="44" height="24" rx="5" class="cart"/>
+            <rect x="31" y="31" width="34" height="7" rx="3" class="slot"/>
+            <circle cx="27" cy="57" r="6" class="key"/>
+            <circle cx="45" cy="57" r="6" class="key"/>
+            <rect x="56" y="52" width="16" height="10" rx="5" class="dark"/>
+            <text x="48" y="85">DENDY</text>
+          </svg>
+        </span>
+        <span class="console-info"><small>FAMICOM · NES</small><strong>DENDY</strong><span class="format-line">.nes · .unif · .unf · архивы</span></span>
+        <span class="play-arrow">→</span>
+      </button>
+
+      <button class="console-card sega focusable" data-action="console" data-core="segaMD" data-system="Sega Mega Drive" data-extensions="MD, SMD, GEN, BIN, MDX, 68K, SGD, SMS, GG, SG, BMS, ZIP, 7Z, RAR">
+        <span class="console-number">02</span>
+        <span class="console-icon console-mega" aria-hidden="true">
+          <svg viewBox="0 0 96 96" role="img">
+            <ellipse cx="48" cy="48" rx="34" ry="24" class="case"/>
+            <circle cx="48" cy="47" r="17" class="ring"/>
+            <rect x="35" y="36" width="26" height="14" rx="3" class="slot"/>
+            <rect x="17" y="44" width="12" height="8" rx="4" class="key"/>
+            <circle cx="70" cy="50" r="5" class="key"/>
+            <text x="48" y="84">MEGA</text>
+          </svg>
+        </span>
+        <span class="console-info"><small>GENESIS · MASTER SYSTEM</small><strong>MEGA DRIVE</strong><span class="format-line">.md · .smd · .gen · .sms · .gg · архивы</span></span>
+        <span class="play-arrow">→</span>
+      </button>
+
+      <button class="console-card psx focusable" data-action="console" data-core="psx" data-system="Sony PlayStation 1" data-extensions="CHD, PBP, BIN, ISO, IMG, EXE, ZIP, 7Z, RAR">
+        <span class="console-number">03</span>
+        <span class="console-icon console-ps" aria-hidden="true">
+          <svg viewBox="0 0 96 96" role="img">
+            <rect x="13" y="28" width="70" height="43" rx="9" class="case"/>
+            <circle cx="48" cy="48" r="16" class="ring"/>
+            <circle cx="48" cy="48" r="5" class="dark"/>
+            <rect x="20" y="58" width="13" height="5" rx="2" class="key"/>
+            <circle cx="73" cy="60" r="3" class="key"/>
+            <text x="48" y="85">PS ONE</text>
+          </svg>
+        </span>
+        <span class="console-info"><small>SONY · PLAYSTATION</small><strong>PLAYSTATION 1</strong><span class="format-line">.chd · .pbp · .bin · .iso · архивы</span></span>
+        <span class="play-arrow">→</span>
+      </button>
+    </section>
+
+    <footer class="footer-hints">
+      <span><kbd>✚</kbd> выбор</span><span><kbd>A</kbd> открыть</span><span><kbd>B</kbd> назад</span>
+      <span class="legal">ROM и BIOS остаются на устройстве.</span>
+    </footer>
+  </main>
+
+  <div class="modal-backdrop" id="launchModal" hidden>
+    <section class="modal console-modal" role="dialog" aria-modal="true" aria-labelledby="launchTitle">
+      <button class="modal-close focusable" data-action="close" aria-label="Закрыть">×</button>
+      <p class="eyebrow" id="launchKicker">СИСТЕМА 01</p>
+      <h2 id="launchTitle">Dendy / NES</h2>
+      <p class="modal-lead">Выберите игру в памяти устройства. ZIP / 7Z / RAR можно выбирать как обычный ROM.</p>
+      <div class="file-format" id="fileFormats">Поддерживаются: NES, UNIF, UNF, ZIP, 7Z, RAR</div>
+
+      <div class="bios-panel" id="biosRow" hidden>
+        <div class="bios-heading">
+          <span><strong>BIOS PlayStation 1</strong><small id="biosState">Не выбран — можно добавить несколько регионов</small></span>
+          <button class="secondary-button focusable" data-action="bios">+ Добавить</button>
+        </div>
+        <div class="bios-list" id="biosList"></div>
+        <button class="text-button focusable" id="biosClear" data-action="bios-clear" hidden>Очистить BIOS</button>
+      </div>
+
+      <button class="primary-button focusable" data-action="rom"><span>Выбрать игру</span><b>→</b></button>
+      <p class="privacy-note">ROM и сохранения остаются только на этом устройстве.</p>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="settingsModal" hidden>
+    <section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <button class="modal-close focusable" data-action="close-settings" aria-label="Закрыть">×</button>
+      <p class="eyebrow">ДЛЯ ВСЕХ ЭМУЛЯТОРОВ</p>
+      <h2 id="settingsTitle">Настройки</h2>
+
+      <div class="setting-list">
+        <label class="setting-row focusable range-row">
+          <span><strong>Громкость</strong><small>Общая громкость игр</small></span>
+          <input id="volume" type="range" min="0" max="100" step="5" value="80" aria-label="Громкость">
+          <output id="volumeValue">80%</output>
+        </label>
+
+        <label class="setting-row focusable select-row">
+          <span><strong>Виртуальный геймпад</strong><small>Полный, только Start + Select или полностью скрыт</small></span>
+          <select id="touchMode" aria-label="Виртуальный геймпад">
+            <option value="full">Полный</option>
+            <option value="minimal">Только Start + Select</option>
+            <option value="off">Выключен</option>
+          </select>
+        </label>
+
+        <label class="setting-row focusable">
+          <span><strong>Растянуть изображение</strong><small>Заполнить экран вместо исходных пропорций</small></span>
+          <input class="switch" id="stretch" type="checkbox">
+        </label>
+
+        <label class="setting-row focusable select-row">
+          <span><strong>Dendy / Mega Drive — движение</strong><small>В полном виртуальном геймпаде. Физический стик всегда дублирует крестовину.</small></span>
+          <select id="virtual8" aria-label="Управление Dendy и Mega Drive">
+            <option value="dpad">Крестовина</option>
+            <option value="stick">Стик</option>
+          </select>
+        </label>
+
+        <label class="setting-row focusable select-row">
+          <span><strong>PS1 — движение</strong><small>Крестовина, стик или оба</small></span>
+          <select id="virtualPs" aria-label="Управление PlayStation">
+            <option value="both">Крестовина + стик</option>
+            <option value="dpad">Только крестовина</option>
+            <option value="stick">Только стик</option>
+          </select>
+        </label>
+
+        <label class="setting-row focusable">
+          <span><strong>Вибрация интерфейса</strong><small>Короткий отклик меню</small></span>
+          <input class="switch" id="vibration" type="checkbox" checked>
+        </label>
+      </div>
+
+      <div class="controller-box">
+        <div><strong>Настройка кнопок</strong><small>Во время игры: ⚙ → «Настроить кнопки». Обычные кнопки + Quick Save / Quick Load.</small></div>
+        <span class="settings-badge">KEYS · SAVE · LOAD</span>
+      </div>
+
+      <button class="primary-button focusable" data-action="save-settings"><span>Готово</span><b>✓</b></button>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="launcher.js"></script>
+</body>
+</html>
