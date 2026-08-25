@@ -49,13 +49,13 @@ jobs:
       - name: Build unsigned release APK and AAB
         run: gradle :app:assembleRelease :app:bundleRelease --stacktrace
 
-      - name: Align unsigned release APK
+      - name: Align unsigned release APK for 16 KB pages
         run: |
           BT="$ANDROID_HOME/build-tools/36.0.0"
           if [ ! -x "$BT/zipalign" ]; then BT="$ANDROID_SDK_ROOT/build-tools/36.0.0"; fi
           test -s app/build/outputs/apk/release/app-release-unsigned.apk
-          "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/Doki-1.1.0-release-aligned-unsigned.apk
-          "$BT/zipalign" -c -p 4 app/build/outputs/apk/release/Doki-1.1.0-release-aligned-unsigned.apk
+          "$BT/zipalign" -P 16 -f 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/Doki-1.1.0-release-aligned-unsigned.apk
+          "$BT/zipalign" -c -P 16 4 app/build/outputs/apk/release/Doki-1.1.0-release-aligned-unsigned.apk
           test -s "$BT/lib/apksigner.jar"
           cp "$BT/lib/apksigner.jar" app/build/outputs/apksigner-36.jar
 
@@ -71,7 +71,7 @@ jobs:
           unzip -Z1 "$APK" | grep -q '^assets/tessdata/eng.traineddata$'
           DEX_COUNT=$(unzip -Z1 "$APK" | grep -Ec '^classes([0-9]+)?\.dex$')
           test "$DEX_COUNT" -ge 1
-          echo "Verified unsigned aligned release APK with $DEX_COUNT dex file(s)"
+          echo "Verified 16 KB aligned unsigned release APK with $DEX_COUNT dex file(s)"
 
       - name: Upload lint report
         if: always()
