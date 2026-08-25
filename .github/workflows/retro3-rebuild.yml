@@ -51,7 +51,7 @@ jobs:
         run: python3 tools/retro3_v284.py
       - name: Apply Retro 3 v2.8.5 PS1 proven control geometry
         run: python3 tools/retro3_v285.py
-      - name: Apply Retro 3 v2.8.6 direct PS1 virtual controls
+      - name: Apply Retro 3 v2.8.6 PS1 digital two-stick aliases
         run: python3 tools/retro3_v286.py
       - name: Fetch complete offline EmulatorJS payload
         run: |
@@ -124,11 +124,11 @@ jobs:
           grep -q "ANDROID_SCAN_" app/src/main/assets/launcher.js
           grep -q "isNativeGamepadKey" app/src/main/java/ru/retro/threeinone/MainActivity.java
           grep -q "retro-ps1-touch-layout-v286" app/src/main/assets/game.html
-          grep -q "installPsVirtualBridge" app/src/main/assets/game.html
-          grep -q "retro-ps-custom" app/src/main/assets/game.html
-          grep -q "retro-ps1-both-v286" app/src/main/assets/launcher.js
-          grep -q "psSim(16" app/src/main/assets/game.html
-          grep -q "psSim(4,ny<-th" app/src/main/assets/game.html
+          grep -q "configurePs1DigitalJoypad" app/src/main/assets/game.html
+          grep -q "retro_stick2" app/src/main/assets/game.html
+          grep -q "const both=currentCore==='psx'" app/src/main/assets/game.html
+          grep -q "Крестовина + 2 стика" app/src/main/assets/launcher.js
+          grep -q "Оба стика работают как крестовина" app/src/main/assets/index.html
           ! grep -q "applyPsFactoryLayout" app/src/main/assets/game.html
           grep -q "BIOS_STORE='bios'" app/src/main/assets/launcher.js
           grep -q "3v1prem147" app/src/main/java/ru/retro/threeinone/MainActivity.java
