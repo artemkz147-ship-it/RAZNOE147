@@ -43,6 +43,7 @@ public class ConvertersActivity extends AppCompatActivity {
         root.addView(tool("PDF → XLSX","Эвристическое разбиение строк и колонок",v->pick(false,"application/pdf","pdf_xlsx")));
         root.addView(tool("PDF → PPTX","Каждая страница как визуальный слайд",v->pick(false,"application/pdf","pdf_pptx")));
         root.addView(tool("PDF → JPG","Все страницы в изображения",v->pick(false,"application/pdf","pdf_jpg")));
+        root.addView(tool("Несколько PDF → JPG","Пакетный экспорт всех страниц",v->pick(true,"application/pdf","batch_pdf_jpg")));
         root.addView(tool("PDF → TXT","Извлечь встроенный текст",v->pick(false,"application/pdf","pdf_text")));
         root.addView(tool("Изображения → PDF","Несколько изображений в один PDF",v->pick(true,"image/*","images_pdf")));
 
@@ -83,6 +84,7 @@ public class ConvertersActivity extends AppCompatActivity {
         case"pdf_xlsx"->runTask("Распознаю строки и колонки…",()->PdfOfficeTools.toXlsx(this,first),"XLSX сохранён");
         case"pdf_pptx"->runTask("Создаю PPTX…",()->PdfOfficeTools.toPptxVisual(this,first),"PPTX сохранён");
         case"pdf_jpg"->runTask("Экспортирую JPG…",()->PdfTools.pdfToJpeg(this,first),"JPG сохранены");
+        case"batch_pdf_jpg"->runTask("Экспортирую PDF в JPG…",()->BatchPdfTools.toJpg(this,uris),"Страницы экспортированы");
         case"pdf_text"->runTask("Извлекаю текст…",()->PdfTools.extractText(this,first),"TXT сохранён");
         case"images_pdf"->runTask("Создаю PDF…",()->PdfTools.imagesToPdf(this,uris),"PDF создан");
         case"docx_txt"->runTask("Извлекаю DOCX…",()->DocxTools.toTxt(this,first),"TXT сохранён");
