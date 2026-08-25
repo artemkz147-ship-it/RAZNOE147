@@ -13,9 +13,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FileMaster">
 
-        <meta-data
-            android:name="com.yandex.mobile.ads.AUTOMATIC_SDK_INITIALIZATION"
-            android:value="false" />
+        <meta-data android:name="com.yandex.mobile.ads.AUTOMATIC_SDK_INITIALIZATION" android:value="false" />
 
         <activity android:name=".LaunchActivity" android:exported="true">
             <intent-filter>
@@ -23,6 +21,42 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- One Android VIEW entry point, so the system shows a single clean “Доки” option. -->
+        <activity android:name=".DokiViewerActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/html" />
+                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/csv" />
+                <data android:mimeType="text/tab-separated-values" />
+                <data android:mimeType="application/rtf" />
+                <data android:mimeType="text/rtf" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                <data android:mimeType="application/vnd.oasis.opendocument.text" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="application/x-7z-compressed" />
+                <data android:mimeType="application/vnd.rar" />
+                <data android:mimeType="application/x-rar-compressed" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".PdfPageOrganizerActivity" android:exported="false" />
+        <activity android:name=".PptxSlideOrganizerActivity" android:exported="false" />
+        <activity android:name=".ImageCompressionActivity" android:exported="false" />
+        <activity android:name=".ImageResizeActivity" android:exported="false" />
+        <activity android:name=".ImageCropActivity" android:exported="false" />
+        <activity android:name=".BackgroundRemovalActivity" android:exported="false" />
+        <activity android:name=".SignatureFlowActivity" android:exported="false" />
+        <activity android:name=".SignaturePlacementActivity" android:exported="false" />
 
         <activity android:name=".ManualCropActivity" android:exported="false" />
         <activity android:name=".PdfVisualEditorActivity" android:exported="false" />
@@ -34,42 +68,10 @@
         <activity android:name=".ScanSessionActivity" android:exported="false" />
         <activity android:name=".DocumentEditorActivity" android:exported="false" />
         <activity android:name=".TableEditorActivity" android:exported="false" />
-        <activity android:name=".EditableOpenActivity" android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
-                <data android:mimeType="application/vnd.oasis.opendocument.text" />
-                <data android:mimeType="text/plain" />
-                <data android:mimeType="text/html" />
-                <data android:mimeType="text/markdown" />
-                <data android:mimeType="application/rtf" />
-                <data android:mimeType="text/rtf" />
-                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
-                <data android:mimeType="text/csv" />
-                <data android:mimeType="text/tab-separated-values" />
-            </intent-filter>
-        </activity>
+        <activity android:name=".EditableOpenActivity" android:exported="false" />
         <activity android:name=".ZipEditorActivity" android:exported="false" />
-        <activity android:name=".ZipOpenActivity" android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="application/zip" />
-                <data android:mimeType="application/x-zip-compressed" />
-            </intent-filter>
-        </activity>
+        <activity android:name=".ZipOpenActivity" android:exported="false" />
         <activity android:name=".SignatureActivity" android:exported="false" android:screenOrientation="portrait" />
-
-        <activity android:name=".MainActivity" android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="application/pdf" />
-            </intent-filter>
-        </activity>
+        <activity android:name=".MainActivity" android:exported="false" />
     </application>
 </manifest>
