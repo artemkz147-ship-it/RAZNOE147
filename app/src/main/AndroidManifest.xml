@@ -48,6 +48,7 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".ConvertersActivity" android:exported="false" />
         <activity android:name=".PdfPageOrganizerActivity" android:exported="false" />
         <activity android:name=".PdfPagePreviewActivity" android:exported="false" />
         <activity android:name=".PptxSlideOrganizerActivity" android:exported="false" />
