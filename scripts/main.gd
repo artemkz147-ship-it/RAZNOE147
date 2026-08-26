@@ -155,6 +155,7 @@ func _assign_stream(player: Node, path: String) -> void:
 func _build_runtime_audio() -> void:
     ambience_player = AudioStreamPlayer.new()
     ambience_player.volume_db = -12.0
+    ambience_player.finished.connect(_restart_ambience)
     add_child(ambience_player)
     narration_player = AudioStreamPlayer.new()
     narration_player.volume_db = -2.0
@@ -163,6 +164,10 @@ func _build_runtime_audio() -> void:
     roar_player.volume_db = 0.0
     roar_player.max_distance = 45.0
     dinosaur_slot.add_child(roar_player)
+
+func _restart_ambience() -> void:
+    if ambience_player != null and ambience_player.stream != null:
+        ambience_player.play()
 
 func _build_ui() -> void:
     var root := Control.new()
