@@ -15,8 +15,14 @@ enum class TransitionType(val title: String) {
     FADE("Затемнение"),
     SLIDE_LEFT("Сдвиг влево"),
     SLIDE_RIGHT("Сдвиг вправо"),
+    SLIDE_UP("Сдвиг вверх"),
+    SLIDE_DOWN("Сдвиг вниз"),
     ZOOM("Масштаб"),
     SPIN("Вращение"),
+    ROTATE_LEFT("Поворот влево"),
+    ROTATE_RIGHT("Поворот вправо"),
+    PULSE("Пульс"),
+    SHAKE("Встряска"),
     FLASH("Вспышка"),
 }
 
@@ -25,6 +31,19 @@ enum class ColorEffect(val title: String) {
     GRAYSCALE("Чёрно-белый"),
     INVERT("Инверсия"),
     SEPIA("Сепия"),
+    WARM("Тёплый"),
+    COLD("Холодный"),
+    VINTAGE("Винтаж"),
+    NIGHT("Ночной"),
+    CYAN("Циан"),
+    PINK("Розовый"),
+}
+
+enum class MaskType(val title: String) {
+    NONE("Без маски"),
+    CIRCLE("Круг"),
+    ROUNDED_RECT("Скруглённая"),
+    CINEMA("Кино-кадр"),
 }
 
 data class TransitionSpec(val type: TransitionType, val durationMs: Long)
@@ -76,6 +95,9 @@ data class VideoClip(
     val redScale: Float = 1f,
     val greenScale: Float = 1f,
     val blueScale: Float = 1f,
+    val maskType: MaskType = MaskType.NONE,
+    val maskSize: Float = 0.82f,
+    val vignette: Float = 0f,
     val transitionOut: TransitionType = TransitionType.NONE,
     val transitionDurationMs: Long = 650L,
     val keyframes: List<TransformKeyframe> = emptyList(),
