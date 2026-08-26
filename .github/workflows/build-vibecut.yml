@@ -21,6 +21,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.5.0'
+      - name: Restore stable VibeCut dev signing key
+        run: base64 -d app/dev-signing.keystore.b64 > app/dev-signing.keystore
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
       - name: Upload APK
