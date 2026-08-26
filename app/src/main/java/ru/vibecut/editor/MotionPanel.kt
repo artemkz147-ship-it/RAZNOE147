@@ -24,6 +24,8 @@ internal fun MotionPanel(
     onUpdate: (VideoClip) -> Unit,
 ) {
     var editingStrength by remember { mutableStateOf(false) }
+    var editingMask by remember { mutableStateOf(false) }
+    var editingVignette by remember { mutableStateOf(false) }
 
     SectionCard("Анимация клипа") {
         Row(
@@ -60,5 +62,62 @@ internal fun MotionPanel(
                 color = Color(0xFF8F8F9C),
             )
         }
+    }
+
+    SectionCard("Маска и виньетка") {
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            MaskType.entries.forEach { mask ->
+                ChoiceButton(mask.title, clip.maskType == mask) {
+                    onSnapshot()
+                    onUpdate(clip.copy(maskType = mask))
+                }
+            }
+        }
+
+        if (clip.maskType != MaskType.NONE) {
+            Text(
+                "Размер маски: ${(clip.maskSize * 100).roundToInt()}%",
+                color = Color.White,
+            )
+            Slider(
+                value = clip.maskSize.coerceIn(0.25f, 1f),
+                onValueChange = {
+                    if (!editingMask) {
+                        onSnapshot()
+                        editingMask = true
+                    }
+                    onUpdate(clip.copy(maskSize = it))
+                },
+                onValueChangeFinished = { editingMask = false },
+                valueRange = 0.25f..1f,
+            )
+        }
+
+        Text(
+            "Виньетка: ${(clip.vignette * 100).roundToInt()}%",
+            color = Color.White,
+        )
+        Slider(
+            value = clip.vignette.coerceIn(0f, 1f),
+            onValueChange = {
+                if (!editingVignette) {
+                    onSnapshot()
+                    editingVignette = true
+                }
+                onUpdate(clip.copy(vignette = it))
+            },
+            onValueChangeFinished = { editingVignette = false },
+            valueRange = 0f..1f,
+        )
+        ToolButton(
+            text = "Сбросить маску",
+            onClick = {
+                onSnapshot()
+                onUpdate(clip.copy(maskType = MaskType.NONE, maskSize = 0.82f, vignette = 0f))
+            },
+        )
     }
 }
