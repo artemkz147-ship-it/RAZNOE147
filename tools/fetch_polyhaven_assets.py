@@ -2,6 +2,7 @@
 import hashlib
 import json
 import pathlib
+import shutil
 import subprocess
 import urllib.parse
 import urllib.request
@@ -68,6 +69,13 @@ def choose_record(data, *, suffix=None, contains=(), preferred_tokens=()):
     return candidates[0][1], candidates[0][2]
 
 
+def dependency_destination(temp: pathlib.Path, basename: str) -> pathlib.Path:
+    suffix = pathlib.Path(basename).suffix.lower()
+    if suffix in {'.jpg', '.jpeg', '.png', '.webp'}:
+        return temp / 'textures' / basename
+    return temp / basename
+
+
 def download_model(slug: str):
     data = get_json(API.format(slug))
     _, main = choose_record(data, suffix='.gltf', preferred_tokens=('1k', '2k', 'gltf'))
@@ -83,7 +91,7 @@ def download_model(slug: str):
         for _, record in walk_records(includes):
             url = record['url']
             basename = pathlib.Path(urllib.request.url2pathname(urllib.parse.urlparse(url).path)).name
-            download(url, temp / basename, record.get('md5'))
+            download(url, dependency_destination(temp, basename), record.get('md5'))
     else:
         for path, record in walk_records(data):
             url = record['url']
@@ -96,7 +104,7 @@ def download_model(slug: str):
             if '1k' not in searchable:
                 continue
             basename = pathlib.Path(urllib.request.url2pathname(urllib.parse.urlparse(url).path)).name
-            dest = temp / basename
+            dest = dependency_destination(temp, basename)
             if not dest.exists():
                 download(url, dest, record.get('md5'))
 
@@ -105,7 +113,7 @@ def download_model(slug: str):
     output = out_dir / f'{slug}.glb'
     subprocess.run([
         'npx', '--yes', 'gltfpack@1.2.0', '-i', str(main_dest), '-o', str(output),
-        '-si', '0.52', '-kn', '-km', '-ke'
+        '-si', '0.52', '-noq', '-kn', '-km', '-ke'
     ], check=True)
     if output.stat().st_size < 50_000:
         raise RuntimeError(f'Converted model is suspiciously small: {output}')
@@ -136,10 +144,15 @@ def download_hdri():
 
 def main():
     ROOT.mkdir(parents=True, exist_ok=True)
+    scratch = ROOT / '_download'
+    if scratch.exists():
+        shutil.rmtree(scratch)
     for slug in MODELS:
         download_model(slug)
     download_texture()
     download_hdri()
+    if scratch.exists():
+        shutil.rmtree(scratch)
     print('POLYHAVEN_ASSETS_OK')
 
 
