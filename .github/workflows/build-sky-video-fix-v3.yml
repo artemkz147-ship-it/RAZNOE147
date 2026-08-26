@@ -1,0 +1,211 @@
+name: Build Sky Frontiers Video Fix V3
+
+on:
+  push:
+    branches:
+      - sky-video-fix-v3
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack game source
+        run: |
+          set -euo pipefail
+          cat skyfrontiers3d_src.part* | base64 -d > skyfrontiers3d-src.zip
+          unzip -q skyfrontiers3d-src.zip
+          test -f skyfrontiers3d/game.js
+          test -f skyfrontiers3d/android/app/build.gradle
+
+      - name: Apply HD, real-aircraft and video QA patches
+        run: |
+          set -euo pipefail
+          python sky_quality_patch.py
+          python sky_real_aircraft_patch.py
+          python sky_video_fix_patch.py
+          node --check skyfrontiers3d/game.js
+          grep -q 'Cessna 172P' skyfrontiers3d/game.js
+          grep -q 'forwardAxis' skyfrontiers3d/game.js
+          grep -q 'safeGround' skyfrontiers3d/game.js
+          grep -q 'gyroEnabled:false' skyfrontiers3d/game.js
+          ! grep -q 'spawnEmergencyPlaceholder' skyfrontiers3d/game.js
+
+      - name: Build authored carrier model
+        run: |
+          python -m pip install --quiet trimesh numpy
+          python make_carrier.py skyfrontiers3d/public/env/carrier_hd.glb
+          test -s skyfrontiers3d/public/env/carrier_hd.glb
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install aircraft conversion tool
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq assimp-utils
+          assimp version
+
+      - name: Fetch detailed flight-simulator source models and textures
+        shell: python
+        run: |
+          import re, pathlib, posixpath, urllib.parse, urllib.request
+
+          MODELS = [
+              ('c172p-team/c172p','master','Models/c172-common.ac','/tmp/fg-c172'),
+              ('mbuse/Flightgear_777','master','Models/777-200ER.ac','/tmp/fg-777'),
+              ('NikolaiVChr/f16','master','Models/F-16D.ac','/tmp/fg-f16'),
+          ]
+
+          def download(url, path):
+              path = pathlib.Path(path)
+              path.parent.mkdir(parents=True, exist_ok=True)
+              with urllib.request.urlopen(url, timeout=90) as r:
+                  path.write_bytes(r.read())
+
+          for repo, branch, ac_path, root in MODELS:
+              root = pathlib.Path(root)
+              base = f'https://raw.githubusercontent.com/{repo}/{branch}/'
+              ac_url = base + urllib.parse.quote(ac_path, safe='/')
+              local_ac = root / ac_path
+              print('aircraft', repo, ac_path)
+              download(ac_url, local_ac)
+              text = local_ac.read_text(errors='ignore')
+              refs = sorted(set(re.findall(r'(?im)^\s*texture\s+"([^"]+)"', text)))
+              print('texture refs', len(refs))
+              for ref in refs:
+                  ref = ref.replace('\\','/')
+                  remote = posixpath.normpath(posixpath.join(posixpath.dirname(ac_path), ref))
+                  if remote.startswith('../'):
+                      print('skip unsafe', ref); continue
+                  url = base + urllib.parse.quote(remote, safe='/')
+                  target = root / remote
+                  try:
+                      download(url, target)
+                      print('  ok', remote, target.stat().st_size)
+                  except Exception as e:
+                      print('  optional texture missing', remote, e)
+              print('AC bytes', local_ac.stat().st_size)
+
+      - name: Convert detailed C172, 777 and F16 to glTF 2 GLB
+        working-directory: skyfrontiers3d
+        run: |
+          set -euo pipefail
+          mkdir -p public/models
+          assimp export /tmp/fg-c172/Models/c172-common.ac public/models/c172_fg.glb -f glb2
+          assimp export /tmp/fg-777/Models/777-200ER.ac public/models/b777_fg.glb -f glb2
+          assimp export /tmp/fg-f16/Models/F-16D.ac public/models/f16_fg.glb -f glb2
+          test -s public/models/c172_fg.glb
+          test -s public/models/b777_fg.glb
+          test -s public/models/f16_fg.glb
+          ls -lh public/models/*_fg.glb
+
+      - name: Validate detailed starter models
+        working-directory: skyfrontiers3d
+        shell: python
+        run: |
+          import json, struct, pathlib
+          minimum = {'c172_fg.glb':300000, 'b777_fg.glb':180000, 'f16_fg.glb':180000}
+          for name, min_geom in minimum.items():
+              p = pathlib.Path('public/models')/name
+              b = p.read_bytes(); magic, version, total = struct.unpack_from('<4sII', b, 0)
+              assert magic == b'glTF' and version == 2, (name, magic, version)
+              clen, ctype = struct.unpack_from('<II', b, 12)
+              assert ctype == 0x4E4F534A
+              g = json.loads(b[20:20+clen].decode('utf8').rstrip('\x00 \t\r\n'))
+              assert str(g.get('asset',{}).get('version','')).startswith('2')
+              assert len(g.get('meshes',[])) >= 5, (name, len(g.get('meshes',[])))
+              geom = sum(int(a.get('count',0)) for a in g.get('accessors',[]))
+              assert geom >= min_geom, (name, geom, min_geom)
+              print(name, 'meshes', len(g.get('meshes',[])), 'accessor elements', geom, 'materials', len(g.get('materials',[])), 'images', len(g.get('images',[])), 'bytes', p.stat().st_size)
+
+      - name: Download HD environment pack
+        working-directory: skyfrontiers3d
+        run: |
+          set -euxo pipefail
+          mkdir -p public/env public/quality
+          BASE_ENV=https://raw.githubusercontent.com/anshaneja5/skyline-run/main/public/assets/models
+          for f in b_small.glb b_medium.glb b_large.glb tree1.glb tree2.glb tree3.glb bush.glb; do
+            curl -fL --retry 3 -o public/env/$f $BASE_ENV/$f
+          done
+
+          P=https://dl.polyhaven.org/file/ph-assets/Textures/png/1k
+          for a in aerial_grass_rock aerial_asphalt_01 dirt_aerial_02 rock_ground_02; do
+            curl -fL --retry 3 -o public/quality/${a}_diff_1k.png $P/$a/${a}_diff_1k.png
+            curl -fL --retry 3 -o public/quality/${a}_nor_gl_1k.png $P/$a/${a}_nor_gl_1k.png
+            curl -fL --retry 3 -o public/quality/${a}_rough_1k.png $P/$a/${a}_rough_1k.png
+          done
+          curl -fL --retry 3 -o public/quality/waternormals.jpg https://raw.githubusercontent.com/mrdoob/three.js/r180/examples/textures/waternormals.jpg
+          curl -fL --retry 3 -o public/quality/sky.hdr https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/rural_asphalt_road_1k.hdr || \
+            curl -fL --retry 3 -o public/quality/sky.hdr https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/sunset_jhbcentral_1k.hdr
+
+      - name: Install web dependencies
+        working-directory: skyfrontiers3d
+        run: npm install --no-audit --no-fund
+
+      - name: Build 3D runtime
+        working-directory: skyfrontiers3d
+        run: npm run build
+
+      - name: Verify web runtime assets
+        working-directory: skyfrontiers3d
+        run: |
+          set -euo pipefail
+          for f in c172_fg b777_fg f16_fg; do test -s dist/models/$f.glb; done
+          test -s dist/env/carrier_hd.glb
+          test -s dist/quality/sky.hdr
+          ! grep -R -q 'spawnEmergencyPlaceholder' dist/assets
+          grep -R -q 'Cessna 172P' dist/assets
+          grep -R -q 'safeGround' dist/assets
+          du -sh dist
+
+      - name: Copy web build into Android assets
+        working-directory: skyfrontiers3d
+        run: |
+          rm -rf android/app/src/main/assets/www
+          mkdir -p android/app/src/main/assets/www
+          cp -R dist/. android/app/src/main/assets/www/
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build installable APK
+        working-directory: skyfrontiers3d/android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Verify finished APK
+        working-directory: skyfrontiers3d/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          for f in c172_fg b777_fg f16_fg; do unzip -l "$APK" | grep -q "assets/www/models/$f.glb"; done
+          unzip -l "$APK" | grep -q 'assets/www/env/carrier_hd.glb'
+          unzip -l "$APK" | grep -q 'assets/www/quality/sky.hdr'
+          SIZE=$(stat -c%s "$APK")
+          echo "APK bytes: $SIZE"
+          test "$SIZE" -ge 18000000
+          cp "$APK" ../../Sky-Frontiers-3D-VIDEO-FIX-v3.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sky-Frontiers-3D-VIDEO-FIX-v3-apk
+          path: Sky-Frontiers-3D-VIDEO-FIX-v3.apk
+          if-no-files-found: error
