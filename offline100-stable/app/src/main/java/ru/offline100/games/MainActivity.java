@@ -68,19 +68,7 @@ public final class MainActivity extends Activity {
                 Log.i(TAG,"PAGE_FINISHED "+url);
                 v.postDelayed(() -> {
                     v.evaluateJavascript("String(document.querySelectorAll('.game-card').length)", value -> Log.i(TAG,"GAME_CARD_COUNT="+value));
-                    if(testGame!=null && !testGame.isEmpty()){
-                        String js="Boolean(window.__openGameForTest && window.__openGameForTest("+JSONObject.quote(testGame)+"))";
-                        v.evaluateJavascript(js, result -> {
-                            Log.i(TAG,"OPEN_TEST_RESULT="+result+" game="+testGame);
-                            v.postDelayed(() -> {
-                                if(testFinish) v.evaluateJavascript("Boolean(window.__finishForTest && window.__finishForTest())", x -> Log.i(TAG,"FINISH_TEST_RESULT="+x));
-                                v.postDelayed(() -> {
-                                    v.evaluateJavascript("JSON.stringify(window.__qaSnapshot && window.__qaSnapshot())", snap -> Log.i(TAG,"QA_SNAPSHOT="+snap));
-                                    if(testFinish) v.evaluateJavascript("JSON.stringify(window.__resultSnapshot && window.__resultSnapshot())", snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap));
-                                },500);
-                            },700);
-                        });
-                    }
+                    if(testGame!=null && !testGame.isEmpty()) runQaProbe(v);
                 },900);
             }
             @Override public boolean onRenderProcessGone(WebView v, RenderProcessGoneDetail detail) {
@@ -91,6 +79,24 @@ public final class MainActivity extends Activity {
         view.setOverScrollMode(View.OVER_SCROLL_NEVER);
         view.setVerticalScrollBarEnabled(false);
         view.setHorizontalScrollBarEnabled(false);
+    }
+
+    private void runQaProbe(WebView v) {
+        String id = JSONObject.quote(testGame);
+        String js;
+        if(testFinish) {
+            js = "JSON.stringify((()=>{const opened=Boolean(window.__openGameForTest&&window.__openGameForTest("+id+"));const finished=Boolean(window.__finishForTest&&window.__finishForTest());return {opened,finished,qa:window.__qaSnapshot&&window.__qaSnapshot(),result:window.__resultSnapshot&&window.__resultSnapshot()};})())";
+        } else {
+            js = "JSON.stringify((()=>{const opened=Boolean(window.__openGameForTest&&window.__openGameForTest("+id+"));return {opened,qa:window.__qaSnapshot&&window.__qaSnapshot()};})())";
+        }
+        v.evaluateJavascript(js, result -> {
+            Log.i(TAG,"QA_PROBE="+result);
+            if(testFinish) {
+                v.evaluateJavascript("JSON.stringify(window.__resultSnapshot&&window.__resultSnapshot())", snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap));
+            } else {
+                v.evaluateJavascript("JSON.stringify(window.__qaSnapshot&&window.__qaSnapshot())", snap -> Log.i(TAG,"QA_SNAPSHOT="+snap));
+            }
+        });
     }
 
     private void applyImmersiveMode() {
