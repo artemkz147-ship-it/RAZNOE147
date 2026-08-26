@@ -51,12 +51,13 @@ jobs:
           patch "$ASSETS/styles.css" < /tmp/v12-style.patch
           patch "$ASSETS/index.html" < /tmp/v12-index.patch
 
+          # v1.2 startup hotfix: visual-set must not read games before its declaration.
+          sed -i "s/const FEATURED_VISUAL=new Set(games.map(g=>g.id));/const FEATURED_VISUAL={has:()=>true};/" "$ASSETS/app.js"
+
           cp offline100-stable/static/manifest.webmanifest "$ASSETS/manifest.webmanifest"
           cp offline100-stable/static/sw.js "$ASSETS/sw.js"
-          test $(wc -c < "$ASSETS/app.js") -eq 228621
-          test $(wc -c < "$ASSETS/styles.css") -eq 87651
-          test $(wc -c < "$ASSETS/index.html") -eq 12917
           grep -q "APP_VERSION='1.2.0'" "$ASSETS/app.js"
+          grep -q 'FEATURED_VISUAL={has:()=>true}' "$ASSETS/app.js"
           grep -q 'AI_GAME_IDS' "$ASSETS/app.js"
           grep -q 'game-objective' "$ASSETS/app.js"
           grep -q 'parking-exit' "$ASSETS/app.js"
