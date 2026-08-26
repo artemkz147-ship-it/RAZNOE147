@@ -39,7 +39,8 @@ class ExportManager(private val context:Context){private var transformer:Transfo
                         buildSpecialEffectEffects(clip)+
                         buildDynamicImageStickerEffects(context,clip)+
                         buildGifStickerEffects(context,clip)+
-                        buildAnimatedStickerEffects(clip)
+                        buildAnimatedStickerEffects(clip)+
+                        buildTrackedObjectOverlayEffects(clip)
                 )).build()
         }
         val sequences=mutableListOf(EditedMediaItemSequence.withAudioAndVideoFrom(items));val duration=clips.sumOf{it.durationMs}.coerceAtLeast(1L)
