@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -91,12 +90,7 @@ internal fun ProTimeline(
                 ) {
                     Box(Modifier.fillMaxWidth().height(43.dp)) {
                         ClipTimelineThumbnail(clip, Modifier.fillMaxWidth().fillMaxHeight())
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight()
-                                .background(Color(0x26000000))
-                        )
+                        Box(Modifier.fillMaxWidth().fillMaxHeight().background(Color(0x26000000)))
                         Text(
                             "${index + 1}",
                             color = Color.White,
@@ -117,7 +111,7 @@ internal fun ProTimeline(
                             if (hasVisualEdits(clip)) TimelineBadge("FX")
                             if (clip.transitionOut != TransitionType.NONE) TimelineBadge("↔")
                         }
-                        if (selected) {
+                        if (selected && progress > 0f) {
                             Box(
                                 Modifier
                                     .align(Alignment.BottomStart)
@@ -173,7 +167,7 @@ private fun ClipTimelineThumbnail(clip: VideoClip, modifier: Modifier = Modifier
                 val uri = Uri.parse(clip.uri)
                 if (uri.scheme == "file") retriever.setDataSource(uri.path)
                 else retriever.setDataSource(context, uri)
-                val frameMs = clip.trimStartMs + (clip.sourceSliceDurationMs / 2L)
+                val frameMs = clip.trimStartMs + clip.sourceSliceDurationMs / 2L
                 retriever.getFrameAtTime(frameMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
             } catch (_: Throwable) {
                 null
@@ -207,5 +201,5 @@ private fun hasVisualEdits(clip: VideoClip): Boolean =
         clip.stickers.isNotEmpty() ||
         clip.animatedStickers.isNotEmpty() ||
         clip.gifStickers.isNotEmpty() ||
-        clip.trackedObjectOverlays.isNotEmpty() ||
+        clip.trackedOverlays.isNotEmpty() ||
         clip.overlayText.isNotBlank()
