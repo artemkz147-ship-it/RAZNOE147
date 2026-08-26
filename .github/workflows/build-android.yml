@@ -43,7 +43,7 @@ jobs:
           curl -L --fail --retry 3 -o /tmp/trex-source/textures/material_0_normal.png "$TREX_BASE/textures/material_0_normal.png"
           curl -L --fail --retry 3 -o /tmp/trex-source/textures/material_0_occlusion.png "$TREX_BASE/textures/material_0_occlusion.png"
           curl -L --fail --retry 3 -o /tmp/trex-source/textures/material_0_specularGlossiness.png "$TREX_BASE/textures/material_0_specularGlossiness.png"
-          npx --yes "gltfpack@${GLTFPACK_VERSION}" -i /tmp/trex-source/scene.gltf -o assets/dinosaurs/tyrannosaurus_rex/model.glb -kn -km -ke
+          npx --yes "gltfpack@${GLTFPACK_VERSION}" -i /tmp/trex-source/scene.gltf -o assets/dinosaurs/tyrannosaurus_rex/model.glb -noq -kn -km -ke
           python3 - <<'PY'
           import json, struct
           p='assets/dinosaurs/tyrannosaurus_rex/model.glb'
@@ -53,7 +53,9 @@ jobs:
               clen, ctype = struct.unpack('<II', f.read(8)); assert ctype == 0x4E4F534A
               doc=json.loads(f.read(clen).decode('utf-8'))
           names=[(a.get('name') or '').lower() for a in doc.get('animations',[])]
-          print('animated T. rex bytes:', total); print('animations:', names)
+          extensions=set(doc.get('extensionsUsed', [])) | set(doc.get('extensionsRequired', []))
+          print('animated T. rex bytes:', total); print('animations:', names); print('extensions:', sorted(extensions))
+          assert 'KHR_mesh_quantization' not in extensions, extensions
           assert len(names) >= 5, names
           for required in ('idle','run','roar','bite'):
               assert any(required in n for n in names), (required,names)
