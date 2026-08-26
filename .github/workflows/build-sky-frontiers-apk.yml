@@ -18,20 +18,60 @@ jobs:
           unzip -q skyfrontiers3d-src.zip
           test -f skyfrontiers3d/game.js
 
+      - name: Apply HD quality patch
+        run: |
+          python sky_quality_patch.py
+          node --check skyfrontiers3d/game.js
+
+      - name: Build authored carrier model
+        run: |
+          python -m pip install --quiet trimesh numpy
+          python make_carrier.py skyfrontiers3d/public/env/carrier_hd.glb
+          test -s skyfrontiers3d/public/env/carrier_hd.glb
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Download 3 bundled aircraft
+      - name: Download starter aircraft and HD environment
         working-directory: skyfrontiers3d
         run: |
-          mkdir -p public/models
+          set -euxo pipefail
+          mkdir -p public/models public/env public/quality
+
           curl -fL --retry 3 -o public/models/pa28.glb https://raw.githubusercontent.com/Flightradar24/fr24-3d-models/master/models/pa28.glb
           curl -fL --retry 3 -o public/models/ask21.glb https://raw.githubusercontent.com/Flightradar24/fr24-3d-models/master/models/ask21.glb
           curl -fL --retry 3 -o public/models/atr42.glb https://raw.githubusercontent.com/Flightradar24/fr24-3d-models/master/models/atr42.glb
+
+          BASE=https://raw.githubusercontent.com/anshaneja5/skyline-run/main/public/assets/models
+          for f in b_small.glb b_medium.glb b_large.glb tree1.glb tree2.glb tree3.glb bush.glb; do
+            curl -fL --retry 3 -o public/env/$f $BASE/$f
+          done
+
+          P=https://dl.polyhaven.org/file/ph-assets/Textures/png/1k
+          for a in aerial_grass_rock aerial_asphalt_01 dirt_aerial_02 rock_ground_02; do
+            curl -fL --retry 3 -o public/quality/${a}_diff_1k.png $P/$a/${a}_diff_1k.png
+            curl -fL --retry 3 -o public/quality/${a}_nor_gl_1k.png $P/$a/${a}_nor_gl_1k.png
+            curl -fL --retry 3 -o public/quality/${a}_rough_1k.png $P/$a/${a}_rough_1k.png
+          done
+
+          curl -fL --retry 3 -o public/quality/waternormals.jpg https://raw.githubusercontent.com/mrdoob/three.js/r180/examples/textures/waternormals.jpg
+          curl -fL --retry 3 -o public/quality/sky.hdr https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/rural_asphalt_road_1k.hdr || \
+            curl -fL --retry 3 -o public/quality/sky.hdr https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/sunset_jhbcentral_1k.hdr
+
           test -s public/models/pa28.glb
           test -s public/models/ask21.glb
           test -s public/models/atr42.glb
+          test -s public/env/b_large.glb
+          test -s public/env/tree1.glb
+          test -s public/env/carrier_hd.glb
+          test -s public/quality/aerial_grass_rock_diff_1k.png
+          test -s public/quality/aerial_asphalt_01_nor_gl_1k.png
+          test -s public/quality/dirt_aerial_02_rough_1k.png
+          test -s public/quality/rock_ground_02_diff_1k.png
+          test -s public/quality/waternormals.jpg
+          test -s public/quality/sky.hdr
+          du -sh public/models public/env public/quality
 
       - name: Install web dependencies
         working-directory: skyfrontiers3d
@@ -40,6 +80,15 @@ jobs:
       - name: Build 3D web runtime
         working-directory: skyfrontiers3d
         run: npm run build
+
+      - name: Verify HD web build
+        working-directory: skyfrontiers3d
+        run: |
+          test -s dist/env/b_large.glb
+          test -s dist/env/carrier_hd.glb
+          test -s dist/quality/aerial_grass_rock_diff_1k.png
+          test -s dist/quality/sky.hdr
+          du -sh dist
 
       - name: Copy web build into Android assets
         working-directory: skyfrontiers3d
@@ -68,7 +117,7 @@ jobs:
         working-directory: skyfrontiers3d/android
         run: gradle --no-daemon assembleDebug
 
-      - name: Verify APK contains starter models
+      - name: Verify APK contains real HD assets
         working-directory: skyfrontiers3d/android
         run: |
           APK=app/build/outputs/apk/debug/app-debug.apk
@@ -76,10 +125,20 @@ jobs:
           unzip -l "$APK" | grep -q 'assets/www/models/pa28.glb'
           unzip -l "$APK" | grep -q 'assets/www/models/ask21.glb'
           unzip -l "$APK" | grep -q 'assets/www/models/atr42.glb'
-          cp "$APK" ../../Sky-Frontiers-3D-gyro.apk
+          unzip -l "$APK" | grep -q 'assets/www/env/b_large.glb'
+          unzip -l "$APK" | grep -q 'assets/www/env/tree1.glb'
+          unzip -l "$APK" | grep -q 'assets/www/env/carrier_hd.glb'
+          unzip -l "$APK" | grep -q 'assets/www/quality/aerial_grass_rock_diff_1k.png'
+          unzip -l "$APK" | grep -q 'assets/www/quality/aerial_asphalt_01_nor_gl_1k.png'
+          unzip -l "$APK" | grep -q 'assets/www/quality/waternormals.jpg'
+          unzip -l "$APK" | grep -q 'assets/www/quality/sky.hdr'
+          SIZE=$(stat -c%s "$APK")
+          echo "APK bytes: $SIZE"
+          test "$SIZE" -ge 14000000
+          cp "$APK" ../../Sky-Frontiers-3D-HD-gyro.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Sky-Frontiers-3D-gyro-apk
-          path: Sky-Frontiers-3D-gyro.apk
+          name: Sky-Frontiers-3D-HD-gyro-apk
+          path: Sky-Frontiers-3D-HD-gyro.apk
           if-no-files-found: error
