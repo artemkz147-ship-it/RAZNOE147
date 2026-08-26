@@ -91,8 +91,8 @@ func _fit_camera_to_actor(actor: Node3D) -> void:
         camera_rig.call("reset_view")
         return
     var center := actor.to_global(bounds.get_center())
-    var radius := max(bounds.size.x, max(bounds.size.y, bounds.size.z)) * 0.5
-    camera_rig.call("focus_target", center, max(radius, 1.0))
+    var radius: float = maxf(bounds.size.x, maxf(bounds.size.y, bounds.size.z)) * 0.5
+    camera_rig.call("focus_target", center, maxf(radius, 1.0))
 
 func _combined_aabb(root: Node3D) -> AABB:
     var has_bounds := false
@@ -166,7 +166,7 @@ func _update_labels() -> void:
     name_label.text = str(current_data.get("name_ru", "")); latin_label.text = str(current_data.get("scientific_name", "")); era_label.text = "%s · %s" % [current_data.get("period_ru", ""), current_data.get("region_ru", "")]; info_text.text = _build_info_bbcode()
 
 func _build_info_bbcode() -> String:
-    var evidence := current_data.get("evidence_notes", []); var evidence_text := ""
+    var evidence: Array = current_data.get("evidence_notes", []); var evidence_text := ""
     for note in evidence: evidence_text += "\n• %s" % str(note)
     return "[font_size=26][b]%s[/b][/font_size]\n[i]%s[/i]\n\n[b]Период:[/b] %s\n[b]Регион:[/b] %s\n[b]Питание:[/b] %s\n[b]Длина:[/b] ~%s м\n[b]Масса:[/b] ~%s кг\n\n%s\n\n[b]Что известно наверняка / где реконструкция[/b]%s" % [current_data.get("name_ru", ""), current_data.get("scientific_name", ""), current_data.get("period_ru", ""), current_data.get("region_ru", ""), current_data.get("diet_ru", ""), current_data.get("length_m", "—"), current_data.get("mass_kg", "—"), current_data.get("description_ru", ""), evidence_text]
 
