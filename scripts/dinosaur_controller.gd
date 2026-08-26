@@ -12,17 +12,42 @@ var _auto_cycle_actions: Array[String] = []
 var _auto_timer: Timer
 var _is_busy := false
 var _current_action := "idle"
+var _home_position := Vector3.ZERO
+var _walk_speed := 1.10
+var _walk_turn_rate := 0.0
+var _wander_radius := 3.2
 
 func _ready() -> void:
     _auto_timer = Timer.new()
     _auto_timer.one_shot = true
     _auto_timer.timeout.connect(_on_auto_timer_timeout)
     add_child(_auto_timer)
+    set_process(true)
+
+func _process(delta: float) -> void:
+    if not _is_busy or _current_action != "walk" or actor == null or not is_instance_valid(actor):
+        return
+    # The source run clip is primarily an in-place skeletal animation. Add restrained
+    # world locomotion so the animal actually changes position without leaving the exhibit.
+    if absf(_walk_turn_rate) > 0.001:
+        actor.rotate_y(_walk_turn_rate * delta)
+    var forward := actor.basis.z.normalized()
+    var proposed := actor.position + forward * _walk_speed * delta
+    var offset := proposed - _home_position
+    if offset.length() <= _wander_radius:
+        actor.position = proposed
+    else:
+        # Turn back toward the exhibit instead of snapping/teleporting.
+        var to_home := (_home_position - actor.position).normalized()
+        if to_home.length() > 0.01:
+            var desired_yaw := atan2(to_home.x, to_home.z)
+            actor.rotation.y = lerp_angle(actor.rotation.y, desired_yaw, minf(delta * 2.2, 1.0))
 
 func attach(new_actor: Node3D, actions: Dictionary) -> void:
     actor = new_actor
     action_map = actions
     animation_player = _find_animation_player(actor)
+    _home_position = actor.position
     _idle_candidates = _to_string_array(action_map.get("idle", ["idle", "Idle"]))
     _auto_cycle_actions.clear()
     for candidate in ["roar", "bite", "threat", "walk"]:
@@ -42,6 +67,7 @@ func play_idle() -> void:
         return
     _is_busy = false
     _current_action = "idle"
+    _walk_turn_rate = 0.0
     animation_player.speed_scale = 1.0
     var anim: Animation = animation_player.get_animation(clip)
     if anim != null:
@@ -57,7 +83,11 @@ func play_action(action_name: String) -> bool:
         return false
     _is_busy = true
     _current_action = action_name
+    _walk_turn_rate = randf_range(-0.18, 0.18) if action_name == "walk" else 0.0
     animation_player.speed_scale = _speed_for_action(action_name)
+    var anim: Animation = animation_player.get_animation(clip)
+    if anim != null:
+        anim.loop_mode = Animation.LOOP_NONE
     animation_player.play(clip, 0.20)
     action_started.emit(action_name)
     if not animation_player.animation_finished.is_connected(_on_animation_finished):
@@ -76,6 +106,8 @@ func stop_all() -> void:
     if animation_player != null:
         animation_player.stop()
     _is_busy = false
+    _current_action = "idle"
+    _walk_turn_rate = 0.0
 
 func _speed_for_action(action_name: String) -> float:
     match action_name:
