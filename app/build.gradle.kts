@@ -56,6 +56,7 @@ dependencies {
     implementation("androidx.media3:media3-transformer:$media3")
     implementation("androidx.media3:media3-effect:$media3")
 
-    // Bundled model: works without Google Play model downloads or a server.
+    // Bundled/on-device ML. No server upload is required.
     implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
+    implementation("com.google.mlkit:object-detection:17.0.2")
 }
