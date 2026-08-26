@@ -21,6 +21,8 @@ public final class MainActivity extends Activity {
     private WebView webView;
     private String testGame;
     private boolean testFinish;
+    private int readyAttempts;
+    private boolean qaReady;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -66,12 +68,12 @@ public final class MainActivity extends Activity {
             }
             @Override public void onPageFinished(WebView v,String url) {
                 Log.i(TAG,"PAGE_FINISHED "+url);
-                v.postDelayed(() -> {
-                    v.evaluateJavascript("String(document.querySelectorAll('.game-card').length)", value -> Log.i(TAG,"GAME_CARD_COUNT="+value));
-                    if(testGame!=null && !testGame.isEmpty()) runQaProbe(v);
-                },900);
+                if (!qaReady) v.postDelayed(() -> waitForReady(v), 250);
             }
-            @Override public boolean onRenderProcessGone(WebView v, RenderProcessGoneDetail detail) {
+            @Override public void onReceivedError(WebView v, android.webkit.WebResourceRequest request, android.webkit.WebResourceError error) {
+                if (request != null && request.isForMainFrame()) Log.e(TAG,"MAIN_FRAME_ERROR "+error);
+            }
+            @Override public void onRenderProcessGone(WebView v, RenderProcessGoneDetail detail) {
                 Log.e(TAG,"WEBVIEW_RENDERER_GONE didCrash="+detail.didCrash());
                 return false;
             }
@@ -81,22 +83,83 @@ public final class MainActivity extends Activity {
         view.setHorizontalScrollBarEnabled(false);
     }
 
+    private void waitForReady(WebView v) {
+        if (qaReady || v == null) return;
+        String js = "document.readyState==='complete' && document.querySelectorAll('.game-card').length===100 && typeof window.__openGameForTest==='function' && typeof window.__finishForTest==='function'";
+        v.evaluateJavascript(js, value -> {
+            if ("true".equals(value)) {
+                qaReady = true;
+                Log.i(TAG,"GAME_CARD_COUNT=\"100\"");
+                logHomeQa(v);
+                return;
+            }
+            readyAttempts++;
+            if (readyAttempts < 80) v.postDelayed(() -> waitForReady(v), 500);
+            else Log.e(TAG,"QA_READY_TIMEOUT attempts="+readyAttempts+" value="+value);
+        });
+    }
+
+    private void logHomeQa(WebView v) {
+        String js = "JSON.stringify((()=>{"+
+                "const cards=[...document.querySelectorAll('.game-card')];"+
+                "const ids=cards.map(c=>c.dataset.id||'');"+
+                "const titleIssues=cards.filter(c=>{const h=c.querySelector('h3');if(!h)return true;return h.scrollWidth>h.clientWidth+1||h.scrollHeight>h.clientHeight+1}).map(c=>c.dataset.id);"+
+                "return {cards:cards.length,unique:new Set(ids).size,bodyOverflow:document.documentElement.scrollWidth>window.innerWidth+2,titleIssues,viewport:[innerWidth,innerHeight]};"+
+                "})())";
+        v.evaluateJavascript(js, snap -> {
+            Log.i(TAG,"HOME_QA="+snap);
+            if (testGame != null && !testGame.isEmpty()) runQaProbe(v);
+        });
+    }
+
+    private String gameSnapshotJs() {
+        return "JSON.stringify((()=>{"+
+                "const m=document.querySelector('#gameMount');"+
+                "const s=document.querySelector('.opponent-selector');"+
+                "const a=s&&s.querySelector('[data-mode].active');"+
+                "const visible=e=>{if(!e)return false;const r=e.getBoundingClientRect(),cs=getComputedStyle(e);return cs.display!=='none'&&cs.visibility!=='hidden'&&r.width>0&&r.height>0};"+
+                "return {"+
+                "game:(document.body.dataset.game||''),"+
+                "title:(document.querySelector('#gameTitle')?.textContent||'').trim(),"+
+                "objective:(document.querySelector('.game-objective b')?.textContent||'').trim(),"+
+                "mountChars:m?m.innerHTML.length:0,"+
+                "mountChildren:m?m.querySelectorAll('*').length:0,"+
+                "bodyOverflow:document.documentElement.scrollWidth>window.innerWidth+2,"+
+                "mountOverflow:m?m.scrollWidth>m.clientWidth+2:false,"+
+                "aiSelector:!!s,"+
+                "aiMode:a?.dataset.mode||'',"+
+                "parkingExit:visible(document.querySelector('.parking-exit')),"+
+                "pipeTerminals:[...document.querySelectorAll('.pipe-terminal')].filter(visible).length,"+
+                "viewport:[innerWidth,innerHeight]"+
+                "};})())";
+    }
+
+    private String resultSnapshotJs() {
+        return "JSON.stringify((()=>{"+
+                "const m=document.querySelector('#resultModal');"+
+                "const msg=document.querySelector('#resultMessage');"+
+                "const buttons=['#resultReplayBtn','#resultNextBtn','#resultHomeBtn'].map(x=>(document.querySelector(x)?.textContent||'').trim());"+
+                "return {open:!!m?.classList.contains('open'),title:(document.querySelector('#resultTitle')?.textContent||'').trim(),message:(msg?.innerText||'').trim(),goal:(msg?.querySelector('small')?.textContent||'').trim(),buttons,bodyOverflow:document.documentElement.scrollWidth>window.innerWidth+2};"+
+                "})())";
+    }
+
     private void runQaProbe(WebView v) {
         String id = JSONObject.quote(testGame);
-        String js;
-        if(testFinish) {
-            js = "JSON.stringify((()=>{const opened=Boolean(window.__openGameForTest&&window.__openGameForTest("+id+"));const finished=Boolean(window.__finishForTest&&window.__finishForTest());return {opened,finished,qa:window.__qaSnapshot&&window.__qaSnapshot()};})())";
-        } else {
-            js = "JSON.stringify((()=>{const opened=Boolean(window.__openGameForTest&&window.__openGameForTest("+id+"));return {opened,qa:window.__qaSnapshot&&window.__qaSnapshot()};})())";
-        }
-        v.evaluateJavascript(js, result -> {
-            Log.i(TAG,"QA_PROBE="+result);
-            if(testFinish) {
-                v.postDelayed(() -> v.evaluateJavascript("JSON.stringify(window.__resultSnapshot&&window.__resultSnapshot())", snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap)), 450);
-            } else {
-                v.evaluateJavascript("JSON.stringify(window.__qaSnapshot&&window.__qaSnapshot())", snap -> Log.i(TAG,"QA_SNAPSHOT="+snap));
-            }
+        String openJs = "Boolean(window.__openGameForTest&&window.__openGameForTest("+id+"))";
+        v.evaluateJavascript(openJs, opened -> {
+            Log.i(TAG,"QA_OPEN game="+testGame+" opened="+opened);
+            v.postDelayed(() -> v.evaluateJavascript(gameSnapshotJs(), snap -> {
+                Log.i(TAG,"QA_SNAPSHOT="+snap);
+                if (testFinish) finishQaProbe(v);
+            }), 300);
         });
+    }
+
+    private void finishQaProbe(WebView v) {
+        v.postDelayed(() -> v.evaluateJavascript("Boolean(window.__finishForTest&&window.__finishForTest())", finished -> {
+            Log.i(TAG,"QA_FINISH game="+testGame+" finished="+finished);
+            v.postDelayed(() -> v.evaluateJavascript(resultSnapshotJs(), snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap)), 300);
+        }), 250);
     }
 
     private void applyImmersiveMode() {
