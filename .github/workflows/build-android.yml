@@ -119,10 +119,17 @@ jobs:
 
       - name: Install Godot 4.7.2 and export templates
         run: |
-          curl -L --fail -o /tmp/godot.zip "https://downloads.godotengine.org/?flavor=stable&platform=linux.64&slug=linux.x86_64.zip&version=${GODOT_VERSION}"
+          set -euxo pipefail
+          GODOT_RELEASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl --http1.1 -L --fail --retry 8 --retry-all-errors --retry-delay 2 -o /tmp/godot.zip "${GODOT_RELEASE}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
           unzip -q /tmp/godot.zip -d /tmp/godot
           sudo install -m 0755 /tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
-          curl -L --fail -o /tmp/templates.tpz "https://downloads.godotengine.org/?flavor=stable&platform=templates&slug=export_templates.tpz&version=${GODOT_VERSION}"
+          rm -f /tmp/templates.tpz
+          for attempt in 1 2 3 4 5 6 7 8; do
+            curl --http1.1 -L --fail --retry 4 --retry-all-errors --retry-delay 2 -C - -o /tmp/templates.tpz "${GODOT_RELEASE}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" && break
+            echo "Template download attempt ${attempt} interrupted; resuming..."
+          done
+          unzip -tq /tmp/templates.tpz >/dev/null
           mkdir -p /tmp/templates "$HOME/.local/share/godot/export_templates/${GODOT_VERSION_ID}"
           unzip -q /tmp/templates.tpz -d /tmp/templates
           cp -a /tmp/templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION_ID}/"
