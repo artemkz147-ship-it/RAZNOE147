@@ -120,4 +120,10 @@ internal fun MotionPanel(
             },
         )
     }
+
+    VideoOverlayPanel(
+        clip = clip,
+        onSnapshot = onSnapshot,
+        onUpdate = onUpdate,
+    )
 }
