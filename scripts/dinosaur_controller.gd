@@ -27,8 +27,6 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     if not _is_busy or _current_action != "walk" or actor == null or not is_instance_valid(actor):
         return
-    # The source run clip is primarily an in-place skeletal animation. Add restrained
-    # world locomotion so the animal actually changes position without leaving the exhibit.
     if absf(_walk_turn_rate) > 0.001:
         actor.rotate_y(_walk_turn_rate * delta)
     var forward := actor.basis.z.normalized()
@@ -37,7 +35,6 @@ func _process(delta: float) -> void:
     if offset.length() <= _wander_radius:
         actor.position = proposed
     else:
-        # Turn back toward the exhibit instead of snapping/teleporting.
         var to_home := (_home_position - actor.position).normalized()
         if to_home.length() > 0.01:
             var desired_yaw := atan2(to_home.x, to_home.z)
@@ -118,10 +115,10 @@ func _play_host_roar_audio() -> void:
     var value: Variant = host.get("roar_player")
     if value is AudioStreamPlayer3D:
         var player := value as AudioStreamPlayer3D
-        if player.stream != null:
+        if player.stream != null and not player.playing:
             if actor != null and is_instance_valid(actor):
                 player.global_position = actor.global_position
-            player.play()
+            player.play(0.0)
 
 func _speed_for_action(action_name: String) -> float:
     match action_name:
