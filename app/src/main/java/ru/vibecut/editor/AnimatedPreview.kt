@@ -67,7 +67,7 @@ internal fun EditorPreview(
     LaunchedEffect(clip.id, clip.trimStartMs, clip.trimEndMs) {
         val clipping = MediaItem.ClippingConfiguration.Builder().setStartPositionMs(clip.trimStartMs).setEndPositionMs(clip.trimEndMs).build()
         player.setMediaItem(MediaItem.Builder().setUri(clip.uri).setClippingConfiguration(clipping).build())
-        player.prepare(); player.seekTo(0L); position = 0L; duration = clip.sourceSliceDurationMs; onPosition(0L)
+        player.prepare(); player.seekTo(0L); position = 0L; duration = clip.sourceSliceDurationMs; EditorCursorState.clipPositionMs = 0L; onPosition(0L)
     }
 
     LaunchedEffect(clip, incomingTransition, exportSettings) {
@@ -85,7 +85,13 @@ internal fun EditorPreview(
     }
 
     LaunchedEffect(player) {
-        while (true) { position = player.currentPosition.coerceAtLeast(0L); if (player.duration > 0) duration = player.duration; onPosition(position); delay(80L) }
+        while (true) {
+            position = player.currentPosition.coerceAtLeast(0L)
+            if (player.duration > 0) duration = player.duration
+            EditorCursorState.clipPositionMs = position
+            onPosition(position)
+            delay(80L)
+        }
     }
 
     val globalPositionMs = projectOffsetMs + (position / clip.speed.coerceAtLeast(0.05f)).toLong()
@@ -107,7 +113,15 @@ internal fun EditorPreview(
                 )
             }
         }
-        Slider(value = position.toFloat().coerceIn(0f, duration.coerceAtLeast(1L).toFloat()), onValueChange = { val target=it.toLong();player.seekTo(target);position=target;onPosition(target) }, valueRange = 0f..duration.coerceAtLeast(1L).toFloat(), modifier=Modifier.fillMaxWidth())
+        Slider(
+            value = position.toFloat().coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
+            onValueChange = {
+                val target = it.toLong()
+                player.seekTo(target); position = target; EditorCursorState.clipPositionMs = target; onPosition(target)
+            },
+            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
+            modifier = Modifier.fillMaxWidth(),
+        )
         Row(modifier=Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
             Button(onClick={if(playing)player.pause() else player.play()}){Text(if(playing)"Пауза" else "Пуск")}
             Text("${formatTime(position)} / ${formatTime(duration)} · ${formatSpeed(clip.speed)}",color=Color(0xFFCACAD3),style=MaterialTheme.typography.labelSmall)
