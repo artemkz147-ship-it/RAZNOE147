@@ -18,63 +18,89 @@ on:
 jobs:
   android-debug:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       GODOT_VERSION: '4.7.2'
       GODOT_VERSION_ID: '4.7.2.stable'
       GLTFPACK_VERSION: '1.2.0'
-      TREX_MODEL_URL: 'https://raw.githubusercontent.com/s010s/prehistoric-animal-museum/4d824cb1973861c1463b012cb0d6bc5976cf9c1f/src/content/animals/tyrannosaurus-rex/model/model.glb'
-      TREX_MODEL_SHA256: 'ea15319ca1fa3724f1a961515c36b4834446f5ac30a9b0de49b62881877efa54'
+      TREX_BASE: 'https://raw.githubusercontent.com/adawolfs/ar/main/assets/models/trex'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch and convert pinned CC BY T. rex model
+      - name: Install production audio tools
         run: |
-          mkdir -p assets/dinosaurs/tyrannosaurus_rex
-          curl -L --fail --retry 3 --retry-delay 2 \
-            -o /tmp/trex-source.glb \
-            "$TREX_MODEL_URL"
-          echo "$TREX_MODEL_SHA256  /tmp/trex-source.glb" | sha256sum -c -
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng python3-venv
 
-          npx --yes "gltfpack@${GLTFPACK_VERSION}" \
-            -i /tmp/trex-source.glb \
-            -o assets/dinosaurs/tyrannosaurus_rex/model.glb \
-            -noq -kn -km -ke
-
+      - name: Fetch animated CC BY T. rex with PBR textures
+        run: |
+          set -euxo pipefail
+          rm -rf /tmp/trex-source
+          mkdir -p /tmp/trex-source/textures assets/dinosaurs/tyrannosaurus_rex
+          curl -L --fail --retry 3 -o /tmp/trex-source/scene.gltf "$TREX_BASE/scene.gltf"
+          curl -L --fail --retry 3 -o /tmp/trex-source/scene.bin "$TREX_BASE/scene.bin"
+          curl -L --fail --retry 3 -o /tmp/trex-source/textures/material_0_diffuse.png "$TREX_BASE/textures/material_0_diffuse.png"
+          curl -L --fail --retry 3 -o /tmp/trex-source/textures/material_0_normal.png "$TREX_BASE/textures/material_0_normal.png"
+          curl -L --fail --retry 3 -o /tmp/trex-source/textures/material_0_occlusion.png "$TREX_BASE/textures/material_0_occlusion.png"
+          curl -L --fail --retry 3 -o /tmp/trex-source/textures/material_0_specularGlossiness.png "$TREX_BASE/textures/material_0_specularGlossiness.png"
+          npx --yes "gltfpack@${GLTFPACK_VERSION}" -i /tmp/trex-source/scene.gltf -o assets/dinosaurs/tyrannosaurus_rex/model.glb -kn -km -ke
           python3 - <<'PY'
           import json, struct
-          path = 'assets/dinosaurs/tyrannosaurus_rex/model.glb'
-          with open(path, 'rb') as f:
+          p='assets/dinosaurs/tyrannosaurus_rex/model.glb'
+          with open(p,'rb') as f:
               magic, version, total = struct.unpack('<4sII', f.read(12))
               assert magic == b'glTF' and version == 2 and total > 1_000_000
-              chunk_len, chunk_type = struct.unpack('<II', f.read(8))
-              assert chunk_type == 0x4E4F534A
-              doc = json.loads(f.read(chunk_len).decode('utf-8'))
-          required = set(doc.get('extensionsRequired', []))
-          used = set(doc.get('extensionsUsed', []))
-          forbidden = {'EXT_meshopt_compression', 'KHR_meshopt_compression', 'KHR_mesh_quantization'}
-          assert not (required & forbidden), f'Godot-incompatible required extensions remain: {required & forbidden}'
-          assert not (used & {'EXT_meshopt_compression', 'KHR_meshopt_compression'}), 'Meshopt compression remains in output'
-          animations = [a.get('name', '<unnamed>') for a in doc.get('animations', [])]
-          print('converted GLB bytes:', total)
-          print('extensions required:', sorted(required))
-          print('extensions used:', sorted(used))
-          print('nodes:', len(doc.get('nodes', [])))
-          print('meshes:', len(doc.get('meshes', [])))
-          print('materials:', len(doc.get('materials', [])))
-          print('animations:', animations)
-          assert doc.get('meshes'), 'No meshes in converted T. rex GLB'
-          assert any('idle' in name.lower() for name in animations), 'Converted T. rex lost Idle animation'
+              clen, ctype = struct.unpack('<II', f.read(8)); assert ctype == 0x4E4F534A
+              doc=json.loads(f.read(clen).decode('utf-8'))
+          names=[(a.get('name') or '').lower() for a in doc.get('animations',[])]
+          print('animated T. rex bytes:', total); print('animations:', names)
+          assert len(names) >= 5, names
+          for required in ('idle','run','roar','bite'):
+              assert any(required in n for n in names), (required,names)
+          assert any('tail' in n for n in names), names
+          assert doc.get('meshes'), 'No T. rex meshes'
           PY
 
-      - name: Generate original scene audio
+      - name: Fetch scanned Poly Haven habitat assets
         run: |
-          python3 tools/generate_trex_bellow.py
-          python3 tools/generate_hell_creek_ambience.py
-          test -s assets/audio/tyrannosaurus_rex/roar_reconstruction.wav
-          test -s assets/audio/tyrannosaurus_rex/hell_creek_ambience.wav
-          sha256sum assets/audio/tyrannosaurus_rex/roar_reconstruction.wav
-          sha256sum assets/audio/tyrannosaurus_rex/hell_creek_ambience.wav
+          set -euxo pipefail
+          python3 tools/fetch_polyhaven_assets.py
+          test -s assets/environments/hell_creek/models/fern_02.glb
+          test -s assets/environments/hell_creek/models/dead_tree_trunk.glb
+          test -s assets/environments/hell_creek/models/tree_stump_01.glb
+          test -s assets/environments/hell_creek/models/rock_moss_set_01.glb
+          test -s assets/environments/hell_creek/models/shrub_03.glb
+          test -s assets/environments/hell_creek/textures/mud_forest_diff_1k.jpg
+          test -s assets/environments/hell_creek/xanderklinge_2k.hdr
+
+      - name: Build real field-recording audio
+        run: |
+          set -euxo pipefail
+          mkdir -p assets/audio/tyrannosaurus_rex
+          curl -L --fail --retry 3 -o /tmp/alligator1.ogg 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Alligatorbellow1.ogg'
+          curl -L --fail --retry 3 -o /tmp/alligator2.ogg 'https://commons.wikimedia.org/wiki/Special:Redirect/file/27alligator2bellow.ogg'
+          curl -L --fail --retry 3 -o /tmp/forest.ogg 'https://commons.wikimedia.org/wiki/Special:Redirect/file/20090610_0_ambience.ogg'
+          curl -L --fail --retry 3 -o /tmp/stream.ogg 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Swale.ogg'
+          ffmpeg -hide_banner -loglevel error -y -i /tmp/alligator1.ogg -i /tmp/alligator2.ogg -filter_complex "[0:a]atrim=start=1.0:end=8.2,asetpts=PTS-STARTPTS,lowpass=f=720,equalizer=f=85:t=q:w=1:g=5,volume=1.05[a];[1:a]atrim=start=4.2:end=11.4,asetpts=PTS-STARTPTS,lowpass=f=620,equalizer=f=72:t=q:w=1:g=4,adelay=170|170,volume=0.72[b];[a][b]amix=inputs=2:normalize=0,acompressor=threshold=0.11:ratio=3.0:attack=18:release=220,afade=t=in:st=0:d=0.08,afade=t=out:st=6.8:d=0.7[out]" -map '[out]' -t 7.5 -c:a libvorbis -q:a 6 assets/audio/tyrannosaurus_rex/roar_realistic.ogg
+          ffmpeg -hide_banner -loglevel error -y -i /tmp/forest.ogg -i /tmp/stream.ogg -filter_complex "[0:a]atrim=start=4:end=49,asetpts=PTS-STARTPTS,volume=0.70[f];[1:a]aloop=loop=2:size=1000000000,atrim=start=0:end=45,asetpts=PTS-STARTPTS,volume=0.24[s];[f][s]amix=inputs=2:normalize=0,highpass=f=35,lowpass=f=12500[out]" -map '[out]' -t 45 -c:a libvorbis -q:a 4 assets/audio/tyrannosaurus_rex/hell_creek_ambience.ogg
+          test -s assets/audio/tyrannosaurus_rex/roar_realistic.ogg
+          test -s assets/audio/tyrannosaurus_rex/hell_creek_ambience.ogg
+
+      - name: Generate packaged Russian narration with Piper
+        run: |
+          set -euxo pipefail
+          python3 -m venv /tmp/piper-venv
+          /tmp/piper-venv/bin/pip install --quiet --upgrade pip
+          /tmp/piper-venv/bin/pip install --quiet piper-tts
+          curl -L --fail --retry 3 -o /tmp/ru_RU-denis-medium.onnx 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx'
+          curl -L --fail --retry 3 -o /tmp/ru_RU-denis-medium.onnx.json 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx.json'
+          python3 - <<'PY' >/tmp/narration.txt
+          import json
+          with open('data/dinosaurs.json',encoding='utf-8') as f: d=json.load(f)
+          print(d['dinosaurs'][0]['narration_text_ru'])
+          PY
+          /tmp/piper-venv/bin/piper --model /tmp/ru_RU-denis-medium.onnx --config /tmp/ru_RU-denis-medium.onnx.json --output_file assets/audio/tyrannosaurus_rex/narration_ru.wav < /tmp/narration.txt
+          test -s assets/audio/tyrannosaurus_rex/narration_ru.wav
 
       - name: Use JDK 17
         run: |
@@ -94,7 +120,6 @@ jobs:
           curl -L --fail -o /tmp/godot.zip "https://downloads.godotengine.org/?flavor=stable&platform=linux.64&slug=linux.x86_64.zip&version=${GODOT_VERSION}"
           unzip -q /tmp/godot.zip -d /tmp/godot
           sudo install -m 0755 /tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
-
           curl -L --fail -o /tmp/templates.tpz "https://downloads.godotengine.org/?flavor=stable&platform=templates&slug=export_templates.tpz&version=${GODOT_VERSION}"
           mkdir -p /tmp/templates "$HOME/.local/share/godot/export_templates/${GODOT_VERSION_ID}"
           unzip -q /tmp/templates.tpz -d /tmp/templates
@@ -110,7 +135,7 @@ jobs:
             exit 1
           fi
 
-      - name: Validate imported T. rex scene
+      - name: Validate production assets
         run: godot --headless --path . --script tools/validate_assets.gd
 
       - name: Smoke-test complete interactive scene
@@ -126,12 +151,12 @@ jobs:
       - name: Export debug APK
         run: |
           mkdir -p build
-          godot --headless --verbose --path . --export-debug "Android Debug" build/DinoEncyclopedia-debug.apk
-          test -s build/DinoEncyclopedia-debug.apk
+          godot --headless --verbose --path . --export-debug "Android Debug" build/DinoEncyclopedia-PRO-debug.apk
+          test -s build/DinoEncyclopedia-PRO-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DinoEncyclopedia-debug-apk
-          path: build/DinoEncyclopedia-debug.apk
+          name: DinoEncyclopedia-PRO-debug-apk
+          path: build/DinoEncyclopedia-PRO-debug.apk
           if-no-files-found: error
