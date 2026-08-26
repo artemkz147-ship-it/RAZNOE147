@@ -222,8 +222,8 @@ internal fun WorkspaceSectionHeader(tab: WorkspaceTab, selectedClip: VideoClip, 
 internal fun EditorMessageBar(message: String) {
     AnimatedVisibility(
         visible = message.isNotBlank(),
-        enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 2,
-        exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { it / 2,
+        enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 2 },
+        exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { it / 2 },
     ) {
         Row(
             modifier = Modifier
