@@ -17,6 +17,7 @@ import androidx.media3.effect.Contrast
 import androidx.media3.effect.Crop
 import androidx.media3.effect.HslAdjustment
 import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.Presentation
 import androidx.media3.effect.ScaleAndRotateTransformation
 import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextOverlay
@@ -40,7 +41,7 @@ fun buildVideoEffects(clip: VideoClip): List<Effect> {
     }
 
     if (clip.crop > 0.001f) {
-        val inset = (clip.crop.coerceIn(0f, 0.45f) * 2f)
+        val inset = clip.crop.coerceIn(0f, 0.45f) * 2f
         effects += Crop(
             -1f + inset,
             1f - inset,
@@ -92,15 +93,41 @@ fun buildVideoEffects(clip: VideoClip): List<Effect> {
             )
         }
         val settings = StaticOverlaySettings.Builder()
-            .setBackgroundFrameAnchor(0f, -0.72f)
+            .setBackgroundFrameAnchor(
+                clip.textX.coerceIn(-1f, 1f),
+                clip.textY.coerceIn(-1f, 1f),
+            )
             .setOverlayFrameAnchor(0f, -1f)
-            .setScale(0.72f, 0.72f)
+            .setScale(
+                clip.textScale.coerceIn(0.25f, 1.6f),
+                clip.textScale.coerceIn(0.25f, 1.6f),
+            )
+            .setRotationDegrees(clip.textRotation)
             .build()
         effects += OverlayEffect(
             listOf(TextOverlay.createStaticTextOverlay(styled, settings))
         )
     }
 
+    return effects
+}
+
+@OptIn(UnstableApi::class)
+fun buildCanvasEffects(settings: ExportSettings, includeResolution: Boolean): List<Effect> {
+    val effects = mutableListOf<Effect>()
+    settings.aspectRatio?.let { ratio ->
+        effects += Presentation.createForAspectRatio(
+            ratio,
+            if (settings.cropToFill) {
+                Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
+            } else {
+                Presentation.LAYOUT_SCALE_TO_FIT
+            },
+        )
+    }
+    if (includeResolution) {
+        effects += Presentation.createForHeight(settings.height)
+    }
     return effects
 }
 
