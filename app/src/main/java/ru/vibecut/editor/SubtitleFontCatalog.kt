@@ -8,41 +8,47 @@ import android.provider.OpenableColumns
 import java.io.File
 import java.util.UUID
 
+enum class CyrillicCoverage(val title: String) {
+    FULL("полная кириллица"),
+    PARTIAL("частичная кириллица"),
+    NONE("без кириллицы"),
+}
+
 data class SubtitleFontOption(
     val key: String,
     val title: String,
+    val coverage: CyrillicCoverage,
 )
 
 data class ImportedSubtitleFont(
     val name: String,
     val path: String,
+    val coverage: CyrillicCoverage,
 )
 
 object SubtitleFontCatalog {
     private val candidates = listOf(
-        SubtitleFontOption("sans-serif", "Системный"),
-        SubtitleFontOption("sans-serif-medium", "Рубленый средний"),
-        SubtitleFontOption("sans-serif-black", "Рубленый жирный"),
-        SubtitleFontOption("sans-serif-light", "Рубленый лёгкий"),
-        SubtitleFontOption("sans-serif-condensed", "Узкий"),
-        SubtitleFontOption("sans-serif-condensed-medium", "Узкий средний"),
-        SubtitleFontOption("sans-serif-condensed-black", "Узкий жирный"),
-        SubtitleFontOption("serif", "С засечками"),
-        SubtitleFontOption("monospace", "Моноширинный"),
-        SubtitleFontOption("casual", "Свободный"),
-        SubtitleFontOption("cursive", "Рукописный"),
+        "sans-serif" to "Roboto / системный",
+        "sans-serif-medium" to "Roboto Medium",
+        "sans-serif-black" to "Roboto Black",
+        "sans-serif-light" to "Roboto Light",
+        "sans-serif-condensed" to "Roboto Condensed",
+        "sans-serif-condensed-medium" to "Roboto Condensed Medium",
+        "sans-serif-condensed-black" to "Roboto Condensed Black",
+        "serif" to "Noto Serif / с засечками",
+        "monospace" to "Roboto Mono / моноширинный",
+        "casual" to "Свободный",
+        "cursive" to "Рукописный",
     )
 
-    fun availableSystemFonts(): List<SubtitleFontOption> =
-        candidates.filter { option -> supportsRussian(Typeface.create(option.key, Typeface.NORMAL)) }
-            .distinctBy { option -> Typeface.create(option.key, Typeface.NORMAL).toString() }
+    fun availableSystemFonts(): List<SubtitleFontOption> = candidates.map { (key, title) ->
+        SubtitleFontOption(key, title, coverage(Typeface.create(key, Typeface.NORMAL)))
+    }.distinctBy { option -> option.key }
 
     fun resolve(style: SubtitleStyle): Typeface {
         val base = if (style.fontFilePath.isNotBlank()) {
             val file = File(style.fontFilePath)
-            if (file.exists() && file.length() > 0L) {
-                runCatching { Typeface.createFromFile(file) }.getOrNull()
-            } else null
+            if (file.exists() && file.length() > 0L) runCatching { Typeface.createFromFile(file) }.getOrNull() else null
         } else null
         val fallback = base ?: Typeface.create(style.fontKey.ifBlank { "sans-serif" }, Typeface.NORMAL)
         val typefaceStyle = when {
@@ -61,9 +67,8 @@ object SubtitleFontCatalog {
             null,
             null,
             null,
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(0) else null
-        }?.trim().orEmpty().ifBlank { "Пользовательский шрифт" }
+        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+            ?.trim().orEmpty().ifBlank { "Пользовательский шрифт" }
 
         val extension = displayName.substringAfterLast('.', "ttf").lowercase().let {
             if (it == "ttf" || it == "otf") it else "ttf"
@@ -74,27 +79,31 @@ object SubtitleFontCatalog {
             file.outputStream().use { output -> input.copyTo(output) }
         } ?: error("Не удалось открыть файл шрифта")
         if (file.length() == 0L) {
-            file.delete()
-            error("Файл шрифта пуст")
+            file.delete(); error("Файл шрифта пуст")
         }
         if (file.length() > 30L * 1024L * 1024L) {
-            file.delete()
-            error("Шрифт слишком большой")
+            file.delete(); error("Шрифт слишком большой")
         }
         val typeface = runCatching { Typeface.createFromFile(file) }.getOrElse {
-            file.delete()
-            error("Файл не распознан как TTF/OTF")
+            file.delete(); error("Файл не распознан как TTF/OTF")
         }
-        if (!supportsRussian(typeface)) {
-            file.delete()
-            error("В этом шрифте нет полного набора русской кириллицы")
-        }
-        return ImportedSubtitleFont(displayName.substringBeforeLast('.'), file.absolutePath)
+        return ImportedSubtitleFont(
+            name = displayName.substringBeforeLast('.'),
+            path = file.absolutePath,
+            coverage = coverage(typeface),
+        )
     }
 
-    fun supportsRussian(typeface: Typeface): Boolean {
+    fun coverage(typeface: Typeface): CyrillicCoverage {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.typeface = typeface; textSize = 42f }
-        val sample = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя"
-        return sample.all { char -> paint.hasGlyph(char.toString()) }
+        val full = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя"
+        val basic = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЫЭЮЯабвгдежзийклмнопрстуфхцчшщыэюя"
+        return when {
+            full.all { paint.hasGlyph(it.toString()) } -> CyrillicCoverage.FULL
+            basic.count { paint.hasGlyph(it.toString()) } >= basic.length * 3 / 4 -> CyrillicCoverage.PARTIAL
+            else -> CyrillicCoverage.NONE
+        }
     }
+
+    fun supportsRussian(typeface: Typeface): Boolean = coverage(typeface) == CyrillicCoverage.FULL
 }
