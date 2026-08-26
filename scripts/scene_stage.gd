@@ -54,7 +54,6 @@ func _create_environment() -> void:
     sky_material.sky_horizon_color = Color(0.63, 0.69, 0.62)
     sky_material.ground_bottom_color = Color(0.035, 0.041, 0.031)
     sky_material.ground_horizon_color = Color(0.20, 0.25, 0.19)
-    sky_material.sun_angle_max = 12.0
     sky_material.sun_curve = 0.075
     sky_material.sun_angle_max = 18.0
     sky.sky_material = sky_material
@@ -123,7 +122,7 @@ float fbm(vec2 p){
 }
 
 void fragment(){
-    vec2 p = WORLD_MATRIX[3].xz * 0.55 + VERTEX.xz * 0.55;
+    vec2 p = UV * 18.0;
     float n = fbm(p);
     float fine = noise2(p * 7.0);
     float wet = smoothstep(0.57, 0.82, n);
@@ -135,7 +134,6 @@ void fragment(){
     ALBEDO = c;
     ROUGHNESS = mix(0.94, 0.46, wet);
     SPECULAR = mix(0.18, 0.42, wet);
-    NORMAL_MAP_DEPTH = 0.35;
 }
 """
     var material := ShaderMaterial.new()
@@ -174,13 +172,13 @@ void vertex(){
 }
 
 void fragment(){
-    vec2 p = VERTEX.xz;
+    vec2 p = UV * 24.0;
     float w1 = wave(p*1.4, TIME);
     float w2 = wave(p*1.4+vec2(0.03,0.0), TIME);
     float w3 = wave(p*1.4+vec2(0.0,0.03), TIME);
     vec3 n = normalize(vec3(w1-w2, 0.12, w1-w3));
     NORMAL = mix(NORMAL, n, 0.36);
-    float depth_hint = smoothstep(-12.0, 12.0, p.x);
+    float depth_hint = smoothstep(0.0, 1.0, UV.x);
     ALBEDO = mix(deep_color, shallow_color, depth_hint);
     ROUGHNESS = 0.12;
     METALLIC = 0.0;
@@ -200,15 +198,15 @@ func _create_bank() -> void:
         var clump := MeshInstance3D.new()
         var mesh := SphereMesh.new()
         mesh.radius = _rng.randf_range(1.8, 4.2)
-        mesh.height = mesh.radius * _rng.randf_range(0.35, 0.55)
+        mesh.height = mesh.radius * 2.0
         mesh.radial_segments = 12
         mesh.rings = 5
         mesh.material = bank_mat
         clump.mesh = mesh
         var z := _rng.randf_range(-45.0, 44.0)
-        var side := -1.0 if i % 2 == 0 else 1.0
+        var side: float = -1.0 if i % 2 == 0 else 1.0
         clump.position = Vector3(-25.0 + side * _rng.randf_range(10.5, 14.5), -0.20, z)
-        clump.scale.y = 0.25
+        clump.scale.y = _rng.randf_range(0.16, 0.28)
         add_child(clump)
 
 func _create_floodplain_trees() -> void:
@@ -224,7 +222,7 @@ func _create_floodplain_trees() -> void:
 
     var canopy_mesh := SphereMesh.new()
     canopy_mesh.radius = 2.35
-    canopy_mesh.height = 4.1
+    canopy_mesh.height = 4.7
     canopy_mesh.radial_segments = 8
     canopy_mesh.rings = 5
     var leaves := StandardMaterial3D.new()
@@ -305,7 +303,7 @@ func _create_reeds() -> void:
     var reeds := _make_multimesh("RiverbankReeds", reed_mesh, REED_COUNT)
     for i in range(REED_COUNT):
         var z := _rng.randf_range(-46.0, 46.0)
-        var side := -1.0 if _rng.randf() < 0.5 else 1.0
+        var side: float = -1.0 if _rng.randf() < 0.5 else 1.0
         var x := -25.0 + side * _rng.randf_range(12.4, 14.8)
         var s := _rng.randf_range(0.65, 1.45)
         reeds.multimesh.set_instance_transform(i, Transform3D(Basis().scaled(Vector3(s,s,s)), Vector3(x, 0.58*s, z)))
@@ -344,11 +342,11 @@ func _make_multimesh(name: String, mesh: Mesh, count: int) -> MultiMeshInstance3
 
 func _random_habitat_point(min_radius: float, max_radius: float) -> Vector3:
     for _attempt in range(20):
-        var angle := _rng.randf_range(-PI, PI)
-        var radius := sqrt(_rng.randf_range(min_radius*min_radius, max_radius*max_radius))
+        var angle: float = _rng.randf_range(-PI, PI)
+        var radius: float = sqrt(_rng.randf_range(min_radius*min_radius, max_radius*max_radius))
         var p := Vector3(cos(angle)*radius, 0.0, sin(angle)*radius)
         # Keep the river corridor open and preserve a presentation clearing near the animal.
-        var river_distance := abs(p.x + 25.0)
-        if river_distance > 15.0 and (abs(p.x) > 5.0 or abs(p.z) > 7.5):
+        var river_distance: float = absf(p.x + 25.0)
+        if river_distance > 15.0 and (absf(p.x) > 5.0 or absf(p.z) > 7.5):
             return p
     return Vector3(max_radius, 0.0, 0.0)
