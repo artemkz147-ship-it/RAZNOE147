@@ -85,14 +85,14 @@ public final class MainActivity extends Activity {
         String id = JSONObject.quote(testGame);
         String js;
         if(testFinish) {
-            js = "JSON.stringify((()=>{const opened=Boolean(window.__openGameForTest&&window.__openGameForTest("+id+"));const finished=Boolean(window.__finishForTest&&window.__finishForTest());return {opened,finished,qa:window.__qaSnapshot&&window.__qaSnapshot(),result:window.__resultSnapshot&&window.__resultSnapshot()};})())";
+            js = "JSON.stringify((()=>{const opened=Boolean(window.__openGameForTest&&window.__openGameForTest("+id+"));const finished=Boolean(window.__finishForTest&&window.__finishForTest());return {opened,finished,qa:window.__qaSnapshot&&window.__qaSnapshot()};})())";
         } else {
             js = "JSON.stringify((()=>{const opened=Boolean(window.__openGameForTest&&window.__openGameForTest("+id+"));return {opened,qa:window.__qaSnapshot&&window.__qaSnapshot()};})())";
         }
         v.evaluateJavascript(js, result -> {
             Log.i(TAG,"QA_PROBE="+result);
             if(testFinish) {
-                v.evaluateJavascript("JSON.stringify(window.__resultSnapshot&&window.__resultSnapshot())", snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap));
+                v.postDelayed(() -> v.evaluateJavascript("JSON.stringify(window.__resultSnapshot&&window.__resultSnapshot())", snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap)), 450);
             } else {
                 v.evaluateJavascript("JSON.stringify(window.__qaSnapshot&&window.__qaSnapshot())", snap -> Log.i(TAG,"QA_SNAPSHOT="+snap));
             }
