@@ -18,6 +18,7 @@ import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.util.UUID
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -162,10 +163,13 @@ class ImageClipMaker(private val context: Context) {
             }
         }
 
-        fun open() = if (uri.scheme == "file") {
-            File(uri.path ?: return null).inputStream()
-        } else {
-            context.contentResolver.openInputStream(uri)
+        fun open(): InputStream? {
+            return if (uri.scheme == "file") {
+                val path = uri.path ?: return null
+                File(path).inputStream()
+            } else {
+                context.contentResolver.openInputStream(uri)
+            }
         }
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
