@@ -22,18 +22,29 @@ jobs:
     env:
       GODOT_VERSION: '4.7.2'
       GODOT_VERSION_ID: '4.7.2.stable'
+      GLTFPACK_VERSION: '1.2.0'
       TREX_MODEL_URL: 'https://raw.githubusercontent.com/s010s/prehistoric-animal-museum/4d824cb1973861c1463b012cb0d6bc5976cf9c1f/src/content/animals/tyrannosaurus-rex/model/model.glb'
       TREX_MODEL_SHA256: 'ea15319ca1fa3724f1a961515c36b4834446f5ac30a9b0de49b62881877efa54'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch pinned CC BY T. rex model
+      - name: Fetch and convert pinned CC BY T. rex model
         run: |
           mkdir -p assets/dinosaurs/tyrannosaurus_rex
           curl -L --fail --retry 3 --retry-delay 2 \
-            -o assets/dinosaurs/tyrannosaurus_rex/model.glb \
+            -o /tmp/trex-source.glb \
             "$TREX_MODEL_URL"
-          echo "$TREX_MODEL_SHA256  assets/dinosaurs/tyrannosaurus_rex/model.glb" | sha256sum -c -
+          echo "$TREX_MODEL_SHA256  /tmp/trex-source.glb" | sha256sum -c -
+
+          # The reviewed upstream derivative uses EXT_meshopt_compression and
+          # KHR_mesh_quantization. Godot 4.7.2 does not import those two
+          # required extensions directly. gltfpack reads meshopt-compressed
+          # input automatically; -noq writes regular, unquantized glTF data.
+          npx --yes "gltfpack@${GLTFPACK_VERSION}" \
+            -i /tmp/trex-source.glb \
+            -o assets/dinosaurs/tyrannosaurus_rex/model.glb \
+            -noq -kn -km -ke
+
           python3 - <<'PY'
           import json, struct
           path = 'assets/dinosaurs/tyrannosaurus_rex/model.glb'
@@ -43,13 +54,21 @@ jobs:
               chunk_len, chunk_type = struct.unpack('<II', f.read(8))
               assert chunk_type == 0x4E4F534A
               doc = json.loads(f.read(chunk_len).decode('utf-8'))
+          required = set(doc.get('extensionsRequired', []))
+          used = set(doc.get('extensionsUsed', []))
+          forbidden = {'EXT_meshopt_compression', 'KHR_meshopt_compression', 'KHR_mesh_quantization'}
+          assert not (required & forbidden), f'Godot-incompatible required extensions remain: {required & forbidden}'
+          assert not (used & {'EXT_meshopt_compression', 'KHR_meshopt_compression'}), 'Meshopt compression remains in output'
           animations = [a.get('name', '<unnamed>') for a in doc.get('animations', [])]
-          print('GLB nodes:', len(doc.get('nodes', [])))
-          print('GLB meshes:', len(doc.get('meshes', [])))
-          print('GLB materials:', len(doc.get('materials', [])))
-          print('GLB animations:', animations)
-          assert doc.get('meshes'), 'No meshes in T. rex GLB'
-          assert animations, 'T. rex GLB must contain an animation'
+          print('converted GLB bytes:', total)
+          print('extensions required:', sorted(required))
+          print('extensions used:', sorted(used))
+          print('nodes:', len(doc.get('nodes', [])))
+          print('meshes:', len(doc.get('meshes', [])))
+          print('materials:', len(doc.get('materials', [])))
+          print('animations:', animations)
+          assert doc.get('meshes'), 'No meshes in converted T. rex GLB'
+          assert any('idle' in name.lower() for name in animations), 'Converted T. rex lost Idle animation'
           PY
 
       - name: Generate original T. rex bellow reconstruction
@@ -88,8 +107,17 @@ jobs:
           cp -a /tmp/templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION_ID}/"
           godot --version
 
-      - name: Import project
-        run: godot --headless --editor --path . --quit
+      - name: Import project without hidden errors
+        run: |
+          set -o pipefail
+          godot --headless --editor --path . --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -E '(^|[[:space:]])(ERROR|SCRIPT ERROR):' /tmp/godot-import.log; then
+            echo 'Godot asset/script import emitted an error.' >&2
+            exit 1
+          fi
+
+      - name: Validate imported T. rex scene
+        run: godot --headless --path . --script tools/validate_assets.gd
 
       - name: Export debug APK
         run: |
