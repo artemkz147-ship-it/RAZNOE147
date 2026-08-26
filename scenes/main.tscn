@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/orbit_camera.gd" id="2_camera"]
 [ext_resource type="Script" path="res://scripts/scene_stage.gd" id="3_stage"]
 [ext_resource type="Script" path="res://scripts/ui_polish.gd" id="4_ui"]
+[ext_resource type="Script" path="res://scripts/scale_reference.gd" id="5_scale"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -14,6 +15,9 @@ script = ExtResource("3_stage")
 [node name="EnvironmentSlot" type="Node3D" parent="."]
 
 [node name="DinosaurSlot" type="Node3D" parent="."]
+
+[node name="ScaleReference" type="Node3D" parent="."]
+script = ExtResource("5_scale")
 
 [node name="CameraRig" type="Node3D" parent="."]
 script = ExtResource("2_camera")
