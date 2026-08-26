@@ -87,7 +87,7 @@ fun VideoEditorScreen(projectId:String,onBack:()->Unit){
             StickerPanel(selected,{pendingStickerClip=selected.id;stickerPicker.launch(arrayOf("image/*"))},{snap()},{replace(it)})
             VideoOverlayPanel(pipBusy,(position/selected.speed.coerceAtLeast(.05f)).toLong()){options->pendingPipBaseId=selected.id;pendingPipOptions=options;pipPicker.launch(arrayOf("video/*"))}
             TextPanel(selected,{snap()},{replace(it)})
-            SubtitlePanel(subtitles,subtitleStyle,cursor,{srtPicker.launch(arrayOf("application/x-subrip","text/plain","*/*"))},{text->subtitles+=SubtitleCue(UUID.randomUUID().toString(),cursor,cursor+2000,text)},{id->subtitles.removeAll{it.id==id}},{subtitles.clear()},{subtitleStyle=it})
+            SubtitleStudioPanel(subtitles,subtitleStyle,cursor,{srtPicker.launch(arrayOf("application/x-subrip","text/plain","*/*"))},{text->subtitles+=SubtitleCue(UUID.randomUUID().toString(),cursor,cursor+2000,text)},{id->subtitles.removeAll{it.id==id}},{subtitles.clear()},{subtitleStyle=it})
             SubtitleExportPanel(subtitles)
             AdvancedProjectPanel(music,exportSettings,{musicPicker.launch(arrayOf("audio/*"))},{music=null;beatAnalyzer.cancel();beatBusy=false;beatMap=null;pendingRhythmStyle=null},{music=it},{exportSettings=it})
             ExportResultPanel(lastExport){val u=lastExport?:return@ExportResultPanel;runCatching{context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="video/mp4";putExtra(Intent.EXTRA_STREAM,Uri.parse(u));addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)},"Поделиться видео"))}}
