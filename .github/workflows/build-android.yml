@@ -81,10 +81,15 @@ jobs:
           test -s assets/environments/hell_creek/models/rock_moss_set_01.glb
           test -s assets/environments/hell_creek/models/shrub_03.glb
           test -s assets/environments/hell_creek/textures/mud_forest_diff_1k.jpg
-          test -s assets/environments/hell_creek/xanderklinge_2k.hdr
 
-      - name: Build 3x T. rex roar and six Russian narrations
-        run: bash tools/build_audio_assets.sh
+      - name: Build six roars and six Russian narrations
+        run: |
+          bash tools/build_audio_assets.sh
+          python3 tools/build_species_roars.py
+          test -s assets/audio/tyrannosaurus_rex/roar_realistic.wav
+          for id in triceratops velociraptor stegosaurus apatosaurus dilophosaurus; do
+            test -s "assets/audio/${id}/roar_voice.wav"
+          done
 
       - name: Use JDK 17
         run: |
@@ -145,6 +150,8 @@ jobs:
           mkdir -p build
           godot --headless --verbose --path . --export-debug "Android Debug" build/DinoEncyclopedia-PRO-6DINOS-debug.apk
           test -s build/DinoEncyclopedia-PRO-6DINOS-debug.apk
+          "${ANDROID_SDK_ROOT}/build-tools/36.0.0/apksigner" verify --verbose build/DinoEncyclopedia-PRO-6DINOS-debug.apk | tee /tmp/apk-signature.txt
+          grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' /tmp/apk-signature.txt
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
