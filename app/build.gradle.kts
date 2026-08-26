@@ -11,8 +11,29 @@ android {
         applicationId = "ru.vibecut.editor"
         minSdk = 26
         targetSdk = 36
-        versionCode = 100
-        versionName = "1.0.0"
+        versionCode = 120
+        versionName = "1.2.0"
+    }
+
+    signingConfigs {
+        create("devStable") {
+            val keystore = rootProject.file("app/dev-signing.keystore")
+            if (keystore.exists()) {
+                storeFile = keystore
+                storePassword = "VibeCutDev2026"
+                keyAlias = "vibecutdev"
+                keyPassword = "VibeCutDev2026"
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            val keystore = rootProject.file("app/dev-signing.keystore")
+            if (keystore.exists()) {
+                signingConfig = signingConfigs.getByName("devStable")
+            }
+        }
     }
 
     buildFeatures {
