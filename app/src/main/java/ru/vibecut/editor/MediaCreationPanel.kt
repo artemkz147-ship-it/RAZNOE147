@@ -35,7 +35,7 @@ internal fun MediaCreationPanel(
         ) {
             listOf(1000L, 2000L, 3000L, 5000L, 10_000L).forEach { ms ->
                 ChoiceButton(
-                    title = if (ms < 10_000L) "${ms / 1000} с" else "10 с",
+                    text = if (ms < 10_000L) "${ms / 1000} с" else "10 с",
                     selected = durationMs == ms,
                 ) { durationMs = ms }
             }
