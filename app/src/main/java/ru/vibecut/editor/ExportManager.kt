@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
 import androidx.annotation.OptIn
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
@@ -18,6 +19,7 @@ import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import java.io.File
 import java.io.FileInputStream
+import kotlin.math.min
 
 @OptIn(UnstableApi::class)
 class ExportManager(private val context: Context) {
@@ -28,6 +30,7 @@ class ExportManager(private val context: Context) {
     fun export(
         clips: List<VideoClip>,
         backgroundAudio: AudioTrack?,
+        positionedAudioTracks: List<PositionedAudioTrack>,
         settings: ExportSettings,
         onProgress: (Int) -> Unit,
         onDone: (String) -> Unit,
@@ -67,6 +70,7 @@ class ExportManager(private val context: Context) {
 
         val videoSequence = EditedMediaItemSequence.withAudioAndVideoFrom(items)
         val sequences = mutableListOf(videoSequence)
+        val projectDurationMs = clips.sumOf { it.durationMs }.coerceAtLeast(1L)
 
         if (backgroundAudio != null) {
             val musicItem = EditedMediaItem.Builder(
@@ -80,6 +84,28 @@ class ExportManager(private val context: Context) {
                 .setIsLooping(true)
                 .build()
             sequences += musicSequence
+        }
+
+        positionedAudioTracks.forEach { track ->
+            if (track.startAtMs >= projectDurationMs) return@forEach
+            val availableMs = (projectDurationMs - track.startAtMs).coerceAtLeast(1L)
+            val playDurationMs = min(track.sourceDurationMs, availableMs).coerceAtLeast(1L)
+            val mediaItem = MediaItem.Builder()
+                .setUri(track.uri)
+                .setClippingConfiguration(
+                    MediaItem.ClippingConfiguration.Builder()
+                        .setStartPositionMs(0L)
+                        .setEndPositionMs(playDurationMs)
+                        .build()
+                )
+                .build()
+            val edited = EditedMediaItem.Builder(mediaItem)
+                .setEffects(Effects(buildPositionedAudioEffects(track), emptyList()))
+                .build()
+            val builder = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
+            if (track.startAtMs > 0L) builder.addGap(track.startAtMs * 1000L)
+            builder.addItem(edited)
+            sequences += builder.build()
         }
 
         val composition = Composition.Builder(sequences)
