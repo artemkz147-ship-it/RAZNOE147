@@ -10,17 +10,31 @@
       "diet_ru": "Хищник",
       "length_m": 12.0,
       "mass_kg": 7000,
-      "description_ru": "Один из крупнейших тираннозавридов. Мощный череп, костедробящие зубы и развитое обоняние делали T. rex доминирующим крупным хищником своей экосистемы. В приложении движения, окраска и голос отделяются от фактов, непосредственно подтверждаемых ископаемыми.",
-      "narration_text_ru": "Тираннозавр рекс жил в конце мелового периода, примерно от шестидесяти восьми до шестидесяти шести миллионов лет назад, на территории западной части Северной Америки. Средняя длина взрослого животного оценивается примерно в двенадцать метров. Окраска, конкретное поведение и голос в этой сцене являются научно обоснованной художественной реконструкцией, а не прямой записью прошлого.",
-      "evidence_notes": ["Период, география находок, строение скелета и зубов подтверждаются ископаемыми.","Точная окраска кожи неизвестна и является реконструкцией.","Реальный голос T. rex неизвестен; звук в приложении является реконструкцией.","Поведенческие анимации опираются на биомеханику, но не являются прямым наблюдением."],
+      "description_ru": "Тираннозавр рекс — один из самых известных крупных хищных динозавров позднего мелового периода. Его массивный череп, чрезвычайно мощные челюсти и крупные зубы позволяли наносить сокрушительные укусы. Длинный тяжёлый хвост помогал удерживать равновесие, а сильные задние конечности делали это животное подвижным для своих размеров. Передние конечности были короткими, но мускулистыми и заканчивались двумя развитыми когтями.",
+      "narration_text_ru": "Тираннозавр рекс жил в конце мелового периода на территории западной части Северной Америки. Взрослые особи достигали примерно двенадцати метров в длину и массы около семи тонн. Это был мощный хищник с массивным черепом, сильнейшим укусом и крупными костедробящими зубами. Его длинный хвост служил балансиром, а сильные задние ноги помогали уверенно перемещаться по поймам и лесистым равнинам.",
+      "evidence_notes": [
+        "Крупный хищный динозавр позднего мела.",
+        "Средняя длина взрослой особи около 12 метров.",
+        "Оценочная масса — порядка 7 тонн.",
+        "Отличался массивным черепом и исключительно сильным укусом."
+      ],
       "model_path": "res://assets/dinosaurs/tyrannosaurus_rex/model.glb",
       "environment_path": "res://assets/environments/hell_creek/environment.glb",
       "ambience_path": "res://assets/audio/tyrannosaurus_rex/hell_creek_ambience.wav",
       "narration_path": "res://assets/audio/tyrannosaurus_rex/narration_ru.ogg",
       "roar_path": "res://assets/audio/tyrannosaurus_rex/roar_reconstruction.wav",
-      "animations": {"idle":["Idle","Idle_Breath","Breathing"],"roar":["Roar","Vocalize","Threat_Roar"],"walk":["Walk","Walk_Forward"],"look":["Look_Around","Look"],"threat":["Threat","Display"]},
-      "interactive_actions": ["look","walk","threat"],
-      "sources": ["https://www.nhm.ac.uk/discover/dino-directory/tyrannosaurus.html","https://www.si.edu/newsdesk/factsheets/tyrannosaurus-rex"]
+      "animations": {
+        "idle": ["Idle", "Idle_Breath", "Breathing"],
+        "roar": ["Roar", "Vocalize", "Threat_Roar"],
+        "walk": ["Walk", "Walk_Forward"],
+        "look": ["Look_Around", "Look"],
+        "threat": ["Threat", "Display"]
+      },
+      "interactive_actions": ["look", "walk", "threat"],
+      "sources": [
+        "https://www.nhm.ac.uk/discover/dino-directory/tyrannosaurus.html",
+        "https://www.si.edu/newsdesk/factsheets/tyrannosaurus-rex"
+      ]
     }
   ]
 }
