@@ -25,7 +25,8 @@ import kotlin.math.roundToInt
 
 private enum class TrackingApplyMode(val title: String) {
     CAMERA("Камера следует"),
-    STICKER("Стикер к объекту"),
+    STICKER("Анимированный стикер"),
+    IMAGE_STICKER("Мой стикер / картинка"),
 }
 
 @Composable
@@ -43,12 +44,17 @@ internal fun ObjectTrackingPanel(
     var progress by remember { mutableIntStateOf(0) }
     var mode by remember { mutableStateOf(TrackingApplyMode.CAMERA) }
     var stickerKind by remember { mutableStateOf(AnimatedStickerKind.TARGET) }
+    var imageStickerId by remember(clip.id, clip.stickers.size) { mutableStateOf(clip.stickers.firstOrNull()?.id) }
     var status by remember { mutableStateOf("") }
 
     DisposableEffect(processor) { onDispose { processor.cancel() } }
 
     fun start() {
         if (busy) return
+        if (mode == TrackingApplyMode.IMAGE_STICKER && imageStickerId == null) {
+            status = "Сначала добавьте PNG / JPG / WebP в разделе «Изображения и стикеры»"
+            return
+        }
         busy = true
         progress = 0
         status = "Ищу объект и строю траекторию…"
@@ -93,18 +99,35 @@ internal fun ObjectTrackingPanel(
                         onUpdate(clip.copy(animatedStickers = clip.animatedStickers + layer))
                         status = "Готово: «${stickerKind.title}» прикреплён к объекту"
                     }
+                    TrackingApplyMode.IMAGE_STICKER -> {
+                        val id = imageStickerId
+                        val sticker = clip.stickers.firstOrNull { it.id == id }
+                        if (sticker == null) {
+                            status = "Выбранный стикер больше не найден"
+                        } else {
+                            onUpdate(
+                                clip.copy(
+                                    stickers = clip.stickers.map {
+                                        if (it.id == sticker.id) it.copy(
+                                            startMs = path.first().timeMs,
+                                            endMs = path.last().timeMs,
+                                            trackingPath = path,
+                                        ) else it
+                                    }
+                                )
+                            )
+                            status = "Готово: «${sticker.name}» прикреплён к объекту"
+                        }
+                    }
                 }
             },
-            onError = {
-                busy = false
-                status = it
-            },
+            onError = { busy = false; status = it },
         )
     }
 
     SectionCard("Отслеживание объекта") {
         Text(
-            "Выберите примерную точку объекта на первом кадре. Нейросеть найдёт объект рядом и проследит его движение по ролику.",
+            "Укажите примерную точку объекта на первом кадре. Нейросеть найдёт объект рядом и сохранит редактируемую траекторию.",
             color = Color(0xFF9A9AA8),
         )
         Text("Точка X: ${(targetX * 100).roundToInt()}", color = Color.White)
@@ -114,24 +137,39 @@ internal fun ObjectTrackingPanel(
 
         Text("Точность трекинга", color = Color.White)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf(6, 10, 15, 20).forEach { value ->
-                ChoiceButton("$value кадров/с", fps == value) { fps = value }
+            listOf(6, 10, 15, 20).forEach { value -> ChoiceButton("$value кадров/с", fps == value) { fps = value } }
+        }
+
+        Text("Что прикрепить к траектории", color = Color.White)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TrackingApplyMode.entries.forEach { item ->
+                ChoiceButton(item.title, mode == item) {
+                    mode = item
+                    if (item == TrackingApplyMode.IMAGE_STICKER && imageStickerId == null) imageStickerId = clip.stickers.firstOrNull()?.id
+                }
             }
         }
 
-        Text("Что сделать с траекторией", color = Color.White)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TrackingApplyMode.entries.forEach { item -> ChoiceButton(item.title, mode == item) { mode = item } }
-        }
-
         if (mode == TrackingApplyMode.STICKER) {
-            Text("Стикер", color = Color.White)
+            Text("Анимированный стикер", color = Color.White)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 AnimatedStickerKind.entries.forEach { kind -> ChoiceButton(kind.title, stickerKind == kind) { stickerKind = kind } }
             }
         }
+        if (mode == TrackingApplyMode.IMAGE_STICKER) {
+            Text("Импортированный стикер", color = Color.White)
+            if (clip.stickers.isEmpty()) Text("Добавьте изображение в разделе «Изображения и стикеры»", color = Color(0xFFFFB4AB))
+            else Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                clip.stickers.forEach { sticker -> ChoiceButton(sticker.name, imageStickerId == sticker.id) { imageStickerId = sticker.id } }
+            }
+        }
 
-        ToolButton(if (mode == TrackingApplyMode.CAMERA) "Отследить и вести камерой" else "Отследить и прикрепить", ::start, enabled = !busy)
+        val action = when (mode) {
+            TrackingApplyMode.CAMERA -> "Отследить и вести камерой"
+            TrackingApplyMode.STICKER -> "Отследить и прикрепить анимацию"
+            TrackingApplyMode.IMAGE_STICKER -> "Отследить и прикрепить картинку"
+        }
+        ToolButton(action, ::start, enabled = !busy)
         if (busy) {
             LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth())
             Text("Обработка: $progress%", color = Color(0xFFC4B5FD))
