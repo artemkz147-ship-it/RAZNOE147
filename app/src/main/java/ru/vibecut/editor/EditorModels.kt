@@ -129,12 +129,36 @@ data class PositionedAudioTrack(
 
 data class SubtitleCue(val id: String, val startMs: Long, val endMs: Long, val text: String)
 
+enum class SubtitleAnimation(val title: String) {
+    NONE("Без анимации"),
+    FADE("Плавное появление"),
+    POP("Акцентное появление"),
+    TYPEWRITER("Печатная машинка"),
+    WORD_BY_WORD("По словам"),
+    KARAOKE("Караоке"),
+    BOUNCE("Прыжок"),
+    SLIDE_UP("Снизу вверх"),
+}
+
 data class SubtitleStyle(
     val fontScale: Float = 1f,
     val textColor: Int = -1,
     val backgroundColor: Int = 0xB3000000.toInt(),
     val backgroundEnabled: Boolean = true,
     val verticalPosition: Float = 0.84f,
+    val fontKey: String = "sans-serif",
+    val fontDisplayName: String = "Системный",
+    val fontFilePath: String = "",
+    val outlineColor: Int = 0xFF000000.toInt(),
+    val outlineWidth: Float = 1.6f,
+    val shadowColor: Int = 0xB3000000.toInt(),
+    val shadowRadius: Float = 1.2f,
+    val bold: Boolean = true,
+    val italic: Boolean = false,
+    val uppercase: Boolean = false,
+    val letterSpacing: Float = 0f,
+    val accentColor: Int = 0xFFFFD54F.toInt(),
+    val animation: SubtitleAnimation = SubtitleAnimation.NONE,
 )
 
 enum class VideoCodec(val title: String, val mimeType: String) {
