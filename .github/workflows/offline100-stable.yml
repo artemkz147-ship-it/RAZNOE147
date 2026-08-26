@@ -87,55 +87,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: |
-            set -e
-            APK=offline100-stable/app/build/outputs/apk/debug/app-debug.apk
-            adb install -r "$APK"
-
-            adb logcat -c
-            adb shell am force-stop ru.offline100.games
-            adb shell am start -W -n ru.offline100.games/.MainActivity
-            sleep 5
-            adb logcat -d > qa-home.log
-            adb exec-out screencap -p > qa-home.png
-            grep -q 'Offline100.*PAGE_FINISHED' qa-home.log
-            grep -q 'Offline100.*GAME_CARD_COUNT="100"' qa-home.log
-            ! grep -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE' qa-home.log
-            adb shell dumpsys activity activities | grep -q 'ru.offline100.games/.MainActivity'
-
-            for GAME in pipes parking; do
-              adb logcat -c
-              adb shell am force-stop ru.offline100.games
-              adb shell am start -W -n ru.offline100.games/.MainActivity --es testGame "$GAME"
-              sleep 5
-              adb logcat -d > "qa-$GAME.log"
-              adb exec-out screencap -p > "qa-$GAME.png"
-              grep -q "QA_SNAPSHOT=.*$GAME" "qa-$GAME.log"
-              grep -q 'QA_SNAPSHOT=.*objective' "qa-$GAME.log"
-              ! grep -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE' "qa-$GAME.log"
-            done
-
-            for GAME in ttt connect4 reversi gomoku nim dots checkers; do
-              adb logcat -c
-              adb shell am force-stop ru.offline100.games
-              adb shell am start -W -n ru.offline100.games/.MainActivity --es testGame "$GAME"
-              sleep 4
-              adb logcat -d > "qa-$GAME.log"
-              grep -q "QA_SNAPSHOT=.*$GAME" "qa-$GAME.log"
-              grep -q 'QA_SNAPSHOT=.*aiSelector.*true' "qa-$GAME.log"
-              ! grep -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE' "qa-$GAME.log"
-            done
-            adb exec-out screencap -p > qa-checkers-ai.png
-
-            adb logcat -c
-            adb shell am force-stop ru.offline100.games
-            adb shell am start -W -n ru.offline100.games/.MainActivity --es testGame ttt --ez testFinish true
-            sleep 5
-            adb logcat -d > qa-result.log
-            adb exec-out screencap -p > qa-result.png
-            grep -q 'RESULT_SNAPSHOT=.*open.*true' qa-result.log
-            grep -q 'RESULT_SNAPSHOT=.*Цель выполнена' qa-result.log
-            ! grep -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE' qa-result.log
+          script: bash offline100-stable/qa.sh
 
       - name: Upload QA proof
         if: always()
