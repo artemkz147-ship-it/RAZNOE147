@@ -35,9 +35,18 @@ jobs:
           patch "$ASSETS/app.js" < /tmp/v11-app.patch
           patch "$ASSETS/styles.css" < /tmp/v11-styles.patch
 
-          cat offline100-stable/.payload/v12-app.00 offline100-stable/.payload/v12-app.01 offline100-stable/.payload/v12-app.rest | base64 -d | gzip -d > /tmp/v12-app.patch
-          cat offline100-stable/.payload/v12-style.00 | base64 -d | gzip -d > /tmp/v12-style.patch
-          cat offline100-stable/.payload/v12-index.00 | base64 -d | gzip -d > /tmp/v12-index.patch
+          cat offline100-stable/.payload/v12-app.00 offline100-stable/.payload/v12-app.01 offline100-stable/.payload/v12-app.02 offline100-stable/.payload/v12-app.03 offline100-stable/.payload/v12-app.04 > /tmp/v12-app.b64
+          cp offline100-stable/.payload/v12-style.00 /tmp/v12-style.b64
+          cp offline100-stable/.payload/v12-index.00 /tmp/v12-index.b64
+          test $(wc -c < /tmp/v12-app.b64) -eq 28020
+          test $(wc -c < /tmp/v12-style.b64) -eq 5348
+          test $(wc -c < /tmp/v12-index.b64) -eq 916
+          echo '33e840ec829b9e0ea53dfb17ab3d03dd868613577d51c43e1ec43ac6df0f78fb  /tmp/v12-app.b64' | sha256sum -c -
+          echo 'de7ea8bde80786e0878ca55fd5371d7ae693014d79f37113417a395695563ee6  /tmp/v12-style.b64' | sha256sum -c -
+          echo '90d2de50950830db02cbe1b341b1f5b8f40f70007b1ba7ad93114276b3a34e03  /tmp/v12-index.b64' | sha256sum -c -
+          base64 -d < /tmp/v12-app.b64 | gzip -d > /tmp/v12-app.patch
+          base64 -d < /tmp/v12-style.b64 | gzip -d > /tmp/v12-style.patch
+          base64 -d < /tmp/v12-index.b64 | gzip -d > /tmp/v12-index.patch
           patch "$ASSETS/app.js" < /tmp/v12-app.patch
           patch "$ASSETS/styles.css" < /tmp/v12-style.patch
           patch "$ASSETS/index.html" < /tmp/v12-index.patch
