@@ -46,6 +46,15 @@ enum class MaskType(val title: String) {
     CINEMA("Кино-кадр"),
 }
 
+enum class KeyframeEasing(val title: String) {
+    LINEAR("Линейно"),
+    EASE_IN("Разгон"),
+    EASE_OUT("Торможение"),
+    EASE_IN_OUT("Плавно"),
+    OVERSHOOT("С перелётом"),
+    BOUNCE("Пружина"),
+}
+
 data class TransitionSpec(val type: TransitionType, val durationMs: Long)
 
 data class TransformKeyframe(
@@ -55,6 +64,14 @@ data class TransformKeyframe(
     val y: Float = 0f,
     val scale: Float = 1f,
     val rotation: Float = 0f,
+    val easing: KeyframeEasing = KeyframeEasing.EASE_IN_OUT,
+)
+
+data class TrackingPoint(
+    val timeMs: Long,
+    val x: Float,
+    val y: Float,
+    val objectScale: Float = 1f,
 )
 
 data class StickerLayer(
@@ -66,6 +83,41 @@ data class StickerLayer(
     val scale: Float = 0.35f,
     val rotation: Float = 0f,
     val alpha: Float = 1f,
+    val startMs: Long = 0L,
+    val endMs: Long = Long.MAX_VALUE,
+    val keyframes: List<TransformKeyframe> = emptyList(),
+    val trackingPath: List<TrackingPoint> = emptyList(),
+)
+
+enum class AnimatedStickerKind(val title: String) {
+    HEART("Сердце"),
+    STAR("Звезда"),
+    SPARKLE("Искры"),
+    ARROW("Стрелка"),
+    RING("Кольцо"),
+    LIGHTNING("Молния"),
+    CONFETTI("Конфетти"),
+    FIRE("Огонь"),
+    CHECK("Галочка"),
+    QUESTION("Вопрос"),
+    WOW("WOW"),
+    TARGET("Прицел"),
+}
+
+data class AnimatedStickerLayer(
+    val id: String,
+    val kind: AnimatedStickerKind,
+    val x: Float = 0f,
+    val y: Float = 0f,
+    val scale: Float = 0.35f,
+    val rotation: Float = 0f,
+    val alpha: Float = 1f,
+    val startMs: Long = 0L,
+    val endMs: Long = Long.MAX_VALUE,
+    val speed: Float = 1f,
+    val loop: Boolean = true,
+    val keyframes: List<TransformKeyframe> = emptyList(),
+    val trackingPath: List<TrackingPoint> = emptyList(),
 )
 
 data class VideoClip(
@@ -102,6 +154,7 @@ data class VideoClip(
     val transitionDurationMs: Long = 650L,
     val keyframes: List<TransformKeyframe> = emptyList(),
     val stickers: List<StickerLayer> = emptyList(),
+    val animatedStickers: List<AnimatedStickerLayer> = emptyList(),
     val overlayText: String = "",
     val textX: Float = 0f,
     val textY: Float = -0.72f,
