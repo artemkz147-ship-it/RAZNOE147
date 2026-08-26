@@ -3,176 +3,188 @@ package ru.vibecut.editor
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.UUID
 
 object ProjectStore {
-    private const val PREFS = "vibecut_project"
-    private const val KEY = "autosave"
+    private const val PREFS = "vibecut_projects_v1"
+    private const val INDEX_KEY = "project_index"
+    private const val MIGRATED_KEY = "legacy_migrated"
+    private const val PROJECT_PREFIX = "project_"
+    private const val LEGACY_PREFS = "vibecut_project"
+    private const val LEGACY_KEY = "autosave"
+
+    fun create(context: Context, name: String = "Новый проект"): SavedProject {
+        ensureMigrated(context)
+        val now = System.currentTimeMillis()
+        val project = SavedProject(
+            id = UUID.randomUUID().toString(),
+            name = name.trim().ifBlank { "Новый проект" },
+            createdAt = now,
+            updatedAt = now,
+        )
+        saveInternal(context, project)
+        return project
+    }
 
     fun save(context: Context, project: SavedProject) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY, projectToJson(project).toString())
-            .apply()
+        ensureMigrated(context)
+        saveInternal(context, project.copy(updatedAt = System.currentTimeMillis()))
     }
 
-    fun load(context: Context): SavedProject? {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY, null)
-            ?: return null
-        return runCatching { projectFromJson(JSONObject(raw)) }.getOrNull()
+    fun load(context: Context, id: String): SavedProject? {
+        ensureMigrated(context)
+        return loadWithoutMigration(context, id)
     }
 
-    fun clear(context: Context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY).apply()
+    fun list(context: Context): List<ProjectSummary> {
+        ensureMigrated(context)
+        return readIndex(context).mapNotNull { id ->
+            loadWithoutMigration(context, id)?.let { p ->
+                ProjectSummary(p.id, p.name, p.updatedAt, p.clips.size, p.clips.sumOf { it.durationMs })
+            }
+        }.sortedByDescending { it.updatedAt }
     }
 
-    private fun projectToJson(project: SavedProject): JSONObject = JSONObject().apply {
-        put("selectedId", project.selectedId)
-        put("clips", JSONArray().apply { project.clips.forEach { put(clipToJson(it)) } })
-        put("backgroundAudio", project.backgroundAudio?.let(::audioToJson))
-        put(
-            "positionedAudioTracks",
-            JSONArray().apply { project.positionedAudioTracks.forEach { put(positionedAudioToJson(it)) } }
+    fun delete(context: Context, id: String) {
+        ensureMigrated(context)
+        prefs(context).edit().remove(PROJECT_PREFIX + id).apply()
+        writeIndex(context, readIndex(context).filterNot { it == id })
+    }
+
+    fun duplicate(context: Context, id: String): SavedProject? {
+        val source = load(context, id) ?: return null
+        val now = System.currentTimeMillis()
+        val copy = source.copy(
+            id = UUID.randomUUID().toString(),
+            name = "${source.name} · копия",
+            createdAt = now,
+            updatedAt = now,
         )
-        put("export", exportToJson(project.exportSettings))
+        saveInternal(context, copy)
+        return copy
     }
 
-    private fun projectFromJson(json: JSONObject): SavedProject {
-        val clipsJson = json.optJSONArray("clips") ?: JSONArray()
-        val clips = buildList {
-            for (index in 0 until clipsJson.length()) add(clipFromJson(clipsJson.getJSONObject(index)))
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    private fun saveInternal(context: Context, project: SavedProject) {
+        prefs(context).edit().putString(PROJECT_PREFIX + project.id, projectToJson(project).toString()).apply()
+        val ids = readIndex(context).toMutableList()
+        if (project.id !in ids) { ids += project.id; writeIndex(context, ids) }
+    }
+
+    private fun loadWithoutMigration(context: Context, id: String): SavedProject? {
+        val raw = prefs(context).getString(PROJECT_PREFIX + id, null) ?: return null
+        return runCatching { projectFromJson(JSONObject(raw), id) }.getOrNull()
+    }
+
+    private fun readIndex(context: Context): List<String> {
+        val raw = prefs(context).getString(INDEX_KEY, "[]") ?: "[]"
+        return runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let(::add)
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun writeIndex(context: Context, ids: List<String>) {
+        val array = JSONArray(); ids.distinct().forEach(array::put)
+        prefs(context).edit().putString(INDEX_KEY, array.toString()).apply()
+    }
+
+    private fun ensureMigrated(context: Context) {
+        val p = prefs(context)
+        if (p.getBoolean(MIGRATED_KEY, false)) return
+        p.edit().putBoolean(MIGRATED_KEY, true).apply()
+        if (readIndex(context).isNotEmpty()) return
+        val raw = context.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE).getString(LEGACY_KEY, null) ?: return
+        val id = UUID.randomUUID().toString()
+        val migrated = runCatching {
+            projectFromJson(JSONObject(raw), id).copy(id = id, name = "Восстановленный проект")
+        }.getOrNull() ?: return
+        saveInternal(context, migrated)
+    }
+
+    private fun projectToJson(p: SavedProject) = JSONObject().apply {
+        put("id", p.id); put("name", p.name); put("createdAt", p.createdAt); put("updatedAt", p.updatedAt)
+        put("selectedId", p.selectedId)
+        put("clips", JSONArray().apply { p.clips.forEach { put(clipToJson(it)) } })
+        put("backgroundAudio", p.backgroundAudio?.let(::audioToJson))
+        put("positionedAudioTracks", JSONArray().apply { p.positionedAudioTracks.forEach { put(positionedAudioToJson(it)) } })
+        put("subtitles", JSONArray().apply { p.subtitles.forEach { put(subtitleToJson(it)) } })
+        put("subtitleStyle", subtitleStyleToJson(p.subtitleStyle)); put("export", exportToJson(p.exportSettings))
+    }
+
+    private fun projectFromJson(json: JSONObject, fallbackId: String): SavedProject {
+        fun <T> parseArray(name: String, parser: (JSONObject) -> T): List<T> {
+            val arr = json.optJSONArray(name) ?: JSONArray()
+            return buildList { for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { add(parser(it)) } }
         }
-        val tracksJson = json.optJSONArray("positionedAudioTracks") ?: JSONArray()
-        val tracks = buildList {
-            for (index in 0 until tracksJson.length()) add(positionedAudioFromJson(tracksJson.getJSONObject(index)))
-        }
-        val audio = json.optJSONObject("backgroundAudio")?.let(::audioFromJson)
-        val export = json.optJSONObject("export")?.let(::exportFromJson) ?: ExportSettings()
         return SavedProject(
-            clips = clips,
+            id = json.optString("id", fallbackId).ifBlank { fallbackId },
+            name = json.optString("name", "Новый проект").ifBlank { "Новый проект" },
+            createdAt = json.optLong("createdAt", System.currentTimeMillis()),
+            updatedAt = json.optLong("updatedAt", System.currentTimeMillis()),
+            clips = parseArray("clips", ::clipFromJson),
             selectedId = json.optString("selectedId").takeIf { it.isNotBlank() && it != "null" },
-            backgroundAudio = audio,
-            positionedAudioTracks = tracks,
-            exportSettings = export,
+            backgroundAudio = json.optJSONObject("backgroundAudio")?.let(::audioFromJson),
+            positionedAudioTracks = parseArray("positionedAudioTracks", ::positionedAudioFromJson),
+            subtitles = parseArray("subtitles", ::subtitleFromJson),
+            subtitleStyle = json.optJSONObject("subtitleStyle")?.let(::subtitleStyleFromJson) ?: SubtitleStyle(),
+            exportSettings = json.optJSONObject("export")?.let(::exportFromJson) ?: ExportSettings(),
         )
     }
 
-    private fun clipToJson(clip: VideoClip) = JSONObject().apply {
-        put("id", clip.id)
-        put("uri", clip.uri)
-        put("name", clip.name)
-        put("sourceDurationMs", clip.sourceDurationMs)
-        put("trimStartMs", clip.trimStartMs)
-        put("trimEndMs", clip.trimEndMs)
-        put("muted", clip.muted)
-        put("audioVolume", clip.audioVolume.toDouble())
-        put("audioFadeInMs", clip.audioFadeInMs)
-        put("audioFadeOutMs", clip.audioFadeOutMs)
-        put("rotationDegrees", clip.rotationDegrees)
-        put("speed", clip.speed.toDouble())
-        put("brightness", clip.brightness.toDouble())
-        put("contrast", clip.contrast.toDouble())
-        put("saturation", clip.saturation.toDouble())
-        put("hue", clip.hue.toDouble())
-        put("lightness", clip.lightness.toDouble())
-        put("crop", clip.crop.toDouble())
-        put("flipHorizontal", clip.flipHorizontal)
-        put("flipVertical", clip.flipVertical)
-        put("motion", clip.motion.name)
-        put("motionStrength", clip.motionStrength.toDouble())
-        put("overlayText", clip.overlayText)
-        put("textX", clip.textX.toDouble())
-        put("textY", clip.textY.toDouble())
-        put("textScale", clip.textScale.toDouble())
-        put("textRotation", clip.textRotation.toDouble())
-        put("textColor", clip.textColor)
-        put("textBackground", clip.textBackground)
-        put("textBold", clip.textBold)
-        put("textItalic", clip.textItalic)
+    private fun clipToJson(c: VideoClip) = JSONObject().apply {
+        put("id", c.id); put("uri", c.uri); put("name", c.name); put("sourceDurationMs", c.sourceDurationMs)
+        put("trimStartMs", c.trimStartMs); put("trimEndMs", c.trimEndMs); put("muted", c.muted)
+        put("audioVolume", c.audioVolume.toDouble()); put("audioFadeInMs", c.audioFadeInMs); put("audioFadeOutMs", c.audioFadeOutMs)
+        put("rotationDegrees", c.rotationDegrees); put("speed", c.speed.toDouble()); put("brightness", c.brightness.toDouble())
+        put("contrast", c.contrast.toDouble()); put("saturation", c.saturation.toDouble()); put("hue", c.hue.toDouble())
+        put("lightness", c.lightness.toDouble()); put("crop", c.crop.toDouble()); put("flipHorizontal", c.flipHorizontal); put("flipVertical", c.flipVertical)
+        put("motion", c.motion.name); put("motionStrength", c.motionStrength.toDouble()); put("colorEffect", c.colorEffect.name)
+        put("redScale", c.redScale.toDouble()); put("greenScale", c.greenScale.toDouble()); put("blueScale", c.blueScale.toDouble())
+        put("transitionOut", c.transitionOut.name); put("transitionDurationMs", c.transitionDurationMs)
+        put("keyframes", JSONArray().apply { c.keyframes.forEach { put(keyframeToJson(it)) } })
+        put("stickers", JSONArray().apply { c.stickers.forEach { put(stickerToJson(it)) } })
+        put("overlayText", c.overlayText); put("textX", c.textX.toDouble()); put("textY", c.textY.toDouble()); put("textScale", c.textScale.toDouble())
+        put("textRotation", c.textRotation.toDouble()); put("textColor", c.textColor); put("textBackground", c.textBackground); put("textBold", c.textBold); put("textItalic", c.textItalic)
     }
 
-    private fun clipFromJson(json: JSONObject) = VideoClip(
-        id = json.getString("id"),
-        uri = json.getString("uri"),
-        name = json.optString("name", "Видео"),
-        sourceDurationMs = json.optLong("sourceDurationMs", 1L).coerceAtLeast(1L),
-        trimStartMs = json.optLong("trimStartMs", 0L),
-        trimEndMs = json.optLong("trimEndMs", json.optLong("sourceDurationMs", 1L)),
-        muted = json.optBoolean("muted", false),
-        audioVolume = json.optDouble("audioVolume", 1.0).toFloat(),
-        audioFadeInMs = json.optLong("audioFadeInMs", 0L),
-        audioFadeOutMs = json.optLong("audioFadeOutMs", 0L),
-        rotationDegrees = json.optInt("rotationDegrees", 0),
-        speed = json.optDouble("speed", 1.0).toFloat(),
-        brightness = json.optDouble("brightness", 0.0).toFloat(),
-        contrast = json.optDouble("contrast", 0.0).toFloat(),
-        saturation = json.optDouble("saturation", 0.0).toFloat(),
-        hue = json.optDouble("hue", 0.0).toFloat(),
-        lightness = json.optDouble("lightness", 0.0).toFloat(),
-        crop = json.optDouble("crop", 0.0).toFloat(),
-        flipHorizontal = json.optBoolean("flipHorizontal", false),
-        flipVertical = json.optBoolean("flipVertical", false),
-        motion = runCatching {
-            ClipMotion.valueOf(json.optString("motion", ClipMotion.NONE.name))
-        }.getOrDefault(ClipMotion.NONE),
-        motionStrength = json.optDouble("motionStrength", 0.14).toFloat(),
-        overlayText = json.optString("overlayText", ""),
-        textX = json.optDouble("textX", 0.0).toFloat(),
-        textY = json.optDouble("textY", -0.72).toFloat(),
-        textScale = json.optDouble("textScale", 0.72).toFloat(),
-        textRotation = json.optDouble("textRotation", 0.0).toFloat(),
-        textColor = json.optInt("textColor", -1),
-        textBackground = json.optBoolean("textBackground", true),
-        textBold = json.optBoolean("textBold", true),
-        textItalic = json.optBoolean("textItalic", false),
-    )
-
-    private fun audioToJson(track: AudioTrack) = JSONObject().apply {
-        put("uri", track.uri)
-        put("name", track.name)
-        put("volume", track.volume.toDouble())
+    private fun clipFromJson(j: JSONObject): VideoClip {
+        fun <T> arr(name: String, parser: (JSONObject) -> T): List<T> {
+            val a = j.optJSONArray(name) ?: JSONArray(); return buildList { for (i in 0 until a.length()) a.optJSONObject(i)?.let { add(parser(it)) } }
+        }
+        val source = j.optLong("sourceDurationMs", 1L).coerceAtLeast(1L)
+        return VideoClip(
+            id = j.optString("id", UUID.randomUUID().toString()), uri = j.getString("uri"), name = j.optString("name", "Видео"), sourceDurationMs = source,
+            trimStartMs = j.optLong("trimStartMs", 0L), trimEndMs = j.optLong("trimEndMs", source), muted = j.optBoolean("muted", false),
+            audioVolume = j.optDouble("audioVolume", 1.0).toFloat(), audioFadeInMs = j.optLong("audioFadeInMs", 0L), audioFadeOutMs = j.optLong("audioFadeOutMs", 0L),
+            rotationDegrees = j.optInt("rotationDegrees", 0), speed = j.optDouble("speed", 1.0).toFloat(), brightness = j.optDouble("brightness", 0.0).toFloat(),
+            contrast = j.optDouble("contrast", 0.0).toFloat(), saturation = j.optDouble("saturation", 0.0).toFloat(), hue = j.optDouble("hue", 0.0).toFloat(), lightness = j.optDouble("lightness", 0.0).toFloat(),
+            crop = j.optDouble("crop", 0.0).toFloat(), flipHorizontal = j.optBoolean("flipHorizontal", false), flipVertical = j.optBoolean("flipVertical", false),
+            motion = enumOrDefault(j.optString("motion"), ClipMotion.NONE), motionStrength = j.optDouble("motionStrength", 0.14).toFloat(),
+            colorEffect = enumOrDefault(j.optString("colorEffect"), ColorEffect.NONE), redScale = j.optDouble("redScale", 1.0).toFloat(), greenScale = j.optDouble("greenScale", 1.0).toFloat(), blueScale = j.optDouble("blueScale", 1.0).toFloat(),
+            transitionOut = enumOrDefault(j.optString("transitionOut"), TransitionType.NONE), transitionDurationMs = j.optLong("transitionDurationMs", 650L),
+            keyframes = arr("keyframes", ::keyframeFromJson), stickers = arr("stickers", ::stickerFromJson),
+            overlayText = j.optString("overlayText", ""), textX = j.optDouble("textX", 0.0).toFloat(), textY = j.optDouble("textY", -0.72).toFloat(), textScale = j.optDouble("textScale", 0.72).toFloat(),
+            textRotation = j.optDouble("textRotation", 0.0).toFloat(), textColor = j.optInt("textColor", -1), textBackground = j.optBoolean("textBackground", true), textBold = j.optBoolean("textBold", true), textItalic = j.optBoolean("textItalic", false),
+        )
     }
 
-    private fun audioFromJson(json: JSONObject) = AudioTrack(
-        uri = json.getString("uri"),
-        name = json.optString("name", "Музыка"),
-        volume = json.optDouble("volume", 0.65).toFloat(),
-    )
-
-    private fun positionedAudioToJson(track: PositionedAudioTrack) = JSONObject().apply {
-        put("id", track.id)
-        put("uri", track.uri)
-        put("name", track.name)
-        put("sourceDurationMs", track.sourceDurationMs)
-        put("startAtMs", track.startAtMs)
-        put("volume", track.volume.toDouble())
-    }
-
-    private fun positionedAudioFromJson(json: JSONObject) = PositionedAudioTrack(
-        id = json.getString("id"),
-        uri = json.getString("uri"),
-        name = json.optString("name", "Звук"),
-        sourceDurationMs = json.optLong("sourceDurationMs", 1L).coerceAtLeast(1L),
-        startAtMs = json.optLong("startAtMs", 0L).coerceAtLeast(0L),
-        volume = json.optDouble("volume", 0.85).toFloat(),
-    )
-
-    private fun exportToJson(settings: ExportSettings) = JSONObject().apply {
-        put("height", settings.height)
-        put("maxFrameRate", settings.maxFrameRate)
-        if (settings.aspectRatio == null) put("aspectRatio", JSONObject.NULL)
-        else put("aspectRatio", settings.aspectRatio.toDouble())
-        put("cropToFill", settings.cropToFill)
-        put("videoCodec", settings.videoCodec.name)
-    }
-
-    private fun exportFromJson(json: JSONObject) = ExportSettings(
-        height = json.optInt("height", 1080),
-        maxFrameRate = json.optInt("maxFrameRate", 30),
-        aspectRatio = if (json.isNull("aspectRatio")) null else json.optDouble("aspectRatio").toFloat(),
-        cropToFill = json.optBoolean("cropToFill", false),
-        videoCodec = runCatching {
-            VideoCodec.valueOf(json.optString("videoCodec", VideoCodec.H264.name))
-        }.getOrDefault(VideoCodec.H264),
-    )
+    private fun keyframeToJson(k: TransformKeyframe) = JSONObject().apply { put("id", k.id); put("timeMs", k.timeMs); put("x", k.x.toDouble()); put("y", k.y.toDouble()); put("scale", k.scale.toDouble()); put("rotation", k.rotation.toDouble()) }
+    private fun keyframeFromJson(j: JSONObject) = TransformKeyframe(j.optString("id", UUID.randomUUID().toString()), j.optLong("timeMs", 0L), j.optDouble("x", 0.0).toFloat(), j.optDouble("y", 0.0).toFloat(), j.optDouble("scale", 1.0).toFloat(), j.optDouble("rotation", 0.0).toFloat())
+    private fun stickerToJson(s: StickerLayer) = JSONObject().apply { put("id", s.id); put("uri", s.uri); put("name", s.name); put("x", s.x.toDouble()); put("y", s.y.toDouble()); put("scale", s.scale.toDouble()); put("rotation", s.rotation.toDouble()); put("alpha", s.alpha.toDouble()) }
+    private fun stickerFromJson(j: JSONObject) = StickerLayer(j.optString("id", UUID.randomUUID().toString()), j.getString("uri"), j.optString("name", "Изображение"), j.optDouble("x", 0.0).toFloat(), j.optDouble("y", 0.0).toFloat(), j.optDouble("scale", 0.35).toFloat(), j.optDouble("rotation", 0.0).toFloat(), j.optDouble("alpha", 1.0).toFloat())
+    private fun audioToJson(a: AudioTrack) = JSONObject().apply { put("uri", a.uri); put("name", a.name); put("volume", a.volume.toDouble()) }
+    private fun audioFromJson(j: JSONObject) = AudioTrack(j.getString("uri"), j.optString("name", "Музыка"), j.optDouble("volume", 0.65).toFloat())
+    private fun positionedAudioToJson(a: PositionedAudioTrack) = JSONObject().apply { put("id", a.id); put("uri", a.uri); put("name", a.name); put("sourceDurationMs", a.sourceDurationMs); put("startAtMs", a.startAtMs); put("volume", a.volume.toDouble()) }
+    private fun positionedAudioFromJson(j: JSONObject) = PositionedAudioTrack(j.optString("id", UUID.randomUUID().toString()), j.getString("uri"), j.optString("name", "Звук"), j.optLong("sourceDurationMs", 1L).coerceAtLeast(1L), j.optLong("startAtMs", 0L).coerceAtLeast(0L), j.optDouble("volume", 0.85).toFloat())
+    private fun subtitleToJson(s: SubtitleCue) = JSONObject().apply { put("id", s.id); put("startMs", s.startMs); put("endMs", s.endMs); put("text", s.text) }
+    private fun subtitleFromJson(j: JSONObject) = SubtitleCue(j.optString("id", UUID.randomUUID().toString()), j.optLong("startMs", 0L), j.optLong("endMs", 2000L), j.optString("text", ""))
+    private fun subtitleStyleToJson(s: SubtitleStyle) = JSONObject().apply { put("fontScale", s.fontScale.toDouble()); put("textColor", s.textColor); put("backgroundColor", s.backgroundColor); put("backgroundEnabled", s.backgroundEnabled); put("verticalPosition", s.verticalPosition.toDouble()) }
+    private fun subtitleStyleFromJson(j: JSONObject) = SubtitleStyle(j.optDouble("fontScale", 1.0).toFloat(), j.optInt("textColor", -1), j.optInt("backgroundColor", 0xB3000000.toInt()), j.optBoolean("backgroundEnabled", true), j.optDouble("verticalPosition", 0.84).toFloat())
+    private fun exportToJson(e: ExportSettings) = JSONObject().apply { put("height", e.height); put("maxFrameRate", e.maxFrameRate); if (e.aspectRatio == null) put("aspectRatio", JSONObject.NULL) else put("aspectRatio", e.aspectRatio.toDouble()); put("cropToFill", e.cropToFill); put("videoCodec", e.videoCodec.name) }
+    private fun exportFromJson(j: JSONObject) = ExportSettings(j.optInt("height", 1080), j.optInt("maxFrameRate", 30), if (j.isNull("aspectRatio")) null else j.optDouble("aspectRatio").toFloat(), j.optBoolean("cropToFill", false), enumOrDefault(j.optString("videoCodec"), VideoCodec.H264))
+    private inline fun <reified T : Enum<T>> enumOrDefault(value: String?, default: T): T = runCatching { enumValueOf<T>(value.orEmpty()) }.getOrDefault(default)
 }
