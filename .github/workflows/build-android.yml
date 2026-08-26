@@ -67,11 +67,14 @@ jobs:
           assert any('idle' in name.lower() for name in animations), 'Converted T. rex lost Idle animation'
           PY
 
-      - name: Generate original T. rex bellow reconstruction
+      - name: Generate original scene audio
         run: |
           python3 tools/generate_trex_bellow.py
+          python3 tools/generate_hell_creek_ambience.py
           test -s assets/audio/tyrannosaurus_rex/roar_reconstruction.wav
+          test -s assets/audio/tyrannosaurus_rex/hell_creek_ambience.wav
           sha256sum assets/audio/tyrannosaurus_rex/roar_reconstruction.wav
+          sha256sum assets/audio/tyrannosaurus_rex/hell_creek_ambience.wav
 
       - name: Use JDK 17
         run: |
@@ -115,7 +118,7 @@ jobs:
           set -o pipefail
           godot --headless --path . --script tools/smoke_main.gd 2>&1 | tee /tmp/godot-smoke.log
           grep -q 'SMOKE_MAIN_OK' /tmp/godot-smoke.log
-          if grep -E '(^|[[:space:]])(ERROR|SCRIPT ERROR):' /tmp/godot-smoke.log; then
+          if grep -E '(^|[[:space:]])(ERROR|SCRIPT ERROR|SHADER ERROR):' /tmp/godot-smoke.log; then
             echo 'Runtime smoke test emitted a Godot error.' >&2
             exit 1
           fi
