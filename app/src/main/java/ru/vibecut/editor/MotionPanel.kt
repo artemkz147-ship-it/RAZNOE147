@@ -41,26 +41,17 @@ internal fun MotionPanel(
         }
 
         if (clip.motion != ClipMotion.NONE) {
-            Text(
-                "Сила анимации: ${(clip.motionStrength * 100).roundToInt()}%",
-                color = Color.White,
-            )
+            Text("Сила анимации: ${(clip.motionStrength * 100).roundToInt()}%", color = Color.White)
             Slider(
                 value = clip.motionStrength.coerceIn(0.03f, 0.35f),
                 onValueChange = {
-                    if (!editingStrength) {
-                        onSnapshot()
-                        editingStrength = true
-                    }
+                    if (!editingStrength) { onSnapshot(); editingStrength = true }
                     onUpdate(clip.copy(motionStrength = it))
                 },
                 onValueChangeFinished = { editingStrength = false },
                 valueRange = 0.03f..0.35f,
             )
-            Text(
-                "Анимация рассчитывается по времени каждого кадра и сохраняется в экспорт.",
-                color = Color(0xFF8F8F9C),
-            )
+            Text("Анимация рассчитывается по времени каждого кадра и сохраняется в экспорт.", color = Color(0xFF8F8F9C))
         }
     }
 
@@ -76,51 +67,37 @@ internal fun MotionPanel(
                 }
             }
         }
-
         if (clip.maskType != MaskType.NONE) {
-            Text(
-                "Размер маски: ${(clip.maskSize * 100).roundToInt()}%",
-                color = Color.White,
-            )
+            Text("Размер маски: ${(clip.maskSize * 100).roundToInt()}%", color = Color.White)
             Slider(
                 value = clip.maskSize.coerceIn(0.25f, 1f),
                 onValueChange = {
-                    if (!editingMask) {
-                        onSnapshot()
-                        editingMask = true
-                    }
+                    if (!editingMask) { onSnapshot(); editingMask = true }
                     onUpdate(clip.copy(maskSize = it))
                 },
                 onValueChangeFinished = { editingMask = false },
                 valueRange = 0.25f..1f,
             )
         }
-
-        Text(
-            "Виньетка: ${(clip.vignette * 100).roundToInt()}%",
-            color = Color.White,
-        )
+        Text("Виньетка: ${(clip.vignette * 100).roundToInt()}%", color = Color.White)
         Slider(
             value = clip.vignette.coerceIn(0f, 1f),
             onValueChange = {
-                if (!editingVignette) {
-                    onSnapshot()
-                    editingVignette = true
-                }
+                if (!editingVignette) { onSnapshot(); editingVignette = true }
                 onUpdate(clip.copy(vignette = it))
             },
             onValueChangeFinished = { editingVignette = false },
             valueRange = 0f..1f,
         )
-        ToolButton(
-            text = "Сбросить маску",
-            onClick = {
-                onSnapshot()
-                onUpdate(clip.copy(maskType = MaskType.NONE, maskSize = 0.82f, vignette = 0f))
-            },
-        )
+        ToolButton("Сбросить маску", {
+            onSnapshot()
+            onUpdate(clip.copy(maskType = MaskType.NONE, maskSize = 0.82f, vignette = 0f))
+        })
     }
 
     CreativeStylePanel(clip, onSnapshot, onUpdate)
+    KeyframeCurvePanel(clip, onSnapshot, onUpdate)
+    AnimatedStickerPanel(clip, 0L, onSnapshot, onUpdate)
+    ObjectTrackingPanel(clip, onSnapshot, onUpdate)
     PersonCutoutPanel(clip, onSnapshot, onUpdate)
 }
