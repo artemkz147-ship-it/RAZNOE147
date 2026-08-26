@@ -139,6 +139,7 @@ func _clear_loaded_scene() -> void:
     current_environment = null
     if ambience_player != null:
         ambience_player.stop()
+        ambience_player.volume_db = -12.0
     if narration_player != null:
         narration_player.stop()
     if roar_player != null:
@@ -162,17 +163,27 @@ func _build_runtime_audio() -> void:
     ambience_player.volume_db = -12.0
     ambience_player.finished.connect(_restart_ambience)
     add_child(ambience_player)
+
     narration_player = AudioStreamPlayer.new()
-    narration_player.volume_db = -2.0
+    narration_player.volume_db = 0.0
+    narration_player.finished.connect(_restore_ambience_after_narration)
     add_child(narration_player)
+
     roar_player = AudioStreamPlayer3D.new()
-    roar_player.volume_db = 1.5
-    roar_player.max_distance = 60.0
+    roar_player.volume_db = 7.0
+    roar_player.max_db = 10.0
+    roar_player.unit_size = 18.0
+    roar_player.max_distance = 120.0
+    roar_player.panning_strength = 0.72
     dinosaur_slot.add_child(roar_player)
 
 func _restart_ambience() -> void:
     if ambience_player != null and ambience_player.stream != null:
         ambience_player.play()
+
+func _restore_ambience_after_narration() -> void:
+    if ambience_player != null:
+        ambience_player.volume_db = -12.0
 
 func _build_ui() -> void:
     var root := Control.new()
@@ -302,11 +313,12 @@ func _reset_view() -> void:
     camera_rig.call("reset_view")
 
 func _roar() -> void:
+    # Audio first: uncompressed WAV is memory-resident, so the roar starts on the tap frame.
+    if roar_player.stream != null:
+        roar_player.stop()
+        roar_player.play(0.0)
     if dinosaur_controller.has_action("roar"):
         dinosaur_controller.play_action("roar")
-    elif roar_player.stream != null:
-        # Fallback for future static specimens: still allow the reconstruction audio.
-        roar_player.play()
 
 func _action() -> void:
     var actions: Array = current_data.get("interactive_actions", [])
@@ -323,8 +335,11 @@ func _narrate() -> void:
     if narration_player.stream != null:
         if narration_player.playing:
             narration_player.stop()
+            _restore_ambience_after_narration()
         else:
-            narration_player.play()
+            if ambience_player != null:
+                ambience_player.volume_db = -21.0
+            narration_player.play(0.0)
         return
     if DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH):
         var voices := DisplayServer.tts_get_voices_for_language("ru")
