@@ -28,11 +28,16 @@ jobs:
           cat offline100-stable/.payload/app.* | base64 -d | gzip -d > offline100-stable/app/src/main/assets/app.js
           cat offline100-stable/.payload/style.* | base64 -d | gzip -d > offline100-stable/app/src/main/assets/styles.css
           cat offline100-stable/.payload/index.* | base64 -d | gzip -d > offline100-stable/app/src/main/assets/index.html
+          base64 -d < offline100-stable/.payload/v11-app.patch.gz.b64 | gzip -d > /tmp/v11-app.patch
+          base64 -d < offline100-stable/.payload/v11-styles.patch.gz.b64 | gzip -d > /tmp/v11-styles.patch
+          patch offline100-stable/app/src/main/assets/app.js < /tmp/v11-app.patch
+          patch offline100-stable/app/src/main/assets/styles.css < /tmp/v11-styles.patch
           cp offline100-stable/static/manifest.webmanifest offline100-stable/app/src/main/assets/manifest.webmanifest
           cp offline100-stable/static/sw.js offline100-stable/app/src/main/assets/sw.js
           test $(wc -c < offline100-stable/app/src/main/assets/app.js) -eq 212277
           test $(wc -c < offline100-stable/app/src/main/assets/styles.css) -eq 74907
           test $(wc -c < offline100-stable/app/src/main/assets/index.html) -eq 12839
+          grep -q '1.1.0' offline100-stable/app/src/main/assets/app.js
       - name: Build APK
         working-directory: offline100-stable
         run: gradle --no-daemon :app:assembleDebug
@@ -63,8 +68,15 @@ jobs:
           cat offline100-stable/.payload/app.* | base64 -d | gzip -d > offline100-stable/app/src/main/assets/app.js
           cat offline100-stable/.payload/style.* | base64 -d | gzip -d > offline100-stable/app/src/main/assets/styles.css
           cat offline100-stable/.payload/index.* | base64 -d | gzip -d > offline100-stable/app/src/main/assets/index.html
+          base64 -d < offline100-stable/.payload/v11-app.patch.gz.b64 | gzip -d > /tmp/v11-app.patch
+          base64 -d < offline100-stable/.payload/v11-styles.patch.gz.b64 | gzip -d > /tmp/v11-styles.patch
+          patch offline100-stable/app/src/main/assets/app.js < /tmp/v11-app.patch
+          patch offline100-stable/app/src/main/assets/styles.css < /tmp/v11-styles.patch
           cp offline100-stable/static/manifest.webmanifest offline100-stable/app/src/main/assets/manifest.webmanifest
           cp offline100-stable/static/sw.js offline100-stable/app/src/main/assets/sw.js
+          test $(wc -c < offline100-stable/app/src/main/assets/app.js) -eq 212277
+          test $(wc -c < offline100-stable/app/src/main/assets/styles.css) -eq 74907
+          test $(wc -c < offline100-stable/app/src/main/assets/index.html) -eq 12839
       - name: Build test APK
         working-directory: offline100-stable
         run: gradle --no-daemon :app:assembleDebug
