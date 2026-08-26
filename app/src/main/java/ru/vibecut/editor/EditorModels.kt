@@ -10,6 +10,45 @@ enum class ClipMotion(val title: String) {
     PAN_DOWN("Панорама вниз"),
 }
 
+enum class TransitionType(val title: String) {
+    NONE("Без перехода"),
+    FADE("Затемнение"),
+    SLIDE_LEFT("Сдвиг влево"),
+    SLIDE_RIGHT("Сдвиг вправо"),
+    ZOOM("Масштаб"),
+    SPIN("Вращение"),
+    FLASH("Вспышка"),
+}
+
+enum class ColorEffect(val title: String) {
+    NONE("Без эффекта"),
+    GRAYSCALE("Чёрно-белый"),
+    INVERT("Инверсия"),
+    SEPIA("Сепия"),
+}
+
+data class TransitionSpec(val type: TransitionType, val durationMs: Long)
+
+data class TransformKeyframe(
+    val id: String,
+    val timeMs: Long,
+    val x: Float = 0f,
+    val y: Float = 0f,
+    val scale: Float = 1f,
+    val rotation: Float = 0f,
+)
+
+data class StickerLayer(
+    val id: String,
+    val uri: String,
+    val name: String = "Изображение",
+    val x: Float = 0f,
+    val y: Float = 0f,
+    val scale: Float = 0.35f,
+    val rotation: Float = 0f,
+    val alpha: Float = 1f,
+)
+
 data class VideoClip(
     val id: String,
     val uri: String,
@@ -33,6 +72,14 @@ data class VideoClip(
     val flipVertical: Boolean = false,
     val motion: ClipMotion = ClipMotion.NONE,
     val motionStrength: Float = 0.14f,
+    val colorEffect: ColorEffect = ColorEffect.NONE,
+    val redScale: Float = 1f,
+    val greenScale: Float = 1f,
+    val blueScale: Float = 1f,
+    val transitionOut: TransitionType = TransitionType.NONE,
+    val transitionDurationMs: Long = 650L,
+    val keyframes: List<TransformKeyframe> = emptyList(),
+    val stickers: List<StickerLayer> = emptyList(),
     val overlayText: String = "",
     val textX: Float = 0f,
     val textY: Float = -0.72f,
@@ -47,11 +94,7 @@ data class VideoClip(
     val durationMs: Long get() = (sourceSliceDurationMs / speed.coerceAtLeast(0.05f)).toLong().coerceAtLeast(1L)
 }
 
-data class AudioTrack(
-    val uri: String,
-    val name: String,
-    val volume: Float = 0.65f,
-)
+data class AudioTrack(val uri: String, val name: String, val volume: Float = 0.65f)
 
 data class PositionedAudioTrack(
     val id: String,
@@ -62,10 +105,17 @@ data class PositionedAudioTrack(
     val volume: Float = 0.85f,
 )
 
-enum class VideoCodec(
-    val title: String,
-    val mimeType: String,
-) {
+data class SubtitleCue(val id: String, val startMs: Long, val endMs: Long, val text: String)
+
+data class SubtitleStyle(
+    val fontScale: Float = 1f,
+    val textColor: Int = -1,
+    val backgroundColor: Int = 0xB3000000.toInt(),
+    val backgroundEnabled: Boolean = true,
+    val verticalPosition: Float = 0.84f,
+)
+
+enum class VideoCodec(val title: String, val mimeType: String) {
     H264("H.264", "video/avc"),
     H265("H.265", "video/hevc"),
 }
@@ -78,19 +128,28 @@ data class ExportSettings(
     val videoCodec: VideoCodec = VideoCodec.H264,
 )
 
-data class EditorSnapshot(
-    val clips: List<VideoClip>,
-    val selectedId: String?,
-)
+data class EditorSnapshot(val clips: List<VideoClip>, val selectedId: String?)
 
 data class SavedProject(
+    val id: String,
+    val name: String = "Новый проект",
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
     val clips: List<VideoClip> = emptyList(),
     val selectedId: String? = null,
     val backgroundAudio: AudioTrack? = null,
     val positionedAudioTracks: List<PositionedAudioTrack> = emptyList(),
+    val subtitles: List<SubtitleCue> = emptyList(),
+    val subtitleStyle: SubtitleStyle = SubtitleStyle(),
     val exportSettings: ExportSettings = ExportSettings(),
 )
 
-enum class ExportState {
-    IDLE, EXPORTING, DONE, ERROR
-}
+data class ProjectSummary(
+    val id: String,
+    val name: String,
+    val updatedAt: Long,
+    val clipCount: Int,
+    val durationMs: Long,
+)
+
+enum class ExportState { IDLE, EXPORTING, DONE, ERROR }
