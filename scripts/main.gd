@@ -36,11 +36,27 @@ func _ready() -> void:
     quality_manager = QualityManagerScript.new()
     add_child(quality_manager)
     quality_manager.apply(quality_manager.choose_initial())
+    _install_master_limiter()
     _build_runtime_audio()
     _build_ui()
     _load_catalog()
     if not catalog.is_empty():
         _show_dinosaur(0)
+
+func _install_master_limiter() -> void:
+    # The roar deliberately carries a lot more gain than the other sounds. A hard
+    # limiter on Master keeps that impact while preventing digital clipping.
+    var master_index := AudioServer.get_bus_index("Master")
+    if master_index < 0:
+        return
+    for i in AudioServer.get_bus_effect_count(master_index):
+        if AudioServer.get_bus_effect(master_index, i) is AudioEffectHardLimiter:
+            return
+    var limiter := AudioEffectHardLimiter.new()
+    limiter.ceiling_db = -0.3
+    limiter.pre_gain_db = 0.0
+    limiter.release = 0.12
+    AudioServer.add_bus_effect(master_index, limiter)
 
 func _load_catalog() -> void:
     var path := "res://data/dinosaurs.json"
@@ -172,11 +188,14 @@ func _build_runtime_audio() -> void:
     add_child(narration_player)
 
     roar_player = AudioStreamPlayer3D.new()
-    roar_player.volume_db = 7.0
-    roar_player.max_db = 10.0
+    # +9.5 dB compared with the previous +7 dB mix is approximately three times
+    # the linear amplitude. The Master hard limiter above catches dangerous peaks.
+    roar_player.volume_db = 16.5
+    roar_player.max_db = 20.0
     roar_player.unit_size = 18.0
     roar_player.max_distance = 120.0
     roar_player.panning_strength = 0.72
+    roar_player.finished.connect(_restore_ambience_after_roar)
     dinosaur_slot.add_child(roar_player)
 
 func _restart_ambience() -> void:
@@ -184,8 +203,13 @@ func _restart_ambience() -> void:
         ambience_player.play()
 
 func _restore_ambience_after_narration() -> void:
-    if ambience_player != null:
+    if ambience_player != null and (roar_player == null or not roar_player.playing):
         ambience_player.volume_db = -12.0
+
+func _restore_ambience_after_roar() -> void:
+    if ambience_player == null:
+        return
+    ambience_player.volume_db = -21.0 if narration_player != null and narration_player.playing else -12.0
 
 func _build_ui() -> void:
     var root := Control.new()
@@ -315,10 +339,17 @@ func _reset_view() -> void:
     camera_rig.call("reset_view")
 
 func _roar() -> void:
-    # Audio first: uncompressed WAV is memory-resident, so the roar starts on the tap frame.
+    # Sound starts before the animation on the same tap. Stop narration so the roar
+    # always wins the mix immediately, and heavily duck the habitat underneath it.
+    if narration_player != null and narration_player.playing:
+        narration_player.stop()
+    if ambience_player != null:
+        ambience_player.volume_db = -32.0
     if roar_player.stream != null:
         roar_player.stop()
         roar_player.play(0.0)
+    else:
+        _restore_ambience_after_roar()
     if dinosaur_controller.has_action("roar"):
         dinosaur_controller.play_action("roar")
 
@@ -339,6 +370,8 @@ func _narrate() -> void:
             narration_player.stop()
             _restore_ambience_after_narration()
         else:
+            if roar_player != null and roar_player.playing:
+                roar_player.stop()
             if ambience_player != null:
                 ambience_player.volume_db = -21.0
             narration_player.play(0.0)
