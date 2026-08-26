@@ -15,7 +15,7 @@
       "evidence_notes": ["Период, география находок, строение скелета и зубов подтверждаются ископаемыми.","Точная окраска кожи неизвестна и является реконструкцией.","Реальный голос T. rex неизвестен; звук в приложении является реконструкцией.","Поведенческие анимации опираются на биомеханику, но не являются прямым наблюдением."],
       "model_path": "res://assets/dinosaurs/tyrannosaurus_rex/model.glb",
       "environment_path": "res://assets/environments/hell_creek/environment.glb",
-      "ambience_path": "res://assets/audio/tyrannosaurus_rex/ambience.ogg",
+      "ambience_path": "res://assets/audio/tyrannosaurus_rex/hell_creek_ambience.wav",
       "narration_path": "res://assets/audio/tyrannosaurus_rex/narration_ru.ogg",
       "roar_path": "res://assets/audio/tyrannosaurus_rex/roar_reconstruction.wav",
       "animations": {"idle":["Idle","Idle_Breath","Breathing"],"roar":["Roar","Vocalize","Threat_Roar"],"walk":["Walk","Walk_Forward"],"look":["Look_Around","Look"],"threat":["Threat","Display"]},
