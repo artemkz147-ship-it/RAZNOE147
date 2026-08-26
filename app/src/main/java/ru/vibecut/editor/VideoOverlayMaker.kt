@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.annotation.OptIn
-import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.OverlaySettings
@@ -129,11 +128,13 @@ class VideoOverlayMaker(private val context: Context) {
                 }
                 onDone(
                     VideoClip(
-                        id = UUID.randomUUID().toString(),
+                        id = base.id,
                         uri = Uri.fromFile(output).toString(),
-                        name = "${base.name} · видео поверх",
+                        name = "${base.name} · ${overlayName.ifBlank { "видео поверх" }}",
                         sourceDurationMs = base.durationMs,
                         muted = base.muted,
+                        transitionOut = base.transitionOut,
+                        transitionDurationMs = base.transitionDurationMs,
                     )
                 )
             }
