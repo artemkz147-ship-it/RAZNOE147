@@ -19,6 +19,7 @@ stretch/mode="canvas_items"
 handheld/orientation=0
 
 [rendering]
+textures/vram_compression/import_etc2_astc=true
 renderer/rendering_method="mobile"
 renderer/rendering_method.mobile="mobile"
 textures/default_filters/use_nearest_mipmap_filter=false
