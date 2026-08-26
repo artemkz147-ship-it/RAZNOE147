@@ -228,7 +228,32 @@ fun VideoEditorScreen(projectId: String, onBack: () -> Unit) {
             Box(Modifier.weight(1f)) { EmptyEditor { videoPicker.launch(arrayOf("video/*")) } }
         } else {
             EditorPreview(selected, incoming, exportSettings, offset, subtitles, subtitleStyle) { position = it }
-            ProTimeline(clips, selectedId, position) { selectedId = it; position = 0L }
+            ProTimeline(
+                clips = clips,
+                selectedId = selectedId,
+                positionMs = position,
+                music = music,
+                audioTracks = audioTracks,
+                subtitles = subtitles,
+                onSelect = { selectedId = it; position = 0L },
+                onSnapshot = { snap() },
+                onUpdateClip = { updated ->
+                    replace(updated)
+                    position = position.coerceAtMost((updated.sourceSliceDurationMs - 1L).coerceAtLeast(0L))
+                    message = "Обрезка клипа обновлена"
+                },
+                onMoveClip = { id, target ->
+                    val from = clips.indexOfFirst { it.id == id }
+                    if (from >= 0 && target != from) {
+                        snap()
+                        val moving = clips.removeAt(from)
+                        clips.add(target.coerceIn(0, clips.size), moving)
+                        selectedId = id
+                        position = 0L
+                        message = "Клип перемещён"
+                    }
+                },
+            )
             EditorMessageBar(message)
 
             Box(Modifier.weight(1f)) {
