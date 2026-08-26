@@ -55,4 +55,7 @@ dependencies {
     implementation("androidx.media3:media3-ui:$media3")
     implementation("androidx.media3:media3-transformer:$media3")
     implementation("androidx.media3:media3-effect:$media3")
+
+    // Bundled model: works without Google Play model downloads or a server.
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
 }
