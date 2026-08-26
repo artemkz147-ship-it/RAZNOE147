@@ -1,0 +1,83 @@
+name: Build Sky Frontiers APK
+
+on:
+  push:
+    branches:
+      - sky-frontiers-apk-gyro-downloads
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack game source
+        run: |
+          base64 -d skyfrontiers3d_src.b64 > skyfrontiers3d-src.zip
+          unzip -q skyfrontiers3d-src.zip
+          test -f skyfrontiers3d/game.js
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download 3 bundled aircraft
+        working-directory: skyfrontiers3d
+        run: |
+          mkdir -p public/models
+          curl -fL --retry 3 -o public/models/pa28.glb https://raw.githubusercontent.com/Flightradar24/fr24-3d-models/master/models/pa28.glb
+          curl -fL --retry 3 -o public/models/ask21.glb https://raw.githubusercontent.com/Flightradar24/fr24-3d-models/master/models/ask21.glb
+          curl -fL --retry 3 -o public/models/atr42.glb https://raw.githubusercontent.com/Flightradar24/fr24-3d-models/master/models/atr42.glb
+          test -s public/models/pa28.glb
+          test -s public/models/ask21.glb
+          test -s public/models/atr42.glb
+
+      - name: Install web dependencies
+        working-directory: skyfrontiers3d
+        run: npm install --no-audit --no-fund
+
+      - name: Build 3D web runtime
+        working-directory: skyfrontiers3d
+        run: npm run build
+
+      - name: Copy web build into Android assets
+        working-directory: skyfrontiers3d
+        run: |
+          rm -rf android/app/src/main/assets/www
+          mkdir -p android/app/src/main/assets/www
+          cp -R dist/. android/app/src/main/assets/www/
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: yes | sdkmanager "platforms;android-35" "build-tools;35.0.0" >/dev/null
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build installable APK
+        working-directory: skyfrontiers3d/android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Verify APK contains starter models
+        working-directory: skyfrontiers3d/android
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -l "$APK" | grep -q 'assets/www/models/pa28.glb'
+          unzip -l "$APK" | grep -q 'assets/www/models/ask21.glb'
+          unzip -l "$APK" | grep -q 'assets/www/models/atr42.glb'
+          cp "$APK" ../../Sky-Frontiers-3D-gyro.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sky-Frontiers-3D-gyro-apk
+          path: Sky-Frontiers-3D-gyro.apk
+          if-no-files-found: error
