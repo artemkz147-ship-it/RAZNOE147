@@ -8,7 +8,6 @@ import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.effect.Presentation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -77,12 +76,7 @@ class ExportManager(private val context: Context) {
         }
 
         val composition = Composition.Builder(sequences)
-            .setEffects(
-                Effects(
-                    emptyList(),
-                    listOf(Presentation.createForHeight(settings.height)),
-                )
-            )
+            .setEffects(Effects(emptyList(), buildCanvasEffects(settings, includeResolution = true)))
             .build()
 
         val output = File(context.cacheDir, "vibecut_${System.currentTimeMillis()}.mp4")
