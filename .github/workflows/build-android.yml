@@ -110,6 +110,16 @@ jobs:
       - name: Validate imported T. rex scene
         run: godot --headless --path . --script tools/validate_assets.gd
 
+      - name: Smoke-test complete interactive scene
+        run: |
+          set -o pipefail
+          godot --headless --path . --script tools/smoke_main.gd 2>&1 | tee /tmp/godot-smoke.log
+          grep -q 'SMOKE_MAIN_OK' /tmp/godot-smoke.log
+          if grep -E '(^|[[:space:]])(ERROR|SCRIPT ERROR):' /tmp/godot-smoke.log; then
+            echo 'Runtime smoke test emitted a Godot error.' >&2
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
