@@ -30,18 +30,18 @@ func _ready() -> void:
     _apply_immediate()
 
 func _process(delta: float) -> void:
-    var t := clamp(delta * smoothing_speed, 0.0, 1.0)
+    var t: float = clampf(delta * smoothing_speed, 0.0, 1.0)
     _yaw = lerp_angle(_yaw, _target_yaw, t)
-    _pitch = lerp(_pitch, _target_pitch, t)
-    _distance = lerp(_distance, _target_distance, t)
+    _pitch = lerpf(_pitch, _target_pitch, t)
+    _distance = lerpf(_distance, _target_distance, t)
     _focus_center = _focus_center.lerp(_target_focus_center, t)
-    _focus_height = lerp(_focus_height, _target_focus_height, t)
+    _focus_height = lerpf(_focus_height, _target_focus_height, t)
     _apply_transform()
 
 func focus_target(center: Vector3, radius: float) -> void:
     _target_focus_center = center
-    _target_focus_height = clamp(radius * 0.35, 1.2, 5.5)
-    _target_distance = clamp(radius * 2.4, min_distance, max_distance)
+    _target_focus_height = clampf(radius * 0.35, 1.2, 5.5)
+    _target_distance = clampf(radius * 2.4, min_distance, max_distance)
 
 func reset_view() -> void:
     _target_yaw = 0.0
@@ -58,7 +58,7 @@ func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventScreenTouch:
         if event.pressed:
             _touches[event.index] = event.position
-            var now := Time.get_ticks_msec()
+            var now: int = Time.get_ticks_msec()
             if _touches.size() == 1 and now - _tap_time_msec < 260:
                 _toggle_top_view()
             _tap_time_msec = now
@@ -73,8 +73,10 @@ func _unhandled_input(event: InputEvent) -> void:
         if _touches.size() == 1:
             _orbit(event.relative)
         elif _touches.size() >= 2:
-            var points := _touches.values()
-            var pinch_distance: float = points[0].distance_to(points[1])
+            var points: Array = _touches.values()
+            var point_a: Vector2 = points[0] as Vector2
+            var point_b: Vector2 = points[1] as Vector2
+            var pinch_distance: float = point_a.distance_to(point_b)
             if _last_pinch_distance > 0.0:
                 _zoom((_last_pinch_distance - pinch_distance) * zoom_speed)
             _last_pinch_distance = pinch_distance
@@ -102,14 +104,14 @@ func _toggle_top_view() -> void:
 
 func _orbit(delta: Vector2) -> void:
     _target_yaw -= delta.x * rotation_speed
-    _target_pitch = clamp(
+    _target_pitch = clampf(
         _target_pitch - delta.y * rotation_speed,
         deg_to_rad(min_pitch_degrees),
         deg_to_rad(max_pitch_degrees)
     )
 
 func _zoom(delta: float) -> void:
-    _target_distance = clamp(_target_distance + delta, min_distance, max_distance)
+    _target_distance = clampf(_target_distance + delta, min_distance, max_distance)
 
 func _apply_immediate() -> void:
     _focus_center = _target_focus_center
