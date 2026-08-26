@@ -227,7 +227,7 @@ fun VideoEditorScreen() {
         if (selected == null) {
             EmptyEditor { importer.launch(arrayOf("video/*")) }
         } else {
-            Preview(
+            EditorPreview(
                 clip = selected,
                 exportSettings = exportSettings,
                 onPosition = { positionMs = it },
@@ -358,6 +358,12 @@ fun VideoEditorScreen() {
             )
 
             FilterPanel(
+                clip = selected,
+                onSnapshot = { snapshot() },
+                onUpdate = { replaceClip(it) },
+            )
+
+            MotionPanel(
                 clip = selected,
                 onSnapshot = { snapshot() },
                 onUpdate = { replaceClip(it) },
