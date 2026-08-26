@@ -1,0 +1,112 @@
+package ru.vibecut.editor
+
+import android.graphics.Color
+import android.graphics.Typeface
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.BackgroundColorSpan
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
+import androidx.annotation.OptIn
+import androidx.media3.common.C
+import androidx.media3.common.Effect
+import androidx.media3.common.audio.SpeedProvider
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.Brightness
+import androidx.media3.effect.Contrast
+import androidx.media3.effect.Crop
+import androidx.media3.effect.HslAdjustment
+import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.ScaleAndRotateTransformation
+import androidx.media3.effect.StaticOverlaySettings
+import androidx.media3.effect.TextOverlay
+
+@OptIn(UnstableApi::class)
+fun buildVideoEffects(clip: VideoClip): List<Effect> {
+    val effects = mutableListOf<Effect>()
+
+    if (
+        clip.rotationDegrees % 360 != 0 ||
+        clip.flipHorizontal ||
+        clip.flipVertical
+    ) {
+        effects += ScaleAndRotateTransformation.Builder()
+            .setScale(
+                if (clip.flipHorizontal) -1f else 1f,
+                if (clip.flipVertical) -1f else 1f,
+            )
+            .setRotationDegrees(clip.rotationDegrees.toFloat())
+            .build()
+    }
+
+    if (clip.crop > 0.001f) {
+        val inset = (clip.crop.coerceIn(0f, 0.45f) * 2f)
+        effects += Crop(
+            -1f + inset,
+            1f - inset,
+            -1f + inset,
+            1f - inset,
+        )
+    }
+
+    if (kotlin.math.abs(clip.brightness) > 0.001f) {
+        effects += Brightness(clip.brightness.coerceIn(-1f, 1f))
+    }
+
+    if (kotlin.math.abs(clip.contrast) > 0.001f) {
+        effects += Contrast(clip.contrast.coerceIn(-1f, 1f))
+    }
+
+    if (
+        kotlin.math.abs(clip.hue) > 0.001f ||
+        kotlin.math.abs(clip.saturation) > 0.001f ||
+        kotlin.math.abs(clip.lightness) > 0.001f
+    ) {
+        effects += HslAdjustment.Builder()
+            .adjustHue(clip.hue)
+            .adjustSaturation(clip.saturation.coerceIn(-100f, 100f))
+            .adjustLightness(clip.lightness.coerceIn(-100f, 100f))
+            .build()
+    }
+
+    val text = clip.overlayText.trim()
+    if (text.isNotEmpty()) {
+        val styled = SpannableString("  $text  ").apply {
+            setSpan(
+                ForegroundColorSpan(Color.WHITE),
+                0,
+                length,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+            setSpan(
+                BackgroundColorSpan(0x99000000.toInt()),
+                0,
+                length,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+            setSpan(
+                StyleSpan(Typeface.BOLD),
+                0,
+                length,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+        }
+        val settings = StaticOverlaySettings.Builder()
+            .setBackgroundFrameAnchor(0f, -0.72f)
+            .setOverlayFrameAnchor(0f, -1f)
+            .setScale(0.72f, 0.72f)
+            .build()
+        effects += OverlayEffect(
+            listOf(TextOverlay.createStaticTextOverlay(styled, settings))
+        )
+    }
+
+    return effects
+}
+
+@OptIn(UnstableApi::class)
+class ConstantSpeedProvider(private val speed: Float) : SpeedProvider {
+    override fun getSpeed(timeUs: Long): Float = speed.coerceIn(0.25f, 4f)
+
+    override fun getNextSpeedChangeTimeUs(timeUs: Long): Long = C.TIME_UNSET
+}
