@@ -1,6 +1,5 @@
 package ru.vibecut.editor
 
-import android.graphics.Color
 import android.graphics.Typeface
 import android.text.Spannable
 import android.text.SpannableString
@@ -74,23 +73,39 @@ fun buildVideoEffects(clip: VideoClip): List<Effect> {
     if (text.isNotEmpty()) {
         val styled = SpannableString("  $text  ").apply {
             setSpan(
-                ForegroundColorSpan(Color.WHITE),
+                ForegroundColorSpan(clip.textColor),
                 0,
                 length,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
             )
-            setSpan(
-                BackgroundColorSpan(0x99000000.toInt()),
-                0,
-                length,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-            )
-            setSpan(
-                StyleSpan(Typeface.BOLD),
-                0,
-                length,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-            )
+            if (clip.textBackground) {
+                setSpan(
+                    BackgroundColorSpan(0x99000000.toInt()),
+                    0,
+                    length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+            }
+            when {
+                clip.textBold && clip.textItalic -> setSpan(
+                    StyleSpan(Typeface.BOLD_ITALIC),
+                    0,
+                    length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+                clip.textBold -> setSpan(
+                    StyleSpan(Typeface.BOLD),
+                    0,
+                    length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+                clip.textItalic -> setSpan(
+                    StyleSpan(Typeface.ITALIC),
+                    0,
+                    length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+            }
         }
         val settings = StaticOverlaySettings.Builder()
             .setBackgroundFrameAnchor(
@@ -102,7 +117,7 @@ fun buildVideoEffects(clip: VideoClip): List<Effect> {
                 clip.textScale.coerceIn(0.25f, 1.6f),
                 clip.textScale.coerceIn(0.25f, 1.6f),
             )
-            .setRotationDegrees(clip.textRotation)
+            .setRotationDegrees(clip.textRotation.coerceIn(-180f, 180f))
             .build()
         effects += OverlayEffect(
             listOf(TextOverlay.createStaticTextOverlay(styled, settings))
