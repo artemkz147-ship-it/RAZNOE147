@@ -99,6 +99,7 @@ internal fun MotionPanel(
     SpecialEffectPanel(clip, onSnapshot, onUpdate)
     KeyframeCurvePanel(clip, onSnapshot, onUpdate)
     AnimatedStickerPanel(clip, 0L, onSnapshot, onUpdate)
+    GifStickerPanel(clip, 0L, onSnapshot, onUpdate)
     ObjectTrackingPanel(clip, onSnapshot, onUpdate)
     PersonCutoutPanel(clip, onSnapshot, onUpdate)
 }
