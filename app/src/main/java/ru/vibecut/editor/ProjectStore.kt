@@ -30,15 +30,21 @@ object ProjectStore {
         put("selectedId", project.selectedId)
         put("clips", JSONArray().apply { project.clips.forEach { put(clipToJson(it)) } })
         put("backgroundAudio", project.backgroundAudio?.let(::audioToJson))
+        put(
+            "positionedAudioTracks",
+            JSONArray().apply { project.positionedAudioTracks.forEach { put(positionedAudioToJson(it)) } }
+        )
         put("export", exportToJson(project.exportSettings))
     }
 
     private fun projectFromJson(json: JSONObject): SavedProject {
         val clipsJson = json.optJSONArray("clips") ?: JSONArray()
         val clips = buildList {
-            for (index in 0 until clipsJson.length()) {
-                add(clipFromJson(clipsJson.getJSONObject(index)))
-            }
+            for (index in 0 until clipsJson.length()) add(clipFromJson(clipsJson.getJSONObject(index)))
+        }
+        val tracksJson = json.optJSONArray("positionedAudioTracks") ?: JSONArray()
+        val tracks = buildList {
+            for (index in 0 until tracksJson.length()) add(positionedAudioFromJson(tracksJson.getJSONObject(index)))
         }
         val audio = json.optJSONObject("backgroundAudio")?.let(::audioFromJson)
         val export = json.optJSONObject("export")?.let(::exportFromJson) ?: ExportSettings()
@@ -46,6 +52,7 @@ object ProjectStore {
             clips = clips,
             selectedId = json.optString("selectedId").takeIf { it.isNotBlank() && it != "null" },
             backgroundAudio = audio,
+            positionedAudioTracks = tracks,
             exportSettings = export,
         )
     }
@@ -124,6 +131,24 @@ object ProjectStore {
         uri = json.getString("uri"),
         name = json.optString("name", "Музыка"),
         volume = json.optDouble("volume", 0.65).toFloat(),
+    )
+
+    private fun positionedAudioToJson(track: PositionedAudioTrack) = JSONObject().apply {
+        put("id", track.id)
+        put("uri", track.uri)
+        put("name", track.name)
+        put("sourceDurationMs", track.sourceDurationMs)
+        put("startAtMs", track.startAtMs)
+        put("volume", track.volume.toDouble())
+    }
+
+    private fun positionedAudioFromJson(json: JSONObject) = PositionedAudioTrack(
+        id = json.getString("id"),
+        uri = json.getString("uri"),
+        name = json.optString("name", "Звук"),
+        sourceDurationMs = json.optLong("sourceDurationMs", 1L).coerceAtLeast(1L),
+        startAtMs = json.optLong("startAtMs", 0L).coerceAtLeast(0L),
+        volume = json.optDouble("volume", 0.85).toFloat(),
     )
 
     private fun exportToJson(settings: ExportSettings) = JSONObject().apply {
