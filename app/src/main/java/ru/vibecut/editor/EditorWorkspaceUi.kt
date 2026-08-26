@@ -1,6 +1,5 @@
 package ru.vibecut.editor
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -152,7 +151,11 @@ internal fun WorkspaceTabBar(active: WorkspaceTab, onSelect: (WorkspaceTab) -> U
                     modifier = Modifier
                         .width(76.dp)
                         .background(
-                            brush = if (selected) Brush.verticalGradient(listOf(Color(0xFF3B2768), Color(0xFF211B36))) else Brush.verticalGradient(listOf(Color(0xFF17171E), Color(0xFF15151B))),
+                            brush = if (selected) {
+                                Brush.verticalGradient(listOf(Color(0xFF3B2768), Color(0xFF211B36)))
+                            } else {
+                                Brush.verticalGradient(listOf(Color(0xFF17171E), Color(0xFF15151B)))
+                            },
                             shape = RoundedCornerShape(15.dp),
                         )
                         .border(1.dp, if (selected) Color(0xFF9B7CF7) else Color(0xFF23232C), RoundedCornerShape(15.dp))
@@ -161,7 +164,7 @@ internal fun WorkspaceTabBar(active: WorkspaceTab, onSelect: (WorkspaceTab) -> U
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(tab.glyph, color = if (selected) Color(0xFFD8C8FF) else Color(0xFFB7B7C2), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text(tab.title, color = if (selected) Color.White else Color(0xFFAAAA B6).let { Color(0xFFAAAAB6) }, fontSize = 10.sp, maxLines = 1)
+                    Text(tab.title, color = if (selected) Color.White else Color(0xFFAAAAB6), fontSize = 10.sp, maxLines = 1)
                 }
             }
         }
@@ -180,7 +183,14 @@ internal fun WorkspaceSectionHeader(tab: WorkspaceTab, selectedClip: VideoClip, 
             Text(tab.hint, color = Color(0xFF8E8E9C), fontSize = 11.sp)
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text(selectedClip.name, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color(0xFFCBCBD6), fontSize = 11.sp, modifier = Modifier.width(130.dp))
+            Text(
+                selectedClip.name,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = Color(0xFFCBCBD6),
+                fontSize = 11.sp,
+                modifier = Modifier.width(130.dp),
+            )
             Text(formatTime(cursorMs), color = Color(0xFF9B7CF7), fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
     }
