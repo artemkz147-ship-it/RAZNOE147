@@ -44,8 +44,6 @@ func _ready() -> void:
         _show_dinosaur(0)
 
 func _install_master_limiter() -> void:
-    # The roar deliberately carries a lot more gain than the other sounds. A hard
-    # limiter on Master keeps that impact while preventing digital clipping.
     var master_index := AudioServer.get_bus_index("Master")
     if master_index < 0:
         return
@@ -92,10 +90,25 @@ func _load_actor(path: String) -> void:
         return
     current_actor = packed.instantiate() as Node3D
     dinosaur_slot.add_child(current_actor)
+    current_actor.visible = true
+    _force_actor_visible(current_actor)
     _apply_scientific_scale(current_actor)
-    dinosaur_controller.attach(current_actor, current_data.get("animations", {}))
+    _center_and_ground_actor(current_actor)
+    dinosaur_controller.attach(current_actor, current_data.get("animations", {}), current_data)
     _fit_camera_to_actor(current_actor)
-    _set_status("Проведи пальцем для вращения. Щипок — приближение и отдаление. Двойной тап — вид сверху.")
+    if roar_player != null:
+        roar_player.global_position = current_actor.global_position + Vector3(0.0, maxf(float(current_data.get("length_m", 4.0)) * 0.12, 0.7), 0.0)
+    _set_status("1 палец — вращение. 2 пальца — перемещение и зум. Двойной тап — вид сверху.")
+
+func _force_actor_visible(root: Node) -> void:
+    if root is Node3D:
+        (root as Node3D).visible = true
+    if root is MeshInstance3D:
+        var mesh_instance := root as MeshInstance3D
+        mesh_instance.visible = true
+        mesh_instance.layers = 1
+    for child in root.get_children():
+        _force_actor_visible(child)
 
 func _apply_scientific_scale(actor: Node3D) -> void:
     var target_length := float(current_data.get("length_m", 0.0))
@@ -106,7 +119,16 @@ func _apply_scientific_scale(actor: Node3D) -> void:
     if source_length <= 0.001:
         return
     var factor := target_length / source_length
-    actor.scale *= Vector3.ONE * factor
+    actor.scale = Vector3.ONE * factor
+
+func _center_and_ground_actor(actor: Node3D) -> void:
+    actor.position = Vector3.ZERO
+    var bounds := _combined_aabb(actor)
+    if bounds.size.length() <= 0.001:
+        return
+    var world_bounds: AABB = actor.global_transform * bounds
+    var center := world_bounds.get_center()
+    actor.global_position += Vector3(-center.x, 0.03 - world_bounds.position.y, -center.z)
 
 func _load_environment(path: String) -> void:
     if path.is_empty() or not ResourceLoader.exists(path):
@@ -124,7 +146,7 @@ func _fit_camera_to_actor(actor: Node3D) -> void:
     var global_bounds: AABB = actor.global_transform * bounds
     var center := global_bounds.get_center()
     var radius: float = maxf(global_bounds.size.x, maxf(global_bounds.size.y, global_bounds.size.z)) * 0.5
-    camera_rig.call("focus_target", center, maxf(radius, 1.0))
+    camera_rig.call("focus_target", center, maxf(radius, 0.3))
 
 func _combined_aabb(root: Node3D) -> AABB:
     var has_bounds := false
@@ -172,8 +194,6 @@ func _assign_stream(player: Node, path: String) -> void:
     if path.is_empty() or not ResourceLoader.exists(path):
         player.set("stream", null)
         return
-    # Runtime audio is owned by the active dinosaur page. Avoid keeping large PCM
-    # narration/roar WAVs alive in the global ResourceLoader cache after switching.
     player.set("stream", ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE))
 
 func _build_runtime_audio() -> void:
@@ -188,8 +208,6 @@ func _build_runtime_audio() -> void:
     add_child(narration_player)
 
     roar_player = AudioStreamPlayer3D.new()
-    # +9.5 dB compared with the previous +7 dB mix is approximately three times
-    # the linear amplitude. The Master hard limiter above catches dangerous peaks.
     roar_player.volume_db = 16.5
     roar_player.max_db = 20.0
     roar_player.unit_size = 18.0
@@ -319,7 +337,7 @@ func _build_info_bbcode() -> String:
 
 func _refresh_action_controls() -> void:
     if roar_button != null:
-        roar_button.disabled = not dinosaur_controller.has_action("roar") and roar_player.stream == null
+        roar_button.disabled = roar_player.stream == null
     if action_button != null:
         var has_supported_action := false
         var actions: Array = current_data.get("interactive_actions", [])
@@ -339,8 +357,6 @@ func _reset_view() -> void:
     camera_rig.call("reset_view")
 
 func _roar() -> void:
-    # Sound starts before the animation on the same tap. Stop narration so the roar
-    # always wins the mix immediately, and heavily duck the habitat underneath it.
     if narration_player != null and narration_player.playing:
         narration_player.stop()
     if ambience_player != null:
