@@ -96,6 +96,7 @@ internal fun MotionPanel(
     }
 
     CreativeStylePanel(clip, onSnapshot, onUpdate)
+    SpecialEffectPanel(clip, onSnapshot, onUpdate)
     KeyframeCurvePanel(clip, onSnapshot, onUpdate)
     AnimatedStickerPanel(clip, 0L, onSnapshot, onUpdate)
     ObjectTrackingPanel(clip, onSnapshot, onUpdate)
