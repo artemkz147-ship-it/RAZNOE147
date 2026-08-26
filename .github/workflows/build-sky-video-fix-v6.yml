@@ -1,0 +1,182 @@
+name: Build Sky Frontiers Video Fix V6
+
+on:
+  push:
+    branches:
+      - sky-video-fix-v6
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack and patch game
+        run: |
+          set -euo pipefail
+          cat skyfrontiers3d_src.part* | base64 -d > skyfrontiers3d-src.zip
+          unzip -q skyfrontiers3d-src.zip
+          python sky_quality_patch.py
+          python sky_real_aircraft_patch.py
+          python sky_video_fix_patch.py
+          python sky_video_v4_hotfix.py
+          node --check skyfrontiers3d/game.js
+          ! grep -q 'ridgesafe' skyfrontiers3d/game.js
+          ! grep -q 'spawnEmergencyPlaceholder' skyfrontiers3d/game.js
+          grep -q 'gyroEnabled:false' skyfrontiers3d/game.js
+          grep -q 'Cessna 172P' skyfrontiers3d/game.js
+          grep -q 'axisSign:-1' skyfrontiers3d/game.js
+          grep -q 'nativeScale:true' skyfrontiers3d/game.js
+          grep -q 'terrainHeight(x,z)+4.6' skyfrontiers3d/game.js
+
+      - name: Build authored carrier
+        run: |
+          python -m pip install --quiet trimesh numpy matplotlib
+          python make_carrier.py skyfrontiers3d/public/env/carrier_hd.glb
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Assimp
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq assimp-utils
+
+      - name: Fetch detailed simulator aircraft
+        shell: python
+        run: |
+          import re, pathlib, posixpath, urllib.parse, urllib.request
+          MODELS=[
+            ('c172p-team/c172p','master','Models/c172-common.ac','/tmp/fg-c172'),
+            ('mbuse/Flightgear_777','master','Models/777-200ER.ac','/tmp/fg-777'),
+            ('NikolaiVChr/f16','master','Models/F-16D.ac','/tmp/fg-f16'),
+          ]
+          def dl(url,path):
+            path=pathlib.Path(path); path.parent.mkdir(parents=True,exist_ok=True)
+            with urllib.request.urlopen(url,timeout=90) as r:path.write_bytes(r.read())
+          for repo,branch,ac_path,root in MODELS:
+            root=pathlib.Path(root);base=f'https://raw.githubusercontent.com/{repo}/{branch}/'
+            local=root/ac_path;dl(base+urllib.parse.quote(ac_path,safe='/'),local)
+            text=local.read_text(errors='ignore')
+            refs=sorted(set(re.findall(r'(?im)^\s*texture\s+"([^"]+)"',text)))
+            for ref in refs:
+              ref=ref.replace('\\','/');remote=posixpath.normpath(posixpath.join(posixpath.dirname(ac_path),ref))
+              if remote.startswith('../'):continue
+              try:dl(base+urllib.parse.quote(remote,safe='/'),root/remote)
+              except Exception as e:print('optional texture missing',remote,e)
+            print(repo,ac_path,'bytes',local.stat().st_size,'texture refs',len(refs))
+
+      - name: Convert detailed aircraft to GLB2
+        working-directory: skyfrontiers3d
+        run: |
+          set -euo pipefail
+          mkdir -p public/models
+          assimp export /tmp/fg-c172/Models/c172-common.ac public/models/c172_fg.glb -f glb2
+          assimp export /tmp/fg-777/Models/777-200ER.ac public/models/b777_fg.glb -f glb2
+          assimp export /tmp/fg-f16/Models/F-16D.ac public/models/f16_fg.glb -f glb2
+          ls -lh public/models/*_fg.glb
+
+      - name: Inspect and preview starter aircraft
+        working-directory: skyfrontiers3d
+        shell: python
+        run: |
+          import json,struct,pathlib
+          import numpy as np
+          import trimesh
+          import matplotlib.pyplot as plt
+          out=pathlib.Path('model-previews');out.mkdir(exist_ok=True)
+          mins={'c172_fg.glb':120000,'b777_fg.glb':70000,'f16_fg.glb':45000}
+          for name,min_geom in mins.items():
+            p=pathlib.Path('public/models')/name;b=p.read_bytes();magic,v,total=struct.unpack_from('<4sII',b,0)
+            assert magic==b'glTF' and v==2,(name,v)
+            clen,ctype=struct.unpack_from('<II',b,12);g=json.loads(b[20:20+clen].decode().rstrip('\x00 \t\r\n'))
+            geom=sum(int(a.get('count',0)) for a in g.get('accessors',[]))
+            scene=trimesh.load(p,force='scene');verts=[]
+            for node_name in scene.graph.nodes_geometry:
+              tf,geom_name=scene.graph[node_name];mesh=scene.geometry[geom_name]
+              vv=trimesh.transform_points(mesh.vertices,tf)
+              if len(vv):verts.append(vv)
+            assert verts,name
+            V=np.vstack(verts);ext=V.max(0)-V.min(0)
+            print(name,'meshes',len(g.get('meshes',[])),'elements',geom,'materials',len(g.get('materials',[])),'images',len(g.get('images',[])),'bounds',V.min(0),V.max(0),'extents',ext,'bytes',p.stat().st_size)
+            assert len(g.get('meshes',[]))>=1
+            assert geom>=min_geom,(name,geom,min_geom)
+            assert np.count_nonzero(ext>1e-4)==3
+            dims=np.sort(ext);assert dims[2]/dims[0]>2.2,(name,ext)
+            fig,axs=plt.subplots(1,3,figsize=(12,4));step=max(1,len(V)//70000);P=V[::step]
+            for ax,(a,c,title) in zip(axs,[(0,1,'X/Y'),(0,2,'X/Z'),(2,1,'Z/Y')]):
+              ax.scatter(P[:,a],P[:,c],s=.08);ax.set_aspect('equal');ax.set_title(title);ax.axis('off')
+            fig.suptitle(name);fig.tight_layout();fig.savefig(out/(name+'.png'),dpi=160);plt.close(fig)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sky-V6-aircraft-previews
+          path: skyfrontiers3d/model-previews/*.png
+          if-no-files-found: error
+
+      - name: Download HD environment
+        working-directory: skyfrontiers3d
+        run: |
+          set -euxo pipefail
+          mkdir -p public/env public/quality
+          BASE=https://raw.githubusercontent.com/anshaneja5/skyline-run/main/public/assets/models
+          for f in b_small.glb b_medium.glb b_large.glb tree1.glb tree2.glb tree3.glb bush.glb; do curl -fL --retry 3 -o public/env/$f $BASE/$f; done
+          P=https://dl.polyhaven.org/file/ph-assets/Textures/png/1k
+          for a in aerial_grass_rock aerial_asphalt_01 dirt_aerial_02 rock_ground_02; do
+            curl -fL --retry 3 -o public/quality/${a}_diff_1k.png $P/$a/${a}_diff_1k.png
+            curl -fL --retry 3 -o public/quality/${a}_nor_gl_1k.png $P/$a/${a}_nor_gl_1k.png
+            curl -fL --retry 3 -o public/quality/${a}_rough_1k.png $P/$a/${a}_rough_1k.png
+          done
+          curl -fL --retry 3 -o public/quality/waternormals.jpg https://raw.githubusercontent.com/mrdoob/three.js/r180/examples/textures/waternormals.jpg
+          curl -fL --retry 3 -o public/quality/sky.hdr https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/rural_asphalt_road_1k.hdr || curl -fL --retry 3 -o public/quality/sky.hdr https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/sunset_jhbcentral_1k.hdr
+
+      - name: Build web runtime
+        working-directory: skyfrontiers3d
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          for f in c172_fg b777_fg f16_fg; do test -s dist/models/$f.glb; done
+          ! grep -R -q 'spawnEmergencyPlaceholder' dist/assets
+          ! grep -R -q 'ridgesafe' dist/assets
+
+      - name: Copy web build into Android
+        working-directory: skyfrontiers3d
+        run: |
+          rm -rf android/app/src/main/assets/www
+          mkdir -p android/app/src/main/assets/www
+          cp -R dist/. android/app/src/main/assets/www/
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        working-directory: skyfrontiers3d/android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Verify APK
+        working-directory: skyfrontiers3d/android
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          for f in c172_fg b777_fg f16_fg; do unzip -l "$APK" | grep -q "assets/www/models/$f.glb"; done
+          unzip -l "$APK" | grep -q 'assets/www/quality/sky.hdr'
+          SIZE=$(stat -c%s "$APK"); echo "APK bytes: $SIZE"; test "$SIZE" -ge 18000000
+          cp "$APK" ../../Sky-Frontiers-3D-VIDEO-FIX-v6.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sky-Frontiers-3D-VIDEO-FIX-v6-apk
+          path: Sky-Frontiers-3D-VIDEO-FIX-v6.apk
+          if-no-files-found: error
