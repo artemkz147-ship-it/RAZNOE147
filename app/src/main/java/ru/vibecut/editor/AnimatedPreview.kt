@@ -76,6 +76,7 @@ internal fun EditorPreview(
                 buildEasedKeyframeEffects(clip) +
                 buildSpecialEffectEffects(clip) +
                 buildDynamicImageStickerEffects(context, clip) +
+                buildGifStickerEffects(context, clip) +
                 buildAnimatedStickerEffects(clip) +
                 buildCanvasEffects(exportSettings, false)
         )
