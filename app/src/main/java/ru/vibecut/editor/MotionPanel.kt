@@ -26,7 +26,6 @@ internal fun MotionPanel(
     var editingStrength by remember { mutableStateOf(false) }
     var editingMask by remember { mutableStateOf(false) }
     var editingVignette by remember { mutableStateOf(false) }
-    val livePosition = EditorCursorState.clipPositionMs.coerceIn(0L, clip.sourceSliceDurationMs)
 
     SectionCard("Анимация клипа") {
         Row(
@@ -95,12 +94,4 @@ internal fun MotionPanel(
             onUpdate(clip.copy(maskType = MaskType.NONE, maskSize = 0.82f, vignette = 0f))
         })
     }
-
-    CreativeStylePanel(clip, onSnapshot, onUpdate)
-    SpecialEffectPanel(clip, onSnapshot, onUpdate)
-    KeyframeCurvePanel(clip, onSnapshot, onUpdate)
-    AnimatedStickerPanel(clip, livePosition, onSnapshot, onUpdate)
-    GifStickerPanel(clip, livePosition, onSnapshot, onUpdate)
-    ObjectTrackingPanel(clip, onSnapshot, onUpdate)
-    PersonCutoutPanel(clip, onSnapshot, onUpdate)
 }
