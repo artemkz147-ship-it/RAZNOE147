@@ -3,6 +3,7 @@ package ru.vibecut.editor
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
@@ -17,10 +18,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -128,7 +129,7 @@ internal fun EditorPreview(
         clip.stickers.isNotEmpty() || clip.animatedStickers.isNotEmpty() || clip.gifStickers.isNotEmpty(),
     ).count { it }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 3.dp)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -233,6 +234,24 @@ internal fun EditorPreview(
                         .padding(horizontal = 8.dp, vertical = 5.dp),
                 )
             }
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(10.dp)
+                    .size(44.dp)
+                    .background(Color(0xCC17171F), CircleShape)
+                    .border(1.dp, Color(0x667C63C9), CircleShape)
+                    .clickable { if (playing) player.pause() else player.play() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    if (playing) "Ⅱ" else "▶",
+                    color = Color.White,
+                    fontSize = if (playing) 17.sp else 16.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
 
         Slider(
@@ -245,7 +264,7 @@ internal fun EditorPreview(
                 onPosition(target)
             },
             valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
-            modifier = Modifier.fillMaxWidth().height(32.dp),
+            modifier = Modifier.fillMaxWidth().height(26.dp),
             colors = SliderDefaults.colors(
                 thumbColor = Color(0xFFB69CFF),
                 activeTrackColor = Color(0xFF8B5CF6),
@@ -254,32 +273,22 @@ internal fun EditorPreview(
         )
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 1.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Button(
-                onClick = { if (playing) player.pause() else player.play() },
-                shape = RoundedCornerShape(13.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D1D26), contentColor = Color.White),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 7.dp),
-            ) {
-                Text(if (playing) "Ⅱ  Пауза" else "▶  Пуск", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "${formatTime(position)} / ${formatTime(duration)}",
-                    color = Color(0xFFE1E1E8),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    formatSpeed(clip.speed),
-                    color = Color(0xFFB69CFF),
-                    fontSize = 10.sp,
-                    modifier = Modifier.background(Color(0xFF211A31), RoundedCornerShape(8.dp)).padding(horizontal = 7.dp, vertical = 4.dp),
-                )
-            }
+            Text(
+                "${formatTime(position)} / ${formatTime(duration)}",
+                color = Color(0xFFE1E1E8),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                formatSpeed(clip.speed),
+                color = Color(0xFFB69CFF),
+                fontSize = 10.sp,
+                modifier = Modifier.background(Color(0xFF211A31), RoundedCornerShape(8.dp)).padding(horizontal = 7.dp, vertical = 4.dp),
+            )
         }
     }
 }
