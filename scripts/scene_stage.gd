@@ -157,7 +157,7 @@ func _water_material() -> ShaderMaterial:
     var shader := Shader.new()
     shader.code = """
 shader_type spatial;
-render_mode blend_mix, depth_draw_alpha_prepass, diffuse_burley, specular_schlick_ggx;
+render_mode blend_mix, depth_prepass_alpha, diffuse_burley, specular_schlick_ggx;
 
 uniform vec3 shallow_color : source_color = vec3(0.075,0.155,0.145);
 uniform vec3 deep_color : source_color = vec3(0.020,0.070,0.075);
