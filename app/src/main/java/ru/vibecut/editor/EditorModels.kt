@@ -1,5 +1,15 @@
 package ru.vibecut.editor
 
+enum class ClipMotion(val title: String) {
+    NONE("Без анимации"),
+    ZOOM_IN("Приближение"),
+    ZOOM_OUT("Отдаление"),
+    PAN_LEFT("Панорама влево"),
+    PAN_RIGHT("Панорама вправо"),
+    PAN_UP("Панорама вверх"),
+    PAN_DOWN("Панорама вниз"),
+}
+
 data class VideoClip(
     val id: String,
     val uri: String,
@@ -21,6 +31,8 @@ data class VideoClip(
     val crop: Float = 0f,
     val flipHorizontal: Boolean = false,
     val flipVertical: Boolean = false,
+    val motion: ClipMotion = ClipMotion.NONE,
+    val motionStrength: Float = 0.14f,
     val overlayText: String = "",
     val textX: Float = 0f,
     val textY: Float = -0.72f,
