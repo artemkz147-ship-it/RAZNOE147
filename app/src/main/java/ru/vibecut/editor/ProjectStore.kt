@@ -79,17 +79,15 @@ object ProjectStore {
     private fun readIndex(context: Context): List<String> {
         val raw = prefs(context).getString(INDEX_KEY, "[]") ?: "[]"
         return runCatching {
-            val array = JSONArray(raw)
-            buildList {
-                for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let(::add)
-            }
+            val a = JSONArray(raw)
+            buildList { for (i in 0 until a.length()) a.optString(i).takeIf { it.isNotBlank() }?.let(::add) }
         }.getOrDefault(emptyList())
     }
 
     private fun writeIndex(context: Context, ids: List<String>) {
-        val array = JSONArray()
-        ids.distinct().forEach(array::put)
-        prefs(context).edit().putString(INDEX_KEY, array.toString()).apply()
+        val a = JSONArray()
+        ids.distinct().forEach(a::put)
+        prefs(context).edit().putString(INDEX_KEY, a.toString()).apply()
     }
 
     private fun ensureMigrated(context: Context) {
@@ -105,24 +103,24 @@ object ProjectStore {
 
     private fun projectToJson(p: SavedProject) = JSONObject().apply {
         put("id", p.id); put("name", p.name); put("createdAt", p.createdAt); put("updatedAt", p.updatedAt); put("selectedId", p.selectedId)
-        put("clips", JSONArray().apply { p.clips.forEach { put(clipToJson(it)) } })
+        put("clips", arrayOfJson(p.clips, ::clipToJson))
         put("backgroundAudio", p.backgroundAudio?.let(::audioToJson))
-        put("positionedAudioTracks", JSONArray().apply { p.positionedAudioTracks.forEach { put(positionedAudioToJson(it)) } })
-        put("subtitles", JSONArray().apply { p.subtitles.forEach { put(subtitleToJson(it)) } })
+        put("positionedAudioTracks", arrayOfJson(p.positionedAudioTracks, ::positionedAudioToJson))
+        put("subtitles", arrayOfJson(p.subtitles, ::subtitleToJson))
         put("subtitleStyle", subtitleStyleToJson(p.subtitleStyle))
         put("export", exportToJson(p.exportSettings))
     }
 
-    private fun projectFromJson(j: JSONObject, fallbackId: String): SavedProject = SavedProject(
+    private fun projectFromJson(j: JSONObject, fallbackId: String) = SavedProject(
         id = j.optString("id", fallbackId).ifBlank { fallbackId },
         name = j.optString("name", "Новый проект").ifBlank { "Новый проект" },
         createdAt = j.optLong("createdAt", System.currentTimeMillis()),
         updatedAt = j.optLong("updatedAt", System.currentTimeMillis()),
-        clips = jsonObjects(j.optJSONArray("clips")).map(::clipFromJson),
+        clips = objects(j.optJSONArray("clips")).map(::clipFromJson),
         selectedId = j.optString("selectedId").takeIf { it.isNotBlank() && it != "null" },
         backgroundAudio = j.optJSONObject("backgroundAudio")?.let(::audioFromJson),
-        positionedAudioTracks = jsonObjects(j.optJSONArray("positionedAudioTracks")).map(::positionedAudioFromJson),
-        subtitles = jsonObjects(j.optJSONArray("subtitles")).map(::subtitleFromJson),
+        positionedAudioTracks = objects(j.optJSONArray("positionedAudioTracks")).map(::positionedAudioFromJson),
+        subtitles = objects(j.optJSONArray("subtitles")).map(::subtitleFromJson),
         subtitleStyle = j.optJSONObject("subtitleStyle")?.let(::subtitleStyleFromJson) ?: SubtitleStyle(),
         exportSettings = j.optJSONObject("export")?.let(::exportFromJson) ?: ExportSettings(),
     )
@@ -137,10 +135,11 @@ object ProjectStore {
         put("redScale", c.redScale.toDouble()); put("greenScale", c.greenScale.toDouble()); put("blueScale", c.blueScale.toDouble())
         put("maskType", c.maskType.name); put("maskSize", c.maskSize.toDouble()); put("vignette", c.vignette.toDouble())
         put("transitionOut", c.transitionOut.name); put("transitionDurationMs", c.transitionDurationMs)
-        put("keyframes", JSONArray().apply { c.keyframes.forEach { put(keyframeToJson(it)) } })
-        put("stickers", JSONArray().apply { c.stickers.forEach { put(stickerToJson(it)) } })
-        put("animatedStickers", JSONArray().apply { c.animatedStickers.forEach { put(animatedStickerToJson(it)) } })
-        put("gifStickers", JSONArray().apply { c.gifStickers.forEach { put(gifStickerToJson(it)) } })
+        put("keyframes", arrayOfJson(c.keyframes, ::keyframeToJson))
+        put("stickers", arrayOfJson(c.stickers, ::stickerToJson))
+        put("animatedStickers", arrayOfJson(c.animatedStickers, ::animatedStickerToJson))
+        put("gifStickers", arrayOfJson(c.gifStickers, ::gifStickerToJson))
+        put("trackedOverlays", arrayOfJson(c.trackedOverlays, ::trackedOverlayToJson))
         put("overlayText", c.overlayText); put("textX", c.textX.toDouble()); put("textY", c.textY.toDouble()); put("textScale", c.textScale.toDouble()); put("textRotation", c.textRotation.toDouble())
         put("textColor", c.textColor); put("textBackground", c.textBackground); put("textBold", c.textBold); put("textItalic", c.textItalic)
     }
@@ -148,22 +147,26 @@ object ProjectStore {
     private fun clipFromJson(j: JSONObject): VideoClip {
         val source = j.optLong("sourceDurationMs", 1L).coerceAtLeast(1L)
         return VideoClip(
-            id = j.optString("id", UUID.randomUUID().toString()), uri = j.getString("uri"), name = j.optString("name", "Видео"), sourceDurationMs = source,
-            trimStartMs = j.optLong("trimStartMs", 0L), trimEndMs = j.optLong("trimEndMs", source), muted = j.optBoolean("muted", false),
-            audioVolume = j.optDouble("audioVolume", 1.0).toFloat(), audioFadeInMs = j.optLong("audioFadeInMs", 0L), audioFadeOutMs = j.optLong("audioFadeOutMs", 0L),
-            rotationDegrees = j.optInt("rotationDegrees", 0), speed = j.optDouble("speed", 1.0).toFloat(), brightness = j.optDouble("brightness", 0.0).toFloat(),
-            contrast = j.optDouble("contrast", 0.0).toFloat(), saturation = j.optDouble("saturation", 0.0).toFloat(), hue = j.optDouble("hue", 0.0).toFloat(),
-            lightness = j.optDouble("lightness", 0.0).toFloat(), crop = j.optDouble("crop", 0.0).toFloat(), flipHorizontal = j.optBoolean("flipHorizontal", false),
-            flipVertical = j.optBoolean("flipVertical", false), motion = enumOrDefault(j.optString("motion"), ClipMotion.NONE), motionStrength = j.optDouble("motionStrength", .14).toFloat(),
-            colorEffect = enumOrDefault(j.optString("colorEffect"), ColorEffect.NONE), specialEffect = enumOrDefault(j.optString("specialEffect"), SpecialEffect.NONE),
-            specialEffectStrength = j.optDouble("specialEffectStrength", .65).toFloat(), redScale = j.optDouble("redScale", 1.0).toFloat(), greenScale = j.optDouble("greenScale", 1.0).toFloat(),
-            blueScale = j.optDouble("blueScale", 1.0).toFloat(), maskType = enumOrDefault(j.optString("maskType"), MaskType.NONE), maskSize = j.optDouble("maskSize", .82).toFloat(),
-            vignette = j.optDouble("vignette", 0.0).toFloat(), transitionOut = enumOrDefault(j.optString("transitionOut"), TransitionType.NONE), transitionDurationMs = j.optLong("transitionDurationMs", 650L),
-            keyframes = jsonObjects(j.optJSONArray("keyframes")).map(::keyframeFromJson), stickers = jsonObjects(j.optJSONArray("stickers")).map(::stickerFromJson),
-            animatedStickers = jsonObjects(j.optJSONArray("animatedStickers")).map(::animatedStickerFromJson), gifStickers = jsonObjects(j.optJSONArray("gifStickers")).map(::gifStickerFromJson),
-            overlayText = j.optString("overlayText", ""), textX = j.optDouble("textX", 0.0).toFloat(), textY = j.optDouble("textY", -.72).toFloat(),
-            textScale = j.optDouble("textScale", .72).toFloat(), textRotation = j.optDouble("textRotation", 0.0).toFloat(), textColor = j.optInt("textColor", -1),
-            textBackground = j.optBoolean("textBackground", true), textBold = j.optBoolean("textBold", true), textItalic = j.optBoolean("textItalic", false),
+            id = j.optString("id", UUID.randomUUID().toString()),
+            uri = j.getString("uri"),
+            name = j.optString("name", "Видео"),
+            sourceDurationMs = source,
+            trimStartMs = j.optLong("trimStartMs", 0L), trimEndMs = j.optLong("trimEndMs", source),
+            muted = j.optBoolean("muted", false), audioVolume = j.optDouble("audioVolume", 1.0).toFloat(), audioFadeInMs = j.optLong("audioFadeInMs", 0L), audioFadeOutMs = j.optLong("audioFadeOutMs", 0L),
+            rotationDegrees = j.optInt("rotationDegrees", 0), speed = j.optDouble("speed", 1.0).toFloat(), brightness = j.optDouble("brightness", 0.0).toFloat(), contrast = j.optDouble("contrast", 0.0).toFloat(),
+            saturation = j.optDouble("saturation", 0.0).toFloat(), hue = j.optDouble("hue", 0.0).toFloat(), lightness = j.optDouble("lightness", 0.0).toFloat(), crop = j.optDouble("crop", 0.0).toFloat(),
+            flipHorizontal = j.optBoolean("flipHorizontal", false), flipVertical = j.optBoolean("flipVertical", false), motion = enumOrDefault(j.optString("motion"), ClipMotion.NONE), motionStrength = j.optDouble("motionStrength", .14).toFloat(),
+            colorEffect = enumOrDefault(j.optString("colorEffect"), ColorEffect.NONE), specialEffect = enumOrDefault(j.optString("specialEffect"), SpecialEffect.NONE), specialEffectStrength = j.optDouble("specialEffectStrength", .65).toFloat(),
+            redScale = j.optDouble("redScale", 1.0).toFloat(), greenScale = j.optDouble("greenScale", 1.0).toFloat(), blueScale = j.optDouble("blueScale", 1.0).toFloat(),
+            maskType = enumOrDefault(j.optString("maskType"), MaskType.NONE), maskSize = j.optDouble("maskSize", .82).toFloat(), vignette = j.optDouble("vignette", 0.0).toFloat(),
+            transitionOut = enumOrDefault(j.optString("transitionOut"), TransitionType.NONE), transitionDurationMs = j.optLong("transitionDurationMs", 650L),
+            keyframes = objects(j.optJSONArray("keyframes")).map(::keyframeFromJson),
+            stickers = objects(j.optJSONArray("stickers")).map(::stickerFromJson),
+            animatedStickers = objects(j.optJSONArray("animatedStickers")).map(::animatedStickerFromJson),
+            gifStickers = objects(j.optJSONArray("gifStickers")).map(::gifStickerFromJson),
+            trackedOverlays = objects(j.optJSONArray("trackedOverlays")).map(::trackedOverlayFromJson),
+            overlayText = j.optString("overlayText", ""), textX = j.optDouble("textX", 0.0).toFloat(), textY = j.optDouble("textY", -.72).toFloat(), textScale = j.optDouble("textScale", .72).toFloat(), textRotation = j.optDouble("textRotation", 0.0).toFloat(),
+            textColor = j.optInt("textColor", -1), textBackground = j.optBoolean("textBackground", true), textBold = j.optBoolean("textBold", true), textItalic = j.optBoolean("textItalic", false),
         )
     }
 
@@ -175,37 +178,50 @@ object ProjectStore {
         scale = j.optDouble("scale", 1.0).toFloat(), rotation = j.optDouble("rotation", 0.0).toFloat(), easing = enumOrDefault(j.optString("easing"), KeyframeEasing.EASE_IN_OUT),
     )
 
-    private fun trackingToJson(t: TrackingPoint) = JSONObject().apply { put("timeMs", t.timeMs); put("x", t.x.toDouble()); put("y", t.y.toDouble()); put("objectScale", t.objectScale.toDouble()) }
-    private fun trackingFromJson(j: JSONObject) = TrackingPoint(j.optLong("timeMs", 0L), j.optDouble("x", 0.0).toFloat(), j.optDouble("y", 0.0).toFloat(), j.optDouble("objectScale", 1.0).toFloat())
+    private fun trackingToJson(t: TrackingPoint) = JSONObject().apply {
+        put("timeMs", t.timeMs); put("x", t.x.toDouble()); put("y", t.y.toDouble()); put("objectScale", t.objectScale.toDouble()); put("width", t.width.toDouble()); put("height", t.height.toDouble())
+    }
+    private fun trackingFromJson(j: JSONObject) = TrackingPoint(
+        timeMs = j.optLong("timeMs", 0L), x = j.optDouble("x", 0.0).toFloat(), y = j.optDouble("y", 0.0).toFloat(), objectScale = j.optDouble("objectScale", 1.0).toFloat(),
+        width = j.optDouble("width", .30).toFloat(), height = j.optDouble("height", .30).toFloat(),
+    )
 
     private fun stickerToJson(s: StickerLayer) = JSONObject().apply {
         put("id", s.id); put("uri", s.uri); put("name", s.name); put("x", s.x.toDouble()); put("y", s.y.toDouble()); put("scale", s.scale.toDouble()); put("rotation", s.rotation.toDouble()); put("alpha", s.alpha.toDouble())
-        put("startMs", s.startMs); put("endMs", s.endMs); put("keyframes", JSONArray().apply { s.keyframes.forEach { put(keyframeToJson(it)) } }); put("trackingPath", JSONArray().apply { s.trackingPath.forEach { put(trackingToJson(it)) } })
+        put("startMs", s.startMs); put("endMs", s.endMs); put("keyframes", arrayOfJson(s.keyframes, ::keyframeToJson)); put("trackingPath", arrayOfJson(s.trackingPath, ::trackingToJson))
     }
     private fun stickerFromJson(j: JSONObject) = StickerLayer(
         id = j.optString("id", UUID.randomUUID().toString()), uri = j.getString("uri"), name = j.optString("name", "Изображение"), x = j.optDouble("x", 0.0).toFloat(), y = j.optDouble("y", 0.0).toFloat(),
-        scale = j.optDouble("scale", .35).toFloat(), rotation = j.optDouble("rotation", 0.0).toFloat(), alpha = j.optDouble("alpha", 1.0).toFloat(), startMs = j.optLong("startMs", 0L),
-        endMs = j.optLong("endMs", Long.MAX_VALUE), keyframes = jsonObjects(j.optJSONArray("keyframes")).map(::keyframeFromJson), trackingPath = jsonObjects(j.optJSONArray("trackingPath")).map(::trackingFromJson),
+        scale = j.optDouble("scale", .35).toFloat(), rotation = j.optDouble("rotation", 0.0).toFloat(), alpha = j.optDouble("alpha", 1.0).toFloat(), startMs = j.optLong("startMs", 0L), endMs = j.optLong("endMs", Long.MAX_VALUE),
+        keyframes = objects(j.optJSONArray("keyframes")).map(::keyframeFromJson), trackingPath = objects(j.optJSONArray("trackingPath")).map(::trackingFromJson),
     )
 
     private fun animatedStickerToJson(s: AnimatedStickerLayer) = JSONObject().apply {
         put("id", s.id); put("kind", s.kind.name); put("x", s.x.toDouble()); put("y", s.y.toDouble()); put("scale", s.scale.toDouble()); put("rotation", s.rotation.toDouble()); put("alpha", s.alpha.toDouble())
-        put("startMs", s.startMs); put("endMs", s.endMs); put("speed", s.speed.toDouble()); put("loop", s.loop); put("keyframes", JSONArray().apply { s.keyframes.forEach { put(keyframeToJson(it)) } }); put("trackingPath", JSONArray().apply { s.trackingPath.forEach { put(trackingToJson(it)) } })
+        put("startMs", s.startMs); put("endMs", s.endMs); put("speed", s.speed.toDouble()); put("loop", s.loop); put("keyframes", arrayOfJson(s.keyframes, ::keyframeToJson)); put("trackingPath", arrayOfJson(s.trackingPath, ::trackingToJson))
     }
     private fun animatedStickerFromJson(j: JSONObject) = AnimatedStickerLayer(
         id = j.optString("id", UUID.randomUUID().toString()), kind = enumOrDefault(j.optString("kind"), AnimatedStickerKind.SPARKLE), x = j.optDouble("x", 0.0).toFloat(), y = j.optDouble("y", 0.0).toFloat(),
         scale = j.optDouble("scale", .35).toFloat(), rotation = j.optDouble("rotation", 0.0).toFloat(), alpha = j.optDouble("alpha", 1.0).toFloat(), startMs = j.optLong("startMs", 0L), endMs = j.optLong("endMs", Long.MAX_VALUE),
-        speed = j.optDouble("speed", 1.0).toFloat(), loop = j.optBoolean("loop", true), keyframes = jsonObjects(j.optJSONArray("keyframes")).map(::keyframeFromJson), trackingPath = jsonObjects(j.optJSONArray("trackingPath")).map(::trackingFromJson),
+        speed = j.optDouble("speed", 1.0).toFloat(), loop = j.optBoolean("loop", true), keyframes = objects(j.optJSONArray("keyframes")).map(::keyframeFromJson), trackingPath = objects(j.optJSONArray("trackingPath")).map(::trackingFromJson),
     )
 
     private fun gifStickerToJson(s: GifStickerLayer) = JSONObject().apply {
         put("id", s.id); put("uri", s.uri); put("name", s.name); put("x", s.x.toDouble()); put("y", s.y.toDouble()); put("scale", s.scale.toDouble()); put("rotation", s.rotation.toDouble()); put("alpha", s.alpha.toDouble())
-        put("startMs", s.startMs); put("endMs", s.endMs); put("speed", s.speed.toDouble()); put("loop", s.loop); put("keyframes", JSONArray().apply { s.keyframes.forEach { put(keyframeToJson(it)) } }); put("trackingPath", JSONArray().apply { s.trackingPath.forEach { put(trackingToJson(it)) } })
+        put("startMs", s.startMs); put("endMs", s.endMs); put("speed", s.speed.toDouble()); put("loop", s.loop); put("keyframes", arrayOfJson(s.keyframes, ::keyframeToJson)); put("trackingPath", arrayOfJson(s.trackingPath, ::trackingToJson))
     }
     private fun gifStickerFromJson(j: JSONObject) = GifStickerLayer(
         id = j.optString("id", UUID.randomUUID().toString()), uri = j.getString("uri"), name = j.optString("name", "GIF"), x = j.optDouble("x", 0.0).toFloat(), y = j.optDouble("y", 0.0).toFloat(),
         scale = j.optDouble("scale", .45).toFloat(), rotation = j.optDouble("rotation", 0.0).toFloat(), alpha = j.optDouble("alpha", 1.0).toFloat(), startMs = j.optLong("startMs", 0L), endMs = j.optLong("endMs", Long.MAX_VALUE),
-        speed = j.optDouble("speed", 1.0).toFloat(), loop = j.optBoolean("loop", true), keyframes = jsonObjects(j.optJSONArray("keyframes")).map(::keyframeFromJson), trackingPath = jsonObjects(j.optJSONArray("trackingPath")).map(::trackingFromJson),
+        speed = j.optDouble("speed", 1.0).toFloat(), loop = j.optBoolean("loop", true), keyframes = objects(j.optJSONArray("keyframes")).map(::keyframeFromJson), trackingPath = objects(j.optJSONArray("trackingPath")).map(::trackingFromJson),
+    )
+
+    private fun trackedOverlayToJson(s: TrackedObjectOverlay) = JSONObject().apply {
+        put("id", s.id); put("style", s.style.name); put("padding", s.padding.toDouble()); put("alpha", s.alpha.toDouble()); put("color", s.color); put("trackingPath", arrayOfJson(s.trackingPath, ::trackingToJson))
+    }
+    private fun trackedOverlayFromJson(j: JSONObject) = TrackedObjectOverlay(
+        id = j.optString("id", UUID.randomUUID().toString()), style = enumOrDefault(j.optString("style"), TrackedOverlayStyle.BLACK_BOX),
+        trackingPath = objects(j.optJSONArray("trackingPath")).map(::trackingFromJson), padding = j.optDouble("padding", .12).toFloat(), alpha = j.optDouble("alpha", .90).toFloat(), color = j.optInt("color", 0xFFFFD54F.toInt()),
     )
 
     private fun audioToJson(a: AudioTrack) = JSONObject().apply { put("uri", a.uri); put("name", a.name); put("volume", a.volume.toDouble()) }
@@ -235,9 +251,7 @@ object ProjectStore {
         height = j.optInt("height", 1080), maxFrameRate = j.optInt("maxFrameRate", 30), aspectRatio = if (j.isNull("aspectRatio")) null else j.optDouble("aspectRatio").toFloat(), cropToFill = j.optBoolean("cropToFill", false), videoCodec = enumOrDefault(j.optString("videoCodec"), VideoCodec.H264),
     )
 
-    private fun jsonObjects(array: JSONArray?): List<JSONObject> = buildList {
-        if (array != null) for (i in 0 until array.length()) array.optJSONObject(i)?.let(::add)
-    }
-
+    private fun objects(a: JSONArray?): List<JSONObject> = buildList { if (a != null) for (i in 0 until a.length()) a.optJSONObject(i)?.let(::add) }
+    private fun <T> arrayOfJson(items: List<T>, mapper: (T) -> JSONObject) = JSONArray().apply { items.forEach { put(mapper(it)) } }
     private inline fun <reified T : Enum<T>> enumOrDefault(value: String?, default: T): T = runCatching { enumValueOf<T>(value.orEmpty()) }.getOrDefault(default)
 }
