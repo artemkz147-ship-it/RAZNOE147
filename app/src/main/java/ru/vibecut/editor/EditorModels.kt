@@ -9,9 +9,30 @@ data class VideoClip(
     val trimEndMs: Long = sourceDurationMs,
     val muted: Boolean = false,
     val rotationDegrees: Int = 0,
+    val speed: Float = 1f,
+    val brightness: Float = 0f,
+    val contrast: Float = 0f,
+    val saturation: Float = 0f,
+    val hue: Float = 0f,
+    val lightness: Float = 0f,
+    val crop: Float = 0f,
+    val flipHorizontal: Boolean = false,
+    val flipVertical: Boolean = false,
+    val overlayText: String = "",
 ) {
-    val durationMs: Long get() = (trimEndMs - trimStartMs).coerceAtLeast(1L)
+    val sourceSliceDurationMs: Long get() = (trimEndMs - trimStartMs).coerceAtLeast(1L)
+    val durationMs: Long get() = (sourceSliceDurationMs / speed.coerceAtLeast(0.05f)).toLong().coerceAtLeast(1L)
 }
+
+data class AudioTrack(
+    val uri: String,
+    val name: String,
+)
+
+data class ExportSettings(
+    val height: Int = 1080,
+    val maxFrameRate: Int = 30,
+)
 
 data class EditorSnapshot(
     val clips: List<VideoClip>,
