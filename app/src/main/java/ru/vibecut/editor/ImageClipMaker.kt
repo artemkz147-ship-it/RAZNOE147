@@ -2,8 +2,11 @@ package ru.vibecut.editor
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -16,20 +19,25 @@ import androidx.media3.transformer.Transformer
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 @OptIn(UnstableApi::class)
 class ImageClipMaker(private val context: Context) {
     private var transformer: Transformer? = null
     private var pendingOutput: File? = null
     private var pendingFrame: File? = null
+    private var pendingNormalizedImage: File? = null
 
     fun cancel() {
         transformer?.cancel()
         transformer = null
         pendingOutput?.delete()
         pendingFrame?.delete()
+        pendingNormalizedImage?.delete()
         pendingOutput = null
         pendingFrame = null
+        pendingNormalizedImage = null
     }
 
     fun createPhotoClip(
@@ -39,13 +47,27 @@ class ImageClipMaker(private val context: Context) {
         onDone: (VideoClip) -> Unit,
         onError: (String) -> Unit,
     ) {
+        cancel()
+        val normalized = runCatching { normalizeImage(imageUri) }.getOrElse {
+            onError("Не удалось прочитать изображение: ${it.message ?: "неподдерживаемый формат"}")
+            return
+        }
+        pendingNormalizedImage = normalized
         createVideoFromImage(
-            imageUri = imageUri,
+            imageUri = Uri.fromFile(normalized),
             displayName = displayName.substringBeforeLast('.').ifBlank { "Фото" },
             durationMs = durationMs,
             deleteSourceAfterwards = false,
-            onDone = onDone,
-            onError = onError,
+            onDone = {
+                pendingNormalizedImage?.delete()
+                pendingNormalizedImage = null
+                onDone(it)
+            },
+            onError = {
+                pendingNormalizedImage?.delete()
+                pendingNormalizedImage = null
+                onError(it)
+            },
         )
     }
 
@@ -99,6 +121,63 @@ class ImageClipMaker(private val context: Context) {
             onDone = onDone,
             onError = onError,
         )
+    }
+
+    private fun normalizeImage(uri: Uri): File {
+        val bitmap = decodeBitmap(uri) ?: error("Android не смог декодировать файл")
+        val dir = File(context.cacheDir, "vibecut_imports").apply { mkdirs() }
+        val hasAlpha = bitmap.hasAlpha()
+        val output = File(dir, "image_${UUID.randomUUID()}.${if (hasAlpha) "png" else "jpg"}")
+        val saved = FileOutputStream(output).use { stream ->
+            if (hasAlpha) bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+            else bitmap.compress(Bitmap.CompressFormat.JPEG, 96, stream)
+        }
+        bitmap.recycle()
+        if (!saved || output.length() == 0L) {
+            output.delete()
+            error("Не удалось подготовить изображение")
+        }
+        return output
+    }
+
+    private fun decodeBitmap(uri: Uri): Bitmap? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = if (uri.scheme == "file") {
+                ImageDecoder.createSource(File(uri.path ?: return null))
+            } else {
+                ImageDecoder.createSource(context.contentResolver, uri)
+            }
+            return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                val width = info.size.width.coerceAtLeast(1)
+                val height = info.size.height.coerceAtLeast(1)
+                val longest = max(width, height)
+                if (longest > 4096) {
+                    val scale = 4096f / longest.toFloat()
+                    decoder.setTargetSize(
+                        (width * scale).roundToInt().coerceAtLeast(1),
+                        (height * scale).roundToInt().coerceAtLeast(1),
+                    )
+                }
+            }
+        }
+
+        fun open() = if (uri.scheme == "file") {
+            File(uri.path ?: return null).inputStream()
+        } else {
+            context.contentResolver.openInputStream(uri)
+        }
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        open()?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (max(bounds.outWidth / sample, bounds.outHeight / sample) > 4096) sample *= 2
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        return open()?.use { BitmapFactory.decodeStream(it, null, options) }
     }
 
     private fun createVideoFromImage(
