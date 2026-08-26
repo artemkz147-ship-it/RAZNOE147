@@ -3,6 +3,8 @@ package ru.vibecut.editor
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +33,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.calculatePan
+import androidx.compose.ui.input.pointer.calculateRotation
+import androidx.compose.ui.input.pointer.calculateZoom
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -44,6 +50,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
+import kotlin.math.abs
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -61,6 +68,7 @@ internal fun EditorPreview(
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(clip.sourceSliceDurationMs) }
     var playing by remember { mutableStateOf(false) }
+    val gesturesEnabled = PreviewGestureBridge.enabled
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -126,7 +134,11 @@ internal fun EditorPreview(
                 .fillMaxWidth()
                 .height(218.dp)
                 .background(Color.Black, RoundedCornerShape(20.dp))
-                .border(1.dp, Color(0xFF282832), RoundedCornerShape(20.dp)),
+                .border(
+                    1.dp,
+                    if (gesturesEnabled) Color(0xFF7C63C9) else Color(0xFF282832),
+                    RoundedCornerShape(20.dp),
+                ),
             contentAlignment = Alignment.Center,
         ) {
             AndroidView(
@@ -178,6 +190,47 @@ internal fun EditorPreview(
                                 Modifier.background(Color(subtitleStyle.backgroundColor), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)
                             } else Modifier
                         ),
+                )
+            }
+
+            if (gesturesEnabled) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(clip.id) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                var started = false
+                                do {
+                                    val event = awaitPointerEvent()
+                                    val pan = event.calculatePan()
+                                    val zoom = event.calculateZoom()
+                                    val rotation = event.calculateRotation()
+                                    val meaningful = pan.getDistance() > .35f || abs(zoom - 1f) > .002f || abs(rotation) > .08f
+                                    if (meaningful) {
+                                        if (!started) {
+                                            started = true
+                                            player.pause()
+                                            PreviewGestureBridge.onGestureStart?.invoke()
+                                        }
+                                        PreviewGestureBridge.onTransform?.invoke(pan.x, pan.y, zoom, rotation)
+                                        event.changes.forEach { change -> if (change.pressed) change.consume() }
+                                    }
+                                } while (event.changes.any { it.pressed })
+                                if (started) PreviewGestureBridge.onGestureEnd?.invoke()
+                            }
+                        }
+                )
+                Text(
+                    "Жесты: перемещение · масштаб · поворот",
+                    color = Color(0xFFF0EBFF),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(9.dp)
+                        .background(Color(0xCC241B3A), RoundedCornerShape(9.dp))
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
                 )
             }
         }
