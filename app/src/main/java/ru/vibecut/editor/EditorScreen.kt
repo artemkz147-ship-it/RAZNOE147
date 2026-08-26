@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import kotlinx.coroutines.delay
 import java.io.File
+import java.util.Locale
 import java.util.UUID
 
 @OptIn(UnstableApi::class)
@@ -67,7 +69,7 @@ fun VideoEditorScreen(projectId: String, onBack: () -> Unit) {
     var exportState by remember { mutableStateOf(ExportState.IDLE) }
     var exportProgress by remember { mutableIntStateOf(0) }
     var lastExport by remember { mutableStateOf<String?>(null) }
-    var message by remember { mutableStateOf(if (clips.isEmpty()) "Добавьте видео, чтобы начать монтаж" else "Проект открыт") }
+    var message by remember { mutableStateOf(if (clips.isEmpty()) "Добавьте фото или видео из галереи" else "Проект открыт") }
     var music by remember { mutableStateOf(restored.backgroundAudio) }
     var subtitleStyle by remember { mutableStateOf(restored.subtitleStyle) }
     var exportSettings by remember { mutableStateOf(restored.exportSettings) }
@@ -146,21 +148,62 @@ fun VideoEditorScreen(projectId: String, onBack: () -> Unit) {
             if (pending != null) applyRhythm(pending, map) else message = "Ритм найден: ${map.bpm} BPM · ${map.beats.size} точек"
         }, { error -> beatBusy = false; pendingRhythmStyle = null; message = error })
     }
-
-    val writePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { if (it) startExport() else message = "Нет разрешения на сохранение" }
-    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris.isNotEmpty()) {
-            snap(); var count = 0
-            uris.forEach { uri -> persist(context, uri); runCatching { readClip(context, uri) }.onSuccess { clip -> clips += clip; if (selectedId == null) selectedId = clip.id; count++ } }
-            message = "Добавлено видео: $count"
+    fun importVisualUri(uri: Uri) {
+        persist(context, uri)
+        when (mediaKind(context, uri)) {
+            ImportedMediaKind.IMAGE -> {
+                if (mediaBusy) {
+                    message = "Дождитесь завершения обработки изображения"
+                    return
+                }
+                mediaBusy = true
+                message = "Подготавливается фото"
+                imageMaker.createPhotoClip(
+                    uri,
+                    displayName(context, uri, "Фото"),
+                    pendingImageDuration,
+                    { clip -> mediaBusy = false; insertAfterSelected(clip); message = "Фото добавлено" },
+                    { error -> mediaBusy = false; message = error },
+                )
+            }
+            ImportedMediaKind.VIDEO -> {
+                runCatching { readClip(context, uri) }
+                    .onSuccess { clip ->
+                        snap()
+                        clips += clip
+                        selectedId = clip.id
+                        position = 0L
+                        message = "Видео добавлено: ${clip.name}"
+                    }
+                    .onFailure { message = "Не удалось прочитать видео: ${it.message ?: "формат не поддержан устройством"}" }
+            }
+            ImportedMediaKind.UNKNOWN -> message = "Не удалось определить тип файла. Попробуйте выбрать его через «Файлы»"
         }
     }
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+
+    val writePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { if (it) startExport() else message = "Нет разрешения на сохранение" }
+    val galleryPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let(::importVisualUri)
+    }
+    val mediaFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(::importVisualUri)
+    }
+    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) {
+            snap(); var count = 0; var skipped = 0
+            uris.forEach { uri ->
+                persist(context, uri)
+                if (mediaKind(context, uri) == ImportedMediaKind.VIDEO) {
+                    runCatching { readClip(context, uri) }.onSuccess { clip -> clips += clip; if (selectedId == null) selectedId = clip.id; count++ }.onFailure { skipped++ }
+                } else skipped++
+            }
+            message = "Добавлено видео: $count${if (skipped > 0) " · пропущено: $skipped" else ""}"
+        }
+    }
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let {
-            persist(context, it); mediaBusy = true; message = "Создаётся клип из фото"
-            imageMaker.createPhotoClip(it, displayName(context, it, "Фото"), pendingImageDuration,
-                { clip -> mediaBusy = false; insertAfterSelected(clip); message = "Фото добавлено как клип" },
-                { error -> mediaBusy = false; message = error })
+            pendingImageDuration = pendingImageDuration.coerceIn(1000L, 10_000L)
+            importVisualUri(it)
         }
     }
     val musicPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -217,7 +260,7 @@ fun VideoEditorScreen(projectId: String, onBack: () -> Unit) {
             projectName = name, clipCount = clips.size, exportState = exportState, exportProgress = exportProgress,
             canUndo = history.isNotEmpty(), canRedo = redo.isNotEmpty(),
             onBack = { ProjectStore.save(context, state()); onBack() }, onNameChange = { name = it }, onUndo = ::undo, onRedo = ::redoAction,
-            onImport = { videoPicker.launch(arrayOf("video/*")) },
+            onImport = { galleryPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
             onExport = {
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P && context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) writePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 else startExport()
@@ -225,7 +268,9 @@ fun VideoEditorScreen(projectId: String, onBack: () -> Unit) {
         )
 
         if (selected == null) {
-            Box(Modifier.weight(1f)) { EmptyEditor { videoPicker.launch(arrayOf("video/*")) } }
+            Box(Modifier.weight(1f)) {
+                EmptyEditor { galleryPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) }
+            }
         } else {
             EditorPreview(selected, incoming, exportSettings, offset, subtitles, subtitleStyle) { position = it }
             ProTimeline(
@@ -279,9 +324,13 @@ fun VideoEditorScreen(projectId: String, onBack: () -> Unit) {
                                 onDuplicate = { snap(); val copy = selected.copy(id = UUID.randomUUID().toString(), name = "${selected.name} · копия"); clips.add(index + 1, copy); selectedId = copy.id },
                                 onMoveLeft = { if (index > 0) { snap(); val clip = clips.removeAt(index); clips.add(index - 1, clip) } }, onMoveRight = { if (index in 0 until clips.lastIndex) { snap(); val clip = clips.removeAt(index); clips.add(index + 1, clip) } },
                                 onDelete = { snap(); clips.removeAt(index); selectedId = if (clips.isEmpty()) null else clips[index.coerceAtMost(clips.lastIndex)].id; position = 0L },
-                                onUndo = ::undo, onRedo = ::redoAction, onImport = { videoPicker.launch(arrayOf("video/*")) })
+                                onUndo = ::undo, onRedo = ::redoAction,
+                                onImport = { mediaFilePicker.launch(arrayOf("*/*")) })
                             MediaCreationPanel(mediaBusy,
-                                { durationMs -> pendingImageDuration = durationMs; imagePicker.launch(arrayOf("image/*")) },
+                                { durationMs ->
+                                    pendingImageDuration = durationMs
+                                    imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                },
                                 { durationMs -> if (!mediaBusy) clips.firstOrNull { it.id == selectedId }?.let { source -> mediaBusy = true; message = "Создаётся стоп-кадр"; imageMaker.createFreezeFrame(source, position, durationMs, { clip -> mediaBusy = false; insertAfterSelected(clip); message = "Стоп-кадр добавлен" }, { error -> mediaBusy = false; message = error }) } })
                             RhythmMontagePanel(music, beatMap, beatBusy,
                                 { music?.let { analyzeMusic(it) } ?: run { message = "Сначала выберите музыку" } },
@@ -316,7 +365,7 @@ fun VideoEditorScreen(projectId: String, onBack: () -> Unit) {
                         WorkspaceTab.LAYERS -> {
                             StickerPanel(selected, { pendingStickerClip = selected.id; stickerPicker.launch(arrayOf("image/*")) }, { snap() }, { replace(it) })
                             AnimatedStickerPanel(selected, position, { snap() }, { replace(it) }); GifStickerPanel(selected, position, { snap() }, { replace(it) })
-                            VideoOverlayPanel(pipBusy, (position / selected.speed.coerceAtLeast(.05f)).toLong()) { options -> pendingPipBaseId = selected.id; pendingPipOptions = options; pipPicker.launch(arrayOf("video/*")) }
+                            VideoOverlayPanel(pipBusy, (position / selected.speed.coerceAtLeast(.05f)).toLong()) { options -> pendingPipBaseId = selected.id; pendingPipOptions = options; pipPicker.launch(arrayOf("video/*", "application/octet-stream")) }
                         }
                         WorkspaceTab.AI -> { ObjectTrackingPanel(selected, { snap() }, { replace(it) }); PersonCutoutPanel(selected, { snap() }, { replace(it) }) }
                         WorkspaceTab.PROJECT -> {
@@ -335,8 +384,39 @@ fun VideoEditorScreen(projectId: String, onBack: () -> Unit) {
     }
 }
 
-private fun persist(context: Context, uri: Uri) { runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } }
-private fun readClip(context: Context, uri: Uri) = VideoClip(UUID.randomUUID().toString(), uri.toString(), displayName(context, uri, "Видео"), duration(context, uri))
+private enum class ImportedMediaKind { IMAGE, VIDEO, UNKNOWN }
+
+private fun persist(context: Context, uri: Uri) {
+    runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+}
+
+private fun mediaKind(context: Context, uri: Uri): ImportedMediaKind {
+    val mime = runCatching { context.contentResolver.getType(uri)?.lowercase(Locale.ROOT) }.getOrNull().orEmpty()
+    if (mime.startsWith("image/")) return ImportedMediaKind.IMAGE
+    if (mime.startsWith("video/")) return ImportedMediaKind.VIDEO
+
+    val ext = displayName(context, uri, "").substringAfterLast('.', "").lowercase(Locale.ROOT)
+    if (ext in setOf("jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "bmp", "dng")) return ImportedMediaKind.IMAGE
+    if (ext in setOf("mp4", "m4v", "mov", "mkv", "webm", "avi", "3gp", "3g2", "ts", "mts", "m2ts", "mpg", "mpeg", "flv", "vob", "ogv")) return ImportedMediaKind.VIDEO
+
+    val retriever = MediaMetadataRetriever()
+    return try {
+        if (uri.scheme == "file") retriever.setDataSource(uri.path) else retriever.setDataSource(context, uri)
+        if (retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO).equals("yes", ignoreCase = true)) ImportedMediaKind.VIDEO
+        else ImportedMediaKind.UNKNOWN
+    } catch (_: Throwable) {
+        ImportedMediaKind.UNKNOWN
+    } finally {
+        runCatching { retriever.release() }
+    }
+}
+
+private fun readClip(context: Context, uri: Uri): VideoClip {
+    val d = duration(context, uri)
+    if (d <= 1L) error("не удалось определить длительность")
+    return VideoClip(UUID.randomUUID().toString(), uri.toString(), displayName(context, uri, "Видео"), d)
+}
+
 private fun duration(context: Context, uri: Uri): Long {
     val retriever = MediaMetadataRetriever()
     return try {
