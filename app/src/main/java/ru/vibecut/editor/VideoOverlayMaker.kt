@@ -34,7 +34,7 @@ internal data class PipOptions(
 )
 
 @OptIn(UnstableApi::class)
-class VideoOverlayMaker(private val context: Context) {
+internal class VideoOverlayMaker(private val context: Context) {
     private var transformer: Transformer? = null
     private var pendingOutput: File? = null
 
