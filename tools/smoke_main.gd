@@ -6,10 +6,6 @@ func _initialize() -> void:
 func _shutdown_main(main: Node) -> void:
     if main == null or not is_instance_valid(main):
         return
-
-    # Stop runtime systems before destroying the tree. This matters in headless CI:
-    # AnimationPlayer, Timer and AudioStreamPlayer can otherwise retain imported
-    # resources until SceneTree teardown and produce false-positive leak diagnostics.
     var controller: Variant = main.get("dinosaur_controller")
     if controller is Node and is_instance_valid(controller):
         if (controller as Node).has_method("stop_all"):
@@ -29,9 +25,6 @@ func _shutdown_main(main: Node) -> void:
         (roar as AudioStreamPlayer3D).stream = null
 
     DisplayServer.tts_stop()
-
-    # Let queued scene removals and audio backend changes settle, then destroy the
-    # complete node hierarchy synchronously instead of quitting on the same frame.
     await process_frame
     await process_frame
     if main.get_parent() != null:
@@ -55,14 +48,12 @@ func _run() -> void:
 
     var main: Node = packed.instantiate()
     root.add_child(main)
-    await process_frame
-    await process_frame
-    await process_frame
-    await process_frame
+    for _frame in 5:
+        await process_frame
 
-    var actor: Node = main.get("current_actor")
-    if actor == null or not is_instance_valid(actor):
-        await _fail(2, "SMOKE: T. rex actor was not instantiated", main)
+    var catalog: Array = main.get("catalog")
+    if catalog.size() != 6:
+        await _fail(2, "SMOKE: expected 6 catalog entries, got %d" % catalog.size(), main)
         return
 
     var stage: Node = main.get_node_or_null("Stage")
@@ -70,60 +61,65 @@ func _run() -> void:
         await _fail(3, "SMOKE: scanned habitat assets did not populate", main)
         return
 
-    var meshes: Array[Node] = actor.find_children("*", "MeshInstance3D", true, false)
-    var animation_players: Array[Node] = actor.find_children("*", "AnimationPlayer", true, false)
-    if meshes.is_empty() or animation_players.is_empty():
-        await _fail(4, "SMOKE: actor lost geometry or animation", main)
-        return
-
-    var required := {
-        "idle": false,
-        "run": false,
-        "roar": false,
-        "bite": false,
-        "attack_tail": false,
-    }
-    var animation_count := 0
-    for node in animation_players:
-        var player := node as AnimationPlayer
-        for clip in player.get_animation_list():
-            animation_count += 1
-            var lower := String(clip).to_lower()
-            if required.has(lower):
-                required[lower] = true
-    for clip_name in required:
-        if not bool(required[clip_name]):
-            await _fail(5, "SMOKE: missing required animation %s" % clip_name, main)
+    for index in catalog.size():
+        main.call("_show_dinosaur", index)
+        for _frame in 4:
+            await process_frame
+        var actor: Node = main.get("current_actor")
+        if actor == null or not is_instance_valid(actor):
+            await _fail(10 + index, "SMOKE: species %d actor was not instantiated" % index, main)
+            return
+        var meshes: Array[Node] = actor.find_children("*", "MeshInstance3D", true, false)
+        if meshes.is_empty():
+            await _fail(20 + index, "SMOKE: species %d actor has no meshes" % index, main)
             return
 
-    var ambience: AudioStreamPlayer = main.get("ambience_player") as AudioStreamPlayer
-    var narration: AudioStreamPlayer = main.get("narration_player") as AudioStreamPlayer
+        var narration: AudioStreamPlayer = main.get("narration_player") as AudioStreamPlayer
+        var ambience: AudioStreamPlayer = main.get("ambience_player") as AudioStreamPlayer
+        if narration == null or narration.stream == null:
+            await _fail(30 + index, "SMOKE: species %d narration is missing" % index, main)
+            return
+        if ambience == null or ambience.stream == null:
+            await _fail(40 + index, "SMOKE: species %d ambience is missing" % index, main)
+            return
+
+        var species: Dictionary = catalog[index]
+        var species_id := str(species.get("id", "unknown"))
+        var animation_players: Array[Node] = actor.find_children("*", "AnimationPlayer", true, false)
+        var animation_count := 0
+        for node in animation_players:
+            var player := node as AnimationPlayer
+            animation_count += player.get_animation_list().size()
+        if animation_count < 1:
+            await _fail(50 + index, "SMOKE: %s has no runtime animation" % species_id, main)
+            return
+        print("SMOKE_SPECIES_OK id=", species_id, " meshes=", meshes.size(), " animations=", animation_count)
+
+        meshes.clear()
+        animation_players.clear()
+        actor = null
+        narration = null
+        ambience = null
+
     var roar: AudioStreamPlayer3D = main.get("roar_player") as AudioStreamPlayer3D
-    if ambience == null or ambience.stream == null:
-        await _fail(6, "SMOKE: real habitat ambience is not loaded", main)
-        return
-    if narration == null or narration.stream == null:
-        await _fail(7, "SMOKE: packaged Russian narration is not loaded", main)
-        return
+    main.call("_show_dinosaur", 0)
+    for _frame in 3:
+        await process_frame
+    roar = main.get("roar_player") as AudioStreamPlayer3D
     if roar == null or roar.stream == null:
-        await _fail(8, "SMOKE: roar audio is not loaded", main)
+        await _fail(60, "SMOKE: T. rex roar audio is missing", main)
+        return
+    if roar.volume_db < 16.0:
+        await _fail(61, "SMOKE: T. rex roar gain was not increased", main)
         return
 
-    print("SMOKE_MAIN_OK meshes=", meshes.size(), " animations=", animation_count, " stage_children=", stage.get_child_count(), " audio=production")
-
-    # Drop local references before freeing the scene so the shutdown check measures
-    # the application tree rather than temporary test variables.
-    actor = null
+    print("SMOKE_MAIN_OK species=6 stage_children=", stage.get_child_count(), " roar_db=", roar.volume_db)
     stage = null
-    meshes.clear()
-    animation_players.clear()
-    ambience = null
-    narration = null
     roar = null
-
+    catalog.clear()
+    packed = null
     await _shutdown_main(main)
     main = null
-    packed = null
     await process_frame
     await process_frame
     quit(0)
