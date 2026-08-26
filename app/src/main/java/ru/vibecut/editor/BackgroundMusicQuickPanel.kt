@@ -49,7 +49,7 @@ internal fun BackgroundMusicQuickPanel(
             Text("Ищу биты и сильные акценты…", color = Color(0xFFB9B9C5))
         } else beatMap?.let { map ->
             Text(
-                "${map.bpm} BPM · ${map.beats.size} точек ритма · ${map.strongBeats.size} сильных акцентов",
+                "${map.bpm} BPM · ${map.beats.size} точек ритма · ${map.strongBeatCount} сильных акцентов",
                 color = Color(0xFF67E8A8),
             )
         }
