@@ -18,6 +18,12 @@ func attach(new_actor: Node3D, actions: Dictionary) -> void:
     _idle_candidates = _to_string_array(action_map.get("idle", ["idle", "Idle", "breathing"]))
     play_idle()
 
+func has_action(action_name: String) -> bool:
+    if animation_player == null:
+        return false
+    var candidates := _to_string_array(action_map.get(action_name, [action_name]))
+    return _resolve_clip(candidates) != StringName()
+
 func play_idle() -> void:
     if animation_player == null:
         return
@@ -32,7 +38,6 @@ func play_action(action_name: String) -> bool:
     var candidates := _to_string_array(action_map.get(action_name, [action_name]))
     var clip := _resolve_clip(candidates)
     if clip == StringName():
-        asset_error.emit("Не найдена анимация: %s" % action_name)
         return false
     animation_player.play(clip, 0.2)
     action_started.emit(action_name)
