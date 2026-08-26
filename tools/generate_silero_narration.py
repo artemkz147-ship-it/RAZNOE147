@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import array
 import json
 import re
 import sys
@@ -49,7 +50,10 @@ if peak <= 0.0001:
 if peak > 0.97:
     full = full * (0.97 / peak)
 
-pcm = (full.clamp(-1.0, 1.0) * 32767.0).to(torch.int16).numpy().tobytes()
+# Avoid an unnecessary NumPy dependency in CI: convert the int16 tensor through
+# Python's standard array module before writing the PCM WAV.
+samples = (full.clamp(-1.0, 1.0) * 32767.0).to(torch.int16).tolist()
+pcm = array.array("h", samples).tobytes()
 OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 with wave.open(str(OUTPUT_PATH), "wb") as wav:
     wav.setnchannels(1)
