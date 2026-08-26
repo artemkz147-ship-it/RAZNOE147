@@ -14,6 +14,7 @@ import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -36,425 +37,53 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import kotlinx.coroutines.delay
+import java.io.File
 import java.util.UUID
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoEditorScreen() {
-    val context = LocalContext.current
-    val restored = remember { ProjectStore.load(context) }
-    val clips = remember {
-        mutableStateListOf<VideoClip>().apply { addAll(restored?.clips.orEmpty()) }
-    }
-    val positionedAudioTracks = remember {
-        mutableStateListOf<PositionedAudioTrack>().apply {
-            addAll(restored?.positionedAudioTracks.orEmpty())
+fun VideoEditorScreen(projectId:String,onBack:()->Unit){
+    val context=LocalContext.current;val restored=remember(projectId){ProjectStore.load(context,projectId)?:SavedProject(id=projectId)}
+    val clips=remember(projectId){mutableStateListOf<VideoClip>().apply{addAll(restored.clips)}};val audioTracks=remember(projectId){mutableStateListOf<PositionedAudioTrack>().apply{addAll(restored.positionedAudioTracks)}};val subtitles=remember(projectId){mutableStateListOf<SubtitleCue>().apply{addAll(restored.subtitles)}};val history=remember{mutableStateListOf<EditorSnapshot>()};val redo=remember{mutableStateListOf<EditorSnapshot>()}
+    var name by remember(projectId){mutableStateOf(restored.name)};var selectedId by remember(projectId){mutableStateOf(restored.selectedId?.takeIf{id->clips.any{it.id==id}}?:clips.firstOrNull()?.id)};var position by remember{mutableLongStateOf(0L)};var pendingAudioStart by remember{mutableLongStateOf(0L)};var pendingStickerClip by remember{mutableStateOf<String?>(null)};var voiceStart by remember{mutableLongStateOf(0L)};var recording by remember{mutableStateOf(false)}
+    var exportState by remember{mutableStateOf(ExportState.IDLE)};var exportProgress by remember{mutableIntStateOf(0)};var lastExport by remember{mutableStateOf<String?>(null)};var message by remember{mutableStateOf(if(clips.isEmpty())"Добавьте видео, чтобы начать монтаж" else "Проект открыт")};var music by remember{mutableStateOf(restored.backgroundAudio)};var subtitleStyle by remember{mutableStateOf(restored.subtitleStyle)};var exportSettings by remember{mutableStateOf(restored.exportSettings)}
+    val exporter=remember{ExportManager(context)};val recorder=remember{VoiceRecorder(context)}
+    DisposableEffect(Unit){onDispose{exporter.cancel();if(recording)recorder.cancel()}}
+    fun snap(){history+=EditorSnapshot(clips.toList(),selectedId);redo.clear();if(history.size>80)history.removeAt(0)}
+    fun restore(s:EditorSnapshot){clips.clear();clips.addAll(s.clips);selectedId=s.selectedId?.takeIf{id->clips.any{it.id==id}}?:clips.firstOrNull()?.id;position=0}
+    fun replace(c:VideoClip){val i=clips.indexOfFirst{it.id==c.id};if(i>=0)clips[i]=c}
+    fun state()=SavedProject(id=projectId,name=name.trim().ifBlank{"Новый проект"},createdAt=restored.createdAt,clips=clips.toList(),selectedId=selectedId,backgroundAudio=music,positionedAudioTracks=audioTracks.toList(),subtitles=subtitles.toList(),subtitleStyle=subtitleStyle,exportSettings=exportSettings)
+    fun startExport(){if(clips.isEmpty()||exportState==ExportState.EXPORTING)return;ProjectStore.save(context,state());exportState=ExportState.EXPORTING;exportProgress=0;lastExport=null;message="Экспорт начат";exporter.export(clips.toList(),music,audioTracks.toList(),subtitles.toList(),subtitleStyle,exportSettings,{exportProgress=it},{uri->exportState=ExportState.DONE;exportProgress=100;lastExport=uri;message="Видео сохранено в Movies/VibeCut"},{exportState=ExportState.ERROR;message=it})}
+    val writePermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){if(it)startExport()else message="Нет разрешения на сохранение"}
+    val videoPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()){uris->if(uris.isNotEmpty()){snap();var count=0;uris.forEach{u->persist(context,u);runCatching{readClip(context,u)}.onSuccess{clips+=it;if(selectedId==null)selectedId=it.id;count++}};message="Добавлено видео: $count"}}
+    val musicPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){u->u?.let{persist(context,it);music=AudioTrack(it.toString(),displayName(context,it,"Музыка"),.65f)}}
+    val audioPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){u->u?.let{persist(context,it);audioTracks+=PositionedAudioTrack(UUID.randomUUID().toString(),it.toString(),displayName(context,it,"Звук"),duration(context,it),pendingAudioStart,.85f);message="Звук добавлен с ${formatTime(pendingAudioStart)}"}}
+    val stickerPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){u->val id=pendingStickerClip;if(u!=null&&id!=null){persist(context,u);clips.firstOrNull{it.id==id}?.let{c->snap();replace(c.copy(stickers=c.stickers+StickerLayer(UUID.randomUUID().toString(),u.toString(),displayName(context,u,"Изображение"))))}};pendingStickerClip=null}
+    val srtPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){u->u?.let{persist(context,it);val list=runCatching{SrtTools.read(context,it)}.getOrDefault(emptyList());if(list.isNotEmpty()){subtitles.clear();subtitles.addAll(list);message="Импортировано субтитров: ${list.size}"}else message="Не удалось прочитать SRT"}}
+    fun beginVoice(start:Long){voiceStart=start;runCatching{recorder.start()}.onSuccess{recording=true;message="Запись озвучки начата"}.onFailure{message="Не удалось начать запись"}}
+    val micPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){if(it)beginVoice(voiceStart)else message="Для озвучки нужен микрофон"}
+    LaunchedEffect(name,clips.toList(),selectedId,music,audioTracks.toList(),subtitles.toList(),subtitleStyle,exportSettings){delay(300);ProjectStore.save(context,state())}
+    val selected=clips.firstOrNull{it.id==selectedId};val index=clips.indexOfFirst{it.id==selectedId};val offset=if(index>0)clips.take(index).sumOf{it.durationMs}else 0L;val cursor=if(selected!=null)offset+(position/selected.speed.coerceAtLeast(.05f)).toLong()else 0L;val incoming=clips.getOrNull(index-1)?.let{p->if(p.transitionOut==TransitionType.NONE)null else TransitionSpec(p.transitionOut,p.transitionDurationMs)}
+    Column(Modifier.fillMaxSize().background(Color(0xFF09090C)).verticalScroll(rememberScrollState())){
+        FullEditorHeader(name,clips.size,exportState,exportProgress,{ProjectStore.save(context,state());onBack()},{name=it},{videoPicker.launch(arrayOf("video/*"))},{if(Build.VERSION.SDK_INT<=Build.VERSION_CODES.P&&context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED)writePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)else startExport()})
+        if(selected==null)EmptyEditor{videoPicker.launch(arrayOf("video/*"))}else{
+            EditorPreview(selected,incoming,exportSettings,offset,subtitles,subtitleStyle){position=it};Timeline(clips,selectedId,{selectedId=it;position=0})
+            BasicTools(selected,position,history.isNotEmpty(),redo.isNotEmpty(),index>0,index in 0 until clips.lastIndex,
+                onSplit={val absolute=selected.trimStartMs+position;if(absolute>selected.trimStartMs+100&&absolute<selected.trimEndMs-100){snap();val left=selected.copy(trimEndMs=absolute,transitionOut=TransitionType.NONE,keyframes=selected.keyframes.filter{it.timeMs<=position});val right=selected.copy(id=UUID.randomUUID().toString(),name="${selected.name} · 2",trimStartMs=absolute,keyframes=selected.keyframes.filter{it.timeMs>=position}.map{it.copy(id=UUID.randomUUID().toString(),timeMs=(it.timeMs-position).coerceAtLeast(0))});clips[index]=left;clips.add(index+1,right);selectedId=right.id;position=0}},
+                onTrimStart={val a=selected.trimStartMs+position;if(a<selected.trimEndMs-100){snap();replace(selected.copy(trimStartMs=a));position=0}},onTrimEnd={val a=selected.trimStartMs+position;if(a>selected.trimStartMs+100){snap();replace(selected.copy(trimEndMs=a))}},onMute={snap();replace(selected.copy(muted=!selected.muted))},onRotate={snap();replace(selected.copy(rotationDegrees=(selected.rotationDegrees+90)%360))},onFlipHorizontal={snap();replace(selected.copy(flipHorizontal=!selected.flipHorizontal))},onFlipVertical={snap();replace(selected.copy(flipVertical=!selected.flipVertical))},onDuplicate={snap();val c=selected.copy(id=UUID.randomUUID().toString(),name="${selected.name} · копия");clips.add(index+1,c);selectedId=c.id},onMoveLeft={if(index>0){snap();val c=clips.removeAt(index);clips.add(index-1,c)}},onMoveRight={if(index in 0 until clips.lastIndex){snap();val c=clips.removeAt(index);clips.add(index+1,c)}},onDelete={snap();clips.removeAt(index);selectedId=if(clips.isEmpty())null else clips[index.coerceAtMost(clips.lastIndex)].id;position=0},onUndo={if(history.isNotEmpty()){redo+=EditorSnapshot(clips.toList(),selectedId);restore(history.removeAt(history.lastIndex))}},onRedo={if(redo.isNotEmpty()){history+=EditorSnapshot(clips.toList(),selectedId);restore(redo.removeAt(redo.lastIndex))}},onImport={videoPicker.launch(arrayOf("video/*"))})
+            AutoMontagePanel{style->snap();clips.indices.forEach{i->val c=clips[i];val last=i==clips.lastIndex;clips[i]=when(style){AutoMontageStyle.DYNAMIC->c.copy(transitionOut=if(last)TransitionType.NONE else listOf(TransitionType.SLIDE_LEFT,TransitionType.ZOOM,TransitionType.SPIN)[i%3],transitionDurationMs=450,motion=listOf(ClipMotion.ZOOM_IN,ClipMotion.PAN_RIGHT,ClipMotion.ZOOM_OUT)[i%3],motionStrength=.16f,contrast=.12f,saturation=16f);AutoMontageStyle.CALM->c.copy(transitionOut=if(last)TransitionType.NONE else TransitionType.FADE,transitionDurationMs=850,motion=ClipMotion.ZOOM_IN,motionStrength=.08f,contrast=-.03f,saturation=-4f,lightness=4f);AutoMontageStyle.TRAVEL->c.copy(transitionOut=if(last)TransitionType.NONE else if(i%2==0)TransitionType.SLIDE_LEFT else TransitionType.SLIDE_RIGHT,transitionDurationMs=600,motion=if(i%2==0)ClipMotion.PAN_RIGHT else ClipMotion.PAN_LEFT,motionStrength=.11f,hue=7f,saturation=14f,lightness=3f);AutoMontageStyle.REELS->c.copy(transitionOut=if(last)TransitionType.NONE else listOf(TransitionType.SLIDE_LEFT,TransitionType.FLASH,TransitionType.ZOOM)[i%3],transitionDurationMs=320,motion=ClipMotion.ZOOM_IN,motionStrength=.20f,contrast=.16f,saturation=22f)}};message="Стиль «${style.title}» применён"}
+            AdjustmentsPanel(selected,{snap()},{replace(it)});FilterPanel(selected,{snap()},{replace(it)});ColorEffectsPanel(selected,{snap()},{replace(it)});MotionPanel(selected,{snap()},{replace(it)});TransitionPanel(selected,index in 0 until clips.lastIndex,{snap()},{replace(it)});KeyframePanel(selected,position,{snap()},{replace(it)});ClipAudioPanel(selected,{snap()},{replace(it)})
+            PositionedAudioPanel(audioTracks,cursor,{pendingAudioStart=cursor;audioPicker.launch(arrayOf("audio/*"))},{a->val i=audioTracks.indexOfFirst{it.id==a.id};if(i>=0)audioTracks[i]=a},{id->audioTracks.removeAll{it.id==id}})
+            VoiceoverPanel(recording,if(recording)voiceStart else cursor,{voiceStart=cursor;if(context.checkSelfPermission(Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED)beginVoice(cursor)else micPermission.launch(Manifest.permission.RECORD_AUDIO)},{val file=recorder.stop();recording=false;if(file!=null){audioTracks+=PositionedAudioTrack(UUID.randomUUID().toString(),Uri.fromFile(file).toString(),"Озвучка",duration(context,Uri.fromFile(file)),voiceStart,1f);message="Озвучка добавлена"}})
+            StickerPanel(selected,{pendingStickerClip=selected.id;stickerPicker.launch(arrayOf("image/*"))},{snap()},{replace(it)});TextPanel(selected,{snap()},{replace(it)})
+            SubtitlePanel(subtitles,subtitleStyle,cursor,{srtPicker.launch(arrayOf("application/x-subrip","text/plain","*/*"))},{text->subtitles+=SubtitleCue(UUID.randomUUID().toString(),cursor,cursor+2000,text)},{id->subtitles.removeAll{it.id==id}},{subtitles.clear()},{subtitleStyle=it})
+            AdvancedProjectPanel(music,exportSettings,{musicPicker.launch(arrayOf("audio/*"))},{music=null},{music=it},{exportSettings=it})
+            ExportResultPanel(lastExport){val u=lastExport?:return@ExportResultPanel;runCatching{context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="video/mp4";putExtra(Intent.EXTRA_STREAM,Uri.parse(u));addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)},"Поделиться видео"))}}
         }
-    }
-    val history = remember { mutableStateListOf<EditorSnapshot>() }
-    val redoHistory = remember { mutableStateListOf<EditorSnapshot>() }
-
-    var selectedId by remember {
-        mutableStateOf(
-            restored?.selectedId?.takeIf { id -> clips.any { it.id == id } }
-                ?: clips.firstOrNull()?.id
-        )
-    }
-    var positionMs by remember { mutableLongStateOf(0L) }
-    var pendingAudioStartMs by remember { mutableLongStateOf(0L) }
-    var exportState by remember { mutableStateOf(ExportState.IDLE) }
-    var exportProgress by remember { mutableIntStateOf(0) }
-    var message by remember {
-        mutableStateOf(
-            if (clips.isEmpty()) "Добавьте видео, чтобы начать монтаж"
-            else "Проект восстановлен из автосохранения"
-        )
-    }
-    var backgroundAudio by remember { mutableStateOf(restored?.backgroundAudio) }
-    var exportSettings by remember { mutableStateOf(restored?.exportSettings ?: ExportSettings()) }
-    val exportManager = remember { ExportManager(context) }
-
-    DisposableEffect(Unit) { onDispose { exportManager.cancel() } }
-
-    fun currentSnapshot() = EditorSnapshot(clips.toList(), selectedId)
-
-    fun snapshot() {
-        history += currentSnapshot()
-        redoHistory.clear()
-        if (history.size > 50) history.removeAt(0)
-    }
-
-    fun restore(saved: EditorSnapshot) {
-        clips.clear()
-        clips.addAll(saved.clips)
-        selectedId = saved.selectedId?.takeIf { id -> clips.any { it.id == id } }
-            ?: clips.firstOrNull()?.id
-        positionMs = 0L
-    }
-
-    fun replaceClip(updated: VideoClip) {
-        val index = clips.indexOfFirst { it.id == updated.id }
-        if (index >= 0) clips[index] = updated
-    }
-
-    fun startExport() {
-        if (clips.isEmpty() || exportState == ExportState.EXPORTING) return
-        exportState = ExportState.EXPORTING
-        exportProgress = 0
-        message = "Экспорт начат"
-        exportManager.export(
-            clips = clips.toList(),
-            backgroundAudio = backgroundAudio,
-            positionedAudioTracks = positionedAudioTracks.toList(),
-            settings = exportSettings,
-            onProgress = { exportProgress = it },
-            onDone = {
-                exportState = ExportState.DONE
-                exportProgress = 100
-                message = "Готово. Видео сохранено в Movies/VibeCut"
-            },
-            onError = {
-                exportState = ExportState.ERROR
-                message = it
-            },
-        )
-    }
-
-    val writePermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) startExport()
-        else message = "Без разрешения на запись Android 8/9 не может сохранить экспорт в галерею"
-    }
-
-    val importer = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris ->
-        if (uris.isEmpty()) return@rememberLauncherForActivityResult
-        snapshot()
-        uris.forEach { uri ->
-            persistReadPermission(context, uri)
-            runCatching { readClip(context, uri) }
-                .onSuccess { clip ->
-                    clips += clip
-                    if (selectedId == null) selectedId = clip.id
-                }
-                .onFailure { message = "Не удалось открыть один из выбранных роликов" }
-        }
-        if (clips.isNotEmpty()) message = "Видео добавлено"
-    }
-
-    val musicPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            persistReadPermission(context, uri)
-            backgroundAudio = AudioTrack(
-                uri = uri.toString(),
-                name = readDisplayName(context, uri, "Музыка"),
-                volume = 0.65f,
-            )
-            message = "Фоновая музыка добавлена"
-        }
-    }
-
-    val positionedAudioPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            persistReadPermission(context, uri)
-            val duration = readMediaDuration(context, uri)
-            positionedAudioTracks += PositionedAudioTrack(
-                id = UUID.randomUUID().toString(),
-                uri = uri.toString(),
-                name = readDisplayName(context, uri, "Звук"),
-                sourceDurationMs = duration,
-                startAtMs = pendingAudioStartMs.coerceAtLeast(0L),
-            )
-            message = "Звуковая дорожка добавлена с ${formatTime(pendingAudioStartMs)}"
-        }
-    }
-
-    LaunchedEffect(
-        clips.toList(),
-        selectedId,
-        backgroundAudio,
-        positionedAudioTracks.toList(),
-        exportSettings,
-    ) {
-        delay(250L)
-        ProjectStore.save(
-            context,
-            SavedProject(
-                clips = clips.toList(),
-                selectedId = selectedId,
-                backgroundAudio = backgroundAudio,
-                positionedAudioTracks = positionedAudioTracks.toList(),
-                exportSettings = exportSettings,
-            )
-        )
-    }
-
-    val selected = clips.firstOrNull { it.id == selectedId }
-    val selectedIndex = clips.indexOfFirst { it.id == selectedId }
-    val projectCursorMs = if (selected != null && selectedIndex >= 0) {
-        clips.take(selectedIndex).sumOf { it.durationMs } +
-            (positionMs / selected.speed.coerceAtLeast(0.05f)).toLong()
-    } else 0L
-
-    Column(
-        modifier = Modifier
-            .background(Color(0xFF09090C))
-            .verticalScroll(rememberScrollState())
-    ) {
-        EditorHeader(
-            clipCount = clips.size,
-            exportState = exportState,
-            exportProgress = exportProgress,
-            onImport = { importer.launch(arrayOf("video/*")) },
-            onExport = {
-                if (
-                    Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
-                    context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    writePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                } else {
-                    startExport()
-                }
-            },
-        )
-
-        if (selected == null) {
-            EmptyEditor { importer.launch(arrayOf("video/*")) }
-        } else {
-            EditorPreview(
-                clip = selected,
-                exportSettings = exportSettings,
-                onPosition = { positionMs = it },
-            )
-
-            Timeline(
-                clips = clips,
-                selectedId = selectedId,
-                onSelect = {
-                    selectedId = it
-                    positionMs = 0L
-                },
-            )
-
-            BasicTools(
-                clip = selected,
-                positionMs = positionMs,
-                canUndo = history.isNotEmpty(),
-                canRedo = redoHistory.isNotEmpty(),
-                canMoveLeft = selectedIndex > 0,
-                canMoveRight = selectedIndex in 0 until clips.lastIndex,
-                onSplit = {
-                    val absolute = selected.trimStartMs + positionMs
-                    if (absolute > selected.trimStartMs + 100 && absolute < selected.trimEndMs - 100) {
-                        snapshot()
-                        val index = clips.indexOfFirst { it.id == selected.id }
-                        val left = selected.copy(trimEndMs = absolute)
-                        val right = selected.copy(
-                            id = UUID.randomUUID().toString(),
-                            name = "${selected.name} · 2",
-                            trimStartMs = absolute,
-                        )
-                        clips[index] = left
-                        clips.add(index + 1, right)
-                        selectedId = right.id
-                        positionMs = 0L
-                        message = "Клип разделён"
-                    }
-                },
-                onTrimStart = {
-                    val absolute = selected.trimStartMs + positionMs
-                    if (absolute < selected.trimEndMs - 100) {
-                        snapshot()
-                        replaceClip(selected.copy(trimStartMs = absolute))
-                        positionMs = 0L
-                        message = "Начало обрезано"
-                    }
-                },
-                onTrimEnd = {
-                    val absolute = selected.trimStartMs + positionMs
-                    if (absolute > selected.trimStartMs + 100) {
-                        snapshot()
-                        replaceClip(selected.copy(trimEndMs = absolute))
-                        message = "Конец обрезан"
-                    }
-                },
-                onMute = {
-                    snapshot()
-                    replaceClip(selected.copy(muted = !selected.muted))
-                },
-                onRotate = {
-                    snapshot()
-                    replaceClip(selected.copy(rotationDegrees = (selected.rotationDegrees + 90) % 360))
-                },
-                onFlipHorizontal = {
-                    snapshot()
-                    replaceClip(selected.copy(flipHorizontal = !selected.flipHorizontal))
-                },
-                onFlipVertical = {
-                    snapshot()
-                    replaceClip(selected.copy(flipVertical = !selected.flipVertical))
-                },
-                onDuplicate = {
-                    snapshot()
-                    val index = clips.indexOfFirst { it.id == selected.id }
-                    val copy = selected.copy(
-                        id = UUID.randomUUID().toString(),
-                        name = "${selected.name} · копия",
-                    )
-                    clips.add(index + 1, copy)
-                    selectedId = copy.id
-                },
-                onMoveLeft = {
-                    val index = clips.indexOfFirst { it.id == selected.id }
-                    if (index > 0) {
-                        snapshot()
-                        val item = clips.removeAt(index)
-                        clips.add(index - 1, item)
-                    }
-                },
-                onMoveRight = {
-                    val index = clips.indexOfFirst { it.id == selected.id }
-                    if (index in 0 until clips.lastIndex) {
-                        snapshot()
-                        val item = clips.removeAt(index)
-                        clips.add(index + 1, item)
-                    }
-                },
-                onDelete = {
-                    snapshot()
-                    val index = clips.indexOfFirst { it.id == selected.id }
-                    clips.removeAt(index)
-                    selectedId = if (clips.isEmpty()) null
-                    else clips[index.coerceAtMost(clips.lastIndex)].id
-                    positionMs = 0L
-                },
-                onUndo = {
-                    if (history.isNotEmpty()) {
-                        redoHistory += currentSnapshot()
-                        restore(history.removeAt(history.lastIndex))
-                        message = "Действие отменено"
-                    }
-                },
-                onRedo = {
-                    if (redoHistory.isNotEmpty()) {
-                        history += currentSnapshot()
-                        restore(redoHistory.removeAt(redoHistory.lastIndex))
-                        message = "Действие повторено"
-                    }
-                },
-                onImport = { importer.launch(arrayOf("video/*")) },
-            )
-
-            AdjustmentsPanel(
-                clip = selected,
-                onSnapshot = { snapshot() },
-                onUpdate = { replaceClip(it) },
-            )
-
-            FilterPanel(
-                clip = selected,
-                onSnapshot = { snapshot() },
-                onUpdate = { replaceClip(it) },
-            )
-
-            MotionPanel(
-                clip = selected,
-                onSnapshot = { snapshot() },
-                onUpdate = { replaceClip(it) },
-            )
-
-            ClipAudioPanel(
-                clip = selected,
-                onSnapshot = { snapshot() },
-                onUpdate = { replaceClip(it) },
-            )
-
-            PositionedAudioPanel(
-                tracks = positionedAudioTracks,
-                projectCursorMs = projectCursorMs,
-                onAddAtCursor = {
-                    pendingAudioStartMs = projectCursorMs
-                    positionedAudioPicker.launch(arrayOf("audio/*"))
-                },
-                onUpdate = { updated ->
-                    val index = positionedAudioTracks.indexOfFirst { it.id == updated.id }
-                    if (index >= 0) positionedAudioTracks[index] = updated
-                },
-                onDelete = { id -> positionedAudioTracks.removeAll { it.id == id } },
-            )
-
-            TextPanel(
-                clip = selected,
-                onSnapshot = { snapshot() },
-                onUpdate = { replaceClip(it) },
-            )
-
-            ProjectPanel(
-                backgroundAudio = backgroundAudio,
-                exportSettings = exportSettings,
-                onChooseMusic = { musicPicker.launch(arrayOf("audio/*")) },
-                onRemoveMusic = {
-                    backgroundAudio = null
-                    message = "Фоновая музыка удалена"
-                },
-                onBackgroundAudioChange = { backgroundAudio = it },
-                onExportSettings = { exportSettings = it },
-            )
-        }
-
-        Text(
-            text = message,
-            color = Color(0xFFB9B9C5),
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        )
-        Spacer(Modifier.height(24.dp))
+        Text(message,color=Color(0xFFB9B9C5),style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(16.dp));Spacer(Modifier.height(28.dp))
     }
 }
-
-private fun persistReadPermission(context: Context, uri: Uri) {
-    runCatching {
-        context.contentResolver.takePersistableUriPermission(
-            uri,
-            Intent.FLAG_GRANT_READ_URI_PERMISSION,
-        )
-    }
-}
-
-private fun readClip(context: Context, uri: Uri): VideoClip {
-    return VideoClip(
-        id = UUID.randomUUID().toString(),
-        uri = uri.toString(),
-        name = readDisplayName(context, uri, "Видео"),
-        sourceDurationMs = readMediaDuration(context, uri),
-    )
-}
-
-private fun readMediaDuration(context: Context, uri: Uri): Long {
-    val retriever = MediaMetadataRetriever()
-    return try {
-        retriever.setDataSource(context, uri)
-        (retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 1L)
-            .coerceAtLeast(1L)
-    } finally {
-        retriever.release()
-    }
-}
-
-private fun readDisplayName(context: Context, uri: Uri, fallback: String): String {
-    return context.contentResolver.query(
-        uri,
-        arrayOf(OpenableColumns.DISPLAY_NAME),
-        null,
-        null,
-        null,
-    )?.use { cursor ->
-        if (cursor.moveToFirst()) cursor.getString(0) else null
-    } ?: fallback
-}
+private fun persist(context:Context,uri:Uri){runCatching{context.contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}}
+private fun readClip(context:Context,uri:Uri)=VideoClip(UUID.randomUUID().toString(),uri.toString(),displayName(context,uri,"Видео"),duration(context,uri))
+private fun duration(context:Context,uri:Uri):Long{val r=MediaMetadataRetriever();return try{if(uri.scheme=="file")r.setDataSource(uri.path)else r.setDataSource(context,uri);(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?:1).coerceAtLeast(1)}finally{r.release()}}
+private fun displayName(context:Context,uri:Uri,fallback:String):String{if(uri.scheme=="file")return File(uri.path.orEmpty()).name.ifBlank{fallback};return context.contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use{c->if(c.moveToFirst())c.getString(0)else null}?:fallback}
