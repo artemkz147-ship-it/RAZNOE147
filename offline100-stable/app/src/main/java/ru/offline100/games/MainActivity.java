@@ -73,7 +73,7 @@ public final class MainActivity extends Activity {
             @Override public void onReceivedError(WebView v, android.webkit.WebResourceRequest request, android.webkit.WebResourceError error) {
                 if (request != null && request.isForMainFrame()) Log.e(TAG,"MAIN_FRAME_ERROR "+error);
             }
-            @Override public void onRenderProcessGone(WebView v, RenderProcessGoneDetail detail) {
+            @Override public boolean onRenderProcessGone(WebView v, RenderProcessGoneDetail detail) {
                 Log.e(TAG,"WEBVIEW_RENDERER_GONE didCrash="+detail.didCrash());
                 return false;
             }
