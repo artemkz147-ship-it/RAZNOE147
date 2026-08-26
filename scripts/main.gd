@@ -129,17 +129,20 @@ func _combined_aabb(root: Node3D) -> AABB:
     return result
 
 func _clear_loaded_scene() -> void:
+    if dinosaur_controller != null:
+        dinosaur_controller.stop_all()
     if is_instance_valid(current_actor):
         current_actor.queue_free()
     if is_instance_valid(current_environment):
         current_environment.queue_free()
     current_actor = null
     current_environment = null
-    if dinosaur_controller != null:
-        dinosaur_controller.stop_all()
-    ambience_player.stop()
-    narration_player.stop()
-    roar_player.stop()
+    if ambience_player != null:
+        ambience_player.stop()
+    if narration_player != null:
+        narration_player.stop()
+    if roar_player != null:
+        roar_player.stop()
 
 func _load_audio() -> void:
     _assign_stream(ambience_player, str(current_data.get("ambience_path", "")))
@@ -301,7 +304,8 @@ func _reset_view() -> void:
 func _roar() -> void:
     if dinosaur_controller.has_action("roar"):
         dinosaur_controller.play_action("roar")
-    if roar_player.stream != null:
+    elif roar_player.stream != null:
+        # Fallback for future static specimens: still allow the reconstruction audio.
         roar_player.play()
 
 func _action() -> void:
