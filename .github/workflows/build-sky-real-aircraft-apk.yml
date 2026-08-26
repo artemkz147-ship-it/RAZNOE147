@@ -1,0 +1,172 @@
+name: Build Sky Frontiers REAL Aircraft APK
+
+on:
+  push:
+    branches:
+      - sky-real-aircraft-v2
+    paths-ignore:
+      - .github/workflows/prepare-sky-aircraft-v2.yml
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack game source
+        run: |
+          cat skyfrontiers3d_src.part* | base64 -d > skyfrontiers3d-src.zip
+          unzip -q skyfrontiers3d-src.zip
+          test -f skyfrontiers3d/game.js
+
+      - name: Apply HD and real-aircraft-only patches
+        run: |
+          python sky_quality_patch.py
+          python sky_real_aircraft_patch.py
+          grep -q 'sky-models-v2/models/' skyfrontiers3d/game.js
+          ! grep -q 'spawnEmergencyPlaceholder' skyfrontiers3d/game.js
+          ! grep -q 'аварийный контур' skyfrontiers3d/game.js
+          ! grep -q 'CapsuleGeometry(8,54' skyfrontiers3d/game.js
+
+      - name: Build carrier without primitive parked aircraft
+        run: |
+          python -m pip install --quiet trimesh numpy
+          python make_carrier.py skyfrontiers3d/public/env/carrier_hd.glb
+          test -s skyfrontiers3d/public/env/carrier_hd.glb
+          ! grep -q 'def add_jet' make_carrier.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install glTF converter
+        run: npm install -g gltf-pipeline@4.3.1
+
+      - name: Download and convert the 3 bundled aircraft to real glTF 2.0
+        working-directory: skyfrontiers3d
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/models starter-src public/env public/quality
+          BASE=https://raw.githubusercontent.com/Flightradar24/fr24-3d-models/master/models
+          for m in pa28 ask21 atr42; do
+            curl -fL --retry 4 --retry-delay 2 -o starter-src/$m.glb $BASE/$m.glb
+            gltf-pipeline -i starter-src/$m.glb -o public/models/$m.glb --keepUnusedElements
+          done
+
+          BASE_ENV=https://raw.githubusercontent.com/anshaneja5/skyline-run/main/public/assets/models
+          for f in b_small.glb b_medium.glb b_large.glb tree1.glb tree2.glb tree3.glb bush.glb; do
+            curl -fL --retry 3 -o public/env/$f $BASE_ENV/$f
+          done
+
+          P=https://dl.polyhaven.org/file/ph-assets/Textures/png/1k
+          for a in aerial_grass_rock aerial_asphalt_01 dirt_aerial_02 rock_ground_02; do
+            curl -fL --retry 3 -o public/quality/${a}_diff_1k.png $P/$a/${a}_diff_1k.png
+            curl -fL --retry 3 -o public/quality/${a}_nor_gl_1k.png $P/$a/${a}_nor_gl_1k.png
+            curl -fL --retry 3 -o public/quality/${a}_rough_1k.png $P/$a/${a}_rough_1k.png
+          done
+          curl -fL --retry 3 -o public/quality/waternormals.jpg https://raw.githubusercontent.com/mrdoob/three.js/r180/examples/textures/waternormals.jpg
+          curl -fL --retry 3 -o public/quality/sky.hdr https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/rural_asphalt_road_1k.hdr || \
+            curl -fL --retry 3 -o public/quality/sky.hdr https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/sunset_jhbcentral_1k.hdr
+
+      - name: Prove bundled aircraft are glTF 2 and non-trivial authored meshes
+        working-directory: skyfrontiers3d
+        shell: python
+        run: |
+          import json,struct,pathlib
+          limits={'pa28.glb':20000,'ask21.glb':10000,'atr42.glb':30000}
+          for name,minimum in limits.items():
+              p=pathlib.Path('public/models')/name
+              b=p.read_bytes();magic,version,total=struct.unpack_from('<4sII',b,0)
+              assert magic==b'glTF' and version==2,(name,magic,version)
+              clen,ctype=struct.unpack_from('<II',b,12)
+              assert ctype==0x4E4F534A
+              g=json.loads(b[20:20+clen].decode('utf8').rstrip('\x00 \t\r\n'))
+              assert str(g['asset']['version']).startswith('2'),g['asset']
+              assert len(g.get('meshes',[]))>0
+              geom=sum(int(a.get('count',0)) for a in g.get('accessors',[]))
+              assert geom>=minimum,(name,geom,minimum)
+              print(name,'GLB2','meshes',len(g['meshes']),'accessor elements',geom,'bytes',p.stat().st_size)
+
+      - name: Install web dependencies
+        working-directory: skyfrontiers3d
+        run: npm install --no-audit --no-fund
+
+      - name: Build 3D web runtime
+        working-directory: skyfrontiers3d
+        run: npm run build
+
+      - name: Verify built runtime cannot show a procedural aircraft fallback
+        working-directory: skyfrontiers3d
+        run: |
+          test -s dist/models/pa28.glb
+          test -s dist/models/ask21.glb
+          test -s dist/models/atr42.glb
+          test -s dist/env/carrier_hd.glb
+          test -s dist/quality/sky.hdr
+          ! grep -R -q 'аварийный контур' dist/assets
+          ! grep -R -q 'spawnEmergencyPlaceholder' dist/assets
+          grep -R -q 'sky-models-v2/models/' dist/assets
+          du -sh dist
+
+      - name: Copy web build into Android assets
+        working-directory: skyfrontiers3d
+        run: |
+          rm -rf android/app/src/main/assets/www
+          mkdir -p android/app/src/main/assets/www
+          cp -R dist/. android/app/src/main/assets/www/
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build installable APK
+        working-directory: skyfrontiers3d/android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Final APK verification
+        working-directory: skyfrontiers3d/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          for f in pa28 ask21 atr42; do unzip -l "$APK" | grep -q "assets/www/models/$f.glb"; done
+          unzip -l "$APK" | grep -q 'assets/www/env/carrier_hd.glb'
+          unzip -l "$APK" | grep -q 'assets/www/quality/sky.hdr'
+          rm -rf /tmp/apkplanes && mkdir -p /tmp/apkplanes
+          unzip -q "$APK" 'assets/www/models/*.glb' -d /tmp/apkplanes
+          python - <<'PY'
+          import json,struct,pathlib
+          for p in pathlib.Path('/tmp/apkplanes/assets/www/models').glob('*.glb'):
+              b=p.read_bytes(); magic,v,total=struct.unpack_from('<4sII',b,0)
+              assert magic==b'glTF' and v==2,(p.name,v)
+              clen,ctype=struct.unpack_from('<II',b,12)
+              g=json.loads(b[20:20+clen].decode().rstrip('\x00 \t\r\n'))
+              assert str(g['asset']['version']).startswith('2')
+              assert len(g.get('meshes',[]))>0
+              print('APK real aircraft OK:',p.name,len(g['meshes']),'meshes')
+          PY
+          SIZE=$(stat -c%s "$APK")
+          echo "APK bytes: $SIZE"
+          test "$SIZE" -ge 14000000
+          cp "$APK" ../../Sky-Frontiers-3D-REAL-aircraft.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sky-Frontiers-3D-REAL-aircraft-apk
+          path: Sky-Frontiers-3D-REAL-aircraft.apk
+          if-no-files-found: error
