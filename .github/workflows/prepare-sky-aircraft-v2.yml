@@ -1,0 +1,111 @@
+name: Prepare Sky Aircraft glTF2
+
+on:
+  push:
+    branches:
+      - sky-real-aircraft-v2
+    paths:
+      - .github/workflows/prepare-sky-aircraft-v2.yml
+      - sky_real_aircraft_patch.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install glTF conversion tools
+        run: npm install -g gltf-pipeline@4.3.1
+
+      - name: Convert real FR24 aircraft from glTF 1.0 to glTF 2.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p converted/models original
+          BASE=https://raw.githubusercontent.com/Flightradar24/fr24-3d-models/master/models
+          MODELS=(
+            pa28 ask21 atr42 q400 citation bae146 crj700 crj900 e170 e190 cs100 cs300
+            a318 a319 a320 a321 a332 a333 a343 a346 a359 a380
+            b736 b737 b738 b739 b744 b748 b752 b753 b762 b763 b764 b772 b773 b788 b789 beluga
+          )
+          for m in "${MODELS[@]}"; do
+            echo "== $m =="
+            curl -fL --retry 4 --retry-delay 2 -o "original/$m.glb" "$BASE/$m.glb"
+            gltf-pipeline -i "original/$m.glb" -o "converted/models/$m.glb" --keepUnusedElements
+          done
+
+      - name: Validate all converted files are real glTF 2 models
+        shell: python
+        run: |
+          import json, struct, pathlib, sys
+          root=pathlib.Path('converted/models')
+          files=sorted(root.glob('*.glb'))
+          assert len(files) >= 38, len(files)
+          required={'pa28.glb':20000,'ask21.glb':10000,'atr42.glb':30000}
+          def inspect(path):
+              b=path.read_bytes()
+              magic,ver,total=struct.unpack_from('<4sII',b,0)
+              assert magic==b'glTF', (path,magic)
+              assert ver==2, (path,'GLB container',ver)
+              off=12
+              clen,ctype=struct.unpack_from('<II',b,off);off+=8
+              assert ctype==0x4E4F534A,(path,hex(ctype))
+              g=json.loads(b[off:off+clen].decode('utf-8').rstrip('\x00 \t\r\n'))
+              assert str(g.get('asset',{}).get('version','')).startswith('2'),(path,g.get('asset'))
+              meshes=g.get('meshes',[])
+              assert len(meshes)>0,(path,'no meshes')
+              accessors=g.get('accessors',[])
+              geom=sum(int(a.get('count',0)) for a in accessors)
+              return geom,len(meshes),path.stat().st_size
+          for p in files:
+              geom,meshes,size=inspect(p)
+              print(f'{p.name}: geometry={geom:,} meshes={meshes} bytes={size:,}')
+              if p.name in required:
+                  assert geom>=required[p.name],(p,geom)
+          print('Validated',len(files),'real glTF 2 aircraft')
+
+      - name: Add model-source notice
+        run: |
+          cat > converted/README.md <<'EOF'
+          # Sky Frontiers aircraft glTF2 cache
+
+          These aircraft are converted from the Flightradar24 `fr24-3d-models` repository from legacy glTF/GLB 1.0 to glTF/GLB 2.0 using Cesium `gltf-pipeline`.
+
+          The conversion changes container/version compatibility only. The aircraft meshes remain authored aircraft meshes; no procedural aircraft geometry is generated.
+
+          Source: https://github.com/Flightradar24/fr24-3d-models
+          Original license: GPL-2.0.
+          EOF
+          curl -fL --retry 3 -o converted/LICENSE-FR24.txt https://raw.githubusercontent.com/Flightradar24/fr24-3d-models/master/LICENSE
+
+      - uses: actions/checkout@v4
+        with:
+          ref: sky-models-v2
+          path: publish
+          fetch-depth: 1
+
+      - name: Publish converted aircraft to dedicated model branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf publish/models publish/README.md publish/LICENSE-FR24.txt
+          cp -R converted/models publish/models
+          cp converted/README.md converted/LICENSE-FR24.txt publish/
+          cd publish
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add models README.md LICENSE-FR24.txt
+          if git diff --cached --quiet; then
+            echo "No model changes"
+          else
+            git commit -m "Publish Sky Frontiers glTF2 aircraft pack"
+            git push origin HEAD:sky-models-v2
+          fi
