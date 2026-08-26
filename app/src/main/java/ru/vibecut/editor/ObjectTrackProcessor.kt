@@ -48,6 +48,8 @@ class ObjectTrackProcessor(private val context: Context) {
                 var trackingId: Int? = null
                 var lastX = targetX.coerceIn(-1f, 1f)
                 var lastY = targetY.coerceIn(-1f, 1f)
+                var lastW = .30f
+                var lastH = .30f
                 var firstObjectSize: Float? = null
                 var time = 0L
                 while (time <= duration && !cancelled) {
@@ -61,13 +63,17 @@ class ObjectTrackProcessor(private val context: Context) {
                             val box = chosen.boundingBox
                             val x = ((box.exactCenterX() / bitmap.width.toFloat()) * 2f - 1f).coerceIn(-1f, 1f)
                             val y = (1f - (box.exactCenterY() / bitmap.height.toFloat()) * 2f).coerceIn(-1f, 1f)
-                            val objectSize = max(box.width().toFloat() / bitmap.width, box.height().toFloat() / bitmap.height).coerceAtLeast(.01f)
+                            val width = (box.width().toFloat() / bitmap.width.toFloat()).coerceIn(.02f, 1f)
+                            val height = (box.height().toFloat() / bitmap.height.toFloat()).coerceIn(.02f, 1f)
+                            val objectSize = max(width, height).coerceAtLeast(.01f)
                             if (firstObjectSize == null) firstObjectSize = objectSize
                             val scale = (objectSize / (firstObjectSize ?: objectSize)).coerceIn(.45f, 2.2f)
                             val smoothX = if (path.isEmpty()) x else lastX * .62f + x * .38f
                             val smoothY = if (path.isEmpty()) y else lastY * .62f + y * .38f
-                            lastX = smoothX; lastY = smoothY
-                            path += TrackingPoint(time, smoothX, smoothY, scale)
+                            val smoothW = if (path.isEmpty()) width else lastW * .62f + width * .38f
+                            val smoothH = if (path.isEmpty()) height else lastH * .62f + height * .38f
+                            lastX = smoothX; lastY = smoothY; lastW = smoothW; lastH = smoothH
+                            path += TrackingPoint(time, smoothX, smoothY, scale, smoothW, smoothH)
                         }
                         bitmap.recycle()
                     }
