@@ -1,4 +1,4 @@
-name: Build and launch-test Offline100 stable
+name: Build and launch-test Offline100 v1.2
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ on:
 jobs:
   launch-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -20,38 +20,58 @@ jobs:
       - run: yes | sdkmanager --licenses >/dev/null || true; sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '9.1.0' }
-      - name: Restore v1.1 assets
+
+      - name: Restore and validate v1.2 assets
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p offline100-stable/app/src/main/assets
-          cat offline100-stable/.payload/app.* | base64 -d | gzip -d > offline100-stable/app/src/main/assets/app.js
-          cat offline100-stable/.payload/style.* | base64 -d | gzip -d > offline100-stable/app/src/main/assets/styles.css
-          cat offline100-stable/.payload/index.* | base64 -d | gzip -d > offline100-stable/app/src/main/assets/index.html
+          ASSETS=offline100-stable/app/src/main/assets
+          mkdir -p "$ASSETS"
+          cat offline100-stable/.payload/app.* | base64 -d | gzip -d > "$ASSETS/app.js"
+          cat offline100-stable/.payload/style.* | base64 -d | gzip -d > "$ASSETS/styles.css"
+          cat offline100-stable/.payload/index.* | base64 -d | gzip -d > "$ASSETS/index.html"
           base64 -d < offline100-stable/.payload/v11-app.patch.gz.b64 | gzip -d > /tmp/v11-app.patch
           base64 -d < offline100-stable/.payload/v11-styles.patch.gz.b64 | gzip -d > /tmp/v11-styles.patch
-          patch offline100-stable/app/src/main/assets/app.js < /tmp/v11-app.patch
-          patch offline100-stable/app/src/main/assets/styles.css < /tmp/v11-styles.patch
-          cp offline100-stable/static/manifest.webmanifest offline100-stable/app/src/main/assets/manifest.webmanifest
-          cp offline100-stable/static/sw.js offline100-stable/app/src/main/assets/sw.js
-          test $(wc -c < offline100-stable/app/src/main/assets/app.js) -eq 212277
-          test $(wc -c < offline100-stable/app/src/main/assets/styles.css) -eq 74907
-          test $(wc -c < offline100-stable/app/src/main/assets/index.html) -eq 12839
+          patch "$ASSETS/app.js" < /tmp/v11-app.patch
+          patch "$ASSETS/styles.css" < /tmp/v11-styles.patch
+
+          cat offline100-stable/.payload/v12-app.00 offline100-stable/.payload/v12-app.01 offline100-stable/.payload/v12-app.rest | base64 -d | gzip -d > /tmp/v12-app.patch
+          cat offline100-stable/.payload/v12-style.00 | base64 -d | gzip -d > /tmp/v12-style.patch
+          cat offline100-stable/.payload/v12-index.00 | base64 -d | gzip -d > /tmp/v12-index.patch
+          patch "$ASSETS/app.js" < /tmp/v12-app.patch
+          patch "$ASSETS/styles.css" < /tmp/v12-style.patch
+          patch "$ASSETS/index.html" < /tmp/v12-index.patch
+
+          cp offline100-stable/static/manifest.webmanifest "$ASSETS/manifest.webmanifest"
+          cp offline100-stable/static/sw.js "$ASSETS/sw.js"
+          test $(wc -c < "$ASSETS/app.js") -eq 228621
+          test $(wc -c < "$ASSETS/styles.css") -eq 87651
+          test $(wc -c < "$ASSETS/index.html") -eq 12917
+          grep -q "APP_VERSION='1.2.0'" "$ASSETS/app.js"
+          grep -q 'AI_GAME_IDS' "$ASSETS/app.js"
+          grep -q 'game-objective' "$ASSETS/app.js"
+          grep -q 'parking-exit' "$ASSETS/app.js"
+          grep -q 'pipe-terminal' "$ASSETS/app.js"
+          node --check "$ASSETS/app.js"
+
       - name: Build APK
         working-directory: offline100-stable
         run: gradle --no-daemon :app:assembleDebug
+
       - uses: actions/upload-artifact@v4
         with:
-          name: offline100-v1.1.1-stable-apk
+          name: offline100-v1.2.0-rebuild-apk
           path: offline100-stable/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Boot emulator and verify real launch
+
+      - name: Emulator QA - home, ambiguous games, AI and result
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -59,24 +79,62 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
+            set -e
+            APK=offline100-stable/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r "$APK"
+
             adb logcat -c
-            adb install -r offline100-stable/app/build/outputs/apk/debug/app-debug.apk
             adb shell am force-stop ru.offline100.games
             adb shell am start -W -n ru.offline100.games/.MainActivity
             sleep 5
-            adb logcat -d > startup-logcat.txt
-            adb exec-out screencap -p > startup.png
-            grep -q 'Offline100.*PAGE_FINISHED' startup-logcat.txt
-            grep -q 'Offline100.*GAME_CARD_COUNT="100"' startup-logcat.txt
-            grep -q -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE' startup-logcat.txt && exit 42 || true
+            adb logcat -d > qa-home.log
+            adb exec-out screencap -p > qa-home.png
+            grep -q 'Offline100.*PAGE_FINISHED' qa-home.log
+            grep -q 'Offline100.*GAME_CARD_COUNT="100"' qa-home.log
+            ! grep -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE' qa-home.log
             adb shell dumpsys activity activities | grep -q 'ru.offline100.games/.MainActivity'
-      - name: Upload launch proof
+
+            for GAME in pipes parking; do
+              adb logcat -c
+              adb shell am force-stop ru.offline100.games
+              adb shell am start -W -n ru.offline100.games/.MainActivity --es testGame "$GAME"
+              sleep 5
+              adb logcat -d > "qa-$GAME.log"
+              adb exec-out screencap -p > "qa-$GAME.png"
+              grep -q "QA_SNAPSHOT=.*$GAME" "qa-$GAME.log"
+              grep -q 'QA_SNAPSHOT=.*objective' "qa-$GAME.log"
+              ! grep -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE' "qa-$GAME.log"
+            done
+
+            for GAME in ttt connect4 reversi gomoku nim dots checkers; do
+              adb logcat -c
+              adb shell am force-stop ru.offline100.games
+              adb shell am start -W -n ru.offline100.games/.MainActivity --es testGame "$GAME"
+              sleep 4
+              adb logcat -d > "qa-$GAME.log"
+              grep -q "QA_SNAPSHOT=.*$GAME" "qa-$GAME.log"
+              grep -q 'QA_SNAPSHOT=.*aiSelector.*true' "qa-$GAME.log"
+              ! grep -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE' "qa-$GAME.log"
+            done
+            adb exec-out screencap -p > qa-checkers-ai.png
+
+            adb logcat -c
+            adb shell am force-stop ru.offline100.games
+            adb shell am start -W -n ru.offline100.games/.MainActivity --es testGame ttt --ez testFinish true
+            sleep 5
+            adb logcat -d > qa-result.log
+            adb exec-out screencap -p > qa-result.png
+            grep -q 'RESULT_SNAPSHOT=.*open.*true' qa-result.log
+            grep -q 'RESULT_SNAPSHOT=.*Цель выполнена' qa-result.log
+            ! grep -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE' qa-result.log
+
+      - name: Upload QA proof
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: offline100-v1.1.1-launch-proof
+          name: offline100-v1.2.0-qa-proof
           path: |
-            startup.png
-            startup-logcat.txt
+            qa-*.png
+            qa-*.log
           if-no-files-found: warn
           retention-days: 7
