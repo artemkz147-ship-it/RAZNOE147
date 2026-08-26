@@ -68,7 +68,7 @@ func _show_dinosaur(index: int) -> void:
 
 func _load_actor(path: String) -> void:
     if path.is_empty() or not ResourceLoader.exists(path):
-        _set_status("Финальный 3D-ассет ещё не подключён: %s" % path)
+        _set_status("3D-модель динозавра не найдена")
         return
     var packed := load(path) as PackedScene
     if packed == null:
@@ -79,7 +79,7 @@ func _load_actor(path: String) -> void:
     _apply_scientific_scale(current_actor)
     dinosaur_controller.attach(current_actor, current_data.get("animations", {}))
     _fit_camera_to_actor(current_actor)
-    _set_status("Проведи пальцем, чтобы осмотреть динозавра")
+    _set_status("Проведи пальцем для вращения. Щипок — приближение и отдаление. Двойной тап — вид сверху.")
 
 func _apply_scientific_scale(actor: Node3D) -> void:
     var target_length := float(current_data.get("length_m", 0.0))
@@ -135,6 +135,8 @@ func _clear_loaded_scene() -> void:
         current_environment.queue_free()
     current_actor = null
     current_environment = null
+    if dinosaur_controller != null:
+        dinosaur_controller.stop_all()
     ambience_player.stop()
     narration_player.stop()
     roar_player.stop()
@@ -161,8 +163,8 @@ func _build_runtime_audio() -> void:
     narration_player.volume_db = -2.0
     add_child(narration_player)
     roar_player = AudioStreamPlayer3D.new()
-    roar_player.volume_db = 0.0
-    roar_player.max_distance = 45.0
+    roar_player.volume_db = 1.5
+    roar_player.max_distance = 60.0
     dinosaur_slot.add_child(roar_player)
 
 func _restart_ambience() -> void:
@@ -217,17 +219,19 @@ func _build_ui() -> void:
     root.add_child(controls)
 
     _add_button(controls, "‹", func(): _show_dinosaur(current_index - 1), 54)
-    _add_button(controls, "Справка", _toggle_info, 126)
-    roar_button = _add_button(controls, "Рык", _roar, 96)
-    action_button = _add_button(controls, "Действие", _action, 126)
-    listen_button = _add_button(controls, "Слушать", _narrate, 126)
+    _add_button(controls, "Справка", _toggle_info, 120)
+    _add_button(controls, "Сверху", _top_view, 104)
+    roar_button = _add_button(controls, "Рык", _roar, 88)
+    action_button = _add_button(controls, "Действие", _action, 118)
+    listen_button = _add_button(controls, "Слушать", _narrate, 118)
+    _add_button(controls, "Сброс", _reset_view, 94)
     _add_button(controls, "›", func(): _show_dinosaur(current_index + 1), 54)
 
     status_label = Label.new()
     status_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
     status_label.offset_left = 22
     status_label.offset_top = -116
-    status_label.offset_right = 760
+    status_label.offset_right = 860
     status_label.offset_bottom = -84
     status_label.modulate = Color(1, 1, 1, 0.72)
     status_label.add_theme_font_size_override("font_size", 14)
@@ -267,16 +271,15 @@ func _update_labels() -> void:
     info_text.text = _build_info_bbcode()
 
 func _build_info_bbcode() -> String:
-    var evidence: Array = current_data.get("evidence_notes", [])
-    var evidence_text := ""
-    for note in evidence:
-        evidence_text += "\n• %s" % str(note)
-    return "[font_size=26][b]%s[/b][/font_size]\n[i]%s[/i]\n\n[b]Период:[/b] %s\n[b]Регион:[/b] %s\n[b]Питание:[/b] %s\n[b]Длина:[/b] ~%s м\n[b]Масса:[/b] ~%s кг\n\n%s\n\n[b]Что известно наверняка / где реконструкция[/b]%s" % [current_data.get("name_ru", ""), current_data.get("scientific_name", ""), current_data.get("period_ru", ""), current_data.get("region_ru", ""), current_data.get("diet_ru", ""), current_data.get("length_m", "—"), current_data.get("mass_kg", "—"), current_data.get("description_ru", ""), evidence_text]
+    var facts: Array = current_data.get("evidence_notes", [])
+    var facts_text := ""
+    for fact in facts:
+        facts_text += "\n• %s" % str(fact)
+    return "[font_size=26][b]%s[/b][/font_size]\n[i]%s[/i]\n\n[b]Период:[/b] %s\n[b]Регион:[/b] %s\n[b]Питание:[/b] %s\n[b]Длина:[/b] ~%s м\n[b]Масса:[/b] ~%s кг\n\n%s\n\n[b]Краткие факты[/b]%s" % [current_data.get("name_ru", ""), current_data.get("scientific_name", ""), current_data.get("period_ru", ""), current_data.get("region_ru", ""), current_data.get("diet_ru", ""), current_data.get("length_m", "—"), current_data.get("mass_kg", "—"), current_data.get("description_ru", ""), facts_text]
 
 func _refresh_action_controls() -> void:
     if roar_button != null:
         roar_button.disabled = not dinosaur_controller.has_action("roar") and roar_player.stream == null
-        roar_button.tooltip_text = "Для этой модели пока нет проверенной анимации/звука рыка" if roar_button.disabled else "Воспроизвести реконструкцию рыка"
     if action_button != null:
         var has_supported_action := false
         var actions: Array = current_data.get("interactive_actions", [])
@@ -285,10 +288,15 @@ func _refresh_action_controls() -> void:
                 has_supported_action = true
                 break
         action_button.disabled = not has_supported_action
-        action_button.tooltip_text = "Доступно только для реально присутствующих анимаций" if action_button.disabled else "Случайное естественное действие"
 
 func _toggle_info() -> void:
     info_panel.visible = not info_panel.visible
+
+func _top_view() -> void:
+    camera_rig.call("set_top_view")
+
+func _reset_view() -> void:
+    camera_rig.call("reset_view")
 
 func _roar() -> void:
     if dinosaur_controller.has_action("roar"):
@@ -318,7 +326,7 @@ func _narrate() -> void:
         var voices := DisplayServer.tts_get_voices_for_language("ru")
         if not voices.is_empty():
             DisplayServer.tts_stop()
-            DisplayServer.tts_speak(str(current_data.get("narration_text_ru", "")), voices[0], 70, 1.0, 1.0)
+            DisplayServer.tts_speak(str(current_data.get("narration_text_ru", "")), voices[0], 72, 1.0, 1.0)
             return
     _set_status("Озвучка ещё не подключена")
 
