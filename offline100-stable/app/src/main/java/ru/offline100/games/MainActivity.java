@@ -19,10 +19,15 @@ import org.json.JSONObject;
 public final class MainActivity extends Activity {
     private static final String TAG = "Offline100";
     private WebView webView;
+    private String testGame;
+    private boolean testFinish;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         try {
+            testGame = getIntent() == null ? null : getIntent().getStringExtra("testGame");
+            testFinish = getIntent() != null && getIntent().getBooleanExtra("testFinish", false);
+            Log.i(TAG,"TEST_REQUEST game="+testGame+" finish="+testFinish);
             webView = new WebView(this);
             webView.setBackgroundColor(Color.rgb(10,14,28));
             configureWebView(webView);
@@ -63,18 +68,20 @@ public final class MainActivity extends Activity {
                 Log.i(TAG,"PAGE_FINISHED "+url);
                 v.postDelayed(() -> {
                     v.evaluateJavascript("String(document.querySelectorAll('.game-card').length)", value -> Log.i(TAG,"GAME_CARD_COUNT="+value));
-                    String testGame=getIntent().getStringExtra("testGame");
                     if(testGame!=null && !testGame.isEmpty()){
-                        String js="window.__openGameForTest && window.__openGameForTest("+JSONObject.quote(testGame)+")";
-                        v.evaluateJavascript(js, ignored -> v.postDelayed(() -> {
-                            if(getIntent().getBooleanExtra("testFinish",false)) v.evaluateJavascript("window.__finishForTest && window.__finishForTest()", x -> {});
+                        String js="Boolean(window.__openGameForTest && window.__openGameForTest("+JSONObject.quote(testGame)+"))";
+                        v.evaluateJavascript(js, result -> {
+                            Log.i(TAG,"OPEN_TEST_RESULT="+result+" game="+testGame);
                             v.postDelayed(() -> {
-                                v.evaluateJavascript("JSON.stringify(window.__qaSnapshot && window.__qaSnapshot())", snap -> Log.i(TAG,"QA_SNAPSHOT="+snap));
-                                if(getIntent().getBooleanExtra("testFinish",false)) v.evaluateJavascript("JSON.stringify(window.__resultSnapshot && window.__resultSnapshot())", snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap));
-                            },400);
-                        },500));
+                                if(testFinish) v.evaluateJavascript("Boolean(window.__finishForTest && window.__finishForTest())", x -> Log.i(TAG,"FINISH_TEST_RESULT="+x));
+                                v.postDelayed(() -> {
+                                    v.evaluateJavascript("JSON.stringify(window.__qaSnapshot && window.__qaSnapshot())", snap -> Log.i(TAG,"QA_SNAPSHOT="+snap));
+                                    if(testFinish) v.evaluateJavascript("JSON.stringify(window.__resultSnapshot && window.__resultSnapshot())", snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap));
+                                },500);
+                            },700);
+                        });
                     }
-                },700);
+                },900);
             }
             @Override public boolean onRenderProcessGone(WebView v, RenderProcessGoneDetail detail) {
                 Log.e(TAG,"WEBVIEW_RENDERER_GONE didCrash="+detail.didCrash());
