@@ -48,8 +48,16 @@ fun buildClipAudioEffects(clip: VideoClip): List<AudioProcessor> {
 }
 
 @OptIn(UnstableApi::class)
-fun buildBackgroundAudioEffects(track: AudioTrack): List<AudioProcessor> {
-    val volume = track.volume.coerceIn(0f, 1f)
+fun buildBackgroundAudioEffects(track: AudioTrack): List<AudioProcessor> =
+    buildSimpleVolumeEffects(track.volume)
+
+@OptIn(UnstableApi::class)
+fun buildPositionedAudioEffects(track: PositionedAudioTrack): List<AudioProcessor> =
+    buildSimpleVolumeEffects(track.volume)
+
+@OptIn(UnstableApi::class)
+private fun buildSimpleVolumeEffects(volumeValue: Float): List<AudioProcessor> {
+    val volume = volumeValue.coerceIn(0f, 1f)
     if (volume >= 0.999f) return emptyList()
     return listOf(GainProcessor(DefaultGainProvider.Builder(volume).build()))
 }
