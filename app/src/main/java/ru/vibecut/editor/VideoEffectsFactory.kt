@@ -1,5 +1,6 @@
 package ru.vibecut.editor
 
+import android.graphics.Matrix
 import android.graphics.Typeface
 import android.text.Spannable
 import android.text.SpannableString
@@ -15,6 +16,7 @@ import androidx.media3.effect.Brightness
 import androidx.media3.effect.Contrast
 import androidx.media3.effect.Crop
 import androidx.media3.effect.HslAdjustment
+import androidx.media3.effect.MatrixTransformation
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.ScaleAndRotateTransformation
@@ -67,6 +69,47 @@ fun buildVideoEffects(clip: VideoClip): List<Effect> {
             .adjustSaturation(clip.saturation.coerceIn(-100f, 100f))
             .adjustLightness(clip.lightness.coerceIn(-100f, 100f))
             .build()
+    }
+
+    if (clip.motion != ClipMotion.NONE) {
+        val durationUs = (clip.sourceSliceDurationMs * 1000L).coerceAtLeast(1L)
+        val strength = clip.motionStrength.coerceIn(0.03f, 0.35f)
+        effects += MatrixTransformation { presentationTimeUs ->
+            val progress = (presentationTimeUs.toFloat() / durationUs.toFloat()).coerceIn(0f, 1f)
+            Matrix().apply {
+                when (clip.motion) {
+                    ClipMotion.NONE -> Unit
+                    ClipMotion.ZOOM_IN -> {
+                        val scale = 1f + strength * progress
+                        postScale(scale, scale)
+                    }
+                    ClipMotion.ZOOM_OUT -> {
+                        val scale = 1f + strength * (1f - progress)
+                        postScale(scale, scale)
+                    }
+                    ClipMotion.PAN_LEFT -> {
+                        val scale = 1f + strength
+                        postScale(scale, scale)
+                        postTranslate(strength * (0.5f - progress), 0f)
+                    }
+                    ClipMotion.PAN_RIGHT -> {
+                        val scale = 1f + strength
+                        postScale(scale, scale)
+                        postTranslate(strength * (progress - 0.5f), 0f)
+                    }
+                    ClipMotion.PAN_UP -> {
+                        val scale = 1f + strength
+                        postScale(scale, scale)
+                        postTranslate(0f, strength * (progress - 0.5f))
+                    }
+                    ClipMotion.PAN_DOWN -> {
+                        val scale = 1f + strength
+                        postScale(scale, scale)
+                        postTranslate(0f, strength * (0.5f - progress))
+                    }
+                }
+            }
+        }
     }
 
     val text = clip.overlayText.trim()
