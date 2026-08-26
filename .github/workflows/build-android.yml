@@ -30,7 +30,7 @@ jobs:
       - name: Install production audio tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng python3-venv
+          sudo apt-get install -y --no-install-recommends ffmpeg python3-venv
 
       - name: Fetch animated CC BY T. rex with PBR textures
         run: |
@@ -75,7 +75,7 @@ jobs:
           test -s assets/environments/hell_creek/textures/mud_forest_diff_1k.jpg
           test -s assets/environments/hell_creek/xanderklinge_2k.hdr
 
-      - name: Build real field-recording audio
+      - name: Build immediate high-impact T. rex bellow
         run: |
           set -euxo pipefail
           mkdir -p assets/audio/tyrannosaurus_rex
@@ -83,26 +83,45 @@ jobs:
           curl -L --fail --retry 3 -o /tmp/alligator2.ogg 'https://commons.wikimedia.org/wiki/Special:Redirect/file/27alligator2bellow.ogg'
           curl -L --fail --retry 3 -o /tmp/forest.ogg 'https://commons.wikimedia.org/wiki/Special:Redirect/file/20090610_0_ambience.ogg'
           curl -L --fail --retry 3 -o /tmp/stream.ogg 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Swale.ogg'
-          ffmpeg -hide_banner -loglevel error -y -i /tmp/alligator1.ogg -i /tmp/alligator2.ogg -filter_complex "[0:a]atrim=start=1.0:end=8.2,asetpts=PTS-STARTPTS,lowpass=f=720,equalizer=f=85:t=q:w=1:g=5,volume=1.05[a];[1:a]atrim=start=4.2:end=11.4,asetpts=PTS-STARTPTS,lowpass=f=620,equalizer=f=72:t=q:w=1:g=4,adelay=170|170,volume=0.72[b];[a][b]amix=inputs=2:normalize=0,acompressor=threshold=0.11:ratio=3.0:attack=18:release=220,afade=t=in:st=0:d=0.08,afade=t=out:st=6.8:d=0.7[out]" -map '[out]' -t 7.5 -c:a libvorbis -q:a 6 assets/audio/tyrannosaurus_rex/roar_realistic.ogg
+
+          ffmpeg -hide_banner -loglevel error -y \
+            -i /tmp/alligator1.ogg -i /tmp/alligator2.ogg \
+            -filter_complex "[0:a]aresample=48000,atrim=start=0.82:end=7.0,asetpts=PTS-STARTPTS,highpass=f=38,lowpass=f=1900,acompressor=threshold=0.075:ratio=3.5:attack=3:release=150,volume=1.55[main];[0:a]aresample=48000,atrim=start=0.82:end=6.2,asetpts=PTS-STARTPTS,asetrate=39840,aresample=48000,lowpass=f=520,equalizer=f=78:t=q:w=0.8:g=7,volume=1.35[sub];[1:a]aresample=48000,atrim=start=4.0:end=10.5,asetpts=PTS-STARTPTS,asetrate=43200,aresample=48000,highpass=f=55,lowpass=f=1450,volume=1.05[body];[main][sub][body]amix=inputs=3:normalize=0,acompressor=threshold=0.12:ratio=4.0:attack=2:release=180,silenceremove=start_periods=1:start_duration=0.01:start_threshold=-42dB,alimiter=limit=0.96:attack=1:release=80,atrim=start=0:end=6.8,afade=t=out:st=6.15:d=0.65[out]" \
+            -map '[out]' -ar 48000 -ac 1 -c:a pcm_s16le assets/audio/tyrannosaurus_rex/roar_realistic.wav
+
           ffmpeg -hide_banner -loglevel error -y -i /tmp/forest.ogg -i /tmp/stream.ogg -filter_complex "[0:a]atrim=start=4:end=49,asetpts=PTS-STARTPTS,volume=0.70[f];[1:a]aloop=loop=2:size=1000000000,atrim=start=0:end=45,asetpts=PTS-STARTPTS,volume=0.24[s];[f][s]amix=inputs=2:normalize=0,highpass=f=35,lowpass=f=12500[out]" -map '[out]' -t 45 -c:a libvorbis -q:a 4 assets/audio/tyrannosaurus_rex/hell_creek_ambience.ogg
-          test -s assets/audio/tyrannosaurus_rex/roar_realistic.ogg
+
+          python3 - <<'PY'
+          import array, math, wave
+          path='assets/audio/tyrannosaurus_rex/roar_realistic.wav'
+          with wave.open(path,'rb') as w:
+              assert w.getnchannels() == 1
+              assert w.getframerate() == 48000
+              first = w.readframes(int(w.getframerate() * 0.10))
+              samples = array.array('h', first)
+              rms = math.sqrt(sum(int(s)*int(s) for s in samples) / max(1, len(samples)))
+              peak = max(abs(s) for s in samples)
+              print('roar first-100ms rms=', round(rms,1), 'peak=', peak)
+              assert rms > 450, 'Roar still has an audible startup delay'
+              assert peak > 1800, 'Roar attack is too weak'
+          PY
+          test -s assets/audio/tyrannosaurus_rex/roar_realistic.wav
           test -s assets/audio/tyrannosaurus_rex/hell_creek_ambience.ogg
 
-      - name: Generate packaged Russian narration with Piper
+      - name: Generate natural Russian narration with Silero v5.5
         run: |
           set -euxo pipefail
-          python3 -m venv /tmp/piper-venv
-          /tmp/piper-venv/bin/pip install --quiet --upgrade pip
-          /tmp/piper-venv/bin/pip install --quiet piper-tts
-          curl -L --fail --retry 3 -o /tmp/ru_RU-denis-medium.onnx 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx'
-          curl -L --fail --retry 3 -o /tmp/ru_RU-denis-medium.onnx.json 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx.json'
-          python3 - <<'PY' >/tmp/narration.txt
-          import json
-          with open('data/dinosaurs.json',encoding='utf-8') as f: d=json.load(f)
-          print(d['dinosaurs'][0]['narration_text_ru'])
-          PY
-          /tmp/piper-venv/bin/piper --model /tmp/ru_RU-denis-medium.onnx --config /tmp/ru_RU-denis-medium.onnx.json --output_file assets/audio/tyrannosaurus_rex/narration_ru.wav < /tmp/narration.txt
+          python3 -m venv /tmp/silero-venv
+          /tmp/silero-venv/bin/pip install --quiet --upgrade pip
+          /tmp/silero-venv/bin/pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
+          curl -L --fail --retry 5 --retry-all-errors -o /tmp/v5_5_ru.pt 'https://models.silero.ai/models/tts/ru/v5_5_ru.pt'
+          /tmp/silero-venv/bin/python tools/generate_silero_narration.py /tmp/v5_5_ru.pt assets/audio/tyrannosaurus_rex/narration_ru_raw.wav
+          ffmpeg -hide_banner -loglevel error -y -i assets/audio/tyrannosaurus_rex/narration_ru_raw.wav \
+            -af "highpass=f=68,equalizer=f=125:t=q:w=0.8:g=1.4,equalizer=f=3000:t=q:w=1.0:g=1.0,acompressor=threshold=0.16:ratio=2.0:attack=12:release=160,loudnorm=I=-16:TP=-1.0:LRA=7" \
+            -ar 48000 -ac 1 -c:a pcm_s16le assets/audio/tyrannosaurus_rex/narration_ru.wav
+          rm -f assets/audio/tyrannosaurus_rex/narration_ru_raw.wav
           test -s assets/audio/tyrannosaurus_rex/narration_ru.wav
+          ffprobe -v error -show_entries stream=codec_name,sample_rate,channels -of default=nw=1 assets/audio/tyrannosaurus_rex/narration_ru.wav
 
       - name: Use JDK 17
         run: |
