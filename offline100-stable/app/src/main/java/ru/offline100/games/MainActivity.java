@@ -108,7 +108,7 @@ public final class MainActivity extends Activity {
                 "})())";
         v.evaluateJavascript(js, snap -> {
             Log.i(TAG,"HOME_QA="+snap);
-            if (testGame != null && !testGame.isEmpty()) runQaProbe(v);
+            if (testGame != null && !testGame.isEmpty()) v.postDelayed(() -> runQaProbe(v), 1500);
         });
     }
 
@@ -151,15 +151,15 @@ public final class MainActivity extends Activity {
             v.postDelayed(() -> v.evaluateJavascript(gameSnapshotJs(), snap -> {
                 Log.i(TAG,"QA_SNAPSHOT="+snap);
                 if (testFinish) finishQaProbe(v);
-            }), 300);
+            }), 500);
         });
     }
 
     private void finishQaProbe(WebView v) {
         v.postDelayed(() -> v.evaluateJavascript("Boolean(window.__finishForTest&&window.__finishForTest())", finished -> {
             Log.i(TAG,"QA_FINISH game="+testGame+" finished="+finished);
-            v.postDelayed(() -> v.evaluateJavascript(resultSnapshotJs(), snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap)), 300);
-        }), 250);
+            v.postDelayed(() -> v.evaluateJavascript(resultSnapshotJs(), snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap)), 500);
+        }), 350);
     }
 
     private void applyImmersiveMode() {
