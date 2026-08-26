@@ -11,8 +11,8 @@ android {
         applicationId = "ru.vibecut.editor"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = 100
+        versionName = "1.0.0"
     }
 
     buildFeatures {
@@ -47,6 +47,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
+    implementation("androidx.core:core-ktx:1.17.0")
 
     val media3 = "1.11.0"
     implementation("androidx.media3:media3-common:$media3")
