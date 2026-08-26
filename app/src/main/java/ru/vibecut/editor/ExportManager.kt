@@ -5,11 +5,10 @@ import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
 import androidx.annotation.OptIn
-import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.effect.ScaleAndRotateTransformation
+import androidx.media3.effect.Presentation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -25,9 +24,12 @@ import java.io.FileInputStream
 class ExportManager(private val context: Context) {
     private var transformer: Transformer? = null
     private var tempFile: File? = null
+    private var active = false
 
     fun export(
         clips: List<VideoClip>,
+        backgroundAudio: AudioTrack?,
+        settings: ExportSettings,
         onProgress: (Int) -> Unit,
         onDone: (String) -> Unit,
         onError: (String) -> Unit,
@@ -36,6 +38,9 @@ class ExportManager(private val context: Context) {
             onError("Добавьте хотя бы один ролик")
             return
         }
+
+        cancel()
+        active = true
 
         val items = clips.map { clip ->
             val clipping = MediaItem.ClippingConfiguration.Builder()
@@ -48,27 +53,44 @@ class ExportManager(private val context: Context) {
                 .setClippingConfiguration(clipping)
                 .build()
 
-            val videoEffects = mutableListOf<Effect>()
-            if (clip.rotationDegrees % 360 != 0) {
-                videoEffects += ScaleAndRotateTransformation.Builder()
-                    .setRotationDegrees(clip.rotationDegrees.toFloat())
-                    .build()
-            }
-
             EditedMediaItem.Builder(mediaItem)
                 .setRemoveAudio(clip.muted)
-                .setEffects(Effects(emptyList(), videoEffects))
+                .setSpeed(ConstantSpeedProvider(clip.speed))
+                .setFrameRate(settings.maxFrameRate)
+                .setEffects(Effects(emptyList(), buildVideoEffects(clip)))
                 .build()
         }
 
-        @Suppress("DEPRECATION")
-        val sequence = EditedMediaItemSequence(items)
-        val composition = Composition.Builder(listOf(sequence)).build()
+        val videoSequence = EditedMediaItemSequence.withAudioAndVideoFrom(items)
+        val sequences = mutableListOf(videoSequence)
+
+        if (backgroundAudio != null) {
+            val musicItem = EditedMediaItem.Builder(
+                MediaItem.fromUri(backgroundAudio.uri)
+            ).build()
+            val musicSequence = EditedMediaItemSequence
+                .withAudioFrom(listOf(musicItem))
+                .buildUpon()
+                .setIsLooping(true)
+                .build()
+            sequences += musicSequence
+        }
+
+        val composition = Composition.Builder(sequences)
+            .setEffects(
+                Effects(
+                    emptyList(),
+                    listOf(Presentation.createForHeight(settings.height)),
+                )
+            )
+            .build()
+
         val output = File(context.cacheDir, "vibecut_${System.currentTimeMillis()}.mp4")
         tempFile = output
 
         val listener = object : Transformer.Listener {
             override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                active = false
                 runCatching { saveToGallery(output) }
                     .onSuccess { uri ->
                         output.delete()
@@ -85,6 +107,7 @@ class ExportManager(private val context: Context) {
                 exportResult: ExportResult,
                 exportException: ExportException,
             ) {
+                active = false
                 onError(exportException.message ?: "Ошибка экспорта")
             }
         }
@@ -100,27 +123,28 @@ class ExportManager(private val context: Context) {
     }
 
     private fun pollProgress(onProgress: (Int) -> Unit) {
-        val active = transformer ?: return
+        val current = transformer ?: return
         val holder = ProgressHolder()
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         val runnable = object : Runnable {
             override fun run() {
-                val state = active.getProgress(holder)
+                if (!active || transformer !== current) return
+                val state = current.getProgress(holder)
                 if (state == Transformer.PROGRESS_STATE_AVAILABLE) {
                     onProgress(holder.progress)
                 }
-                if (state != Transformer.PROGRESS_STATE_NOT_STARTED) {
-                    handler.postDelayed(this, 300L)
-                }
+                handler.postDelayed(this, 300L)
             }
         }
         handler.post(runnable)
     }
 
     fun cancel() {
+        active = false
         transformer?.cancel()
         tempFile?.delete()
         transformer = null
+        tempFile = null
     }
 
     private fun saveToGallery(file: File): String {
@@ -134,8 +158,14 @@ class ExportManager(private val context: Context) {
             }
         }
 
-        val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        val uri = resolver.insert(collection, values) ?: error("Не удалось создать файл в галерее")
+        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        } else {
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        }
+        val uri = resolver.insert(collection, values)
+            ?: error("Не удалось создать файл в галерее")
+
         resolver.openOutputStream(uri)?.use { output ->
             FileInputStream(file).use { input -> input.copyTo(output) }
         } ?: error("Не удалось открыть файл для записи")
