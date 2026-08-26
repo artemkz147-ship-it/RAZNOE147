@@ -9,6 +9,7 @@ on:
       - 'export_presets.cfg'
       - 'scenes/**'
       - 'scripts/**'
+      - 'tools/**'
       - 'data/**'
       - 'assets/**'
       - 'ASSET_CREDITS.md'
@@ -50,6 +51,17 @@ jobs:
           assert doc.get('meshes'), 'No meshes in T. rex GLB'
           assert animations, 'T. rex GLB must contain an animation'
           PY
+
+      - name: Generate original T. rex bellow reconstruction
+        run: |
+          python3 tools/generate_trex_bellow.py
+          ffmpeg -y -hide_banner -loglevel error \
+            -i assets/audio/tyrannosaurus_rex/roar_reconstruction.wav \
+            -c:a libvorbis -q:a 5 \
+            assets/audio/tyrannosaurus_rex/roar_reconstruction.ogg
+          rm assets/audio/tyrannosaurus_rex/roar_reconstruction.wav
+          test -s assets/audio/tyrannosaurus_rex/roar_reconstruction.ogg
+          sha256sum assets/audio/tyrannosaurus_rex/roar_reconstruction.ogg
 
       - name: Use JDK 17
         run: |
