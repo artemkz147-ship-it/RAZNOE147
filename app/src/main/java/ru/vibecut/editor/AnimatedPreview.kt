@@ -78,6 +78,7 @@ internal fun EditorPreview(
                 buildDynamicImageStickerEffects(context, clip) +
                 buildGifStickerEffects(context, clip) +
                 buildAnimatedStickerEffects(clip) +
+                buildTrackedObjectOverlayEffects(clip) +
                 buildCanvasEffects(exportSettings, false)
         )
         player.setPlaybackSpeed(clip.speed)
