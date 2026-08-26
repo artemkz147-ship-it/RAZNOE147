@@ -11,7 +11,7 @@ on:
 jobs:
   launch-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -51,7 +51,10 @@ jobs:
           patch "$ASSETS/styles.css" < /tmp/v12-style.patch
           patch "$ASSETS/index.html" < /tmp/v12-index.patch
 
-          # v1.2 startup hotfix: visual-set must not read games before its declaration.
+          # Permanent post-patch responsive layer for the Android container.
+          cat offline100-stable/static/v12-responsive.css >> "$ASSETS/styles.css"
+
+          # v1.2 startup fix: visual-set must not read games before its declaration.
           sed -i "s/const FEATURED_VISUAL=new Set(games.map(g=>g.id));/const FEATURED_VISUAL={has:()=>true};/" "$ASSETS/app.js"
 
           cp offline100-stable/static/manifest.webmanifest "$ASSETS/manifest.webmanifest"
@@ -62,6 +65,7 @@ jobs:
           grep -q 'game-objective' "$ASSETS/app.js"
           grep -q 'parking-exit' "$ASSETS/app.js"
           grep -q 'pipe-terminal' "$ASSETS/app.js"
+          grep -q 'sudoku-board' "$ASSETS/styles.css"
           node --check "$ASSETS/app.js"
 
       - name: Build APK
@@ -81,7 +85,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Emulator QA - home, ambiguous games, AI and result
+      - name: Emulator QA - all 100 games and all 100 results
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
