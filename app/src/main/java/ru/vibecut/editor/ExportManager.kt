@@ -56,7 +56,12 @@ class ExportManager(private val context: Context) {
                 .setRemoveAudio(clip.muted)
                 .setSpeed(ConstantSpeedProvider(clip.speed))
                 .setFrameRate(settings.maxFrameRate)
-                .setEffects(Effects(emptyList(), buildVideoEffects(clip)))
+                .setEffects(
+                    Effects(
+                        buildClipAudioEffects(clip),
+                        buildVideoEffects(clip),
+                    )
+                )
                 .build()
         }
 
@@ -66,7 +71,9 @@ class ExportManager(private val context: Context) {
         if (backgroundAudio != null) {
             val musicItem = EditedMediaItem.Builder(
                 MediaItem.fromUri(backgroundAudio.uri)
-            ).build()
+            )
+                .setEffects(Effects(buildBackgroundAudioEffects(backgroundAudio), emptyList()))
+                .build()
             val musicSequence = EditedMediaItemSequence
                 .withAudioFrom(listOf(musicItem))
                 .buildUpon()
@@ -107,7 +114,7 @@ class ExportManager(private val context: Context) {
         }
 
         transformer = Transformer.Builder(context)
-            .setVideoMimeType(MimeTypes.VIDEO_H264)
+            .setVideoMimeType(settings.videoCodec.mimeType)
             .setAudioMimeType(MimeTypes.AUDIO_AAC)
             .addListener(listener)
             .build()
