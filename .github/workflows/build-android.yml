@@ -11,6 +11,7 @@ on:
       - 'scripts/**'
       - 'data/**'
       - 'assets/**'
+      - 'ASSET_CREDITS.md'
       - '.github/workflows/build-android.yml'
 
 jobs:
@@ -20,8 +21,35 @@ jobs:
     env:
       GODOT_VERSION: '4.7.2'
       GODOT_VERSION_ID: '4.7.2.stable'
+      TREX_MODEL_URL: 'https://raw.githubusercontent.com/s010s/prehistoric-animal-museum/4d824cb1973861c1463b012cb0d6bc5976cf9c1f/src/content/animals/tyrannosaurus-rex/model/model.glb'
+      TREX_MODEL_SHA256: 'ea15319ca1fa3724f1a961515c36b4834446f5ac30a9b0de49b62881877efa54'
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch pinned CC BY T. rex model
+        run: |
+          mkdir -p assets/dinosaurs/tyrannosaurus_rex
+          curl -L --fail --retry 3 --retry-delay 2 \
+            -o assets/dinosaurs/tyrannosaurus_rex/model.glb \
+            "$TREX_MODEL_URL"
+          echo "$TREX_MODEL_SHA256  assets/dinosaurs/tyrannosaurus_rex/model.glb" | sha256sum -c -
+          python3 - <<'PY'
+          import json, struct
+          path = 'assets/dinosaurs/tyrannosaurus_rex/model.glb'
+          with open(path, 'rb') as f:
+              magic, version, total = struct.unpack('<4sII', f.read(12))
+              assert magic == b'glTF' and version == 2 and total > 1_000_000
+              chunk_len, chunk_type = struct.unpack('<II', f.read(8))
+              assert chunk_type == 0x4E4F534A
+              doc = json.loads(f.read(chunk_len).decode('utf-8'))
+          animations = [a.get('name', '<unnamed>') for a in doc.get('animations', [])]
+          print('GLB nodes:', len(doc.get('nodes', [])))
+          print('GLB meshes:', len(doc.get('meshes', [])))
+          print('GLB materials:', len(doc.get('materials', [])))
+          print('GLB animations:', animations)
+          assert doc.get('meshes'), 'No meshes in T. rex GLB'
+          assert animations, 'T. rex GLB must contain an animation'
+          PY
 
       - name: Use JDK 17
         run: |
