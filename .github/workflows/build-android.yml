@@ -36,10 +36,6 @@ jobs:
             "$TREX_MODEL_URL"
           echo "$TREX_MODEL_SHA256  /tmp/trex-source.glb" | sha256sum -c -
 
-          # The reviewed upstream derivative uses EXT_meshopt_compression and
-          # KHR_mesh_quantization. Godot 4.7.2 does not import those two
-          # required extensions directly. gltfpack reads meshopt-compressed
-          # input automatically; -noq writes regular, unquantized glTF data.
           npx --yes "gltfpack@${GLTFPACK_VERSION}" \
             -i /tmp/trex-source.glb \
             -o assets/dinosaurs/tyrannosaurus_rex/model.glb \
@@ -74,13 +70,8 @@ jobs:
       - name: Generate original T. rex bellow reconstruction
         run: |
           python3 tools/generate_trex_bellow.py
-          ffmpeg -y -hide_banner -loglevel error \
-            -i assets/audio/tyrannosaurus_rex/roar_reconstruction.wav \
-            -c:a libvorbis -q:a 5 \
-            assets/audio/tyrannosaurus_rex/roar_reconstruction.ogg
-          rm assets/audio/tyrannosaurus_rex/roar_reconstruction.wav
-          test -s assets/audio/tyrannosaurus_rex/roar_reconstruction.ogg
-          sha256sum assets/audio/tyrannosaurus_rex/roar_reconstruction.ogg
+          test -s assets/audio/tyrannosaurus_rex/roar_reconstruction.wav
+          sha256sum assets/audio/tyrannosaurus_rex/roar_reconstruction.wav
 
       - name: Use JDK 17
         run: |
