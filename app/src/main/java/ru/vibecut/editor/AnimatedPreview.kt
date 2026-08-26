@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -66,44 +68,96 @@ internal fun EditorPreview(
 ) {
     val context = LocalContext.current
     val player = remember { ExoPlayer.Builder(context).build() }
-    var position by remember { mutableLongStateOf(0L) }
-    var duration by remember { mutableLongStateOf(clip.sourceSliceDurationMs) }
+    var position by remember(clip.id) { mutableLongStateOf(0L) }
+    var duration by remember(clip.id) { mutableLongStateOf(clip.sourceSliceDurationMs) }
     var playing by remember { mutableStateOf(false) }
+    var compatibilityMode by remember(clip.id) { mutableStateOf(false) }
+    var firstFrameRendered by remember(clip.id) { mutableStateOf(false) }
+    var previewError by remember(clip.id) { mutableStateOf<String?>(null) }
+    var retryNonce by remember(clip.id) { mutableIntStateOf(0) }
     val gesturesEnabled = PreviewGestureBridge.enabled
 
-    DisposableEffect(player) {
+    fun fullPreviewEffects() =
+        buildVideoEffects(context, clip.copy(keyframes = emptyList(), stickers = emptyList()), incomingTransition) +
+            buildEasedKeyframeEffects(clip) +
+            buildSpecialEffectEffects(clip) +
+            buildDynamicImageStickerEffects(context, clip) +
+            buildGifStickerEffects(context, clip) +
+            buildAnimatedStickerEffects(clip) +
+            buildTrackedObjectOverlayEffects(clip) +
+            buildCanvasEffects(exportSettings, false)
+
+    DisposableEffect(player, compatibilityMode) {
         val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                playing = isPlaying
+            }
+
+            override fun onRenderedFirstFrame() {
+                firstFrameRendered = true
+                previewError = null
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                playing = false
+                if (!compatibilityMode) {
+                    previewError = "Перезапускаю предпросмотр в совместимом режиме"
+                    compatibilityMode = true
+                } else {
+                    previewError = "Не удалось воспроизвести этот файл · нажмите для повтора"
+                }
+            }
         }
         player.addListener(listener)
-        onDispose { player.removeListener(listener); player.release() }
+        onDispose { player.removeListener(listener) }
     }
 
-    LaunchedEffect(clip.id, clip.trimStartMs, clip.trimEndMs) {
-        val clipping = MediaItem.ClippingConfiguration.Builder()
-            .setStartPositionMs(clip.trimStartMs)
-            .setEndPositionMs(clip.trimEndMs)
-            .build()
-        player.setMediaItem(MediaItem.Builder().setUri(clip.uri).setClippingConfiguration(clipping).build())
-        player.prepare()
-        player.seekTo(0L)
-        position = 0L
-        duration = clip.sourceSliceDurationMs
-        EditorCursorState.clipPositionMs = 0L
-        onPosition(0L)
+    DisposableEffect(player) {
+        onDispose { player.release() }
     }
 
-    LaunchedEffect(clip, incomingTransition, exportSettings) {
-        player.setVideoEffects(
-            buildVideoEffects(context, clip.copy(keyframes = emptyList(), stickers = emptyList()), incomingTransition) +
-                buildEasedKeyframeEffects(clip) +
-                buildSpecialEffectEffects(clip) +
-                buildDynamicImageStickerEffects(context, clip) +
-                buildGifStickerEffects(context, clip) +
-                buildAnimatedStickerEffects(clip) +
-                buildTrackedObjectOverlayEffects(clip) +
-                buildCanvasEffects(exportSettings, false)
-        )
+    LaunchedEffect(clip.id, clip.trimStartMs, clip.trimEndMs, compatibilityMode, retryNonce) {
+        firstFrameRendered = false
+        playing = false
+        runCatching {
+            player.stop()
+            player.clearMediaItems()
+            player.setVideoEffects(if (compatibilityMode) emptyList() else fullPreviewEffects())
+            val clipping = MediaItem.ClippingConfiguration.Builder()
+                .setStartPositionMs(clip.trimStartMs)
+                .setEndPositionMs(clip.trimEndMs)
+                .build()
+            player.setMediaItem(
+                MediaItem.Builder()
+                    .setUri(clip.uri)
+                    .setClippingConfiguration(clipping)
+                    .build()
+            )
+            player.setPlaybackSpeed(clip.speed)
+            player.volume = if (clip.muted) 0f else clip.audioVolume.coerceIn(0f, 1f)
+            player.prepare()
+            player.seekTo(0L)
+            position = 0L
+            duration = clip.sourceSliceDurationMs
+            EditorCursorState.clipPositionMs = 0L
+            onPosition(0L)
+        }.onFailure {
+            if (!compatibilityMode) {
+                compatibilityMode = true
+            } else {
+                previewError = "Ошибка открытия видео: ${it.message ?: "неизвестная ошибка"}"
+            }
+        }
+    }
+
+    LaunchedEffect(clip, incomingTransition, exportSettings, compatibilityMode) {
+        if (!compatibilityMode) {
+            runCatching { player.setVideoEffects(fullPreviewEffects()) }
+                .onFailure {
+                    previewError = "Эффект несовместим с предпросмотром — включён безопасный режим"
+                    compatibilityMode = true
+                }
+        }
         player.setPlaybackSpeed(clip.speed)
         player.volume = if (clip.muted) 0f else clip.audioVolume.coerceIn(0f, 1f)
     }
@@ -115,6 +169,16 @@ internal fun EditorPreview(
             EditorCursorState.clipPositionMs = position
             onPosition(position)
             delay(80L)
+        }
+    }
+
+    LaunchedEffect(playing, firstFrameRendered, compatibilityMode, clip.id) {
+        if (playing && !firstFrameRendered && !compatibilityMode) {
+            delay(1800L)
+            if (playing && !firstFrameRendered && !compatibilityMode) {
+                previewError = "Первый кадр не появился — включён совместимый режим"
+                compatibilityMode = true
+            }
         }
     }
 
@@ -166,8 +230,14 @@ internal fun EditorPreview(
                         .weight(1f, fill = false),
                 )
                 Spacer(Modifier.width(6.dp))
-                if (effectsCount > 0) {
-                    Text(
+                when {
+                    compatibilityMode -> Text(
+                        "Совместимый режим",
+                        color = Color(0xFFFFD58A),
+                        fontSize = 9.sp,
+                        modifier = Modifier.background(Color(0xCC3A2B12), RoundedCornerShape(9.dp)).padding(horizontal = 8.dp, vertical = 5.dp),
+                    )
+                    effectsCount > 0 -> Text(
                         "$effectsCount эфф.",
                         color = Color(0xFFE1D5FF),
                         fontSize = 10.sp,
@@ -235,6 +305,22 @@ internal fun EditorPreview(
                 )
             }
 
+            if (!gesturesEnabled) {
+                Box(
+                    modifier = Modifier.fillMaxSize().clickable {
+                        if (previewError != null && compatibilityMode && player.playbackState == Player.STATE_IDLE) {
+                            previewError = null
+                            retryNonce++
+                        } else if (playing) {
+                            player.pause()
+                        } else {
+                            if (player.playbackState == Player.STATE_ENDED) player.seekTo(0L)
+                            player.play()
+                        }
+                    }
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -242,7 +328,13 @@ internal fun EditorPreview(
                     .size(44.dp)
                     .background(Color(0xCC17171F), CircleShape)
                     .border(1.dp, Color(0x667C63C9), CircleShape)
-                    .clickable { if (playing) player.pause() else player.play() },
+                    .clickable {
+                        if (playing) player.pause()
+                        else {
+                            if (player.playbackState == Player.STATE_ENDED) player.seekTo(0L)
+                            player.play()
+                        }
+                    },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -250,6 +342,26 @@ internal fun EditorPreview(
                     color = Color.White,
                     fontSize = if (playing) 17.sp else 16.sp,
                     fontWeight = FontWeight.Bold,
+                )
+            }
+
+            previewError?.let { error ->
+                Text(
+                    error,
+                    color = Color(0xFFFFD0D5),
+                    fontSize = 9.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 62.dp, vertical = 12.dp)
+                        .background(Color(0xD43A151B), RoundedCornerShape(9.dp))
+                        .clickable {
+                            previewError = null
+                            retryNonce++
+                        }
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
                 )
             }
         }
