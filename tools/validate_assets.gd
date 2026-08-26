@@ -10,7 +10,7 @@ const PRODUCTION_ASSETS: Array[String] = [
     "res://assets/environments/hell_creek/models/shrub_03.glb",
     "res://assets/environments/hell_creek/xanderklinge_2k.hdr",
     "res://assets/environments/hell_creek/textures/mud_forest_diff_1k.jpg",
-    "res://assets/audio/tyrannosaurus_rex/roar_realistic.ogg",
+    "res://assets/audio/tyrannosaurus_rex/roar_realistic.wav",
     "res://assets/audio/tyrannosaurus_rex/hell_creek_ambience.ogg",
     "res://assets/audio/tyrannosaurus_rex/narration_ru.wav",
 ]
