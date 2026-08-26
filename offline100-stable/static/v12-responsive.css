@@ -1,0 +1,57 @@
+/* v1.2 responsive safety layer.
+   Game layouts live inside .game-mount, so viewport-based widths must never
+   be allowed to exceed that container on narrow Android screens. */
+.game-mount,
+.game-shell,
+.game-mount > *,
+.game-mount [class$="-board"],
+.game-mount [class*="-board "],
+.game-mount [class$="-grid"],
+.game-mount [class*="-grid "],
+.game-mount [class$="-wrap"],
+.game-mount [class*="-wrap "],
+.game-mount [class$="-pad"],
+.game-mount [class*="-pad "] {
+  max-width:100% !important;
+  min-width:0;
+}
+
+.game-mount .cell,
+.game-mount button,
+.game-mount input,
+.game-mount select,
+.game-mount textarea {
+  min-width:0;
+}
+
+/* Sudoku has nine tracks; minmax(0,1fr) prevents button min-content from
+   forcing the board wider than its container. */
+body[data-game="sudoku"] .sudoku-board {
+  width:min(100%,500px) !important;
+  grid-template-columns:repeat(9,minmax(0,1fr)) !important;
+}
+body[data-game="sudoku"] .sudoku-pad {
+  width:min(100%,520px) !important;
+  grid-template-columns:repeat(5,minmax(0,1fr)) !important;
+}
+body[data-game="sudoku"] .sudoku-board .cell {
+  min-width:0 !important;
+  padding:0 !important;
+}
+
+/* Keep the most common fixed-grid families inside the play panel. */
+.ttt-board,.connect-board,.mine-board,.slide-board,.g2048,.memory-board,
+.pipe-board,.word-grid,.parking-board,.maze-board,.block-board,.reversi-board,
+.gomoku-board,.lights-board,.hanoi-wrap,.simon-board,.reaction-pad,.chain-board,
+.odd-board,.memory-grid,.route-grid,.queens-board,.magic-board,.oneline-board,
+.new-card-grid,.number-pair-grid,.puzzle4,.knight-board,.arrow-board,
+.number-sort-grid,.flood-board,.mole-grid,.odd-letter-grid,.color-link-grid,
+.tiles3-grid,.battleship-grid,.checkers-grid,.pyramid13-board {
+  max-width:100% !important;
+}
+
+@media (max-width:620px) {
+  .game-mount {overflow-x:clip;}
+  body[data-game="sudoku"] .sudoku-board .cell {font-size:clamp(11px,3.4vw,15px);}
+  body[data-game="sudoku"] .sudoku-pad .small-action {padding:8px 3px;}
+}
