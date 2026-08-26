@@ -71,7 +71,11 @@ internal fun EditorPreview(
     }
 
     LaunchedEffect(clip, incomingTransition, exportSettings) {
-        player.setVideoEffects(buildVideoEffects(context, clip, incomingTransition) + buildCanvasEffects(exportSettings, false))
+        player.setVideoEffects(
+            buildVideoEffects(context, clip, incomingTransition) +
+                buildAnimatedStickerEffects(clip) +
+                buildCanvasEffects(exportSettings, false)
+        )
         player.setPlaybackSpeed(clip.speed)
         player.volume = if (clip.muted) 0f else clip.audioVolume.coerceIn(0f, 1f)
     }
