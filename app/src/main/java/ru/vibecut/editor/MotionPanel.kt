@@ -120,4 +120,6 @@ internal fun MotionPanel(
             },
         )
     }
+
+    CreativeStylePanel(clip, onSnapshot, onUpdate)
 }
