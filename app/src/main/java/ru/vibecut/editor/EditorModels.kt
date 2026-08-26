@@ -41,6 +41,15 @@ data class AudioTrack(
     val volume: Float = 0.65f,
 )
 
+data class PositionedAudioTrack(
+    val id: String,
+    val uri: String,
+    val name: String,
+    val sourceDurationMs: Long,
+    val startAtMs: Long = 0L,
+    val volume: Float = 0.85f,
+)
+
 enum class VideoCodec(
     val title: String,
     val mimeType: String,
@@ -66,6 +75,7 @@ data class SavedProject(
     val clips: List<VideoClip> = emptyList(),
     val selectedId: String? = null,
     val backgroundAudio: AudioTrack? = null,
+    val positionedAudioTracks: List<PositionedAudioTrack> = emptyList(),
     val exportSettings: ExportSettings = ExportSettings(),
 )
 
