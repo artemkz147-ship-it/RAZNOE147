@@ -78,6 +78,8 @@ object ProjectStore {
         put("crop", clip.crop.toDouble())
         put("flipHorizontal", clip.flipHorizontal)
         put("flipVertical", clip.flipVertical)
+        put("motion", clip.motion.name)
+        put("motionStrength", clip.motionStrength.toDouble())
         put("overlayText", clip.overlayText)
         put("textX", clip.textX.toDouble())
         put("textY", clip.textY.toDouble())
@@ -110,6 +112,10 @@ object ProjectStore {
         crop = json.optDouble("crop", 0.0).toFloat(),
         flipHorizontal = json.optBoolean("flipHorizontal", false),
         flipVertical = json.optBoolean("flipVertical", false),
+        motion = runCatching {
+            ClipMotion.valueOf(json.optString("motion", ClipMotion.NONE.name))
+        }.getOrDefault(ClipMotion.NONE),
+        motionStrength = json.optDouble("motionStrength", 0.14).toFloat(),
         overlayText = json.optString("overlayText", ""),
         textX = json.optDouble("textX", 0.0).toFloat(),
         textY = json.optDouble("textY", -0.72).toFloat(),
