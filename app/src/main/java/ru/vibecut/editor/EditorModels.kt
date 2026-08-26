@@ -20,7 +20,31 @@ enum class MaskType(val title: String) { NONE("Без маски"), CIRCLE("Кр
 enum class KeyframeEasing(val title: String) { LINEAR("Линейно"), EASE_IN("Разгон"), EASE_OUT("Торможение"), EASE_IN_OUT("Плавно"), OVERSHOOT("С перелётом"), BOUNCE("Пружина") }
 data class TransitionSpec(val type: TransitionType, val durationMs: Long)
 data class TransformKeyframe(val id:String,val timeMs:Long,val x:Float=0f,val y:Float=0f,val scale:Float=1f,val rotation:Float=0f,val easing:KeyframeEasing=KeyframeEasing.EASE_IN_OUT)
-data class TrackingPoint(val timeMs:Long,val x:Float,val y:Float,val objectScale:Float=1f)
+
+data class TrackingPoint(
+    val timeMs:Long,
+    val x:Float,
+    val y:Float,
+    val objectScale:Float=1f,
+    val width:Float=.30f,
+    val height:Float=.30f,
+)
+
+enum class TrackedOverlayStyle(val title:String) {
+    BLACK_BOX("Чёрная плашка"),
+    MOSAIC("Мозаика"),
+    FRAME("Рамка"),
+    HIGHLIGHT("Подсветка"),
+}
+
+data class TrackedObjectOverlay(
+    val id:String,
+    val style:TrackedOverlayStyle,
+    val trackingPath:List<TrackingPoint>,
+    val padding:Float=.12f,
+    val alpha:Float=.90f,
+    val color:Int=0xFFFFD54F.toInt(),
+)
 
 data class StickerLayer(
     val id:String,val uri:String,val name:String="Изображение",val x:Float=0f,val y:Float=0f,val scale:Float=.35f,val rotation:Float=0f,val alpha:Float=1f,
@@ -48,6 +72,7 @@ data class VideoClip(
     val redScale:Float=1f,val greenScale:Float=1f,val blueScale:Float=1f,val maskType:MaskType=MaskType.NONE,val maskSize:Float=.82f,val vignette:Float=0f,
     val transitionOut:TransitionType=TransitionType.NONE,val transitionDurationMs:Long=650L,val keyframes:List<TransformKeyframe> = emptyList(),
     val stickers:List<StickerLayer> = emptyList(),val animatedStickers:List<AnimatedStickerLayer> = emptyList(),val gifStickers:List<GifStickerLayer> = emptyList(),
+    val trackedOverlays:List<TrackedObjectOverlay> = emptyList(),
     val overlayText:String="",val textX:Float=0f,val textY:Float=-.72f,val textScale:Float=.72f,val textRotation:Float=0f,val textColor:Int=-1,val textBackground:Boolean=true,val textBold:Boolean=true,val textItalic:Boolean=false
 ){val sourceSliceDurationMs:Long get()=(trimEndMs-trimStartMs).coerceAtLeast(1L);val durationMs:Long get()=(sourceSliceDurationMs/speed.coerceAtLeast(.05f)).toLong().coerceAtLeast(1L)}
 
