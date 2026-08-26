@@ -90,6 +90,8 @@ func play_action(action_name: String) -> bool:
         anim.loop_mode = Animation.LOOP_NONE
     animation_player.play(clip, 0.20)
     action_started.emit(action_name)
+    if action_name == "roar":
+        _play_host_roar_audio()
     if not animation_player.animation_finished.is_connected(_on_animation_finished):
         animation_player.animation_finished.connect(_on_animation_finished, CONNECT_ONE_SHOT)
     return true
@@ -108,6 +110,18 @@ func stop_all() -> void:
     _is_busy = false
     _current_action = "idle"
     _walk_turn_rate = 0.0
+
+func _play_host_roar_audio() -> void:
+    var host := get_parent()
+    if host == null:
+        return
+    var value: Variant = host.get("roar_player")
+    if value is AudioStreamPlayer3D:
+        var player := value as AudioStreamPlayer3D
+        if player.stream != null:
+            if actor != null and is_instance_valid(actor):
+                player.global_position = actor.global_position
+            player.play()
 
 func _speed_for_action(action_name: String) -> float:
     match action_name:
