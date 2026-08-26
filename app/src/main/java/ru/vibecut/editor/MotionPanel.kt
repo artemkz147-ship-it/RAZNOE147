@@ -122,4 +122,5 @@ internal fun MotionPanel(
     }
 
     CreativeStylePanel(clip, onSnapshot, onUpdate)
+    PersonCutoutPanel(clip, onSnapshot, onUpdate)
 }
