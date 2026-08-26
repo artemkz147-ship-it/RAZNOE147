@@ -25,6 +25,7 @@ import kotlin.math.roundToInt
 
 private enum class TrackingApplyMode(val title: String) {
     CAMERA("Камера следует"),
+    TRACKED_OVERLAY("Цензура / выделение"),
     STICKER("Анимированный стикер"),
     IMAGE_STICKER("Мой стикер / картинка"),
     GIF_STICKER("Мой GIF"),
@@ -44,9 +45,11 @@ internal fun ObjectTrackingPanel(
     var busy by remember { mutableStateOf(false) }
     var progress by remember { mutableIntStateOf(0) }
     var mode by remember { mutableStateOf(TrackingApplyMode.CAMERA) }
+    var trackedStyle by remember { mutableStateOf(TrackedOverlayStyle.BLACK_BOX) }
     var stickerKind by remember { mutableStateOf(AnimatedStickerKind.TARGET) }
     var imageStickerId by remember(clip.id, clip.stickers.size) { mutableStateOf(clip.stickers.firstOrNull()?.id) }
     var gifStickerId by remember(clip.id, clip.gifStickers.size) { mutableStateOf(clip.gifStickers.firstOrNull()?.id) }
+    var selectedOverlayId by remember(clip.id, clip.trackedOverlays.size) { mutableStateOf(clip.trackedOverlays.firstOrNull()?.id) }
     var status by remember { mutableStateOf("") }
 
     DisposableEffect(processor) { onDispose { processor.cancel() } }
@@ -89,6 +92,16 @@ internal fun ObjectTrackingPanel(
                         onUpdate(clip.copy(keyframes = keys))
                         status = "Готово: камера следует за объектом · ${keys.size} ключей"
                     }
+                    TrackingApplyMode.TRACKED_OVERLAY -> {
+                        val overlay = TrackedObjectOverlay(
+                            id = UUID.randomUUID().toString(),
+                            style = trackedStyle,
+                            trackingPath = path,
+                        )
+                        onUpdate(clip.copy(trackedOverlays = clip.trackedOverlays + overlay))
+                        selectedOverlayId = overlay.id
+                        status = "Готово: «${trackedStyle.title}» следует за объектом"
+                    }
                     TrackingApplyMode.STICKER -> {
                         val layer = AnimatedStickerLayer(
                             id = UUID.randomUUID().toString(), kind = stickerKind, x = 0f, y = 0f, scale = .28f,
@@ -121,8 +134,12 @@ internal fun ObjectTrackingPanel(
         )
     }
 
+    fun updateOverlay(value: TrackedObjectOverlay) {
+        onUpdate(clip.copy(trackedOverlays = clip.trackedOverlays.map { if (it.id == value.id) value else it }))
+    }
+
     SectionCard("Отслеживание объекта") {
-        Text("Укажите примерную точку объекта на первом кадре. Нейросеть найдёт объект рядом и сохранит редактируемую траекторию.", color = Color(0xFF9A9AA8))
+        Text("Укажите примерную точку объекта на первом кадре. Нейросеть найдёт объект рядом, его размер и построит редактируемую траекторию.", color = Color(0xFF9A9AA8))
         Text("Точка X: ${(targetX * 100).roundToInt()}", color = Color.White)
         Slider(targetX, { targetX = it }, valueRange = -1f..1f)
         Text("Точка Y: ${(targetY * 100).roundToInt()}", color = Color.White)
@@ -133,7 +150,7 @@ internal fun ObjectTrackingPanel(
             listOf(6, 10, 15, 20).forEach { value -> ChoiceButton("$value кадров/с", fps == value) { fps = value } }
         }
 
-        Text("Что прикрепить к траектории", color = Color.White)
+        Text("Что сделать с траекторией", color = Color.White)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TrackingApplyMode.entries.forEach { item ->
                 ChoiceButton(item.title, mode == item) {
@@ -144,6 +161,12 @@ internal fun ObjectTrackingPanel(
             }
         }
 
+        if (mode == TrackingApplyMode.TRACKED_OVERLAY) {
+            Text("Вид", color = Color.White)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                TrackedOverlayStyle.entries.forEach { style -> ChoiceButton(style.title, trackedStyle == style) { trackedStyle = style } }
+            }
+        }
         if (mode == TrackingApplyMode.STICKER) {
             Text("Анимированный стикер", color = Color.White)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -167,6 +190,7 @@ internal fun ObjectTrackingPanel(
 
         val action = when (mode) {
             TrackingApplyMode.CAMERA -> "Отследить и вести камерой"
+            TrackingApplyMode.TRACKED_OVERLAY -> "Отследить и добавить слой"
             TrackingApplyMode.STICKER -> "Отследить и прикрепить анимацию"
             TrackingApplyMode.IMAGE_STICKER -> "Отследить и прикрепить картинку"
             TrackingApplyMode.GIF_STICKER -> "Отследить и прикрепить GIF"
@@ -177,5 +201,31 @@ internal fun ObjectTrackingPanel(
             Text("Обработка: $progress%", color = Color(0xFFC4B5FD))
         }
         if (status.isNotBlank()) Text(status, color = Color(0xFFB9B9C5))
+
+        if (clip.trackedOverlays.isNotEmpty()) {
+            Text("Слои цензуры и выделения", color = Color.White)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                clip.trackedOverlays.forEachIndexed { index, layer ->
+                    ChoiceButton("${index + 1}. ${layer.style.title}", selectedOverlayId == layer.id) { selectedOverlayId = layer.id }
+                }
+            }
+            clip.trackedOverlays.firstOrNull { it.id == selectedOverlayId }?.let { layer ->
+                Text("Запас вокруг объекта: ${(layer.padding * 100).roundToInt()}%", color = Color.White)
+                Slider(layer.padding.coerceIn(0f,.65f), { updateOverlay(layer.copy(padding = it)) }, valueRange = 0f.. .65f)
+                Text("Непрозрачность: ${(layer.alpha * 100).roundToInt()}%", color = Color.White)
+                Slider(layer.alpha.coerceIn(.1f,1f), { updateOverlay(layer.copy(alpha = it)) }, valueRange = .1f..1f)
+                Text("Стиль слоя", color = Color.White)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    TrackedOverlayStyle.entries.forEach { style ->
+                        ChoiceButton(style.title, layer.style == style) { onSnapshot(); updateOverlay(layer.copy(style = style)) }
+                    }
+                }
+                ToolButton("Удалить слой", {
+                    onSnapshot()
+                    onUpdate(clip.copy(trackedOverlays = clip.trackedOverlays.filterNot { it.id == layer.id }))
+                    selectedOverlayId = clip.trackedOverlays.firstOrNull { it.id != layer.id }?.id
+                })
+            }
+        }
     }
 }
