@@ -38,6 +38,7 @@ class ExportManager(private val context:Context){private var transformer:Transfo
                         buildEasedKeyframeEffects(clip)+
                         buildSpecialEffectEffects(clip)+
                         buildDynamicImageStickerEffects(context,clip)+
+                        buildGifStickerEffects(context,clip)+
                         buildAnimatedStickerEffects(clip)
                 )).build()
         }
