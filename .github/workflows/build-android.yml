@@ -1,0 +1,50 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dino-encyclopedia-3d]
+    paths:
+      - 'project.godot'
+      - 'export_presets.cfg'
+      - 'scenes/**'
+      - 'scripts/**'
+      - 'data/**'
+      - 'assets/**'
+      - '.github/workflows/build-android.yml'
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GODOT_VERSION: '4.7.2'
+      GODOT_VERSION_ID: '4.7.2.stable'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Android packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "build-tools;35.0.1" "platforms;android-35"
+      - name: Install Godot 4.7.2 and export templates
+        run: |
+          curl -L --fail -o /tmp/godot.zip "https://downloads.godotengine.org/?flavor=stable&platform=linux.64&slug=linux.x86_64.zip&version=${GODOT_VERSION}"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          sudo install -m 0755 /tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          curl -L --fail -o /tmp/templates.tpz "https://downloads.godotengine.org/?flavor=stable&platform=templates&slug=export_templates.tpz&version=${GODOT_VERSION}"
+          mkdir -p "/tmp/templates" "$HOME/.local/share/godot/export_templates/${GODOT_VERSION_ID}"
+          unzip -q /tmp/templates.tpz -d /tmp/templates
+          cp -a /tmp/templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION_ID}/"
+      - name: Import project
+        run: godot --headless --editor --path . --quit
+      - name: Export debug APK
+        run: |
+          mkdir -p build
+          godot --headless --verbose --path . --export-debug "Android Debug" build/DinoEncyclopedia-debug.apk
+          test -s build/DinoEncyclopedia-debug.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DinoEncyclopedia-debug-apk
+          path: build/DinoEncyclopedia-debug.apk
+          if-no-files-found: error
