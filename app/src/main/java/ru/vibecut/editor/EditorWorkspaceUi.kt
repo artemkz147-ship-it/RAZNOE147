@@ -71,6 +71,7 @@ internal fun ProEditorTopBar(
             .fillMaxWidth()
             .background(Color(0xFF0B0B10))
             .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -86,14 +87,11 @@ internal fun ProEditorTopBar(
                 singleLine = true,
                 placeholder = { Text("Название проекта") },
             )
-            MiniSquareButton("↶", onUndo, canUndo)
-            MiniSquareButton("↷", onRedo, canRedo)
-            MiniSquareButton("＋", onImport, true)
             Button(
                 onClick = onExport,
                 enabled = clipCount > 0 && exportState != ExportState.EXPORTING,
                 shape = RoundedCornerShape(14.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 13.dp, vertical = 11.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 11.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF8B5CF6),
                     contentColor = Color.White,
@@ -110,13 +108,20 @@ internal fun ProEditorTopBar(
             }
         }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 5.dp, start = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("$clipCount клип.", color = Color(0xFF8E8E9B), fontSize = 11.sp)
-            Text("Автосохранение", color = Color(0xFF67E8A8), fontSize = 11.sp)
-            if (exportState == ExportState.DONE) Text("Экспорт готов", color = Color(0xFF67E8A8), fontSize = 11.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                MiniSquareButton("↶", onUndo, canUndo)
+                MiniSquareButton("↷", onRedo, canRedo)
+                MiniSquareButton("＋", onImport, true)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("$clipCount клип.", color = Color(0xFF8E8E9B), fontSize = 11.sp)
+                Text("● сохранено", color = Color(0xFF67E8A8), fontSize = 11.sp)
+                if (exportState == ExportState.DONE) Text("● готово", color = Color(0xFF22D3EE), fontSize = 11.sp)
+            }
         }
     }
 }
@@ -206,15 +211,15 @@ internal fun EditorMessageBar(message: String) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .padding(horizontal = 12.dp, vertical = 4.dp)
                 .background(Color(0xFF15151D), RoundedCornerShape(12.dp))
                 .border(1.dp, Color(0xFF252531), RoundedCornerShape(12.dp))
-                .padding(horizontal = 11.dp, vertical = 8.dp),
+                .padding(horizontal = 11.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(7.dp).background(Color(0xFF22D3EE), CircleShape))
             Spacer(Modifier.width(8.dp))
-            Text(message, color = Color(0xFFC8C8D3), fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(message, color = Color(0xFFC8C8D3), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
