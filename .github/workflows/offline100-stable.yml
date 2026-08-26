@@ -51,7 +51,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Boot emulator and diagnose real launch
+      - name: Boot emulator and verify real launch
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -59,27 +59,18 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            set +e
             adb logcat -c
             adb install -r offline100-stable/app/build/outputs/apk/debug/app-debug.apk
             adb shell am force-stop ru.offline100.games
             adb shell am start -W -n ru.offline100.games/.MainActivity
             sleep 5
             adb logcat -d > startup-logcat.txt
-            adb exec-out screencap -p > startup.png 2>/dev/null || true
-            PID=$(adb shell pidof ru.offline100.games | tr -d '\r')
-            echo "APP_PID=$PID"
-            echo '--- Offline100 lines ---'
-            grep -E 'Offline100|FATAL EXCEPTION|AndroidRuntime|Process: ru.offline100.games' startup-logcat.txt | tail -n 160 || true
-            if [ -z "$PID" ]; then
-              echo 'PROCESS_DIED_AFTER_LAUNCH'
-              exit 41
-            fi
-            if grep -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE' startup-logcat.txt; then exit 42; fi
-            grep 'Offline100.*PAGE_FINISHED' startup-logcat.txt || exit 43
-            grep 'Offline100.*GAME_CARD_COUNT="100"' startup-logcat.txt || exit 44
-            exit 0
-      - name: Upload launch proof even on failure
+            adb exec-out screencap -p > startup.png
+            grep -q 'Offline100.*PAGE_FINISHED' startup-logcat.txt
+            grep -q 'Offline100.*GAME_CARD_COUNT="100"' startup-logcat.txt
+            grep -q -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE' startup-logcat.txt && exit 42 || true
+            adb shell dumpsys activity activities | grep -q 'ru.offline100.games/.MainActivity'
+      - name: Upload launch proof
         if: always()
         uses: actions/upload-artifact@v4
         with:
