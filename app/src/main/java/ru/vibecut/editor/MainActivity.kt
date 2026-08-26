@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -61,7 +63,13 @@ class MainActivity : ComponentActivity() {
                     extraLarge = RoundedCornerShape(28.dp),
                 ),
             ) {
-                Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF08080C)) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .safeDrawingPadding()
+                        .imePadding(),
+                    color = Color(0xFF08080C),
+                ) {
                     var currentProjectId by rememberSaveable { mutableStateOf<String?>(null) }
                     if (currentProjectId == null) {
                         ProjectBrowserScreen(onOpen = { currentProjectId = it })
