@@ -72,8 +72,9 @@ internal fun EditorPreview(
 
     LaunchedEffect(clip, incomingTransition, exportSettings) {
         player.setVideoEffects(
-            buildVideoEffects(context, clip.copy(keyframes = emptyList()), incomingTransition) +
+            buildVideoEffects(context, clip.copy(keyframes = emptyList(), stickers = emptyList()), incomingTransition) +
                 buildEasedKeyframeEffects(clip) +
+                buildDynamicImageStickerEffects(context, clip) +
                 buildAnimatedStickerEffects(clip) +
                 buildCanvasEffects(exportSettings, false)
         )
