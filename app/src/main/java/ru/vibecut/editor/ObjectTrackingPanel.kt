@@ -27,6 +27,7 @@ private enum class TrackingApplyMode(val title: String) {
     CAMERA("Камера следует"),
     STICKER("Анимированный стикер"),
     IMAGE_STICKER("Мой стикер / картинка"),
+    GIF_STICKER("Мой GIF"),
 }
 
 @Composable
@@ -45,6 +46,7 @@ internal fun ObjectTrackingPanel(
     var mode by remember { mutableStateOf(TrackingApplyMode.CAMERA) }
     var stickerKind by remember { mutableStateOf(AnimatedStickerKind.TARGET) }
     var imageStickerId by remember(clip.id, clip.stickers.size) { mutableStateOf(clip.stickers.firstOrNull()?.id) }
+    var gifStickerId by remember(clip.id, clip.gifStickers.size) { mutableStateOf(clip.gifStickers.firstOrNull()?.id) }
     var status by remember { mutableStateOf("") }
 
     DisposableEffect(processor) { onDispose { processor.cancel() } }
@@ -53,6 +55,10 @@ internal fun ObjectTrackingPanel(
         if (busy) return
         if (mode == TrackingApplyMode.IMAGE_STICKER && imageStickerId == null) {
             status = "Сначала добавьте PNG / JPG / WebP в разделе «Изображения и стикеры»"
+            return
+        }
+        if (mode == TrackingApplyMode.GIF_STICKER && gifStickerId == null) {
+            status = "Сначала добавьте GIF в разделе «GIF-стикеры»"
             return
         }
         busy = true
@@ -85,38 +91,28 @@ internal fun ObjectTrackingPanel(
                     }
                     TrackingApplyMode.STICKER -> {
                         val layer = AnimatedStickerLayer(
-                            id = UUID.randomUUID().toString(),
-                            kind = stickerKind,
-                            x = 0f,
-                            y = 0f,
-                            scale = .28f,
-                            startMs = path.first().timeMs,
-                            endMs = path.last().timeMs,
-                            speed = 1f,
-                            loop = true,
-                            trackingPath = path,
+                            id = UUID.randomUUID().toString(), kind = stickerKind, x = 0f, y = 0f, scale = .28f,
+                            startMs = path.first().timeMs, endMs = path.last().timeMs, speed = 1f, loop = true, trackingPath = path,
                         )
                         onUpdate(clip.copy(animatedStickers = clip.animatedStickers + layer))
                         status = "Готово: «${stickerKind.title}» прикреплён к объекту"
                     }
                     TrackingApplyMode.IMAGE_STICKER -> {
-                        val id = imageStickerId
-                        val sticker = clip.stickers.firstOrNull { it.id == id }
-                        if (sticker == null) {
-                            status = "Выбранный стикер больше не найден"
-                        } else {
-                            onUpdate(
-                                clip.copy(
-                                    stickers = clip.stickers.map {
-                                        if (it.id == sticker.id) it.copy(
-                                            startMs = path.first().timeMs,
-                                            endMs = path.last().timeMs,
-                                            trackingPath = path,
-                                        ) else it
-                                    }
-                                )
-                            )
+                        val sticker = clip.stickers.firstOrNull { it.id == imageStickerId }
+                        if (sticker == null) status = "Выбранный стикер больше не найден" else {
+                            onUpdate(clip.copy(stickers = clip.stickers.map {
+                                if (it.id == sticker.id) it.copy(startMs = path.first().timeMs, endMs = path.last().timeMs, trackingPath = path) else it
+                            }))
                             status = "Готово: «${sticker.name}» прикреплён к объекту"
+                        }
+                    }
+                    TrackingApplyMode.GIF_STICKER -> {
+                        val sticker = clip.gifStickers.firstOrNull { it.id == gifStickerId }
+                        if (sticker == null) status = "Выбранный GIF больше не найден" else {
+                            onUpdate(clip.copy(gifStickers = clip.gifStickers.map {
+                                if (it.id == sticker.id) it.copy(startMs = path.first().timeMs, endMs = path.last().timeMs, trackingPath = path) else it
+                            }))
+                            status = "Готово: GIF «${sticker.name}» прикреплён к объекту"
                         }
                     }
                 }
@@ -126,10 +122,7 @@ internal fun ObjectTrackingPanel(
     }
 
     SectionCard("Отслеживание объекта") {
-        Text(
-            "Укажите примерную точку объекта на первом кадре. Нейросеть найдёт объект рядом и сохранит редактируемую траекторию.",
-            color = Color(0xFF9A9AA8),
-        )
+        Text("Укажите примерную точку объекта на первом кадре. Нейросеть найдёт объект рядом и сохранит редактируемую траекторию.", color = Color(0xFF9A9AA8))
         Text("Точка X: ${(targetX * 100).roundToInt()}", color = Color.White)
         Slider(targetX, { targetX = it }, valueRange = -1f..1f)
         Text("Точка Y: ${(targetY * 100).roundToInt()}", color = Color.White)
@@ -146,6 +139,7 @@ internal fun ObjectTrackingPanel(
                 ChoiceButton(item.title, mode == item) {
                     mode = item
                     if (item == TrackingApplyMode.IMAGE_STICKER && imageStickerId == null) imageStickerId = clip.stickers.firstOrNull()?.id
+                    if (item == TrackingApplyMode.GIF_STICKER && gifStickerId == null) gifStickerId = clip.gifStickers.firstOrNull()?.id
                 }
             }
         }
@@ -163,11 +157,19 @@ internal fun ObjectTrackingPanel(
                 clip.stickers.forEach { sticker -> ChoiceButton(sticker.name, imageStickerId == sticker.id) { imageStickerId = sticker.id } }
             }
         }
+        if (mode == TrackingApplyMode.GIF_STICKER) {
+            Text("Импортированный GIF", color = Color.White)
+            if (clip.gifStickers.isEmpty()) Text("Добавьте GIF в разделе «GIF-стикеры»", color = Color(0xFFFFB4AB))
+            else Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                clip.gifStickers.forEach { sticker -> ChoiceButton(sticker.name, gifStickerId == sticker.id) { gifStickerId = sticker.id } }
+            }
+        }
 
         val action = when (mode) {
             TrackingApplyMode.CAMERA -> "Отследить и вести камерой"
             TrackingApplyMode.STICKER -> "Отследить и прикрепить анимацию"
             TrackingApplyMode.IMAGE_STICKER -> "Отследить и прикрепить картинку"
+            TrackingApplyMode.GIF_STICKER -> "Отследить и прикрепить GIF"
         }
         ToolButton(action, ::start, enabled = !busy)
         if (busy) {
