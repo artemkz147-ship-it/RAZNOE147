@@ -1,6 +1,6 @@
 extends Node3D
 
-@export var min_distance := 0.9
+@export var min_distance := 0.85
 @export var max_distance := 36.0
 @export var rotation_speed := 0.005
 @export var zoom_speed := 0.012
@@ -46,16 +46,19 @@ func _process(delta: float) -> void:
     _apply_transform()
 
 func focus_target(center: Vector3, radius: float) -> void:
-    var safe_radius := maxf(radius, 0.35)
+    var safe_radius := maxf(radius, 0.22)
     _default_focus = _clamp_focus(center)
-    _default_focus_height = clampf(safe_radius * 0.42, 0.28, 4.8)
-    _default_distance = clampf(safe_radius * 2.15, 1.45, max_distance)
+    _default_focus_height = clampf(safe_radius * 0.42, 0.24, 4.8)
+    # Small species need a deliberately closer camera. Large species still use the
+    # same formula so switching never inherits the previous dinosaur's distance.
+    _default_distance = clampf(safe_radius * 1.85 + 0.45, 1.10, max_distance)
     _target_focus_center = _default_focus
     _target_focus_height = _default_focus_height
     _target_distance = _default_distance
     _target_yaw = deg_to_rad(-28.0)
-    _target_pitch = deg_to_rad(-13.0 if safe_radius < 2.0 else -16.0)
-    camera.fov = 40.0 if safe_radius < 1.5 else 47.0
+    _target_pitch = deg_to_rad(-12.0 if safe_radius < 1.4 else -16.0)
+    camera.fov = 37.0 if safe_radius < 1.2 else (42.0 if safe_radius < 3.0 else 47.0)
+    _apply_immediate()
 
 func reset_view() -> void:
     _target_focus_center = _default_focus
@@ -63,10 +66,11 @@ func reset_view() -> void:
     _target_distance = _default_distance
     _target_yaw = deg_to_rad(-28.0)
     _target_pitch = deg_to_rad(-14.0)
+    _apply_immediate()
 
 func set_top_view() -> void:
     _target_pitch = deg_to_rad(-72.0)
-    _target_distance = clampf(maxf(_default_distance * 1.35, 5.0), min_distance, max_distance)
+    _target_distance = clampf(maxf(_default_distance * 1.35, 4.0), min_distance, max_distance)
 
 func set_side_view() -> void:
     _target_pitch = deg_to_rad(-14.0)
