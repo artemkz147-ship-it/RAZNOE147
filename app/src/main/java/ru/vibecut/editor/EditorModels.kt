@@ -8,6 +8,9 @@ data class VideoClip(
     val trimStartMs: Long = 0L,
     val trimEndMs: Long = sourceDurationMs,
     val muted: Boolean = false,
+    val audioVolume: Float = 1f,
+    val audioFadeInMs: Long = 0L,
+    val audioFadeOutMs: Long = 0L,
     val rotationDegrees: Int = 0,
     val speed: Float = 1f,
     val brightness: Float = 0f,
@@ -23,6 +26,10 @@ data class VideoClip(
     val textY: Float = -0.72f,
     val textScale: Float = 0.72f,
     val textRotation: Float = 0f,
+    val textColor: Int = -1,
+    val textBackground: Boolean = true,
+    val textBold: Boolean = true,
+    val textItalic: Boolean = false,
 ) {
     val sourceSliceDurationMs: Long get() = (trimEndMs - trimStartMs).coerceAtLeast(1L)
     val durationMs: Long get() = (sourceSliceDurationMs / speed.coerceAtLeast(0.05f)).toLong().coerceAtLeast(1L)
@@ -31,18 +38,35 @@ data class VideoClip(
 data class AudioTrack(
     val uri: String,
     val name: String,
+    val volume: Float = 0.65f,
 )
+
+enum class VideoCodec(
+    val title: String,
+    val mimeType: String,
+) {
+    H264("H.264", "video/avc"),
+    H265("H.265", "video/hevc"),
+}
 
 data class ExportSettings(
     val height: Int = 1080,
     val maxFrameRate: Int = 30,
     val aspectRatio: Float? = null,
     val cropToFill: Boolean = false,
+    val videoCodec: VideoCodec = VideoCodec.H264,
 )
 
 data class EditorSnapshot(
     val clips: List<VideoClip>,
     val selectedId: String?,
+)
+
+data class SavedProject(
+    val clips: List<VideoClip> = emptyList(),
+    val selectedId: String? = null,
+    val backgroundAudio: AudioTrack? = null,
+    val exportSettings: ExportSettings = ExportSettings(),
 )
 
 enum class ExportState {
