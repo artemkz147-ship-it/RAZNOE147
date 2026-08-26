@@ -1,4 +1,4 @@
-name: Build Offline100 APK
+name: Build Offline100 v1.1 Visual APK
 
 on:
   pull_request:
@@ -33,7 +33,7 @@ jobs:
         with:
           gradle-version: '9.1.0'
 
-      - name: Restore game assets
+      - name: Restore v1.1 visual game assets
         shell: bash
         run: |
           set -euo pipefail
@@ -41,9 +41,14 @@ jobs:
           cat offline100-apk/.payload/app.* | base64 -d | gzip -d > offline100-apk/app/src/main/assets/app.js
           cat offline100-apk/.payload/style.* | base64 -d | gzip -d > offline100-apk/app/src/main/assets/styles.css
           cat offline100-apk/.payload/index.* | base64 -d | gzip -d > offline100-apk/app/src/main/assets/index.html
-          test $(wc -c < offline100-apk/app/src/main/assets/app.js) -eq 207910
-          test $(wc -c < offline100-apk/app/src/main/assets/styles.css) -eq 46475
+          base64 -d < offline100-apk/.payload/v11-app.patch.gz.b64 | gzip -d > /tmp/v11-app.patch
+          base64 -d < offline100-apk/.payload/v11-styles.patch.gz.b64 | gzip -d > /tmp/v11-styles.patch
+          patch offline100-apk/app/src/main/assets/app.js < /tmp/v11-app.patch
+          patch offline100-apk/app/src/main/assets/styles.css < /tmp/v11-styles.patch
+          test $(wc -c < offline100-apk/app/src/main/assets/app.js) -eq 212277
+          test $(wc -c < offline100-apk/app/src/main/assets/styles.css) -eq 74907
           test $(wc -c < offline100-apk/app/src/main/assets/index.html) -eq 12839
+          grep -q "1.1.0" offline100-apk/app/src/main/assets/app.js
 
       - name: Build installable debug APK
         working-directory: offline100-apk
@@ -52,7 +57,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: offline100-v1.0-debug-apk
+          name: offline100-v1.1-visual-debug-apk
           path: offline100-apk/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
