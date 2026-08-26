@@ -13,31 +13,12 @@ enum class ColorEffect(val title: String) {
 }
 
 enum class SpecialEffect(val title: String) {
-    NONE("Без спецэффекта"),
-    VHS("VHS"),
-    CRT("CRT / телевизор"),
-    FILM_GRAIN("Плёночное зерно"),
-    OLD_FILM("Старая плёнка"),
-    SCRATCHES("Царапины"),
-    GLITCH("Глитч"),
-    RGB_PULSE("RGB-пульсация"),
-    STROBE("Строб"),
-    FLICKER("Мерцание"),
-    LIGHT_LEAK("Засветка плёнки"),
-    FLASHES("Вспышки"),
-    CAMERA_SHAKE("Дрожание камеры"),
-    ZOOM_PULSE("Зум-пульс"),
-    DREAM("Сон / сияние"),
-    NIGHT_VISION("Ночное видение"),
-    SECURITY_CAM("Камера наблюдения"),
+    NONE("Без спецэффекта"), VHS("VHS"), CRT("CRT / телевизор"), FILM_GRAIN("Плёночное зерно"), OLD_FILM("Старая плёнка"), SCRATCHES("Царапины"), GLITCH("Глитч"), RGB_PULSE("RGB-пульсация"), STROBE("Строб"), FLICKER("Мерцание"), LIGHT_LEAK("Засветка плёнки"), FLASHES("Вспышки"), CAMERA_SHAKE("Дрожание камеры"), ZOOM_PULSE("Зум-пульс"), DREAM("Сон / сияние"), NIGHT_VISION("Ночное видение"), SECURITY_CAM("Камера наблюдения")
 }
 
 enum class MaskType(val title: String) { NONE("Без маски"), CIRCLE("Круг"), ROUNDED_RECT("Скруглённая"), CINEMA("Кино-кадр") }
-
 enum class KeyframeEasing(val title: String) { LINEAR("Линейно"), EASE_IN("Разгон"), EASE_OUT("Торможение"), EASE_IN_OUT("Плавно"), OVERSHOOT("С перелётом"), BOUNCE("Пружина") }
-
 data class TransitionSpec(val type: TransitionType, val durationMs: Long)
-
 data class TransformKeyframe(val id:String,val timeMs:Long,val x:Float=0f,val y:Float=0f,val scale:Float=1f,val rotation:Float=0f,val easing:KeyframeEasing=KeyframeEasing.EASE_IN_OUT)
 data class TrackingPoint(val timeMs:Long,val x:Float,val y:Float,val objectScale:Float=1f)
 
@@ -47,10 +28,15 @@ data class StickerLayer(
 )
 
 enum class AnimatedStickerKind(val title:String){HEART("Сердце"),STAR("Звезда"),SPARKLE("Искры"),ARROW("Стрелка"),RING("Кольцо"),LIGHTNING("Молния"),CONFETTI("Конфетти"),FIRE("Огонь"),CHECK("Галочка"),QUESTION("Вопрос"),WOW("WOW"),TARGET("Прицел")}
-
 data class AnimatedStickerLayer(
     val id:String,val kind:AnimatedStickerKind,val x:Float=0f,val y:Float=0f,val scale:Float=.35f,val rotation:Float=0f,val alpha:Float=1f,val startMs:Long=0L,val endMs:Long=Long.MAX_VALUE,
     val speed:Float=1f,val loop:Boolean=true,val keyframes:List<TransformKeyframe> = emptyList(),val trackingPath:List<TrackingPoint> = emptyList()
+)
+
+data class GifStickerLayer(
+    val id:String,val uri:String,val name:String="GIF",val x:Float=0f,val y:Float=0f,val scale:Float=.45f,val rotation:Float=0f,val alpha:Float=1f,
+    val startMs:Long=0L,val endMs:Long=Long.MAX_VALUE,val speed:Float=1f,val loop:Boolean=true,
+    val keyframes:List<TransformKeyframe> = emptyList(),val trackingPath:List<TrackingPoint> = emptyList()
 )
 
 data class VideoClip(
@@ -60,23 +46,21 @@ data class VideoClip(
     val flipHorizontal:Boolean=false,val flipVertical:Boolean=false,val motion:ClipMotion=ClipMotion.NONE,val motionStrength:Float=.14f,
     val colorEffect:ColorEffect=ColorEffect.NONE,val specialEffect:SpecialEffect=SpecialEffect.NONE,val specialEffectStrength:Float=.65f,
     val redScale:Float=1f,val greenScale:Float=1f,val blueScale:Float=1f,val maskType:MaskType=MaskType.NONE,val maskSize:Float=.82f,val vignette:Float=0f,
-    val transitionOut:TransitionType=TransitionType.NONE,val transitionDurationMs:Long=650L,val keyframes:List<TransformKeyframe> = emptyList(),val stickers:List<StickerLayer> = emptyList(),val animatedStickers:List<AnimatedStickerLayer> = emptyList(),
+    val transitionOut:TransitionType=TransitionType.NONE,val transitionDurationMs:Long=650L,val keyframes:List<TransformKeyframe> = emptyList(),
+    val stickers:List<StickerLayer> = emptyList(),val animatedStickers:List<AnimatedStickerLayer> = emptyList(),val gifStickers:List<GifStickerLayer> = emptyList(),
     val overlayText:String="",val textX:Float=0f,val textY:Float=-.72f,val textScale:Float=.72f,val textRotation:Float=0f,val textColor:Int=-1,val textBackground:Boolean=true,val textBold:Boolean=true,val textItalic:Boolean=false
 ){val sourceSliceDurationMs:Long get()=(trimEndMs-trimStartMs).coerceAtLeast(1L);val durationMs:Long get()=(sourceSliceDurationMs/speed.coerceAtLeast(.05f)).toLong().coerceAtLeast(1L)}
 
 data class AudioTrack(val uri:String,val name:String,val volume:Float=.65f)
 data class PositionedAudioTrack(val id:String,val uri:String,val name:String,val sourceDurationMs:Long,val startAtMs:Long=0L,val volume:Float=.85f)
 data class SubtitleCue(val id:String,val startMs:Long,val endMs:Long,val text:String)
-
 enum class SubtitleAnimation(val title:String){NONE("Без анимации"),FADE("Плавное появление"),POP("Акцентное появление"),TYPEWRITER("Печатная машинка"),WORD_BY_WORD("По словам"),KARAOKE("Караоке"),BOUNCE("Прыжок"),SLIDE_UP("Снизу вверх")}
-
 data class SubtitleStyle(
     val fontScale:Float=1f,val textColor:Int=-1,val backgroundColor:Int=0xB3000000.toInt(),val backgroundEnabled:Boolean=true,val verticalPosition:Float=.84f,
     val fontKey:String="sans-serif",val fontDisplayName:String="Системный",val fontFilePath:String="",val outlineColor:Int=0xFF000000.toInt(),val outlineWidth:Float=1.6f,
     val shadowColor:Int=0xB3000000.toInt(),val shadowRadius:Float=1.2f,val bold:Boolean=true,val italic:Boolean=false,val uppercase:Boolean=false,val letterSpacing:Float=0f,
     val accentColor:Int=0xFFFFD54F.toInt(),val animation:SubtitleAnimation=SubtitleAnimation.NONE
 )
-
 enum class VideoCodec(val title:String,val mimeType:String){H264("H.264","video/avc"),H265("H.265","video/hevc")}
 data class ExportSettings(val height:Int=1080,val maxFrameRate:Int=30,val aspectRatio:Float?=null,val cropToFill:Boolean=false,val videoCodec:VideoCodec=VideoCodec.H264)
 data class EditorSnapshot(val clips:List<VideoClip>,val selectedId:String?)
