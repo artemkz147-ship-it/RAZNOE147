@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch pinned CC BY dinosaur assets and repack them for Godot Mobile."""
+"""Fetch dinosaur assets and repack them for Godot Mobile."""
 from __future__ import annotations
 
 import json
@@ -48,6 +48,30 @@ def gltfpack(src: Path, dst: Path) -> None:
     ], check=True)
 
 
+def _accessor_bounds(doc: dict) -> tuple[list[float] | None, list[float] | None]:
+    mins: list[float] | None = None
+    maxs: list[float] | None = None
+    accessors = doc.get("accessors", [])
+    for mesh in doc.get("meshes", []):
+        for primitive in mesh.get("primitives", []):
+            pos_index = primitive.get("attributes", {}).get("POSITION")
+            if pos_index is None or pos_index >= len(accessors):
+                continue
+            accessor = accessors[pos_index]
+            amin, amax = accessor.get("min"), accessor.get("max")
+            if not (isinstance(amin, list) and isinstance(amax, list) and len(amin) >= 3 and len(amax) >= 3):
+                continue
+            if mins is None:
+                mins = [float(amin[i]) for i in range(3)]
+                maxs = [float(amax[i]) for i in range(3)]
+            else:
+                assert maxs is not None
+                for i in range(3):
+                    mins[i] = min(mins[i], float(amin[i]))
+                    maxs[i] = max(maxs[i], float(amax[i]))
+    return mins, maxs
+
+
 def inspect_glb(species_id: str, path: Path) -> None:
     with path.open("rb") as f:
         magic, version, total = struct.unpack("<4sII", f.read(12))
@@ -63,7 +87,28 @@ def inspect_glb(species_id: str, path: Path) -> None:
     if not doc.get("meshes"):
         raise RuntimeError(f"{species_id}: no meshes")
     animations = [(item.get("name") or "").strip() for item in doc.get("animations", [])]
+    node_names = [(node.get("name") or f"node_{i}") for i, node in enumerate(doc.get("nodes", []))]
+    skin_joints: list[str] = []
+    for skin in doc.get("skins", []):
+        for joint_index in skin.get("joints", []):
+            if isinstance(joint_index, int) and 0 <= joint_index < len(node_names):
+                skin_joints.append(node_names[joint_index])
+    mins, maxs = _accessor_bounds(doc)
+    size = None
+    if mins is not None and maxs is not None:
+        size = [round(maxs[i] - mins[i], 5) for i in range(3)]
+    animated_targets: list[str] = []
+    for anim in doc.get("animations", []):
+        for channel in anim.get("channels", []):
+            target = channel.get("target", {}).get("node")
+            if isinstance(target, int) and 0 <= target < len(node_names):
+                name = node_names[target]
+                if name not in animated_targets:
+                    animated_targets.append(name)
     print(f"SPECIES_MODEL_OK id={species_id} bytes={total} meshes={len(doc['meshes'])} animations={animations} extensions={sorted(extensions)}")
+    print(f"SPECIES_BOUNDS id={species_id} min={mins} max={maxs} size={size}")
+    print(f"SPECIES_SKIN_JOINTS id={species_id} count={len(skin_joints)} names={skin_joints}")
+    print(f"SPECIES_ANIM_TARGETS id={species_id} names={animated_targets}")
 
 
 def main() -> None:
