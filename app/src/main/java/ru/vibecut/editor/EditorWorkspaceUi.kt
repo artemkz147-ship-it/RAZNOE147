@@ -9,7 +9,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -142,34 +140,53 @@ private fun MiniSquareButton(text: String, onClick: () -> Unit, enabled: Boolean
 
 @Composable
 internal fun WorkspaceTabBar(active: WorkspaceTab, onSelect: (WorkspaceTab) -> Unit) {
+    val rows = listOf(
+        listOf(WorkspaceTab.EDIT, WorkspaceTab.LOOK, WorkspaceTab.MOTION, WorkspaceTab.AUDIO),
+        listOf(WorkspaceTab.TEXT, WorkspaceTab.LAYERS, WorkspaceTab.AI, WorkspaceTab.PROJECT),
+    )
     Surface(color = Color(0xFF0E0E14), tonalElevation = 8.dp) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            WorkspaceTab.entries.forEach { tab ->
-                val selected = tab == active
-                Column(
-                    modifier = Modifier
-                        .width(76.dp)
-                        .background(
-                            brush = if (selected) {
-                                Brush.verticalGradient(listOf(Color(0xFF3B2768), Color(0xFF211B36)))
-                            } else {
-                                Brush.verticalGradient(listOf(Color(0xFF17171E), Color(0xFF15151B)))
-                            },
-                            shape = RoundedCornerShape(15.dp),
-                        )
-                        .border(1.dp, if (selected) Color(0xFF9B7CF7) else Color(0xFF23232C), RoundedCornerShape(15.dp))
-                        .clickable { onSelect(tab) }
-                        .padding(vertical = 7.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+            rows.forEach { tabs ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    Text(tab.glyph, color = if (selected) Color(0xFFD8C8FF) else Color(0xFFB7B7C2), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text(tab.title, color = if (selected) Color.White else Color(0xFFAAAAB6), fontSize = 10.sp, maxLines = 1)
+                    tabs.forEach { tab ->
+                        val selected = tab == active
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    brush = if (selected) {
+                                        Brush.verticalGradient(listOf(Color(0xFF3B2768), Color(0xFF211B36)))
+                                    } else {
+                                        Brush.verticalGradient(listOf(Color(0xFF17171E), Color(0xFF15151B)))
+                                    },
+                                    shape = RoundedCornerShape(13.dp),
+                                )
+                                .border(1.dp, if (selected) Color(0xFF9B7CF7) else Color(0xFF23232C), RoundedCornerShape(13.dp))
+                                .clickable { onSelect(tab) }
+                                .padding(vertical = 5.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                tab.glyph,
+                                color = if (selected) Color(0xFFD8C8FF) else Color(0xFFB7B7C2),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                tab.title,
+                                color = if (selected) Color.White else Color(0xFFAAAAB6),
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -205,8 +222,8 @@ internal fun WorkspaceSectionHeader(tab: WorkspaceTab, selectedClip: VideoClip, 
 internal fun EditorMessageBar(message: String) {
     AnimatedVisibility(
         visible = message.isNotBlank(),
-        enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 2 },
-        exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { it / 2 },
+        enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 2,
+        exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { it / 2,
     ) {
         Row(
             modifier = Modifier
