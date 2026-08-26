@@ -46,6 +46,11 @@ fun VideoEditorScreen() {
     val clips = remember {
         mutableStateListOf<VideoClip>().apply { addAll(restored?.clips.orEmpty()) }
     }
+    val positionedAudioTracks = remember {
+        mutableStateListOf<PositionedAudioTrack>().apply {
+            addAll(restored?.positionedAudioTracks.orEmpty())
+        }
+    }
     val history = remember { mutableStateListOf<EditorSnapshot>() }
     val redoHistory = remember { mutableStateListOf<EditorSnapshot>() }
 
@@ -56,6 +61,7 @@ fun VideoEditorScreen() {
         )
     }
     var positionMs by remember { mutableLongStateOf(0L) }
+    var pendingAudioStartMs by remember { mutableLongStateOf(0L) }
     var exportState by remember { mutableStateOf(ExportState.IDLE) }
     var exportProgress by remember { mutableIntStateOf(0) }
     var message by remember {
@@ -99,6 +105,7 @@ fun VideoEditorScreen() {
         exportManager.export(
             clips = clips.toList(),
             backgroundAudio = backgroundAudio,
+            positionedAudioTracks = positionedAudioTracks.toList(),
             settings = exportSettings,
             onProgress = { exportProgress = it },
             onDone = {
@@ -151,7 +158,30 @@ fun VideoEditorScreen() {
         }
     }
 
-    LaunchedEffect(clips.toList(), selectedId, backgroundAudio, exportSettings) {
+    val positionedAudioPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            persistReadPermission(context, uri)
+            val duration = readMediaDuration(context, uri)
+            positionedAudioTracks += PositionedAudioTrack(
+                id = UUID.randomUUID().toString(),
+                uri = uri.toString(),
+                name = readDisplayName(context, uri, "Звук"),
+                sourceDurationMs = duration,
+                startAtMs = pendingAudioStartMs.coerceAtLeast(0L),
+            )
+            message = "Звуковая дорожка добавлена с ${formatTime(pendingAudioStartMs)}"
+        }
+    }
+
+    LaunchedEffect(
+        clips.toList(),
+        selectedId,
+        backgroundAudio,
+        positionedAudioTracks.toList(),
+        exportSettings,
+    ) {
         delay(250L)
         ProjectStore.save(
             context,
@@ -159,12 +189,18 @@ fun VideoEditorScreen() {
                 clips = clips.toList(),
                 selectedId = selectedId,
                 backgroundAudio = backgroundAudio,
+                positionedAudioTracks = positionedAudioTracks.toList(),
                 exportSettings = exportSettings,
             )
         )
     }
 
     val selected = clips.firstOrNull { it.id == selectedId }
+    val selectedIndex = clips.indexOfFirst { it.id == selectedId }
+    val projectCursorMs = if (selected != null && selectedIndex >= 0) {
+        clips.take(selectedIndex).sumOf { it.durationMs } +
+            (positionMs / selected.speed.coerceAtLeast(0.05f)).toLong()
+    } else 0L
 
     Column(
         modifier = Modifier
@@ -211,8 +247,8 @@ fun VideoEditorScreen() {
                 positionMs = positionMs,
                 canUndo = history.isNotEmpty(),
                 canRedo = redoHistory.isNotEmpty(),
-                canMoveLeft = clips.indexOfFirst { it.id == selected.id } > 0,
-                canMoveRight = clips.indexOfFirst { it.id == selected.id } in 0 until clips.lastIndex,
+                canMoveLeft = selectedIndex > 0,
+                canMoveRight = selectedIndex in 0 until clips.lastIndex,
                 onSplit = {
                     val absolute = selected.trimStartMs + positionMs
                     if (absolute > selected.trimStartMs + 100 && absolute < selected.trimEndMs - 100) {
@@ -333,6 +369,20 @@ fun VideoEditorScreen() {
                 onUpdate = { replaceClip(it) },
             )
 
+            PositionedAudioPanel(
+                tracks = positionedAudioTracks,
+                projectCursorMs = projectCursorMs,
+                onAddAtCursor = {
+                    pendingAudioStartMs = projectCursorMs
+                    positionedAudioPicker.launch(arrayOf("audio/*"))
+                },
+                onUpdate = { updated ->
+                    val index = positionedAudioTracks.indexOfFirst { it.id == updated.id }
+                    if (index >= 0) positionedAudioTracks[index] = updated
+                },
+                onDelete = { id -> positionedAudioTracks.removeAll { it.id == id } },
+            )
+
             TextPanel(
                 clip = selected,
                 onSnapshot = { snapshot() },
@@ -372,19 +422,23 @@ private fun persistReadPermission(context: Context, uri: Uri) {
 }
 
 private fun readClip(context: Context, uri: Uri): VideoClip {
-    val retriever = MediaMetadataRetriever()
-    val duration = try {
-        retriever.setDataSource(context, uri)
-        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 1L
-    } finally {
-        retriever.release()
-    }
     return VideoClip(
         id = UUID.randomUUID().toString(),
         uri = uri.toString(),
         name = readDisplayName(context, uri, "Видео"),
-        sourceDurationMs = duration.coerceAtLeast(1L),
+        sourceDurationMs = readMediaDuration(context, uri),
     )
+}
+
+private fun readMediaDuration(context: Context, uri: Uri): Long {
+    val retriever = MediaMetadataRetriever()
+    return try {
+        retriever.setDataSource(context, uri)
+        (retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 1L)
+            .coerceAtLeast(1L)
+    } finally {
+        retriever.release()
+    }
 }
 
 private fun readDisplayName(context: Context, uri: Uri, fallback: String): String {
