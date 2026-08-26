@@ -35,7 +35,7 @@ func attach(new_actor: Node3D, actions: Dictionary) -> void:
 func play_idle() -> void:
     if animation_player == null:
         return
-    var clip := _resolve_clip(_idle_candidates)
+    var clip: StringName = _resolve_clip(_idle_candidates)
     if clip != StringName():
         _is_busy = false
         animation_player.play(clip, 0.25)
@@ -44,8 +44,8 @@ func play_action(action_name: String) -> bool:
     if animation_player == null:
         asset_error.emit("В модели отсутствует AnimationPlayer")
         return false
-    var candidates := _to_string_array(action_map.get(action_name, [action_name]))
-    var clip := _resolve_clip(candidates)
+    var candidates: Array[String] = _to_string_array(action_map.get(action_name, [action_name]))
+    var clip: StringName = _resolve_clip(candidates)
     if clip == StringName():
         return false
     _is_busy = true
@@ -56,7 +56,7 @@ func play_action(action_name: String) -> bool:
     return true
 
 func has_action(action_name: String) -> bool:
-    var candidates := _to_string_array(action_map.get(action_name, [action_name]))
+    var candidates: Array[String] = _to_string_array(action_map.get(action_name, [action_name]))
     return _resolve_clip(candidates) != StringName()
 
 func stop_all() -> void:
@@ -75,7 +75,7 @@ func _on_auto_timer_timeout() -> void:
         return
     if _auto_cycle_actions.is_empty():
         return
-    var next_action := _auto_cycle_actions.pick_random()
+    var next_action: String = str(_auto_cycle_actions.pick_random())
     if not play_action(next_action):
         play_idle()
         _queue_next_auto_action()
@@ -87,7 +87,7 @@ func _on_animation_finished(_clip: StringName) -> void:
 func _resolve_clip(candidates: Array[String]) -> StringName:
     if animation_player == null:
         return StringName()
-    var clips := animation_player.get_animation_list()
+    var clips: PackedStringArray = animation_player.get_animation_list()
     for candidate in candidates:
         for clip in clips:
             if String(clip).to_lower() == candidate.to_lower():
@@ -102,7 +102,7 @@ func _find_animation_player(root: Node) -> AnimationPlayer:
     if root is AnimationPlayer:
         return root
     for child in root.get_children():
-        var found := _find_animation_player(child)
+        var found: AnimationPlayer = _find_animation_player(child)
         if found != null:
             return found
     return null
@@ -111,7 +111,7 @@ func _find_audio_player(root: Node) -> AudioStreamPlayer3D:
     if root is AudioStreamPlayer3D:
         return root
     for child in root.get_children():
-        var found := _find_audio_player(child)
+        var found: AudioStreamPlayer3D = _find_audio_player(child)
         if found != null:
             return found
     return null
