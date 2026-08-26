@@ -1,5 +1,6 @@
 ; Engine configuration file.
 ; Godot 4.7.2 project for the interactive 3D dinosaur encyclopedia.
+; CI revision 2.
 config_version=5
 
 [application]
