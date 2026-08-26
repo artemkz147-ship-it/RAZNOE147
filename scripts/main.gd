@@ -156,7 +156,9 @@ func _assign_stream(player: Node, path: String) -> void:
     if path.is_empty() or not ResourceLoader.exists(path):
         player.set("stream", null)
         return
-    player.set("stream", load(path))
+    # Runtime audio is owned by the active dinosaur page. Avoid keeping large PCM
+    # narration/roar WAVs alive in the global ResourceLoader cache after switching.
+    player.set("stream", ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE))
 
 func _build_runtime_audio() -> void:
     ambience_player = AudioStreamPlayer.new()
