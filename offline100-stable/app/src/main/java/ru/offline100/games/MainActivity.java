@@ -18,9 +18,19 @@ import org.json.JSONObject;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "Offline100";
+    private static final String[] QA_GAMES = {
+            "ttt","connect4","snake","mines","fifteen","g2048","memory","pipes","sudoku","blocks","breakout","words","parking","liquid","maze","reversi","gomoku","nim","lights","hanoi",
+            "simon","numbers","target","reaction","math","guess","dots","chain","pong","dodge","rps","higher","blackjack","war","hangman","anagram","wordchain","odd","colormatch","memgrid",
+            "route","queens","magic","oneline","stack","flappy","catch","space","runner","compare","pyramid13","suithunt","cardmemory","exact21","tenpairs","cipher","proverb","missing",
+            "wordbuild","categoryword","takuzu","latin","knight","arrows","flood","gears","balance","numsort","timer","ballsort","shells","mole","lanes","zigzag","precision","solpairs",
+            "redblack","cardfour","cardstairs","cardsum","wordfrom","oddletter","alphabet","syllables","wordlength","sequence","parity","colorlinks","tiles3","codebreak","tap30",
+            "stopsignal","orbit","coinfall","minigolf","emojimem","changed","battleship","checkers","escape"
+    };
+
     private WebView webView;
     private String testGame;
     private boolean testFinish;
+    private boolean testAll;
     private int readyAttempts;
     private boolean qaReady;
 
@@ -29,7 +39,8 @@ public final class MainActivity extends Activity {
         try {
             testGame = getIntent() == null ? null : getIntent().getStringExtra("testGame");
             testFinish = getIntent() != null && getIntent().getBooleanExtra("testFinish", false);
-            Log.i(TAG,"TEST_REQUEST game="+testGame+" finish="+testFinish);
+            testAll = getIntent() != null && getIntent().getBooleanExtra("testAll", false);
+            Log.i(TAG,"TEST_REQUEST game="+testGame+" finish="+testFinish+" all="+testAll);
             webView = new WebView(this);
             webView.setBackgroundColor(Color.rgb(10,14,28));
             configureWebView(webView);
@@ -70,7 +81,7 @@ public final class MainActivity extends Activity {
                 Log.i(TAG,"PAGE_FINISHED "+url);
                 if (!qaReady) v.postDelayed(() -> waitForReady(v), 250);
             }
-            @Override public void onReceivedError(WebView v, android.webkit.WebResourceRequest request, android.webkit.WebResourceError error) {
+            @Override public void onReceivedError(WebView v, WebResourceRequest request, android.webkit.WebResourceError error) {
                 if (request != null && request.isForMainFrame()) Log.e(TAG,"MAIN_FRAME_ERROR "+error);
             }
             @Override public boolean onRenderProcessGone(WebView v, RenderProcessGoneDetail detail) {
@@ -104,11 +115,12 @@ public final class MainActivity extends Activity {
                 "const cards=[...document.querySelectorAll('.game-card')];"+
                 "const ids=cards.map(c=>c.dataset.id||'');"+
                 "const titleIssues=cards.filter(c=>{const h=c.querySelector('h3');if(!h)return true;return h.scrollWidth>h.clientWidth+1||h.scrollHeight>h.clientHeight+1}).map(c=>c.dataset.id);"+
-                "return {cards:cards.length,unique:new Set(ids).size,bodyOverflow:document.documentElement.scrollWidth>window.innerWidth+2,titleIssues,viewport:[innerWidth,innerHeight]};"+
+                "return {cards:cards.length,unique:new Set(ids).size,aiCards:cards.filter(c=>c.querySelector('.ai-card-badge')).length,bodyOverflow:document.documentElement.scrollWidth>window.innerWidth+2,titleIssues,viewport:[innerWidth,innerHeight]};"+
                 "})())";
         v.evaluateJavascript(js, snap -> {
             Log.i(TAG,"HOME_QA="+snap);
-            if (testGame != null && !testGame.isEmpty()) v.postDelayed(() -> runQaProbe(v), 1500);
+            if (testAll) v.postDelayed(() -> runQaAll(v, 0), 250);
+            else if (testGame != null && !testGame.isEmpty()) v.postDelayed(() -> runQaProbe(v), 750);
         });
     }
 
@@ -151,15 +163,38 @@ public final class MainActivity extends Activity {
             v.postDelayed(() -> v.evaluateJavascript(gameSnapshotJs(), snap -> {
                 Log.i(TAG,"QA_SNAPSHOT="+snap);
                 if (testFinish) finishQaProbe(v);
-            }), 500);
+            }), 400);
         });
     }
 
     private void finishQaProbe(WebView v) {
         v.postDelayed(() -> v.evaluateJavascript("Boolean(window.__finishForTest&&window.__finishForTest())", finished -> {
             Log.i(TAG,"QA_FINISH game="+testGame+" finished="+finished);
-            v.postDelayed(() -> v.evaluateJavascript(resultSnapshotJs(), snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap)), 500);
-        }), 350);
+            v.postDelayed(() -> v.evaluateJavascript(resultSnapshotJs(), snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap)), 300);
+        }), 200);
+    }
+
+    private void runQaAll(WebView v, int index) {
+        if (v == null) return;
+        if (index >= QA_GAMES.length) {
+            Log.i(TAG, "QA_ALL_DONE count="+QA_GAMES.length);
+            return;
+        }
+        final String game = QA_GAMES[index];
+        final String id = JSONObject.quote(game);
+        v.evaluateJavascript("Boolean(window.__openGameForTest&&window.__openGameForTest("+id+"))", opened -> {
+            Log.i(TAG,"QA_ALL_OPEN "+game+"="+opened);
+            v.postDelayed(() -> v.evaluateJavascript(gameSnapshotJs(), snap -> {
+                Log.i(TAG,"QA_ALL_GAME "+game+"="+snap);
+                v.evaluateJavascript("Boolean(window.__finishForTest&&window.__finishForTest())", finished -> {
+                    Log.i(TAG,"QA_ALL_FINISH "+game+"="+finished);
+                    v.postDelayed(() -> v.evaluateJavascript(resultSnapshotJs(), result -> {
+                        Log.i(TAG,"QA_ALL_RESULT "+game+"="+result);
+                        v.postDelayed(() -> runQaAll(v, index+1), 60);
+                    }), 170);
+                });
+            }), 260);
+        });
     }
 
     private void applyImmersiveMode() {
