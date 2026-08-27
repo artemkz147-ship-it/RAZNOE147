@@ -23,8 +23,10 @@
 .game-mount button,
 .game-mount input,
 .game-mount select,
-.game-mount textarea {
+.game-mount textarea,
+.game-mount canvas {
   min-width:0;
+  max-width:100%;
   box-sizing:border-box;
 }
 
@@ -69,6 +71,26 @@ body[data-game="blocks"] .block-controls button {
   width:100%;
   padding-left:2px;
   padding-right:2px;
+}
+
+/* Dots & Boxes used 94vw inside a narrower padded game mount. */
+body[data-game="dots"] .dots-canvas {
+  width:min(100%,440px) !important;
+  max-width:100% !important;
+  height:auto !important;
+  display:block;
+  box-sizing:border-box;
+}
+
+/* Other inner surfaces that use viewport widths in the base stylesheet.
+   Cap them to the actual game mount so later games in the full 100-game pass
+   cannot exceed the padded Android play panel. */
+.alphabet,.word-options,.compare-expr,.proverb-answer,.balance-scale,
+.card-stairs,.word-sort-list,.code-breaker,.tap-thirty,.escape-room,
+.target-field,.precision-bar {
+  max-width:100% !important;
+  min-width:0;
+  box-sizing:border-box;
 }
 
 /* Keep the most common fixed-grid families inside the play panel. */
