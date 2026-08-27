@@ -11,9 +11,12 @@
 .game-mount [class$="-wrap"],
 .game-mount [class*="-wrap "],
 .game-mount [class$="-pad"],
-.game-mount [class*="-pad "] {
+.game-mount [class*="-pad "],
+.game-mount [class$="-controls"],
+.game-mount [class*="-controls "] {
   max-width:100% !important;
   min-width:0;
+  box-sizing:border-box;
 }
 
 .game-mount .cell,
@@ -22,6 +25,7 @@
 .game-mount select,
 .game-mount textarea {
   min-width:0;
+  box-sizing:border-box;
 }
 
 /* Sudoku has nine tracks; minmax(0,1fr) prevents button min-content from
@@ -39,6 +43,34 @@ body[data-game="sudoku"] .sudoku-board .cell {
   padding:0 !important;
 }
 
+/* Falling Blocks had a 94vw control row inside a narrower padded game mount.
+   Size both the board/preview layout and controls from the mount itself. */
+body[data-game="blocks"] .blocks-layout {
+  width:min(100%,311px) !important;
+  max-width:100% !important;
+  grid-template-columns:minmax(0,1fr) minmax(48px,64px) !important;
+  box-sizing:border-box;
+}
+body[data-game="blocks"] .block-board {
+  width:100% !important;
+  min-width:0 !important;
+}
+body[data-game="blocks"] .blocks-layout aside {
+  min-width:0;
+  box-sizing:border-box;
+  padding:7px;
+}
+body[data-game="blocks"] .block-controls {
+  width:min(100%,460px) !important;
+  max-width:100% !important;
+  grid-template-columns:repeat(5,minmax(0,1fr)) !important;
+}
+body[data-game="blocks"] .block-controls button {
+  width:100%;
+  padding-left:2px;
+  padding-right:2px;
+}
+
 /* Keep the most common fixed-grid families inside the play panel. */
 .ttt-board,.connect-board,.mine-board,.slide-board,.g2048,.memory-board,
 .pipe-board,.word-grid,.parking-board,.maze-board,.block-board,.reversi-board,
@@ -54,4 +86,6 @@ body[data-game="sudoku"] .sudoku-board .cell {
   .game-mount {overflow-x:clip;}
   body[data-game="sudoku"] .sudoku-board .cell {font-size:clamp(11px,3.4vw,15px);}
   body[data-game="sudoku"] .sudoku-pad .small-action {padding:8px 3px;}
+  body[data-game="blocks"] .block-controls {gap:4px;}
+  body[data-game="blocks"] .block-controls button {font-size:17px;min-height:40px;}
 }
