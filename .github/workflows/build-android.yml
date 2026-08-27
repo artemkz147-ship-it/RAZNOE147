@@ -67,7 +67,7 @@ jobs:
         run: |
           set -euxo pipefail
           python3 tools/fetch_next_dinosaurs.py "${GLTFPACK_VERSION}"
-          for id in triceratops velociraptor stegosaurus apatosaurus dilophosaurus; do
+          for id in triceratops velociraptor stegosaurus apatosaurus parasaurolophus; do
             test -s "assets/dinosaurs/${id}/model.glb"
           done
 
@@ -87,7 +87,7 @@ jobs:
           bash tools/build_audio_assets.sh
           python3 tools/build_species_roars.py
           test -s assets/audio/tyrannosaurus_rex/roar_realistic.wav
-          for id in triceratops velociraptor stegosaurus apatosaurus dilophosaurus; do
+          for id in triceratops velociraptor stegosaurus apatosaurus parasaurolophus; do
             test -s "assets/audio/${id}/roar_voice.wav"
           done
 
