@@ -80,8 +80,7 @@ body[data-game="dots"] .dots-canvas {
   box-sizing:border-box;
 }
 
-/* Hangman: the 8-column Cyrillic keyboard and long masked words must size
-   from the padded play panel, never from viewport width. */
+/* Hangman */
 body[data-game="hangman"] .hangman {
   width:100% !important;
   max-width:100% !important;
@@ -114,6 +113,38 @@ body[data-game="hangman"] .masked-word {
   box-sizing:border-box;
 }
 
+/* Compare: the expression/result row used viewport-sized spacing and could
+   remain wider than the padded game mount even when the outer node was capped. */
+body[data-game="compare"] .compare-expr,
+body[data-game="compare"] .compare-expr > *,
+body[data-game="compare"] .compare-actions,
+body[data-game="compare"] .compare-actions > * {
+  width:auto !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  box-sizing:border-box !important;
+}
+body[data-game="compare"] .compare-expr {
+  width:100% !important;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:8px;
+  white-space:normal !important;
+  overflow-wrap:anywhere;
+}
+body[data-game="compare"] .compare-actions {
+  width:100% !important;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+}
+body[data-game="compare"] .compare-actions button {
+  width:100% !important;
+  padding-left:4px !important;
+  padding-right:4px !important;
+}
+
 /* Other inner surfaces that use viewport widths in the base stylesheet. */
 .alphabet,.word-options,.compare-expr,.proverb-answer,.balance-scale,
 .card-stairs,.word-sort-list,.code-breaker,.tap-thirty,.escape-room,
@@ -143,4 +174,5 @@ body[data-game="hangman"] .masked-word {
   body[data-game="hangman"] .alphabet {gap:4px;}
   body[data-game="hangman"] .letter-btn {font-size:13px;min-height:38px;}
   body[data-game="hangman"] .masked-word {font-size:clamp(22px,7vw,34px);}
+  body[data-game="compare"] .compare-expr {font-size:clamp(20px,6vw,30px);}
 }
