@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 APK="offline100-stable/app/build/outputs/apk/debug/app-debug.apk"
 PKG="ru.offline100.games"
 ACT="$PKG/.MainActivity"
@@ -12,26 +12,19 @@ ALL_GAMES=(
   redblack cardfour cardstairs cardsum wordfrom oddletter alphabet syllables wordlength sequence parity colorlinks tiles3 codebreak tap30
   stopsignal orbit coinfall minigolf emojimem changed battleship checkers escape
 )
-DUO_GAMES=" ttt connect4 reversi gomoku nim dots checkers "
 
 if [[ ${#ALL_GAMES[@]} -ne 100 ]]; then
   echo "Expected 100 games, got ${#ALL_GAMES[@]}" >&2
   exit 2
 fi
 
-fail_on_crash() {
+has_crash() {
   local log="$1"
-  if grep -E 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE|MAIN_FRAME_ERROR|QA_READY_TIMEOUT' "$log"; then
-    echo "Crash/error marker in $log" >&2
-    exit 42
-  fi
+  grep -Eq 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE|MAIN_FRAME_ERROR|QA_READY_TIMEOUT' "$log"
 }
 
 capture_log_until() {
-  local file="$1"
-  local pattern="$2"
-  local tries="${3:-35}"
-  local i
+  local file="$1" pattern="$2" tries="${3:-35}" i
   for ((i=1;i<=tries;i++)); do
     adb logcat -d > "$file"
     if grep -q "$pattern" "$file"; then return 0; fi
@@ -39,7 +32,6 @@ capture_log_until() {
   done
   adb logcat -d > "$file"
   echo "Timed out waiting for $pattern in $file" >&2
-  tail -120 "$file" >&2 || true
   return 1
 }
 
@@ -93,54 +85,89 @@ else:
 PY
 }
 
-adb install -r "$APK"
+adb install -r "$APK" || exit 10
 
-# 1) Cold launch + complete catalog sanity.
+# Home is a hard prerequisite.
 adb logcat -c
 adb shell am force-stop "$PKG"
-adb shell am start -W -n "$ACT"
-capture_log_until qa-home.log 'HOME_QA=' 45
-adb exec-out screencap -p > qa-home.png
-fail_on_crash qa-home.log
-validate_marker_json qa-home.log 'HOME_QA=' home
-adb shell pidof "$PKG" | grep -q '[0-9]'
-adb shell dumpsys activity activities | grep -q "$PKG/.MainActivity"
+adb shell am start -W -n "$ACT" || exit 11
+capture_log_until qa-home.log 'HOME_QA=' 45 || exit 12
+adb exec-out screencap -p > qa-home.png || true
+if has_crash qa-home.log; then echo 'HOME_FAIL crash' | tee qa-failures.log; exit 13; fi
+validate_marker_json qa-home.log 'HOME_QA=' home || exit 14
+adb shell pidof "$PKG" | grep -q '[0-9]' || exit 15
+adb shell dumpsys activity activities | grep -q "$PKG/.MainActivity" || exit 16
 
-# 2) Open every game individually. Validate title, objective, non-empty playfield,
-# responsive width, special UX, and default AI for every real two-player title.
 : > qa-all-games-summary.log
+: > qa-failures.log
+FAIL_COUNT=0
+
+record_fail() {
+  local phase="$1" game="$2" reason="$3"
+  echo "${phase}_FAIL $game :: $reason" | tee -a qa-all-games-summary.log qa-failures.log
+  FAIL_COUNT=$((FAIL_COUNT+1))
+}
+
+# Open and validate every one of the 100 games. Do not abort on the first bad
+# layout: collect the whole defect set in a single emulator pass.
 for GAME in "${ALL_GAMES[@]}"; do
   LOG="qa-game-$GAME.log"
   adb logcat -c
   adb shell am force-stop "$PKG"
-  adb shell am start -W -n "$ACT" --es testGame "$GAME" >/dev/null
-  capture_log_until "$LOG" 'QA_SNAPSHOT=' 35
-  fail_on_crash "$LOG"
-  validate_marker_json "$LOG" 'QA_SNAPSHOT=' game "$GAME"
-  adb shell pidof "$PKG" | grep -q '[0-9]'
-  adb exec-out screencap -p > "qa-game-$GAME.png"
+  if ! adb shell am start -W -n "$ACT" --es testGame "$GAME" >/dev/null; then
+    record_fail OPEN "$GAME" 'activity start failed'; continue
+  fi
+  if ! capture_log_until "$LOG" 'QA_SNAPSHOT=' 35; then
+    record_fail OPEN "$GAME" 'QA snapshot timeout'; continue
+  fi
+  adb exec-out screencap -p > "qa-game-$GAME.png" || true
+  if has_crash "$LOG"; then
+    record_fail OPEN "$GAME" 'crash marker'; continue
+  fi
+  ERR=$(validate_marker_json "$LOG" 'QA_SNAPSHOT=' game "$GAME" 2>&1) || {
+    record_fail OPEN "$GAME" "$ERR"; continue;
+  }
+  if ! adb shell pidof "$PKG" | grep -q '[0-9]'; then
+    record_fail OPEN "$GAME" 'process not alive'; continue
+  fi
   echo "OPEN_OK $GAME" >> qa-all-games-summary.log
 done
 
-# 3) Force the unified end state for every game and validate that each one has
-# a readable result, repeated goal, and all three navigation actions.
+# Validate the unified final state for all 100 games independently too.
 for GAME in "${ALL_GAMES[@]}"; do
   LOG="qa-final-$GAME.log"
   adb logcat -c
   adb shell am force-stop "$PKG"
-  adb shell am start -W -n "$ACT" --es testGame "$GAME" --ez testFinish true >/dev/null
-  capture_log_until "$LOG" 'RESULT_SNAPSHOT=' 35
-  fail_on_crash "$LOG"
-  validate_marker_json "$LOG" 'QA_SNAPSHOT=' game "$GAME"
-  validate_marker_json "$LOG" 'RESULT_SNAPSHOT=' result "$GAME"
-  adb shell pidof "$PKG" | grep -q '[0-9]'
-  adb exec-out screencap -p > "qa-final-$GAME.png"
+  if ! adb shell am start -W -n "$ACT" --es testGame "$GAME" --ez testFinish true >/dev/null; then
+    record_fail FINAL "$GAME" 'activity start failed'; continue
+  fi
+  if ! capture_log_until "$LOG" 'RESULT_SNAPSHOT=' 35; then
+    record_fail FINAL "$GAME" 'result snapshot timeout'; continue
+  fi
+  adb exec-out screencap -p > "qa-final-$GAME.png" || true
+  if has_crash "$LOG"; then
+    record_fail FINAL "$GAME" 'crash marker'; continue
+  fi
+  ERR=$(validate_marker_json "$LOG" 'QA_SNAPSHOT=' game "$GAME" 2>&1) || {
+    record_fail FINAL "$GAME" "$ERR"; continue;
+  }
+  ERR=$(validate_marker_json "$LOG" 'RESULT_SNAPSHOT=' result "$GAME" 2>&1) || {
+    record_fail FINAL "$GAME" "$ERR"; continue;
+  }
+  if ! adb shell pidof "$PKG" | grep -q '[0-9]'; then
+    record_fail FINAL "$GAME" 'process not alive'; continue
+  fi
   echo "FINAL_OK $GAME" >> qa-all-games-summary.log
 done
 
-OPEN_COUNT=$(grep -c '^OPEN_OK ' qa-all-games-summary.log)
-FINAL_COUNT=$(grep -c '^FINAL_OK ' qa-all-games-summary.log)
-test "$OPEN_COUNT" -eq 100
-test "$FINAL_COUNT" -eq 100
+OPEN_COUNT=$(grep -c '^OPEN_OK ' qa-all-games-summary.log || true)
+FINAL_COUNT=$(grep -c '^FINAL_OK ' qa-all-games-summary.log || true)
+echo "QA_TOTAL open=$OPEN_COUNT/100 final=$FINAL_COUNT/100 failures=$FAIL_COUNT" | tee -a qa-all-games-summary.log
 
-echo "QA_OK open=$OPEN_COUNT final=$FINAL_COUNT"
+if [[ "$FAIL_COUNT" -ne 0 || "$OPEN_COUNT" -ne 100 || "$FINAL_COUNT" -ne 100 ]]; then
+  echo 'FULL_QA_FAILED'
+  cat qa-failures.log
+  exit 1
+fi
+
+echo 'QA_OK open=100 final=100 failures=0'
