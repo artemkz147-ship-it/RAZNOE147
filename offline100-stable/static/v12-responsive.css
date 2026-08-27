@@ -1,6 +1,5 @@
 /* v1.2 responsive safety layer.
-   Game layouts live inside .game-mount, so viewport-based widths must never
-   be allowed to exceed that container on narrow Android screens. */
+   Every game is contained by the padded Android play panel. */
 .game-mount,
 .game-shell,
 .game-mount > *,
@@ -19,6 +18,16 @@
   box-sizing:border-box;
 }
 
+/* Structural containment for all 100 games: inner flex/grid/content boxes may
+   shrink inside the play panel instead of keeping viewport/min-content widths. */
+.game-mount *,
+.game-mount *::before,
+.game-mount *::after {
+  box-sizing:border-box;
+  max-width:100%;
+  min-width:0;
+}
+
 .game-mount .cell,
 .game-mount button,
 .game-mount input,
@@ -28,6 +37,18 @@
   min-width:0;
   max-width:100%;
   box-sizing:border-box;
+}
+
+/* Text/content should wrap instead of growing the playfield. */
+.game-mount button,
+.game-mount .word-chip,
+.game-mount .proverb-answer,
+.game-mount .word-options,
+.game-mount .found-words,
+.game-mount .code-history,
+.game-mount .inventory {
+  overflow-wrap:anywhere;
+  word-break:normal;
 }
 
 /* Sudoku */
@@ -176,16 +197,17 @@ body[data-game="proverb"] .word-options button {
   padding-right:8px !important;
 }
 
-/* Other inner surfaces that use viewport widths in the base stylesheet. */
+/* Common viewport-sized surfaces. */
 .alphabet,.word-options,.compare-expr,.proverb-answer,.balance-scale,
 .card-stairs,.word-sort-list,.code-breaker,.tap-thirty,.escape-room,
-.target-field,.precision-bar {
+.target-field,.precision-bar,.new-card-grid,.number-pair-grid,.puzzle4,
+.ball-tubes,.shell-row,.color-controls,.object-row,.code-history {
   max-width:100% !important;
   min-width:0;
   box-sizing:border-box;
 }
 
-/* Keep common fixed-grid families inside the play panel. */
+/* Common fixed-grid families. */
 .ttt-board,.connect-board,.mine-board,.slide-board,.g2048,.memory-board,
 .pipe-board,.word-grid,.parking-board,.maze-board,.block-board,.reversi-board,
 .gomoku-board,.lights-board,.hanoi-wrap,.simon-board,.reaction-pad,.chain-board,
