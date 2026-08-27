@@ -113,8 +113,7 @@ body[data-game="hangman"] .masked-word {
   box-sizing:border-box;
 }
 
-/* Compare: the expression/result row used viewport-sized spacing and could
-   remain wider than the padded game mount even when the outer node was capped. */
+/* Compare */
 body[data-game="compare"] .compare-expr,
 body[data-game="compare"] .compare-expr > *,
 body[data-game="compare"] .compare-actions,
@@ -143,6 +142,38 @@ body[data-game="compare"] .compare-actions button {
   width:100% !important;
   padding-left:4px !important;
   padding-right:4px !important;
+}
+
+/* Proverb */
+body[data-game="proverb"] .proverb-answer,
+body[data-game="proverb"] .word-options {
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  box-sizing:border-box !important;
+  display:flex !important;
+  flex-wrap:wrap !important;
+  justify-content:center;
+  align-items:center;
+  gap:8px;
+  white-space:normal !important;
+  overflow-wrap:anywhere;
+}
+body[data-game="proverb"] .proverb-answer > *,
+body[data-game="proverb"] .word-options > * {
+  width:auto !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  box-sizing:border-box !important;
+  white-space:normal !important;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+body[data-game="proverb"] .proverb-answer button,
+body[data-game="proverb"] .word-options button {
+  flex:0 1 auto !important;
+  padding-left:8px !important;
+  padding-right:8px !important;
 }
 
 /* Other inner surfaces that use viewport widths in the base stylesheet. */
@@ -175,4 +206,8 @@ body[data-game="compare"] .compare-actions button {
   body[data-game="hangman"] .letter-btn {font-size:13px;min-height:38px;}
   body[data-game="hangman"] .masked-word {font-size:clamp(22px,7vw,34px);}
   body[data-game="compare"] .compare-expr {font-size:clamp(20px,6vw,30px);}
+  body[data-game="proverb"] .proverb-answer,
+  body[data-game="proverb"] .word-options {gap:6px;}
+  body[data-game="proverb"] .proverb-answer button,
+  body[data-game="proverb"] .word-options button {font-size:14px;}
 }
