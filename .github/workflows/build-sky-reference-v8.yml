@@ -62,15 +62,15 @@ jobs:
             path=pathlib.Path(path); path.parent.mkdir(parents=True,exist_ok=True)
             with urllib.request.urlopen(url,timeout=90) as r:path.write_bytes(r.read())
           for repo,branch,ac_path,root in MODELS:
-            root=pathlib.Path(root);base=f'https://raw.githubusercontent.com/{repo}/{branch}/'
-            local=root/ac_path;dl(base+urllib.parse.quote(ac_path,safe='/'),local)
+            root=pathlib.Path(root); base=f'https://raw.githubusercontent.com/{repo}/{branch}/'
+            local=root/ac_path; dl(base+urllib.parse.quote(ac_path,safe='/'),local)
             text=local.read_text(errors='ignore')
             refs=sorted(set(re.findall(r'(?im)^\s*texture\s+"([^"]+)"',text)))
             for ref in refs:
-              ref=ref.replace('\\','/');remote=posixpath.normpath(posixpath.join(posixpath.dirname(ac_path),ref))
-              if remote.startswith('../'):continue
-              try:dl(base+urllib.parse.quote(remote,safe='/'),root/remote)
-              except Exception as e:print('optional texture missing',remote,e)
+              ref=ref.replace('\\','/'); remote=posixpath.normpath(posixpath.join(posixpath.dirname(ac_path),ref))
+              if remote.startswith('../'): continue
+              try: dl(base+urllib.parse.quote(remote,safe='/'),root/remote)
+              except Exception as e: print('optional texture missing',remote,e)
 
       - name: Convert detailed aircraft to GLB2
         working-directory: skyfrontiers3d
@@ -103,11 +103,16 @@ jobs:
       - name: Build web runtime
         working-directory: skyfrontiers3d
         run: |
+          set -euo pipefail
           npm install --no-audit --no-fund
           npm run build
           for f in c172_fg b777_fg f16_fg; do test -s dist/models/$f.glb; done
-          grep -q 'style.css' dist/index.html
-          grep -R -q 'throttle-unit' dist/assets dist/index.html
+          grep -Eq 'assets/[^" ]+\.css' dist/index.html
+          CSS=$(find dist/assets -maxdepth 1 -type f -name '*.css' | head -1)
+          test -n "$CSS"
+          grep -q 'throttle-unit' "$CSS"
+          grep -q 'round-gauge' "$CSS"
+          grep -q 'start-nav' "$CSS"
           ! grep -R -q 'spawnEmergencyPlaceholder' dist/assets
 
       - name: Copy web build into Android
@@ -141,11 +146,16 @@ jobs:
           APK=app/build/outputs/apk/debug/app-debug.apk
           for f in c172_fg b777_fg f16_fg; do unzip -l "$APK" | grep -q "assets/www/models/$f.glb"; done
           unzip -l "$APK" | grep -q 'assets/www/quality/sky.hdr'
-          unzip -p "$APK" assets/www/index.html | grep -q 'style.css'
+          unzip -p "$APK" assets/www/index.html | grep -Eq 'assets/[^" ]+\.css'
           unzip -p "$APK" assets/www/index.html | grep -q 'startDeck'
           CSS=$(unzip -Z1 "$APK" | grep '^assets/www/assets/.*\.css$' | head -1)
           test -n "$CSS"
           unzip -p "$APK" "$CSS" | grep -q 'throttle-unit'
+          unzip -p "$APK" "$CSS" | grep -q 'round-gauge'
+          unzip -p "$APK" "$CSS" | grep -q 'start-nav'
+          JS=$(unzip -Z1 "$APK" | grep '^assets/www/assets/.*\.js$' | head -1)
+          test -n "$JS"
+          ! unzip -p "$APK" "$JS" | grep -q 'spawnEmergencyPlaceholder'
           SIZE=$(stat -c%s "$APK"); echo "APK bytes: $SIZE"; test "$SIZE" -ge 18000000
           cp "$APK" ../../Sky-Frontiers-3D-REFERENCE-V8.apk
 
