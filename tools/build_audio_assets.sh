@@ -57,7 +57,7 @@ python3 -m venv /tmp/silero-venv
 /tmp/silero-venv/bin/pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
 curl -L --fail --retry 5 --retry-all-errors -o /tmp/v5_5_ru.pt 'https://models.silero.ai/models/tts/ru/v5_5_ru.pt'
 
-for species_id in tyrannosaurus_rex triceratops velociraptor stegosaurus apatosaurus dilophosaurus; do
+for species_id in tyrannosaurus_rex triceratops velociraptor stegosaurus apatosaurus parasaurolophus; do
   mkdir -p "assets/audio/${species_id}"
   /tmp/silero-venv/bin/python tools/generate_silero_narration.py /tmp/v5_5_ru.pt "assets/audio/${species_id}/narration_ru_raw.wav" "${species_id}"
   ffmpeg -hide_banner -loglevel error -y -i "assets/audio/${species_id}/narration_ru_raw.wav" \
