@@ -86,3 +86,5 @@
 ## Лицензия Creative Commons
 
 Для всех моделей с пометкой CC BY 4.0 действует Creative Commons Attribution 4.0 International: https://creativecommons.org/licenses/by/4.0/
+
+<!-- build-trigger: package latest locomotion pass -->
