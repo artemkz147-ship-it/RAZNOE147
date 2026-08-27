@@ -15,7 +15,7 @@ PROFILES = {
     "velociraptor": dict(speed=1.58, seconds=2.35, lowpass=4200.0, highpass=150.0, sub_hz=0.0, sub=0.0, noise=0.035, drive=1.55, tremolo=9.0),
     "stegosaurus": dict(speed=0.70, seconds=4.6, lowpass=980.0, highpass=30.0, sub_hz=48.0, sub=0.20, noise=0.004, drive=1.35, tremolo=2.4),
     "apatosaurus": dict(speed=0.50, seconds=6.5, lowpass=620.0, highpass=24.0, sub_hz=34.0, sub=0.28, noise=0.003, drive=1.45, tremolo=1.6),
-    "dilophosaurus": dict(speed=1.27, seconds=3.15, lowpass=3000.0, highpass=95.0, sub_hz=72.0, sub=0.08, noise=0.018, drive=1.50, tremolo=6.2),
+    "parasaurolophus": dict(speed=0.92, seconds=4.4, lowpass=1850.0, highpass=48.0, sub_hz=64.0, sub=0.12, noise=0.008, drive=1.28, tremolo=3.8),
 }
 
 
