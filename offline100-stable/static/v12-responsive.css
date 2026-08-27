@@ -30,8 +30,7 @@
   box-sizing:border-box;
 }
 
-/* Sudoku has nine tracks; minmax(0,1fr) prevents button min-content from
-   forcing the board wider than its container. */
+/* Sudoku */
 body[data-game="sudoku"] .sudoku-board {
   width:min(100%,500px) !important;
   grid-template-columns:repeat(9,minmax(0,1fr)) !important;
@@ -45,8 +44,7 @@ body[data-game="sudoku"] .sudoku-board .cell {
   padding:0 !important;
 }
 
-/* Falling Blocks had a 94vw control row inside a narrower padded game mount.
-   Size both the board/preview layout and controls from the mount itself. */
+/* Falling Blocks */
 body[data-game="blocks"] .blocks-layout {
   width:min(100%,311px) !important;
   max-width:100% !important;
@@ -73,7 +71,7 @@ body[data-game="blocks"] .block-controls button {
   padding-right:2px;
 }
 
-/* Dots & Boxes used 94vw inside a narrower padded game mount. */
+/* Dots & Boxes */
 body[data-game="dots"] .dots-canvas {
   width:min(100%,440px) !important;
   max-width:100% !important;
@@ -82,9 +80,41 @@ body[data-game="dots"] .dots-canvas {
   box-sizing:border-box;
 }
 
-/* Other inner surfaces that use viewport widths in the base stylesheet.
-   Cap them to the actual game mount so later games in the full 100-game pass
-   cannot exceed the padded Android play panel. */
+/* Hangman: the 8-column Cyrillic keyboard and long masked words must size
+   from the padded play panel, never from viewport width. */
+body[data-game="hangman"] .hangman {
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  margin-left:0 !important;
+  margin-right:0 !important;
+  box-sizing:border-box;
+}
+body[data-game="hangman"] .alphabet {
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  grid-template-columns:repeat(8,minmax(0,1fr)) !important;
+  box-sizing:border-box;
+}
+body[data-game="hangman"] .letter-btn {
+  width:100% !important;
+  min-width:0 !important;
+  padding-left:2px !important;
+  padding-right:2px !important;
+}
+body[data-game="hangman"] .masked-word {
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  text-align:center;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  letter-spacing:clamp(1px,1vw,4px);
+  box-sizing:border-box;
+}
+
+/* Other inner surfaces that use viewport widths in the base stylesheet. */
 .alphabet,.word-options,.compare-expr,.proverb-answer,.balance-scale,
 .card-stairs,.word-sort-list,.code-breaker,.tap-thirty,.escape-room,
 .target-field,.precision-bar {
@@ -93,7 +123,7 @@ body[data-game="dots"] .dots-canvas {
   box-sizing:border-box;
 }
 
-/* Keep the most common fixed-grid families inside the play panel. */
+/* Keep common fixed-grid families inside the play panel. */
 .ttt-board,.connect-board,.mine-board,.slide-board,.g2048,.memory-board,
 .pipe-board,.word-grid,.parking-board,.maze-board,.block-board,.reversi-board,
 .gomoku-board,.lights-board,.hanoi-wrap,.simon-board,.reaction-pad,.chain-board,
@@ -110,4 +140,7 @@ body[data-game="dots"] .dots-canvas {
   body[data-game="sudoku"] .sudoku-pad .small-action {padding:8px 3px;}
   body[data-game="blocks"] .block-controls {gap:4px;}
   body[data-game="blocks"] .block-controls button {font-size:17px;min-height:40px;}
+  body[data-game="hangman"] .alphabet {gap:4px;}
+  body[data-game="hangman"] .letter-btn {font-size:13px;min-height:38px;}
+  body[data-game="hangman"] .masked-word {font-size:clamp(22px,7vw,34px);}
 }
