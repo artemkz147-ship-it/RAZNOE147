@@ -1,0 +1,55 @@
+name: Build Dino Museum APK
+
+on:
+  push:
+    branches:
+      - chatgpt/dino-museum-v1
+    paths:
+      - 'dino-museum/**'
+      - '.github/workflows/build-dino-museum-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dino-museum
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Generate T. rex assets
+        run: python tools/generate_assets.py
+
+      - name: Verify exemplar asset set
+        run: |
+          test "$(find app/src/main/assets/dinosaurs/tyrannosaurus_rex -maxdepth 1 -name '*.svg' | wc -l)" -eq 10
+          test -f app/src/main/assets/index.html
+          grep -q "Tyrannosaurus rex" app/src/main/assets/index.html
+          grep -q "const dinosaurs=" app/src/main/assets/index.html
+
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dino-museum-apk
+          path: dino-museum/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
