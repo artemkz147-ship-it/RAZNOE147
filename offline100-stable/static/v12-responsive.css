@@ -237,6 +237,38 @@ body[data-game="balance"] .choice-buttons .big-choice {
   padding-right:4px !important;
 }
 
+/* Syllable Builder */
+body[data-game="syllables"] .syllable-game {
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  margin-left:0 !important;
+  margin-right:0 !important;
+}
+body[data-game="syllables"] .proverb-answer {
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  padding-left:10px !important;
+  padding-right:10px !important;
+  overflow-wrap:anywhere;
+}
+body[data-game="syllables"] .choice-buttons {
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  display:grid !important;
+  grid-template-columns:repeat(auto-fit,minmax(72px,1fr)) !important;
+  gap:8px !important;
+}
+body[data-game="syllables"] .choice-buttons .big-choice {
+  width:100% !important;
+  min-width:0 !important;
+  padding-left:6px !important;
+  padding-right:6px !important;
+  overflow-wrap:anywhere;
+}
+
 /* Common viewport-sized surfaces. */
 .alphabet,.word-options,.compare-expr,.proverb-answer,.balance-scale,
 .card-stairs,.word-sort-list,.code-breaker,.tap-thirty,.escape-room,
