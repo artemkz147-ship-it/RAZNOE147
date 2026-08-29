@@ -1,0 +1,45 @@
+name: Build Alias No Ads APK v2
+
+on:
+  push:
+    branches: [alias-noads-build34-apk-v2]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and unpack project
+        run: |
+          set -euxo pipefail
+          sha256sum alias-apk-v2/project.zip
+          test "$(sha256sum alias-apk-v2/project.zip | awk '{print $1}')" = "7e00c513ee285baa665c1c380843b013b3cd3a32ca614f56109a703bd7761f89"
+          rm -rf alias-apk-v2/project
+          mkdir -p alias-apk-v2/project
+          unzip -q alias-apk-v2/project.zip -d alias-apk-v2/project
+          test -f alias-apk-v2/project/settings.gradle.kts
+          test -f alias-apk-v2/project/app/src/main/assets/www/code.js
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Build installable APK
+        working-directory: alias-apk-v2/project
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Prepare artifact
+        run: |
+          cp alias-apk-v2/project/app/build/outputs/apk/debug/app-debug.apk AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk
+          ls -lh AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk
+          sha256sum AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk > AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AliasTop_BUILD_34_NO_ADS_APK
+          path: |
+            AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk
+            AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
