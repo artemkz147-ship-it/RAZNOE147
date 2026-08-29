@@ -4,10 +4,10 @@ APK="offline100-stable/app/build/outputs/apk/debug/app-debug.apk"
 PKG="ru.offline100.games"
 ACT="$PKG/.MainActivity"
 
-# Original games 1-50 are intentionally excluded.
-# At width 412, tail games 51-66 already passed, so resume at Balance (#67).
+# User requested the remaining half only. Original games 1-50 are never launched here.
 TAIL50="pyramid13,suithunt,cardmemory,exact21,tenpairs,cipher,proverb,missing,wordbuild,categoryword,takuzu,latin,knight,arrows,flood,gears,balance,numsort,timer,ballsort,shells,mole,lanes,zigzag,precision,solpairs,redblack,cardfour,cardstairs,cardsum,wordfrom,oddletter,alphabet,syllables,wordlength,sequence,parity,colorlinks,tiles3,codebreak,tap30,stopsignal,orbit,coinfall,minigolf,emojimem,changed,battleship,checkers,escape"
-TAIL34="balance,numsort,timer,ballsort,shells,mole,lanes,zigzag,precision,solpairs,redblack,cardfour,cardstairs,cardsum,wordfrom,oddletter,alphabet,syllables,wordlength,sequence,parity,colorlinks,tiles3,codebreak,tap30,stopsignal,orbit,coinfall,minigolf,emojimem,changed,battleship,checkers,escape"
+# These are the only w412 games that failed run #37. All other w412 tail games are not repeated.
+W412_RETEST=(wordfrom oddletter alphabet syllables parity changed battleship checkers escape)
 
 adb install -r "$APK"
 
@@ -81,16 +81,63 @@ if errors:
 print(f'QA_OK {label} viewport={vp[0]} open={len(expected)} final={len(expected)} failures=0')
 PY
 
+cat > /tmp/validate_one.py <<'PY'
+import json,sys
+path,gid,minw,maxw=sys.argv[1],sys.argv[2],int(sys.argv[3]),int(sys.argv[4])
+text=open(path,encoding='utf-8',errors='replace').read()
+def decode(marker):
+    rows=[ln.split(marker,1)[1].strip() for ln in text.splitlines() if marker in ln]
+    if not rows: raise AssertionError(f'{gid}: missing {marker}')
+    obj=json.loads(rows[-1]); return json.loads(obj) if isinstance(obj,str) else obj
+def need(c,m):
+    if not c: raise AssertionError(f'{gid}: {m}')
+h=decode('HOME_QA='); g=decode('QA_SNAPSHOT='); r=decode('RESULT_SNAPSHOT=')
+need(h.get('cards')==100 and h.get('unique')==100,'catalog count')
+need(h.get('aiCards')==12,'AI card count')
+need(h.get('bodyOverflow') is False and h.get('titleIssues')==[],'catalog layout')
+vp=h.get('viewport') or [0,0]; need(minw<=int(vp[0])<=maxw,f'viewport {vp}')
+need(f'QA_OPEN game={gid} opened=true' in text,'open failed')
+need(f'QA_FINISH game={gid} finished=true' in text,'finish hook failed')
+need(g.get('game')==gid,'wrong active game')
+need(bool(str(g.get('title','')).strip()) and bool(str(g.get('objective','')).strip()),'title/objective')
+need(int(g.get('mountChars',0))>20 and int(g.get('mountChildren',0))>0,'empty playfield')
+need(g.get('bodyOverflow') is False and g.get('mountOverflow') is False,'playfield overflow')
+if gid=='checkers': need(g.get('aiSelector') is True and g.get('aiMode')=='ai','AI not default')
+need(r.get('open') is True,'result closed')
+need(bool(str(r.get('title','')).strip()) and bool(str(r.get('message','')).strip()) and bool(str(r.get('goal','')).strip()),'result text')
+need(len(r.get('buttons') or [])==3 and all(str(x).strip() for x in r.get('buttons')),'result buttons')
+need(r.get('bodyOverflow') is False,'result overflow')
+print(f'QA_OK w412-retest {gid}')
+PY
+
+run_one_w412() {
+  local GAME="$1" LOG="qa-w412-$1.log" READY=0
+  adb shell wm density 420
+  adb shell pm clear "$PKG" >/dev/null
+  adb logcat -c
+  adb shell am start -W -n "$ACT" --es testGame "$GAME" --ez testFinish true >/dev/null
+  for i in $(seq 1 30); do
+    adb logcat -d -s Offline100:I '*:S' > "$LOG"
+    if grep -q 'RESULT_SNAPSHOT=' "$LOG"; then READY=1; break; fi
+    if grep -Eq 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE|MAIN_FRAME_ERROR|QA_READY_TIMEOUT' "$LOG"; then
+      echo "w412/$GAME: Android/WebView crash" >&2; cat "$LOG" >&2; return 1
+    fi
+    sleep 1
+  done
+  [[ "$READY" -eq 1 ]]
+  python3 /tmp/validate_one.py "$LOG" "$GAME" 400 420
+}
+
 run_suite() {
-  local LABEL="$1" DENSITY="$2" MINW="$3" MAXW="$4" START="$5" COUNT="$6" EXPECTED="$7"
+  local LABEL="$1" DENSITY="$2" MINW="$3" MAXW="$4"
   local LOG="qa-$LABEL.log" DONE=0
   adb shell wm density "$DENSITY"
   adb shell pm clear "$PKG" >/dev/null
   adb logcat -c
-  adb shell am start -W -n "$ACT" --ez testAll true --ei testFrom "$START" >/dev/null
+  adb shell am start -W -n "$ACT" --ez testAll true --ei testFrom 50 >/dev/null
   for i in $(seq 1 360); do
     adb logcat -d -s Offline100:I '*:S' > "$LOG"
-    if grep -q "QA_ALL_DONE count=$COUNT start=$START" "$LOG"; then DONE=1; break; fi
+    if grep -q 'QA_ALL_DONE count=50 start=50' "$LOG"; then DONE=1; break; fi
     if grep -Eq 'FATAL EXCEPTION|STARTUP_FAILED|WEBVIEW_RENDERER_GONE|MAIN_FRAME_ERROR|QA_READY_TIMEOUT' "$LOG"; then
       echo "$LABEL: Android/WebView crash" >&2; cat "$LOG" >&2; return 1
     fi
@@ -99,15 +146,19 @@ run_suite() {
   [[ "$DONE" -eq 1 ]]
   adb logcat -d -s Offline100:I '*:S' > "$LOG"
   adb shell pidof "$PKG" | grep -q '[0-9]'
-  python3 /tmp/validate_tail.py "$LOG" "$LABEL" "$MINW" "$MAXW" "$EXPECTED"
+  python3 /tmp/validate_tail.py "$LOG" "$LABEL" "$MINW" "$MAXW" "$TAIL50"
 }
 
-# Width 412: the first 16 games of the second half already passed, so do not repeat them.
-run_suite w412 420 400 420 66 34 "$TAIL34"
-# Widths not yet checked for the second half: test games 51-100 only.
-run_suite w360 480 350 370 50 50 "$TAIL50"
-run_suite w320 540 310 330 50 50 "$TAIL50"
+# Retest only the nine w412 failures from run #37; no already-passed w412 games are relaunched.
+: > qa-summary-w412-retest.log
+for GAME in "${W412_RETEST[@]}"; do
+  run_one_w412 "$GAME" | tee -a qa-summary-w412-retest.log
+done
+
+# The remaining half has never been checked at these narrower widths, so test exactly games 51-100.
+run_suite w360 480 350 370
+run_suite w320 540 310 330
 
 adb shell wm density reset
-cat qa-summary-w412.log qa-summary-w360.log qa-summary-w320.log > qa-all-games-summary.log
-echo 'QA_TAIL_OK no-original-first-half; w412=34/34 remaining; w360=50/50; w320=50/50; results matched; failures=0'
+cat qa-summary-w412-retest.log qa-summary-w360.log qa-summary-w320.log > qa-all-games-summary.log
+echo 'QA_TAIL_OK original-first-half-not-run; w412 failed-only=9/9; w360 tail=50/50; w320 tail=50/50; results matched; failures=0'
