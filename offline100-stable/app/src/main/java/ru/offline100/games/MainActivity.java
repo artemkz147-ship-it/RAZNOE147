@@ -31,6 +31,7 @@ public final class MainActivity extends Activity {
     private String testGame;
     private boolean testFinish;
     private boolean testAll;
+    private int testFrom;
     private int readyAttempts;
     private boolean qaReady;
 
@@ -40,7 +41,10 @@ public final class MainActivity extends Activity {
             testGame = getIntent() == null ? null : getIntent().getStringExtra("testGame");
             testFinish = getIntent() != null && getIntent().getBooleanExtra("testFinish", false);
             testAll = getIntent() != null && getIntent().getBooleanExtra("testAll", false);
-            Log.i(TAG,"TEST_REQUEST game="+testGame+" finish="+testFinish+" all="+testAll);
+            testFrom = getIntent() == null ? 0 : getIntent().getIntExtra("testFrom", 0);
+            if (testFrom < 0) testFrom = 0;
+            if (testFrom > QA_GAMES.length) testFrom = QA_GAMES.length;
+            Log.i(TAG,"TEST_REQUEST game="+testGame+" finish="+testFinish+" all="+testAll+" from="+testFrom);
             webView = new WebView(this);
             webView.setBackgroundColor(Color.rgb(10,14,28));
             configureWebView(webView);
@@ -119,7 +123,7 @@ public final class MainActivity extends Activity {
                 "})())";
         v.evaluateJavascript(js, snap -> {
             Log.i(TAG,"HOME_QA="+snap);
-            if (testAll) v.postDelayed(() -> runQaAll(v, 0), 250);
+            if (testAll) v.postDelayed(() -> runQaAll(v, testFrom), 250);
             else if (testGame != null && !testGame.isEmpty()) v.postDelayed(() -> runQaProbe(v), 750);
         });
     }
@@ -177,7 +181,7 @@ public final class MainActivity extends Activity {
     private void runQaAll(WebView v, int index) {
         if (v == null) return;
         if (index >= QA_GAMES.length) {
-            Log.i(TAG, "QA_ALL_DONE count="+QA_GAMES.length);
+            Log.i(TAG, "QA_ALL_DONE count="+(QA_GAMES.length-testFrom)+" start="+testFrom);
             return;
         }
         final String game = QA_GAMES[index];
