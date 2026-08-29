@@ -174,8 +174,19 @@ public final class MainActivity extends Activity {
     private void finishQaProbe(WebView v) {
         v.postDelayed(() -> v.evaluateJavascript("Boolean(window.__finishForTest&&window.__finishForTest())", finished -> {
             Log.i(TAG,"QA_FINISH game="+testGame+" finished="+finished);
-            v.postDelayed(() -> v.evaluateJavascript(resultSnapshotJs(), snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap)), 300);
+            waitForProbeResult(v, 0);
         }), 200);
+    }
+
+    private void waitForProbeResult(WebView v, int attempt) {
+        if (v == null) return;
+        v.evaluateJavascript("Boolean(document.querySelector('#resultModal')?.classList.contains('open'))", open -> {
+            if ("true".equals(open) || attempt >= 20) {
+                v.evaluateJavascript(resultSnapshotJs(), snap -> Log.i(TAG,"RESULT_SNAPSHOT="+snap));
+            } else {
+                v.postDelayed(() -> waitForProbeResult(v, attempt+1), 75);
+            }
+        });
     }
 
     private void runQaAll(WebView v, int index) {
@@ -192,12 +203,23 @@ public final class MainActivity extends Activity {
                 Log.i(TAG,"QA_ALL_GAME "+game+"="+snap);
                 v.evaluateJavascript("Boolean(window.__finishForTest&&window.__finishForTest())", finished -> {
                     Log.i(TAG,"QA_ALL_FINISH "+game+"="+finished);
-                    v.postDelayed(() -> v.evaluateJavascript(resultSnapshotJs(), result -> {
-                        Log.i(TAG,"QA_ALL_RESULT "+game+"="+result);
-                        v.postDelayed(() -> runQaAll(v, index+1), 60);
-                    }), 170);
+                    waitForQaAllResult(v, game, index, 0);
                 });
             }), 260);
+        });
+    }
+
+    private void waitForQaAllResult(WebView v, String game, int index, int attempt) {
+        if (v == null) return;
+        v.evaluateJavascript("Boolean(document.querySelector('#resultModal')?.classList.contains('open'))", open -> {
+            if ("true".equals(open) || attempt >= 20) {
+                v.evaluateJavascript(resultSnapshotJs(), result -> {
+                    Log.i(TAG,"QA_ALL_RESULT "+game+"="+result);
+                    v.postDelayed(() -> runQaAll(v, index+1), 60);
+                });
+            } else {
+                v.postDelayed(() -> waitForQaAllResult(v, game, index, attempt+1), 75);
+            }
         });
     }
 
