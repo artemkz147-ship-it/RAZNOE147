@@ -91,7 +91,8 @@ print(f'QA_OK {label} open=50 final=50 failures=0')
 PY
 
 run_one(){
- local LABEL="$1" DENSITY="$2" MINW="$3" MAXW="$4" GAME="$5" LOG="qa-${LABEL}-${GAME}.log" READY=0
+ local LABEL="$1" DENSITY="$2" MINW="$3" MAXW="$4" GAME="$5"
+ local LOG="qa-${LABEL}-${GAME}.log" READY=0
  adb shell wm density "$DENSITY"
  adb shell pm clear "$PKG" >/dev/null
  adb logcat -c
@@ -124,10 +125,8 @@ run_tail320(){
  python3 /tmp/validate_tail.py "$LOG" w320 310 330 "$TAIL50"
 }
 
-# Width 412 is fully passed. Width 360 had only these two failures, so retest only them.
 : >qa-summary-w360-retest.log
 for GAME in "${W360_RETEST[@]}"; do run_one w360-retest 480 350 370 "$GAME" | tee -a qa-summary-w360-retest.log; done
-# Width 320 has not been tested for games 51-100 yet.
 run_tail320
 adb shell wm density reset
 cat qa-summary-w360-retest.log qa-summary-w320.log >qa-all-games-summary.log
