@@ -1,0 +1,1 @@
+-keepclassmembers class ru.offline100.games.AndroidBridge { @android.webkit.JavascriptInterface <methods>; }

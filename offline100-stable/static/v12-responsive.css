@@ -1,0 +1,92 @@
+/* v1.2 Android responsive safety layer */
+.game-mount,.game-shell,.game-mount>*,
+.game-mount [class$="-board"],.game-mount [class*="-board "],
+.game-mount [class$="-grid"],.game-mount [class*="-grid "],
+.game-mount [class$="-wrap"],.game-mount [class*="-wrap "],
+.game-mount [class$="-pad"],.game-mount [class*="-pad "],
+.game-mount [class$="-controls"],.game-mount [class*="-controls "]{
+  max-width:100%!important;min-width:0;box-sizing:border-box;
+}
+.game-mount *, .game-mount *::before, .game-mount *::after{
+  box-sizing:border-box;max-width:100%;min-width:0;
+}
+.game-mount .cell,.game-mount button,.game-mount input,.game-mount select,
+.game-mount textarea,.game-mount canvas{min-width:0;max-width:100%;box-sizing:border-box}
+.game-mount button,.game-mount .word-chip,.game-mount .proverb-answer,
+.game-mount .word-options,.game-mount .found-words,.game-mount .code-history,
+.game-mount .inventory{overflow-wrap:anywhere;word-break:normal}
+
+body[data-game="sudoku"] .sudoku-board{width:min(100%,500px)!important;grid-template-columns:repeat(9,minmax(0,1fr))!important}
+body[data-game="sudoku"] .sudoku-pad{width:min(100%,520px)!important;grid-template-columns:repeat(5,minmax(0,1fr))!important}
+body[data-game="sudoku"] .sudoku-board .cell{min-width:0!important;padding:0!important}
+
+body[data-game="blocks"] .blocks-layout{width:min(100%,311px)!important;grid-template-columns:minmax(0,1fr) minmax(48px,64px)!important}
+body[data-game="blocks"] .block-board{width:100%!important;min-width:0!important}
+body[data-game="blocks"] .blocks-layout aside{min-width:0;padding:7px;box-sizing:border-box}
+body[data-game="blocks"] .block-controls{width:min(100%,460px)!important;grid-template-columns:repeat(5,minmax(0,1fr))!important}
+body[data-game="blocks"] .block-controls button{width:100%;padding-left:2px;padding-right:2px}
+
+body[data-game="dots"] .dots-canvas{width:min(100%,440px)!important;height:auto!important;display:block}
+
+body[data-game="hangman"] .hangman{width:100%!important;margin-left:0!important;margin-right:0!important}
+body[data-game="hangman"] .alphabet{width:100%!important;grid-template-columns:repeat(8,minmax(0,1fr))!important}
+body[data-game="hangman"] .letter-btn{width:100%!important;padding-left:2px!important;padding-right:2px!important}
+body[data-game="hangman"] .masked-word{width:100%;text-align:center;overflow-wrap:anywhere;word-break:break-word;letter-spacing:clamp(1px,1vw,4px)}
+
+body[data-game="compare"] .compare-expr{width:100%!important;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;white-space:normal!important;overflow-wrap:anywhere}
+body[data-game="compare"] .compare-expr>*{width:auto!important;max-width:100%!important;min-width:0!important}
+body[data-game="compare"] .compare-actions{width:100%!important;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+body[data-game="compare"] .compare-actions>*{min-width:0!important;max-width:100%!important}
+body[data-game="compare"] .compare-actions button{width:100%!important;padding-left:4px!important;padding-right:4px!important}
+
+body[data-game="proverb"] .proverb-answer,body[data-game="proverb"] .word-options{width:100%!important;display:flex!important;flex-wrap:wrap!important;justify-content:center;align-items:center;gap:8px;white-space:normal!important;overflow-wrap:anywhere}
+body[data-game="proverb"] .proverb-answer>*,body[data-game="proverb"] .word-options>*{width:auto!important;max-width:100%!important;min-width:0!important;white-space:normal!important;overflow-wrap:anywhere;word-break:break-word}
+body[data-game="proverb"] .proverb-answer button,body[data-game="proverb"] .word-options button{flex:0 1 auto!important;padding-left:8px!important;padding-right:8px!important}
+
+body[data-game="balance"] .choice-game{width:100%!important;margin-left:0!important;margin-right:0!important}
+body[data-game="balance"] .balance-scale{width:100%!important;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;gap:8px!important}
+body[data-game="balance"] .balance-scale b{width:100%!important;padding-left:6px!important;padding-right:6px!important;text-align:center;white-space:nowrap}
+body[data-game="balance"] .balance-scale span{font-size:clamp(30px,10vw,42px)!important}
+body[data-game="balance"] .choice-buttons{width:100%!important;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important}
+body[data-game="balance"] .choice-buttons .big-choice{width:100%!important;min-width:0!important;padding-left:4px!important;padding-right:4px!important}
+
+body[data-game="syllables"] .syllable-game{width:100%!important;margin-left:0!important;margin-right:0!important}
+body[data-game="syllables"] .proverb-answer{width:100%!important;padding-left:10px!important;padding-right:10px!important;overflow-wrap:anywhere}
+body[data-game="syllables"] .choice-buttons{width:100%!important;display:grid!important;grid-template-columns:repeat(auto-fit,minmax(72px,1fr))!important;gap:8px!important}
+body[data-game="syllables"] .choice-buttons .big-choice{width:100%!important;min-width:0!important;padding-left:6px!important;padding-right:6px!important;overflow-wrap:anywhere}
+
+body[data-game="cipher"] .word-form-game,body[data-game="categoryword"] .word-form-game{width:100%!important;margin-left:0!important;margin-right:0!important}
+body[data-game="cipher"] .word-options,body[data-game="categoryword"] .word-options{width:100%!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+body[data-game="cipher"] .word-options .big-choice,body[data-game="categoryword"] .word-options .big-choice{width:100%!important;min-width:0!important;padding-left:6px!important;padding-right:6px!important;overflow-wrap:anywhere}
+body[data-game="cipher"] .scramble-word{max-width:100%;text-align:center;overflow-wrap:anywhere;letter-spacing:clamp(1px,1vw,4px)}
+body[data-game="categoryword"] .choice-display{width:100%;text-align:center;overflow-wrap:anywhere}
+
+.alphabet,.word-options,.compare-expr,.proverb-answer,.balance-scale,.card-stairs,
+.word-sort-list,.code-breaker,.tap-thirty,.escape-room,.target-field,.precision-bar,
+.new-card-grid,.number-pair-grid,.puzzle4,.ball-tubes,.shell-row,.color-controls,
+.object-row,.code-history{max-width:100%!important;min-width:0;box-sizing:border-box}
+.ttt-board,.connect-board,.mine-board,.slide-board,.g2048,.memory-board,.pipe-board,
+.word-grid,.parking-board,.maze-board,.block-board,.reversi-board,.gomoku-board,
+.lights-board,.hanoi-wrap,.simon-board,.reaction-pad,.chain-board,.odd-board,
+.memory-grid,.route-grid,.queens-board,.magic-board,.oneline-board,.new-card-grid,
+.number-pair-grid,.puzzle4,.knight-board,.arrow-board,.number-sort-grid,.flood-board,
+.mole-grid,.odd-letter-grid,.color-link-grid,.tiles3-grid,.battleship-grid,
+.checkers-grid,.pyramid13-board{max-width:100%!important}
+
+@media(max-width:620px){
+ .game-mount{overflow-x:clip}
+ body[data-game="sudoku"] .sudoku-board .cell{font-size:clamp(11px,3.4vw,15px)}
+ body[data-game="sudoku"] .sudoku-pad .small-action{padding:8px 3px}
+ body[data-game="blocks"] .block-controls{gap:4px}
+ body[data-game="blocks"] .block-controls button{font-size:17px;min-height:40px}
+ body[data-game="hangman"] .alphabet{gap:4px}
+ body[data-game="hangman"] .letter-btn{font-size:13px;min-height:38px}
+ body[data-game="hangman"] .masked-word{font-size:clamp(22px,7vw,34px)}
+ body[data-game="compare"] .compare-expr{font-size:clamp(20px,6vw,30px)}
+ body[data-game="proverb"] .proverb-answer,body[data-game="proverb"] .word-options{gap:6px}
+ body[data-game="proverb"] .proverb-answer button,body[data-game="proverb"] .word-options button{font-size:14px}
+}
+
+@media(max-width:340px){
+ .game-card h3{font-size:17px!important;line-height:1.13!important;-webkit-line-clamp:3!important;overflow-wrap:anywhere!important}
+}
