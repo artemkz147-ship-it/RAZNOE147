@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Restore Android project
         run: |
-          cat payload/p* | base64 -d > project.zip
+          cat payload/p* payload2/r* | base64 -d > project.zip
           unzip -qo project.zip
       - uses: actions/setup-java@v4
         with:
