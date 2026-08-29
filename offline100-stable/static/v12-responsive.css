@@ -197,6 +197,46 @@ body[data-game="proverb"] .word-options button {
   padding-right:8px !important;
 }
 
+/* Balance */
+body[data-game="balance"] .choice-game {
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  margin-left:0 !important;
+  margin-right:0 !important;
+}
+body[data-game="balance"] .balance-scale {
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) !important;
+  gap:8px !important;
+}
+body[data-game="balance"] .balance-scale b {
+  min-width:0 !important;
+  width:100% !important;
+  padding-left:6px !important;
+  padding-right:6px !important;
+  text-align:center;
+  white-space:nowrap;
+}
+body[data-game="balance"] .balance-scale span {
+  font-size:clamp(30px,10vw,42px) !important;
+}
+body[data-game="balance"] .choice-buttons {
+  width:100% !important;
+  max-width:100% !important;
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:8px !important;
+}
+body[data-game="balance"] .choice-buttons .big-choice {
+  width:100% !important;
+  min-width:0 !important;
+  padding-left:4px !important;
+  padding-right:4px !important;
+}
+
 /* Common viewport-sized surfaces. */
 .alphabet,.word-options,.compare-expr,.proverb-answer,.balance-scale,
 .card-stairs,.word-sort-list,.code-breaker,.tap-thirty,.escape-room,
