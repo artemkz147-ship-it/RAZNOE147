@@ -1,0 +1,55 @@
+name: Build Alias No Ads APK
+
+on:
+  push:
+    branches: [ alias-noads-build34-apk ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct Android project
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat alias-apk-src/part-000.txt \
+              alias-apk-src/part-001-00 \
+              alias-apk-src/part-001-01 \
+              alias-apk-src/part-001-02 \
+              alias-apk-src/part-001-03a \
+              alias-apk-src/part-001-03b \
+              alias-apk-src/part-001-04a \
+              alias-apk-src/part-001-04b \
+              alias-apk-src/part-001-05a \
+              alias-apk-src/part-001-05b \
+              alias-apk-src/part-002.txt > alias-apk-src/project.zip.b64
+          base64 -d alias-apk-src/project.zip.b64 > alias-apk-src/project.zip
+          echo "d946c5d23fcc39f4a3cf994a1d58347d0010b389e15da4705992ce0b05c7bf0c  alias-apk-src/project.zip" | sha256sum -c -
+          mkdir -p alias-apk
+          unzip -q alias-apk-src/project.zip -d alias-apk
+          test -f alias-apk/settings.gradle.kts
+          test -f alias-apk/app/src/main/assets/www/code.js
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        run: gradle -p alias-apk --no-daemon assembleDebug
+
+      - name: Rename APK
+        run: cp alias-apk/app/build/outputs/apk/debug/app-debug.apk AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES_APK
+          path: AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk
+          if-no-files-found: error
