@@ -11,10 +11,51 @@ jobs:
       - uses: actions/checkout@v4
       - name: Restore Android project
         run: |
-          rm -f project.zip
-          for f in payload/p* payload2/r*; do
-            base64 -d "$f" >> project.zip
-          done
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, io, re, zipfile, sys
+          files = sorted(Path('payload').glob('p*')) + sorted(Path('payload2').glob('r*'))
+          parts = [re.sub(rb'\s+', b'', p.read_bytes()) for p in files]
+          print('chunks:', [(p.as_posix(), len(d)) for p,d in zip(files, parts)])
+
+          def valid_zip(blob):
+              if not blob.startswith(b'PK'):
+                  return False
+              try:
+                  with zipfile.ZipFile(io.BytesIO(blob)) as z:
+                      bad = z.testzip()
+                      return bad is None and 'settings.gradle' in z.namelist()
+              except Exception:
+                  return False
+
+          # Most likely format: consecutive pieces of one base64 stream.
+          for n in range(len(parts), 0, -1):
+              s = b''.join(parts[:n])
+              s += b'=' * ((-len(s)) % 4)
+              try:
+                  blob = base64.b64decode(s, validate=True)
+              except Exception:
+                  continue
+              if valid_zip(blob):
+                  Path('project.zip').write_bytes(blob)
+                  print('restored continuous ZIP using', n, 'chunks, bytes=', len(blob))
+                  sys.exit(0)
+
+          # Fallback: each chunk may have been encoded independently.
+          out = bytearray()
+          for i, s0 in enumerate(parts):
+              s = s0 + b'=' * ((-len(s0)) % 4)
+              try:
+                  out.extend(base64.b64decode(s, validate=True))
+              except Exception:
+                  break
+              if valid_zip(out):
+                  Path('project.zip').write_bytes(out)
+                  print('restored independently encoded ZIP using', i + 1, 'chunks, bytes=', len(out))
+                  sys.exit(0)
+
+          raise SystemExit('Could not reconstruct a valid Android project ZIP')
+          PY
           unzip -t project.zip
           unzip -qo project.zip
       - uses: actions/setup-java@v4
