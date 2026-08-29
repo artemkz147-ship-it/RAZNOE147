@@ -1,0 +1,59 @@
+name: Build Alias No Ads APK v3
+
+on:
+  push:
+    branches: [alias-noads-build34-apk-v2]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct verified Android project
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat alias-apk-v3/part-00 \
+              alias-apk-v3/part-01 \
+              alias-apk-v3/part-02 \
+              alias-apk-v3/part-03 \
+              alias-apk-v3/part-04 \
+              alias-apk-v3/part-05 > alias-apk-v3/project.tar.xz.b64
+          base64 -d alias-apk-v3/project.tar.xz.b64 > alias-apk-v3/project.tar.xz
+          echo "29c674d2dcdf73106d760cb4d91e386ec73813f6a1ce3e7cf47d72c65533eb88  alias-apk-v3/project.tar.xz" | sha256sum -c -
+          mkdir -p alias-apk-v3/project
+          tar -xJf alias-apk-v3/project.tar.xz -C alias-apk-v3/project
+          test -f alias-apk-v3/project/settings.gradle.kts
+          test -f alias-apk-v3/project/app/src/main/assets/www/code.js
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Build installable APK
+        working-directory: alias-apk-v3/project
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Prepare APK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cp alias-apk-v3/project/app/build/outputs/apk/debug/app-debug.apk AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk
+          sha256sum AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk > AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk.sha256
+          ls -lh AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AliasTop_BUILD_34_NO_ADS_APK
+          path: |
+            AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk
+            AliasTop_BUILD_34_NO_ADS_CURATED_CATEGORIES.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
