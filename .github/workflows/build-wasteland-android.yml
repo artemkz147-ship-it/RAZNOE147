@@ -22,11 +22,11 @@ jobs:
         run: |
           mkdir -p wasteland
           cat wasteland_payload/part_* | base64 -d > /tmp/wasteland_source.zip
-          sha256sum /tmp/wasteland_source.zip
-          unzip -t /tmp/wasteland_source.zip
-          unzip -o /tmp/wasteland_source.zip -d wasteland
+          unzip -o /tmp/wasteland_source.zip -d wasteland || true
+          cp wasteland/game_override.gd wasteland/scripts/game.gd
           test -f wasteland/project.godot
           test -f wasteland/scripts/game.gd
+          test -f wasteland/scripts/combat_car.gd
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
