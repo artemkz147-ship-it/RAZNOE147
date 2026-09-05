@@ -26,6 +26,7 @@ jobs:
           cp wasteland/game_override.gd wasteland/scripts/game.gd
           python3 - <<'PY'
           from pathlib import Path
+
           p = Path('wasteland/scripts/combat_car.gd')
           s = p.read_text()
           replacements = {
@@ -39,20 +40,33 @@ jobs:
           }
           for old, new in replacements.items():
               if old not in s:
-                  raise SystemExit(f'Missing expected source fragment: {old}')
+                  raise SystemExit(f'Missing expected combat_car source fragment: {old}')
               s = s.replace(old, new)
           p.write_text(s)
 
+          rocket = Path('wasteland/scripts/rocket.gd')
+          r = rocket.read_text()
+          old = 'var desired := (target.global_position + Vector3.UP * 0.65 - global_position).normalized()'
+          new = 'var desired: Vector3 = (target.global_position + Vector3.UP * 0.65 - global_position).normalized()'
+          if old not in r:
+              raise SystemExit('Missing expected rocket source fragment')
+          rocket.write_text(r.replace(old, new))
+
           project = Path('wasteland/project.godot')
           t = project.read_text()
-          setting = 'rendering/textures/vram_compression/import_etc2_astc=true'
-          if setting not in t:
-              t = t.replace('[rendering]\n', '[rendering]\n' + setting + '\n')
+          wrong = 'rendering/textures/vram_compression/import_etc2_astc=true'
+          correct = 'textures/vram_compression/import_etc2_astc=true'
+          t = t.replace(wrong + '\n', '')
+          if correct not in t:
+              if '[rendering]\n' not in t:
+                  raise SystemExit('Missing [rendering] section')
+              t = t.replace('[rendering]\n', '[rendering]\n' + correct + '\n', 1)
           project.write_text(t)
           PY
           rm -rf wasteland/.godot
           grep -n "to_enemy: Vector3\|local_dir: Vector3\|score: float" wasteland/scripts/combat_car.gd
-          grep -n "import_etc2_astc=true" wasteland/project.godot
+          grep -n "desired: Vector3" wasteland/scripts/rocket.gd
+          grep -n "^textures/vram_compression/import_etc2_astc=true$" wasteland/project.godot
           test -f wasteland/project.godot
           test -f wasteland/scripts/game.gd
           test -f wasteland/scripts/combat_car.gd
