@@ -1,0 +1,26 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.openai.drawphysics'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.openai.drawphysics'
+        minSdk 23
+        targetSdk 35
+        versionCode 5
+        versionName '5.0.1-fixed'
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
