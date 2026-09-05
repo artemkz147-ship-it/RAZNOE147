@@ -17,19 +17,48 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Rebuild project payload
+      - name: Rebuild and patch project
         shell: bash
         run: |
           mkdir -p wasteland
           cat wasteland_payload/part_* | base64 -d > /tmp/wasteland_source.zip
           unzip -o /tmp/wasteland_source.zip -d wasteland || true
           cp wasteland/game_override.gd wasteland/scripts/game.gd
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('wasteland/scripts/combat_car.gd')
+          s = p.read_text()
+          replacements = {
+              'var to_enemy := node.global_position - global_position': 'var to_enemy: Vector3 = node.global_position - global_position',
+              'var dist := to_enemy.length()': 'var dist: float = to_enemy.length()',
+              'var local := global_transform.basis.inverse() * to_enemy.normalized()': 'var local_dir: Vector3 = global_transform.basis.inverse() * to_enemy.normalized()',
+              'if local.z >= -0.20 or absf(local.x) > max_side:': 'if local_dir.z >= -0.20 or absf(local_dir.x) > max_side:',
+              'var score := dist + absf(local.x) * 35.0': 'var score: float = dist + absf(local_dir.x) * 35.0',
+              'var local := global_transform.basis.inverse() * (target.global_position - global_position)': 'var local_dir: Vector3 = global_transform.basis.inverse() * (target.global_position - global_position)',
+              'desired_y = clampf(atan2(-local.x, -local.z), -0.52, 0.52)': 'desired_y = clampf(atan2(-local_dir.x, -local_dir.z), -0.52, 0.52)',
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'Missing expected source fragment: {old}')
+              s = s.replace(old, new)
+          p.write_text(s)
+
+          project = Path('wasteland/project.godot')
+          t = project.read_text()
+          setting = 'rendering/textures/vram_compression/import_etc2_astc=true'
+          if setting not in t:
+              t = t.replace('[rendering]\n', '[rendering]\n' + setting + '\n')
+          project.write_text(t)
+          PY
+          rm -rf wasteland/.godot
+          grep -n "to_enemy: Vector3\|local_dir: Vector3\|score: float" wasteland/scripts/combat_car.gd
+          grep -n "import_etc2_astc=true" wasteland/project.godot
           test -f wasteland/project.godot
           test -f wasteland/scripts/game.gd
           test -f wasteland/scripts/combat_car.gd
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
