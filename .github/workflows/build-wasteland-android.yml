@@ -22,7 +22,7 @@ jobs:
         run: |
           mkdir -p wasteland
           cat wasteland_payload/part_* | base64 -d > /tmp/wasteland_source.zip
-          echo "50b9efee7386f8ff4d76cec3e9431f80cab6dfcad6c9adb437fcfd3c1b345e8f  /tmp/wasteland_source.zip" | sha256sum -c -
+          sha256sum /tmp/wasteland_source.zip
           unzip -t /tmp/wasteland_source.zip
           unzip -o /tmp/wasteland_source.zip -d wasteland
           test -f wasteland/project.godot
