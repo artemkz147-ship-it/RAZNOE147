@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -24,6 +24,11 @@ jobs:
         run: |
           mkdir -p ar-space-breach/app/src/main/java/com/artem/arspacebreach
           cat ar-space-breach/buildparts/main.b64.* | tr -d '\n' | base64 -d > ar-space-breach/app/src/main/java/com/artem/arspacebreach/MainActivity.kt
+          SRC=ar-space-breach/app/src/main/java/com/artem/arspacebreach/MainActivity.kt
+          sed -i '/import androidx.compose.foundation.layout.weight/d' "$SRC"
+          sed -i '/import io.github.sceneview.material.createColorInstance/d' "$SRC"
+          sed -i 's/Modifier.weight(1f).height(62.dp)/Modifier.size(width = 160.dp, height = 62.dp)/' "$SRC"
+          sed -i 's/^[[:space:]]*\.weight(1f)$/                        .size(width = 160.dp, height = 62.dp)/' "$SRC"
       - name: Build debug APK
         working-directory: ar-space-breach
         run: gradle :app:assembleDebug --stacktrace --no-daemon
