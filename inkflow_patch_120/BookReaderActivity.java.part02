@@ -1,0 +1,21 @@
+ntRatio()); updateProgressText(); }
+    private void scheduleSave(){ if(saver!=null) handler.removeCallbacks(saver); saver=() -> saveNow(); handler.postDelayed(saver,250); updateProgressText(); }
+    private void restoreScroll(){ int ratio=progress.getRatio(uri); handler.postDelayed(() -> web.evaluateJavascript("(function(){var m=Math.max(0,document.documentElement.scrollHeight-window.innerHeight); window.scrollTo(0, Math.floor(m*"+(ratio/1000000.0)+")); true;})()",null),160); }
+    private void updateProgressText(){ progressView.setText((currentRatio()/10000)+"%"); }
+    private void toggleBars(){ bars=!bars; topBar.animate().alpha(bars?1:0).translationY(bars?0:-topBar.getHeight()).setDuration(180).start(); bottomBar.animate().alpha(bars?1:0).translationY(bars?0:bottomBar.getHeight()).setDuration(180).start(); }
+
+    private void showSettings(){
+        ScrollView sc=new ScrollView(this); LinearLayout box=new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setPadding(Ui.dp(this,18),Ui.dp(this,14),Ui.dp(this,18),Ui.dp(this,18)); box.setBackgroundColor(Ui.BG); sc.addView(box);
+        TextView h=Ui.text(this,"Идеальная читалка книг",18,Ui.TEXT); h.setTypeface(Typeface.DEFAULT_BOLD); box.addView(h);
+        TextView sub=Ui.text(this,"Форматы: EPUB, FB2, TXT, HTML. Сохраняет место чтения, размер шрифта и тему.",12,Ui.MUTED); LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2); sp.topMargin=Ui.dp(this,6); box.addView(sub,sp);
+        TextView a=smallBtn("Шрифт меньше",false); a.setOnClickListener(v->{fontSp=Math.max(14,fontSp-2); progress.setFontSp(fontSp); reloadTheme();}); box.addView(a,new LinearLayout.LayoutParams(-1,Ui.dp(this,48)));
+        TextView b=smallBtn("Шрифт больше",false); b.setOnClickListener(v->{fontSp=Math.min(34,fontSp+2); progress.setFontSp(fontSp); reloadTheme();}); LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,Ui.dp(this,48)); bp.topMargin=Ui.dp(this,8); box.addView(b,bp);
+        TextView c=smallBtn("Сменить тему: "+themeName(),true); c.setOnClickListener(v->{theme=(theme+1)%3; progress.setTheme(theme); reloadTheme(); c.setText("Сменить тему: "+themeName());}); LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,Ui.dp(this,48)); cp.topMargin=Ui.dp(this,8); box.addView(c,cp);
+        TextView d=smallBtn("Панели скрываются тапом по тексту",false); LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,Ui.dp(this,48)); dp.topMargin=Ui.dp(this,8); box.addView(d,dp);
+        AlertDialog dialog=new AlertDialog.Builder(this).setView(sc).setNegativeButton("Закрыть",null).create(); dialog.setOnShowListener(x->dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Ui.BG))); dialog.show();
+    }
+
+    @Override protected void onPause(){ super.onPause(); saveNow(); }
+    @Override protected void onStop(){ super.onStop(); saveNow(); }
+    @Override protected void onDestroy(){ if(saver!=null) handler.removeCallbacks(saver); saveNow(); if(web!=null){ web.destroy(); } super.onDestroy(); }
+}
