@@ -20,7 +20,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.6.0"
-      - name: Rebuild Kotlin source
+      - name: Rebuild and patch Kotlin source
         run: |
           mkdir -p ar-space-breach/app/src/main/java/com/artem/arspacebreach
           cat ar-space-breach/buildparts/main.b64.* | tr -d '\n' | base64 -d > ar-space-breach/app/src/main/java/com/artem/arspacebreach/MainActivity.kt
@@ -29,6 +29,23 @@ jobs:
           sed -i '/import io.github.sceneview.material.createColorInstance/d' "$SRC"
           sed -i 's/Modifier.weight(1f).height(62.dp)/Modifier.size(width = 160.dp, height = 62.dp)/' "$SRC"
           sed -i 's/^[[:space:]]*\.weight(1f)$/                        .size(width = 160.dp, height = 62.dp)/' "$SRC"
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('ar-space-breach/app/src/main/java/com/artem/arspacebreach/MainActivity.kt')
+          s = p.read_text()
+          anchor = 'import androidx.compose.foundation.layout.size\n'
+          extra = (
+              'import androidx.compose.foundation.layout.WindowInsets\n'
+              'import androidx.compose.foundation.layout.safeDrawing\n'
+              'import androidx.compose.foundation.layout.windowInsetsPadding\n'
+          )
+          if 'windowInsetsPadding' not in s:
+              s = s.replace(anchor, anchor + extra)
+          s = s.replace('Modifier.fillMaxSize()', 'Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)')
+          p.write_text(s)
+          PY
+          echo '--- SCAN LOGIC ---'
+          grep -nE 'scanText|Plane\.Type|extent|TrackingState|lastBreachSpawn|Breach|breach|plane|Plane' "$SRC" | head -n 180 || true
       - name: Build debug APK
         working-directory: ar-space-breach
         run: gradle :app:assembleDebug --stacktrace --no-daemon
