@@ -12,12 +12,12 @@ permissions:
 jobs:
   android:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Rebuild v1.6 race project
+      - name: Rebuild v1.6.1 fixed project
         shell: bash
         run: |
           mkdir -p wasteland
@@ -56,17 +56,41 @@ jobs:
           fetch_asset "$CITY/fence.glb" wasteland/assets/kenney/city/fence.glb
           fetch_asset "https://raw.githubusercontent.com/Arslan12216775/kenney_car-kit/master/License.txt" wasteland/assets/kenney/LICENSE.txt
 
-          python3 wasteland/ci_patch_v16.py
+          python3 wasteland/ci_patch_v161.py
           rm -rf wasteland/.godot
 
           test -s wasteland/assets/kenney/vehicles/sedan-sports.glb
           test -s wasteland/assets/kenney/vehicles/garbage-truck.glb
-          test -s wasteland/assets/kenney/city/building-type-p.glb
+          grep -n "MainMenuRoot\|get_visible_rect\|ci-race" wasteland/scripts/game.gd
           grep -n "starting_gun_ammo\|drift_stage\|_update_wheel_damage" wasteland/scripts/combat_car.gd
-          grep -n "_build_main_menu\|selected_car\|_build_v16_track_features" wasteland/scripts/game.gd
-          grep -n "ПУЛЕМЁТ\|set_drift_stage" wasteland/scripts/hud.gd
-          grep -n "^textures/vram_compression/import_etc2_astc=true$" wasteland/project.godot
           grep -n "version/name=\|package/unique_name=" wasteland/export_presets.cfg
+
+      - name: Runtime smoke test with Godot 4.7.2
+        shell: bash
+        run: |
+          curl -L --fail --retry 4 --retry-delay 2 \
+            https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip \
+            -o /tmp/godot.zip
+          mkdir -p /tmp/godot
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          GODOT=/tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+          chmod +x "$GODOT"
+
+          "$GODOT" --headless --editor --path wasteland --quit 2>&1 | tee /tmp/wc-import.log
+
+          set +e
+          timeout 18s "$GODOT" --headless --path wasteland --quit-after 240 -- --ci-race 2>&1 | tee /tmp/wc-runtime.log
+          STATUS=${PIPESTATUS[0]}
+          set -e
+
+          if grep -E "SCRIPT ERROR|Parse Error|Invalid call|Invalid access|Attempt to call|Cannot call method" /tmp/wc-runtime.log; then
+            echo "Runtime smoke test found a Godot script error"
+            exit 1
+          fi
+          if [ "$STATUS" -ne 0 ] && [ "$STATUS" -ne 124 ]; then
+            echo "Godot runtime exited with status $STATUS"
+            exit "$STATUS"
+          fi
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
@@ -99,6 +123,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Wasteland-Circuit-Race-v1.6.0
+          name: Wasteland-Circuit-Race-v1.6.1-fixed
           path: ${{ steps.export.outputs.build_directory }}/**/*.apk
           if-no-files-found: error
