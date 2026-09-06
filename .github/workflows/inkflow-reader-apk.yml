@@ -20,7 +20,7 @@ jobs:
 
       - name: Restore source
         run: |
-          base64 --decode inkflow_build_parts/part00 > InkFlowBuild.zip
+          cat inkflow_build_parts/part00 inkflow_build_parts/part01 inkflow_build_parts/part02 inkflow_build_parts/part03 inkflow_build_parts/part04 | base64 --decode > InkFlowBuild.zip
           unzip -tq InkFlowBuild.zip
           unzip -q -o InkFlowBuild.zip
 
