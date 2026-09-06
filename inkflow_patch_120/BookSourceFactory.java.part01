@@ -1,0 +1,57 @@
+ut.append("<div class='sp'></div>"); return;}
+        if("p".equals(n)){String t=node.getTextContent().trim(); if(!t.isEmpty()) out.append("<p>").append(esc(t)).append("</p>"); return;}
+        NodeList ch=node.getChildNodes(); for(int i=0;i<ch.getLength();i++) appendFb2Node(ch.item(i),out,level);
+    }
+
+    private static BookContent parseEpub(Context c, Uri uri, String fallback) throws Exception {
+        File f=SourceFactory.copyToCache(c,uri,".epub");
+        try(ZipFile z=new ZipFile(f)){
+            String container=readZipText(z,"META-INF/container.xml");
+            if(container==null) throw new IOException("EPUB: container.xml not found");
+            String opfPath=extractAttr(container,"full-path");
+            if(opfPath==null) throw new IOException("EPUB: package path not found");
+            DocumentBuilderFactory dbf=DocumentBuilderFactory.newInstance();dbf.setNamespaceAware(false);
+            Document opfDoc;
+            try(InputStream in=z.getInputStream(z.getEntry(opfPath))){ opfDoc=dbf.newDocumentBuilder().parse(in); }
+            String title=textOfFirst(opfDoc.getDocumentElement(),"dc:title"); if(title==null||title.trim().isEmpty()) title=textOfFirst(opfDoc.getDocumentElement(),"title"); if(title==null||title.trim().isEmpty()) title=stripExt(fallback);
+            Map<String,String> manifest=new HashMap<>();
+            NodeList items=opfDoc.getElementsByTagName("item");
+            for(int i=0;i<items.getLength();i++){Element e=(Element)items.item(i);manifest.put(e.getAttribute("id"),resolvePath(opfPath,e.getAttribute("href")));}
+            List<String> spine=new ArrayList<>();
+            NodeList itemrefs=opfDoc.getElementsByTagName("itemref");
+            for(int i=0;i<itemrefs.getLength();i++){Element e=(Element)itemrefs.item(i);String p=manifest.get(e.getAttribute("idref")); if(p!=null) spine.add(p);}            
+            StringBuilder html=new StringBuilder(); html.append("<h1>").append(esc(title)).append("</h1>");
+            for(String part:spine){String page=readZipText(z,part); if(page==null) continue; String body=extractBody(page); if(body==null) body=esc(page); html.append(body);}            
+            return new BookContent(title, html.toString());
+        }
+    }
+
+    private static String resolvePath(String baseFile, String href){
+        int slash=baseFile.lastIndexOf('/'); String dir=slash>=0?baseFile.substring(0,slash+1):"";
+        String raw=dir+href;
+        LinkedList<String> parts=new LinkedList<>();
+        for(String p:raw.split("/")){
+            if(p.isEmpty()||".".equals(p)) continue;
+            if("..".equals(p)){ if(!parts.isEmpty()) parts.removeLast(); }
+            else parts.add(p);
+        }
+        return String.join("/", parts);
+    }
+
+    private static byte[] readAll(InputStream in) throws IOException { if(in==null) throw new IOException("Не удалось открыть файл"); try(InputStream i=in; ByteArrayOutputStream out=new ByteArrayOutputStream()){ byte[] buf=new byte[8192]; int n; while((n=i.read(buf))>0) out.write(buf,0,n); return out.toByteArray(); } }
+    private static String readZipText(ZipFile z,String name) throws Exception { ZipEntry e=z.getEntry(name); if(e==null) return null; try(InputStream in=z.getInputStream(e)){ return decodeSmart(readAll(in)); } }
+    private static String decodeSmart(byte[] data){
+        String s=new String(data, StandardCharsets.UTF_8);
+        int bad=0; for(int i=0;i<s.length();i++) if(s.charAt(i)=='\uFFFD') bad++;
+        if(bad>3){ try{s=new String(data, Charset.forName("windows-1251"));}catch(Exception ignored){} }
+        if(s.length()>0 && s.charAt(0)=='\uFEFF') s=s.substring(1);
+        return s;
+    }
+    private static String extractBody(String html){
+        String l=html.toLowerCase(Locale.ROOT); int s=l.indexOf("<body"); if(s<0) return html; s=l.indexOf('>',s); int e=l.lastIndexOf("</body>"); if(s<0||e<0||e<=s) return html; return html.substring(s+1,e);
+    }
+    private static String extractTag(String html,String tag){
+        String l=html.toLowerCase(Locale.ROOT); String t1="<"+tag.toLowerCase(Locale.ROOT)+">", t2="</"+tag.toLowerCase(Locale.ROOT)+">"; int s=l.indexOf(t1), e=l.indexOf(t2); if(s<0||e<0||e<=s) return null; return html.substring(s+t1.length(),e).replaceAll("<[^>]+>","").trim();
+    }
+    private static String extractAttr(String xml,String attr){
+        String l=xml.toLowerCase(Locale.ROOT); String a=attr.toLowerCase(Locale.ROOT)+"="; int i=l.indexOf(a); if(i<0) return null; int q1=xml.index
