@@ -20,22 +20,9 @@ jobs:
 
       - name: Restore source
         run: |
-          cat inkflow_build_parts/part00 inkflow_build_parts/part01 inkflow_build_parts/part02 inkflow_build_parts/part03 inkflow_build_parts/part04 | base64 --decode > InkFlowBuild.zip
+          base64 --decode inkflow_build_parts/part00 > InkFlowBuild.zip
           unzip -tq InkFlowBuild.zip
           unzip -q -o InkFlowBuild.zip
-
-      - name: Apply ReaderActivity compile fix
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('InkFlowReader/app/src/main/java/app/inkflow/reader/ReaderActivity.java')
-          s = p.read_text()
-          old = 'else b=source.renderPage(index,width);cache.put(key,b);return b;\n        cache.put(key,b);return b;}'
-          new = 'else b=source.renderPage(index,width);\n        cache.put(key,b);return b;}'
-          if old not in s:
-              raise SystemExit('Expected ReaderActivity pattern not found')
-          p.write_text(s.replace(old, new, 1))
-          PY
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -58,11 +45,11 @@ jobs:
         run: gradle --no-daemon -p InkFlowReader assembleDebug --stacktrace
 
       - name: Rename APK
-        run: cp InkFlowReader/app/build/outputs/apk/debug/app-debug.apk InkFlowReader-1.0.0.apk
+        run: cp InkFlowReader/app/build/outputs/apk/debug/app-debug.apk InkFlowReader-1.0.1.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: InkFlowReader-APK
-          path: InkFlowReader-1.0.0.apk
+          path: InkFlowReader-1.0.1.apk
           if-no-files-found: error
