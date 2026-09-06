@@ -27,6 +27,9 @@ jobs:
           python3 magnetic-scrap-android/tools/gen_assets.py
           test "$(find magnetic-scrap-android/app/src/main/res/drawable-nodpi -name '*.png' | wc -l)" -ge 21
 
+      - name: Patch runtime safety
+        run: python3 magnetic-scrap-android/tools/patch_runtime.py
+
       - name: Android SDK
         uses: android-actions/setup-android@v3
 
@@ -47,8 +50,13 @@ jobs:
           APK=magnetic-scrap-android/app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | head -20
-          unzip -l "$APK" | grep -q 'res/drawable_nodpi'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "package: name='com.artem.magneticscrap.rebuild'" /tmp/badging.txt
+          grep -q "targetSdkVersion:'35'" /tmp/badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump resources "$APK" > /tmp/resources.txt
+          grep -q 'drawable/core' /tmp/resources.txt
+          grep -q 'drawable/boss_magnetar' /tmp/resources.txt
+          grep -q 'drawable/floor_foundry' /tmp/resources.txt
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
