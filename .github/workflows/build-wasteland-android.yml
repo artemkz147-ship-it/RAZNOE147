@@ -12,12 +12,12 @@ permissions:
 jobs:
   android:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Rebuild v1.4 race project
+      - name: Rebuild v1.5 race project
         shell: bash
         run: |
           mkdir -p wasteland
@@ -26,42 +26,42 @@ jobs:
           cp wasteland/game_override.gd wasteland/scripts/game.gd
           cp wasteland/combat_car_override.gd wasteland/scripts/combat_car.gd
           cp wasteland/hud_override.gd wasteland/scripts/hud.gd
-          python3 - <<'PY'
-          from pathlib import Path
 
-          rocket = Path('wasteland/scripts/rocket.gd')
-          r = rocket.read_text()
-          old = 'var desired := (target.global_position + Vector3.UP * 0.65 - global_position).normalized()'
-          new = 'var desired: Vector3 = (target.global_position + Vector3.UP * 0.65 - global_position).normalized()'
-          if old in r:
-              r = r.replace(old, new)
-          rocket.write_text(r)
+          mkdir -p wasteland/assets/kenney/vehicles wasteland/assets/kenney/debris wasteland/assets/kenney/city
+          BASE="https://raw.githubusercontent.com/Arslan12216775/kenney_car-kit/master/Models/GLB%20format"
+          CITY="https://raw.githubusercontent.com/Arslan12216775/kenney_car-kit/master/Models/City"
+          fetch_asset() { curl -L --fail --retry 4 --retry-delay 2 "$1" -o "$2"; }
 
-          project = Path('wasteland/project.godot')
-          t = project.read_text()
-          wrong = 'rendering/textures/vram_compression/import_etc2_astc=true'
-          correct = 'textures/vram_compression/import_etc2_astc=true'
-          t = t.replace(wrong + '\n', '')
-          if correct not in t:
-              if '[rendering]\n' not in t:
-                  raise SystemExit('Missing [rendering] section')
-              t = t.replace('[rendering]\n', '[rendering]\n' + correct + '\n', 1)
-          project.write_text(t)
+          fetch_asset "$BASE/race.glb" wasteland/assets/kenney/vehicles/race.glb
+          fetch_asset "$BASE/hatchback-sports.glb" wasteland/assets/kenney/vehicles/hatchback-sports.glb
+          fetch_asset "$BASE/suv.glb" wasteland/assets/kenney/vehicles/suv.glb
+          fetch_asset "$BASE/race-future.glb" wasteland/assets/kenney/vehicles/race-future.glb
+          fetch_asset "$BASE/firetruck.glb" wasteland/assets/kenney/vehicles/firetruck.glb
+          fetch_asset "$BASE/delivery.glb" wasteland/assets/kenney/vehicles/delivery.glb
 
-          preset = Path('wasteland/export_presets.cfg')
-          p = preset.read_text()
-          import re
-          p = re.sub(r'package/unique_name="[^"]+"', 'package/unique_name="ru.openai148.wastelandcircuit.race"', p)
-          p = re.sub(r'package/name="[^"]+"', 'package/name="Wasteland Circuit Race"', p)
-          p = re.sub(r'version/code=\d+', 'version/code=14', p)
-          p = re.sub(r'version/name="[^"]+"', 'version/name="1.4.0"', p)
-          p = re.sub(r'export_path="[^"]+"', 'export_path="builds/Wasteland-Circuit-Race-v1.4.0.apk"', p)
-          preset.write_text(p)
-          PY
+          fetch_asset "$BASE/debris-door.glb" wasteland/assets/kenney/debris/debris-door.glb
+          fetch_asset "$BASE/debris-bumper.glb" wasteland/assets/kenney/debris/debris-bumper.glb
+          fetch_asset "$BASE/debris-spoiler-a.glb" wasteland/assets/kenney/debris/debris-spoiler-a.glb
+          fetch_asset "$BASE/debris-plate-a.glb" wasteland/assets/kenney/debris/debris-plate-a.glb
+          fetch_asset "$BASE/debris-plate-b.glb" wasteland/assets/kenney/debris/debris-plate-b.glb
+          fetch_asset "$BASE/debris-tire.glb" wasteland/assets/kenney/debris/debris-tire.glb
+          fetch_asset "$BASE/debris-drivetrain.glb" wasteland/assets/kenney/debris/debris-drivetrain.glb
+          fetch_asset "$BASE/cone.glb" wasteland/assets/kenney/city/cone.glb
+
+          for letter in a b c d e f g h; do
+            fetch_asset "$CITY/building-type-$letter.glb" "wasteland/assets/kenney/city/building-type-$letter.glb"
+          done
+          fetch_asset "$CITY/fence.glb" wasteland/assets/kenney/city/fence.glb
+          fetch_asset "https://raw.githubusercontent.com/Arslan12216775/kenney_car-kit/master/License.txt" wasteland/assets/kenney/LICENSE.txt
+
+          python3 wasteland/ci_patch_v15.py
           rm -rf wasteland/.godot
-          grep -n "drift_boosted\|_detach_part\|vehicle_name" wasteland/scripts/combat_car.gd
-          grep -n "PATH_SEGMENTS\|_race_position\|_build_boost_pads" wasteland/scripts/game.gd
-          grep -n "set_race_position\|set_drift_charge\|ДРИФТ" wasteland/scripts/hud.gd
+
+          test -s wasteland/assets/kenney/vehicles/race.glb
+          test -s wasteland/assets/kenney/debris/debris-door.glb
+          test -s wasteland/assets/kenney/city/building-type-a.glb
+          grep -n "_build_external_vehicle\|_spawn_bonus_debris\|_update_external_visual" wasteland/scripts/combat_car.gd
+          grep -n "_track_title\|_spawn_imported_city\|track_style" wasteland/scripts/game.gd
           grep -n "^textures/vram_compression/import_etc2_astc=true$" wasteland/project.godot
           grep -n "version/name=\|package/unique_name=" wasteland/export_presets.cfg
 
@@ -96,6 +96,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Wasteland-Circuit-Race-v1.4.0
+          name: Wasteland-Circuit-Race-v1.5.0
           path: ${{ steps.export.outputs.build_directory }}/**/*.apk
           if-no-files-found: error
