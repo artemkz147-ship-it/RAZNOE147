@@ -25,7 +25,7 @@ public class BookReaderActivity extends Activity {
         root=new FrameLayout(this); root.setBackgroundColor(bg()); Ui.safeInsets(root,this,0,0,0,0);
         web=new WebView(this); FrameLayout.LayoutParams wp=new FrameLayout.LayoutParams(-1,-1); wp.topMargin=Ui.dp(this,64); wp.bottomMargin=Ui.dp(this,58); root.addView(web,wp);
         WebSettings s=web.getSettings(); s.setJavaScriptEnabled(true); s.setBuiltInZoomControls(true); s.setDisplayZoomControls(false); s.setDomStorageEnabled(true); s.setLoadWithOverviewMode(true); s.setUseWideViewPort(true); s.setDefaultTextEncodingName("utf-8");
-        web.setBackgroundColor(bg()); if(Build.VERSION.SDK_INT>=29) web.setForceDark(WebSettings.FORCE_DARK_OFF);
+        web.setBackgroundColor(bg()); if(Build.VERSION.SDK_INT>=29) s.setForceDark(WebSettings.FORCE_DARK_OFF);
         web.setOnScrollChangeListener((v,x,y,ox,oy)->scheduleSave());
         web.setWebChromeClient(new WebChromeClient());
         web.setWebViewClient(new WebViewClient(){@Override public void onPageFinished(WebView view,String url){loaded=true; restoreScroll(); updateProgressText();}});
