@@ -24,6 +24,19 @@ jobs:
           unzip -tq InkFlowBuild.zip
           unzip -q -o InkFlowBuild.zip
 
+      - name: Apply ReaderActivity compile fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('InkFlowReader/app/src/main/java/app/inkflow/reader/ReaderActivity.java')
+          s = p.read_text()
+          old = 'else b=source.renderPage(index,width);cache.put(key,b);return b;\n        cache.put(key,b);return b;}'
+          new = 'else b=source.renderPage(index,width);\n        cache.put(key,b);return b;}'
+          if old not in s:
+              raise SystemExit('Expected ReaderActivity pattern not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
