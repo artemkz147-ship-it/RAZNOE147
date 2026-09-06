@@ -1,10 +1,11 @@
-name: Build InkFlow Reader APK
+name: Build Читай Всё APK
 
 on:
   push:
     branches: [main]
     paths:
       - 'inkflow_build_parts/**'
+      - 'inkflow_patch_120/**'
       - '.github/workflows/inkflow-reader-apk.yml'
   workflow_dispatch:
 
@@ -23,6 +24,20 @@ jobs:
           cat inkflow_build_parts/part00 inkflow_build_parts/part01 inkflow_build_parts/part02 inkflow_build_parts/part03 inkflow_build_parts/part04 | base64 --decode > InkFlowBuild.zip
           unzip -tq InkFlowBuild.zip
           unzip -q -o InkFlowBuild.zip
+
+      - name: Add book reader and branding
+        run: |
+          TARGET=InkFlowReader/app/src/main/java/app/inkflow/reader
+          cp inkflow_patch_120/BookContent.java "$TARGET/BookContent.java"
+          cp inkflow_patch_120/BookProgressStore.java "$TARGET/BookProgressStore.java"
+          cat inkflow_patch_120/BookSourceFactory.java.part00 inkflow_patch_120/BookSourceFactory.java.part01 inkflow_patch_120/BookSourceFactory.java.part02 > "$TARGET/BookSourceFactory.java"
+          cat inkflow_patch_120/BookReaderActivity.java.part00 inkflow_patch_120/BookReaderActivity.java.part01 inkflow_patch_120/BookReaderActivity.java.part02 > "$TARGET/BookReaderActivity.java"
+          python3 inkflow_patch_120/apply_120.py
+          rm -f InkFlowReader/app/src/main/res/drawable/ic_launcher.xml
+          cat inkflow_patch_120/icon.part00 inkflow_patch_120/icon.part01 inkflow_patch_120/icon.part02 | base64 --decode > InkFlowReader/app/src/main/res/drawable/ic_launcher.png
+          test -s InkFlowReader/app/src/main/res/drawable/ic_launcher.png
+          grep -q 'versionName .1.2.0.' InkFlowReader/app/build.gradle
+          grep -q 'Читай Всё' InkFlowReader/app/src/main/AndroidManifest.xml
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -45,11 +60,11 @@ jobs:
         run: gradle --no-daemon -p InkFlowReader assembleDebug --stacktrace
 
       - name: Rename APK
-        run: cp InkFlowReader/app/build/outputs/apk/debug/app-debug.apk InkFlowReader-1.1.1.apk
+        run: cp InkFlowReader/app/build/outputs/apk/debug/app-debug.apk Chitai-Vse-1.2.0.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: InkFlowReader-APK-1.1.1
-          path: InkFlowReader-1.1.1.apk
+          name: Chitai-Vse-APK-1.2.0
+          path: Chitai-Vse-1.2.0.apk
           if-no-files-found: error
