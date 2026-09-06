@@ -3,7 +3,7 @@ on:
   push:
     branches: [ "storybook-ai-v1" ]
     paths:
-      - "storybook-ai-source.zip"
+      - "storybook-ai/**"
       - ".github/workflows/build-storybook.yml"
   workflow_dispatch:
 
@@ -12,8 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Unpack source
-        run: unzip -q -o storybook-ai-source.zip
+      - name: Restore generated sources
+        run: |
+          gzip -dc storybook-ai/app/src/main/assets/index.html.gz > storybook-ai/app/src/main/assets/index.html
+          gzip -dc storybook-ai/backend/worker.js.gz > storybook-ai/backend/worker.js
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

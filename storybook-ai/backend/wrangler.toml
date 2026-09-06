@@ -1,0 +1,7 @@
+name = "storybook-ai-api"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+TEXT_MODEL = "gpt-5.6-terra"
+IMAGE_MODEL = "gpt-image-2"
