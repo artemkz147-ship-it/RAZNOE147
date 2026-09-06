@@ -17,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Rebuild v1.6.2 fixed project
+      - name: Rebuild v1.6.3 fixed project
         shell: bash
         run: |
           mkdir -p wasteland
@@ -56,7 +56,7 @@ jobs:
           fetch_asset "$CITY/fence.glb" wasteland/assets/kenney/city/fence.glb
           fetch_asset "https://raw.githubusercontent.com/Arslan12216775/kenney_car-kit/master/License.txt" wasteland/assets/kenney/LICENSE.txt
 
-          python3 wasteland/ci_patch_v162.py
+          python3 wasteland/ci_patch_v163.py
           rm -rf wasteland/.godot
 
           test -s wasteland/assets/kenney/vehicles/sedan-sports.glb
@@ -64,6 +64,7 @@ jobs:
           grep -n "MainMenuRoot\|get_visible_rect\|ci-race" wasteland/scripts/game.gd
           grep -n "starting_gun_ammo\|drift_stage\|_update_wheel_damage" wasteland/scripts/combat_car.gd
           ! grep -R "posmodi(" wasteland/scripts
+          grep -n "tunnel_indices" wasteland/scripts/game.gd
           grep -n "version/name=\|package/unique_name=" wasteland/export_presets.cfg
 
       - name: Runtime smoke test with Godot 4.7.2
@@ -124,6 +125,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Wasteland-Circuit-Race-v1.6.2-fixed
+          name: Wasteland-Circuit-Race-v1.6.3-fixed
           path: ${{ steps.export.outputs.build_directory }}/**/*.apk
           if-no-files-found: error
