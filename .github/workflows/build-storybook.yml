@@ -14,8 +14,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Restore generated sources
         run: |
-          gzip -dc storybook-ai/app/src/main/assets/index.html.gz > storybook-ai/app/src/main/assets/index.html
-          gzip -dc storybook-ai/backend/worker.js.gz > storybook-ai/backend/worker.js
+          cat storybook-ai/app/src/main/assets/index.html.gz.part* > /tmp/index.html.gz
+          gzip -t /tmp/index.html.gz
+          gzip -dc /tmp/index.html.gz > storybook-ai/app/src/main/assets/index.html
+          cat storybook-ai/backend/worker.js.gz.part* > /tmp/worker.js.gz
+          gzip -t /tmp/worker.js.gz
+          gzip -dc /tmp/worker.js.gz > storybook-ai/backend/worker.js
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
