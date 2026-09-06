@@ -1,0 +1,46 @@
+package app.inkflow.reader;
+
+import android.annotation.SuppressLint;
+import android.app.*;
+import android.graphics.*;
+import android.os.*;
+import android.view.*;
+import android.webkit.*;
+import android.widget.*;
+
+public class BookReaderActivity extends Activity {
+    private FrameLayout root; private LinearLayout topBar,bottomBar; private WebView web; private TextView titleView,progressView,themeView,fontView;
+    private String uri,name; private BookProgressStore progress; private Handler handler=new Handler(Looper.getMainLooper());
+    private int fontSp=20, theme=0; private boolean bars=true; private boolean loaded=false; private Runnable saver;
+
+    @Override protected void onCreate(Bundle b){
+        super.onCreate(b);
+        uri=getIntent().getDataString(); name=getIntent().getStringExtra("name"); if(uri==null){finish();return;}
+        progress=new BookProgressStore(this); fontSp=progress.getFontSp(); theme=progress.getTheme();
+        getWindow().setStatusBarColor(Ui.BG); getWindow().setNavigationBarColor(Ui.BG); getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        buildUi(); loadBook();
+    }
+
+    @SuppressLint({"SetJavaScriptEnabled"}) private void buildUi(){
+        root=new FrameLayout(this); root.setBackgroundColor(bg()); Ui.safeInsets(root,this,0,0,0,0);
+        web=new WebView(this); FrameLayout.LayoutParams wp=new FrameLayout.LayoutParams(-1,-1); wp.topMargin=Ui.dp(this,64); wp.bottomMargin=Ui.dp(this,58); root.addView(web,wp);
+        WebSettings s=web.getSettings(); s.setJavaScriptEnabled(true); s.setBuiltInZoomControls(true); s.setDisplayZoomControls(false); s.setDomStorageEnabled(true); s.setLoadWithOverviewMode(true); s.setUseWideViewPort(true); s.setDefaultTextEncodingName("utf-8");
+        web.setBackgroundColor(bg()); if(Build.VERSION.SDK_INT>=29) web.setForceDark(WebSettings.FORCE_DARK_OFF);
+        web.setOnScrollChangeListener((v,x,y,ox,oy)->scheduleSave());
+        web.setWebChromeClient(new WebChromeClient());
+        web.setWebViewClient(new WebViewClient(){@Override public void onPageFinished(WebView view,String url){loaded=true; restoreScroll(); updateProgressText();}});
+        web.addJavascriptInterface(new Object(){@android.webkit.JavascriptInterface public void toggleBars(){runOnUiThread(() -> BookReaderActivity.this.toggleBars());}},"Reader");
+        web.setOnLongClickListener(v->true);
+        buildBars(); setContentView(root);
+    }
+    private void buildBars(){
+        topBar=new LinearLayout(this); topBar.setGravity(Gravity.CENTER_VERTICAL); topBar.setPadding(Ui.dp(this,10),Ui.dp(this,8),Ui.dp(this,10),Ui.dp(this,8)); topBar.setBackground(Ui.topBar(this)); topBar.setElevation(Ui.dp(this,8));
+        TextView back=button("‹",true); back.setTextSize(34); back.setOnClickListener(v->finish()); topBar.addView(back,new LinearLayout.LayoutParams(Ui.dp(this,48),Ui.dp(this,48)));
+        LinearLayout titles=new LinearLayout(this); titles.setOrientation(LinearLayout.VERTICAL); titleView=Ui.text(this,name!=null?name:"Книга",14,Ui.TEXT); titleView.setTypeface(Typeface.DEFAULT_BOLD); titleView.setMaxLines(1); titleView.setEllipsize(android.text.TextUtils.TruncateAt.END); titles.addView(titleView); TextView sub=Ui.text(this,"Книги • EPUB • FB2 • TXT • HTML",10,Ui.GOLD); titles.addView(sub); topBar.addView(titles,new LinearLayout.LayoutParams(0,-2,1));
+        TextView menu=button("☰",false); menu.setTextSize(22); menu.setOnClickListener(v->showSettings()); topBar.addView(menu,new LinearLayout.LayoutParams(Ui.dp(this,48),Ui.dp(this,48)));
+        root.addView(topBar,new FrameLayout.LayoutParams(-1,Ui.dp(this,64),Gravity.TOP));
+
+        bottomBar=new LinearLayout(this); bottomBar.setGravity(Gravity.CENTER_VERTICAL); bottomBar.setPadding(Ui.dp(this,10),Ui.dp(this,7),Ui.dp(this,10),Ui.dp(this,8)); bottomBar.setBackground(Ui.bottomBar(this)); bottomBar.setElevation(Ui.dp(this,10));
+        fontView=smallBtn("A−",false); fontView.setOnClickListener(v->{fontSp=Math.max(14,fontSp-2); progress.setFontSp(fontSp); reloadTheme();}); bottomBar.addView(fontView,new LinearLayout.LayoutParams(Ui.dp(this,54),Ui.dp(this,38)));
+        TextView fontPlus=smallBtn("A+",false); fontPlus.setOnClickListener(v->{fontSp=Math.min(34,fontSp+2); progress.setFontSp(fontSp); reloadTheme();}); LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(Ui.dp(this,54),Ui.dp(this,38)); fp.leftMargin=Ui.dp(this,6); bottomBar.addView(fontPlus,fp);
+        progressView=Ui.text(this,"0%",12,Ui.TEXT); p
