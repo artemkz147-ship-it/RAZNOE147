@@ -12,12 +12,12 @@ permissions:
 jobs:
   android:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Rebuild v1.5 race project
+      - name: Rebuild v1.6 race project
         shell: bash
         run: |
           mkdir -p wasteland
@@ -38,6 +38,8 @@ jobs:
           fetch_asset "$BASE/race-future.glb" wasteland/assets/kenney/vehicles/race-future.glb
           fetch_asset "$BASE/firetruck.glb" wasteland/assets/kenney/vehicles/firetruck.glb
           fetch_asset "$BASE/delivery.glb" wasteland/assets/kenney/vehicles/delivery.glb
+          fetch_asset "$BASE/sedan-sports.glb" wasteland/assets/kenney/vehicles/sedan-sports.glb
+          fetch_asset "$BASE/garbage-truck.glb" wasteland/assets/kenney/vehicles/garbage-truck.glb
 
           fetch_asset "$BASE/debris-door.glb" wasteland/assets/kenney/debris/debris-door.glb
           fetch_asset "$BASE/debris-bumper.glb" wasteland/assets/kenney/debris/debris-bumper.glb
@@ -48,20 +50,21 @@ jobs:
           fetch_asset "$BASE/debris-drivetrain.glb" wasteland/assets/kenney/debris/debris-drivetrain.glb
           fetch_asset "$BASE/cone.glb" wasteland/assets/kenney/city/cone.glb
 
-          for letter in a b c d e f g h; do
+          for letter in a b c d e f g h i j k l m n o p; do
             fetch_asset "$CITY/building-type-$letter.glb" "wasteland/assets/kenney/city/building-type-$letter.glb"
           done
           fetch_asset "$CITY/fence.glb" wasteland/assets/kenney/city/fence.glb
           fetch_asset "https://raw.githubusercontent.com/Arslan12216775/kenney_car-kit/master/License.txt" wasteland/assets/kenney/LICENSE.txt
 
-          python3 wasteland/ci_patch_v15.py
+          python3 wasteland/ci_patch_v16.py
           rm -rf wasteland/.godot
 
-          test -s wasteland/assets/kenney/vehicles/race.glb
-          test -s wasteland/assets/kenney/debris/debris-door.glb
-          test -s wasteland/assets/kenney/city/building-type-a.glb
-          grep -n "_build_external_vehicle\|_spawn_bonus_debris\|_update_external_visual" wasteland/scripts/combat_car.gd
-          grep -n "_track_title\|_spawn_imported_city\|track_style" wasteland/scripts/game.gd
+          test -s wasteland/assets/kenney/vehicles/sedan-sports.glb
+          test -s wasteland/assets/kenney/vehicles/garbage-truck.glb
+          test -s wasteland/assets/kenney/city/building-type-p.glb
+          grep -n "starting_gun_ammo\|drift_stage\|_update_wheel_damage" wasteland/scripts/combat_car.gd
+          grep -n "_build_main_menu\|selected_car\|_build_v16_track_features" wasteland/scripts/game.gd
+          grep -n "ПУЛЕМЁТ\|set_drift_stage" wasteland/scripts/hud.gd
           grep -n "^textures/vram_compression/import_etc2_astc=true$" wasteland/project.godot
           grep -n "version/name=\|package/unique_name=" wasteland/export_presets.cfg
 
@@ -96,6 +99,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Wasteland-Circuit-Race-v1.5.0
+          name: Wasteland-Circuit-Race-v1.6.0
           path: ${{ steps.export.outputs.build_directory }}/**/*.apk
           if-no-files-found: error
