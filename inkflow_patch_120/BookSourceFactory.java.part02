@@ -1,0 +1,6 @@
+Of('"',i); if(q1<0) return null; int q2=xml.indexOf('"',q1+1); if(q2<0) return null; return xml.substring(q1+1,q2);
+    }
+    private static String textOfFirst(Element root,String tag){ NodeList n=root.getElementsByTagName(tag); if(n.getLength()==0) return null; return n.item(0).getTextContent(); }
+    private static String stripExt(String name){ int i=name.lastIndexOf('.'); return i>0?name.substring(0,i):name; }
+    public static String esc(String s){ return s==null?"":s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;"); }
+}
