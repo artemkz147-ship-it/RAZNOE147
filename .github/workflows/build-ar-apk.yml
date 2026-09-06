@@ -33,19 +33,35 @@ jobs:
           from pathlib import Path
           p = Path('ar-space-breach/app/src/main/java/com/artem/arspacebreach/MainActivity.kt')
           s = p.read_text()
+
+          # Android 15/16 edge-to-edge: keep all important UI inside safe drawing insets
+          # (status bar, camera cutout, gesture/3-button navigation).
           anchor = 'import androidx.compose.foundation.layout.size\n'
           extra = (
               'import androidx.compose.foundation.layout.WindowInsets\n'
               'import androidx.compose.foundation.layout.safeDrawing\n'
               'import androidx.compose.foundation.layout.windowInsetsPadding\n'
           )
-          if 'windowInsetsPadding' not in s:
+          if 'import androidx.compose.foundation.layout.windowInsetsPadding' not in s:
               s = s.replace(anchor, anchor + extra)
           s = s.replace('Modifier.fillMaxSize()', 'Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)')
+
+          # Faster, easier real wall recognition: don't wait for ARCore to grow a 65x65 cm plane.
+          s = s.replace('it.extentX > 0.65f && it.extentZ > 0.65f',
+                        'it.extentX > 0.30f && it.extentZ > 0.30f')
+          s = s.replace('now - lastBreachSpawnMs > 900L',
+                        'now - lastBreachSpawnMs > 250L')
+          s = s.replace('МЕДЛЕННО ПРОВЕДИ КАМЕРОЙ ПО СТЕНЕ',
+                        'НАВЕДИ КАМЕРУ НА СТЕНУ И СЛЕГКА ПОВЕДИ В СТОРОНУ')
+          s = s.replace('ДВИГАЙ ТЕЛЕФОН МЕДЛЕННЕЕ — AR ИЩЕТ ОРИЕНТИРЫ',
+                        'НАВЕДИ НА СТЕНУ И СЛЕГКА СДВИНЬ ТЕЛЕФОН')
+          s = s.replace('СКАНИРУЙ СТЕНУ — ВОДИ КАМЕРОЙ ВЛЕВО И ВПРАВО',
+                        'НАВЕДИ НА СТЕНУ — ДОСТАТОЧНО НЕБОЛЬШОГО ДВИЖЕНИЯ')
+
           p.write_text(s)
           PY
-          echo '--- SCAN LOGIC ---'
-          grep -nE 'scanText|Plane\.Type|extent|TrackingState|lastBreachSpawn|Breach|breach|plane|Plane' "$SRC" | head -n 180 || true
+          echo '--- FINAL SCAN SETTINGS ---'
+          grep -nE 'extentX >|lastBreachSpawnMs >|scanText =' "$SRC" | head -n 80 || true
       - name: Build debug APK
         working-directory: ar-space-breach
         run: gradle :app:assembleDebug --stacktrace --no-daemon
