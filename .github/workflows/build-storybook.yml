@@ -1,0 +1,33 @@
+name: Build StoryBook AI APK
+on:
+  push:
+    branches: [ "storybook-ai-v1" ]
+    paths:
+      - "storybook-ai-source.zip"
+      - ".github/workflows/build-storybook.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack source
+        run: unzip -q -o storybook-ai-source.zip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build debug APK
+        working-directory: storybook-ai
+        run: gradle :app:assembleDebug --stacktrace
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-ai-debug-apk
+          path: storybook-ai/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
