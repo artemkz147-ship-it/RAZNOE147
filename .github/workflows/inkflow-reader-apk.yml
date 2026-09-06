@@ -45,11 +45,11 @@ jobs:
         run: gradle --no-daemon -p InkFlowReader assembleDebug --stacktrace
 
       - name: Rename APK
-        run: cp InkFlowReader/app/build/outputs/apk/debug/app-debug.apk InkFlowReader-1.0.1.apk
+        run: cp InkFlowReader/app/build/outputs/apk/debug/app-debug.apk InkFlowReader-1.1.1.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: InkFlowReader-APK
-          path: InkFlowReader-1.0.1.apk
+          name: InkFlowReader-APK-1.1.1
+          path: InkFlowReader-1.1.1.apk
           if-no-files-found: error
