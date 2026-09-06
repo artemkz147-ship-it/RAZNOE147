@@ -1,0 +1,41 @@
+rogressView.setGravity(Gravity.CENTER); progressView.setTypeface(Typeface.DEFAULT_BOLD); LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(0,Ui.dp(this,40),1); pp.leftMargin=Ui.dp(this,10); pp.rightMargin=Ui.dp(this,10); bottomBar.addView(progressView,pp);
+        themeView=smallBtn(themeName(),true); themeView.setOnClickListener(v->{theme=(theme+1)%3; progress.setTheme(theme); reloadTheme();}); bottomBar.addView(themeView,new LinearLayout.LayoutParams(Ui.dp(this,98),Ui.dp(this,38)));
+        root.addView(bottomBar,new FrameLayout.LayoutParams(-1,Ui.dp(this,58),Gravity.BOTTOM));
+    }
+    private TextView button(String s,boolean gold){TextView t=Ui.text(this,s,20,gold?0xFF201400:Ui.TEXT); t.setGravity(Gravity.CENTER); t.setBackground(gold?Ui.goldButton(this):Ui.softButton(this)); return t;}
+    private TextView smallBtn(String s,boolean gold){TextView t=Ui.text(this,s,12,gold?0xFF201400:Ui.TEXT); t.setTypeface(Typeface.DEFAULT_BOLD); t.setGravity(Gravity.CENTER); t.setBackground(gold?Ui.goldButton(this):Ui.softButton(this)); return t;}
+
+    private void loadBook(){
+        ProgressBar pb=new ProgressBar(this); root.addView(pb,new FrameLayout.LayoutParams(Ui.dp(this,52),Ui.dp(this,52),Gravity.CENTER));
+        new Thread(() -> {
+            try{
+                BookContent b=BookSourceFactory.open(this,android.net.Uri.parse(uri));
+                runOnUiThread(() -> { if(b.title!=null) titleView.setText(b.title); web.loadDataWithBaseURL("https://appassets.androidplatform.net/", wrapHtml(b.title,b.html), "text/html", "utf-8", null); root.removeView(pb); });
+            }catch(Exception e){ runOnUiThread(() -> { root.removeView(pb); new AlertDialog.Builder(this).setTitle("Не удалось открыть книгу").setMessage(e.getMessage()).setPositiveButton("Закрыть",(d,w)->finish()).show(); }); }
+        }).start();
+    }
+
+    private String wrapHtml(String title,String body){
+        return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=5'><style>"+
+                "body{margin:0;padding:20px 18px 120px 18px;background:"+hex(bg())+";color:"+hex(text())+";font-family:serif;font-size:"+fontSp+"px;line-height:1.64;word-wrap:break-word;}"+
+                "h1,h2,h3,h4{line-height:1.25;color:"+hex(head())+";margin:1.2em 0 .55em;font-family:sans-serif;}h1{font-size:1.55em;margin-top:.2em;} h2{font-size:1.25em;} p{margin:.7em 0;text-indent:1.4em;} blockquote{margin:1em 0;padding:.8em 1em;border-left:4px solid "+hex(accent())+";background:"+hex(card())+";border-radius:14px;} .poem{margin:1em 0;padding-left:1em;} .sp{height:1em;} img{max-width:100%;height:auto;border-radius:14px;} a{color:"+hex(accent())+";text-decoration:none;} hr{border:none;border-top:1px solid "+hex(cardBorder())+";margin:1.3em 0;} </style></head><body onclick='if(window.Reader) Reader.toggleBars();'>"+body+"</body></html>";
+    }
+    private String hex(int c){ return String.format("#%06X",0xFFFFFF & c); }
+    private int bg(){ return theme==0?0xFFF7F1E6:theme==1?0xFF10141C:0xFFF3EFE8; }
+    private int text(){ return theme==0?0xFF2C2118:theme==1?0xFFEDEFF4:0xFF1E1C19; }
+    private int head(){ return theme==0?0xFF6D3F08:theme==1?0xFFFFD06B:0xFF4D3424; }
+    private int accent(){ return theme==0?0xFFA35D00:theme==1?0xFF8A74FF:0xFF8B4B16; }
+    private int card(){ return theme==0?0x33A35D00:theme==1?0x221F2A44:0x22A36B33; }
+    private int cardBorder(){ return theme==0?0x44A35D00:theme==1?0x443A445C:0x443C2E21; }
+    private String themeName(){ return theme==0?"СЕПИЯ":theme==1?"НОЧЬ":"ДЕНЬ"; }
+
+    private void reloadTheme(){
+        root.setBackgroundColor(bg()); web.setBackgroundColor(bg()); titleView.setTextColor(Ui.TEXT); themeView.setText(themeName());
+        if(loaded){ captureAndReload(); }
+    }
+    private void captureAndReload(){ final int ratio=currentRatio(); new Thread(() -> {
+        try{ BookContent b=BookSourceFactory.open(this,android.net.Uri.parse(uri)); runOnUiThread(() -> { progress.setRatio(uri,ratio); web.loadDataWithBaseURL("https://appassets.androidplatform.net/", wrapHtml(b.title,b.html), "text/html", "utf-8", null); }); }catch(Exception ignored){}
+    }).start(); }
+
+    private int currentRatio(){ int range=(int)(web.getContentHeight()*web.getScale())-web.getHeight(); if(range<=0) return 0; int y=web.getScrollY(); return Math.max(0,Math.min(1000000,(int)((y*1000000L)/range))); }
+    private void saveNow(){ if(!loaded) return; progress.setRatio(uri,curre
