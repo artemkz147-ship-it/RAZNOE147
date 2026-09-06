@@ -1,0 +1,75 @@
+package app.inkflow.reader;
+
+import android.content.Context;
+import android.net.Uri;
+import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.zip.*;
+import javax.xml.parsers.*;
+import org.w3c.dom.*;
+
+public final class BookSourceFactory {
+    public static boolean isBookFormat(String name){
+        String l=(name==null?"":name.toLowerCase(Locale.ROOT));
+        return l.endsWith(".epub")||l.endsWith(".fb2")||l.endsWith(".txt")||l.endsWith(".html")||l.endsWith(".htm");
+    }
+
+    public static BookContent open(Context c, Uri uri) throws Exception {
+        String name=SourceFactory.fileName(c,uri);
+        String lower=name.toLowerCase(Locale.ROOT);
+        if(lower.endsWith(".epub")) return parseEpub(c,uri,name);
+        if(lower.endsWith(".fb2")) return parseFb2(c,uri,name);
+        if(lower.endsWith(".html")||lower.endsWith(".htm")) return parseHtml(c,uri,name);
+        if(lower.endsWith(".txt")) return parseTxt(c,uri,name);
+        throw new IOException("Неподдерживаемая книга: "+name);
+    }
+
+    private static BookContent parseTxt(Context c, Uri uri, String fallback) throws Exception {
+        byte[] data=readAll(c.getContentResolver().openInputStream(uri));
+        String s=decodeSmart(data);
+        StringBuilder html=new StringBuilder();
+        html.append("<h1>").append(esc(stripExt(fallback))).append("</h1>");
+        for(String block:s.replace("\r","\n").split("\n\n+")){
+            String t=block.trim(); if(t.isEmpty()) continue;
+            html.append("<p>").append(esc(t).replace("\n","<br/>\n")).append("</p>");
+        }
+        return new BookContent(stripExt(fallback), html.toString());
+    }
+
+    private static BookContent parseHtml(Context c, Uri uri, String fallback) throws Exception {
+        byte[] data=readAll(c.getContentResolver().openInputStream(uri));
+        String s=decodeSmart(data);
+        String title=extractTag(s,"title"); if(title==null||title.trim().isEmpty()) title=stripExt(fallback);
+        String body=extractBody(s); if(body==null) body="<p>"+esc(s)+"</p>";
+        return new BookContent(title, body);
+    }
+
+    private static BookContent parseFb2(Context c, Uri uri, String fallback) throws Exception {
+        DocumentBuilderFactory f=DocumentBuilderFactory.newInstance();f.setNamespaceAware(false);
+        Document doc;
+        try(InputStream in=c.getContentResolver().openInputStream(uri)){ doc=f.newDocumentBuilder().parse(in); }
+        Element root=doc.getDocumentElement();
+        String title=textOfFirst(root,"book-title"); if(title==null||title.trim().isEmpty()) title=stripExt(fallback);
+        StringBuilder html=new StringBuilder(); html.append("<h1>").append(esc(title)).append("</h1>");
+        NodeList bodies=root.getElementsByTagName("body");
+        for(int i=0;i<bodies.getLength();i++) appendFb2Node((Element)bodies.item(i),html,0);
+        return new BookContent(title, html.toString());
+    }
+
+    private static void appendFb2Node(Node node, StringBuilder out, int level){
+        if(node.getNodeType()==Node.TEXT_NODE){String t=node.getTextContent(); if(t!=null&&!t.trim().isEmpty()) out.append(esc(t)); return;}
+        if(node.getNodeType()!=Node.ELEMENT_NODE) return;
+        String n=node.getNodeName();
+        if("section".equals(n) || "body".equals(n)){
+            NodeList ch=node.getChildNodes(); for(int i=0;i<ch.getLength();i++) appendFb2Node(ch.item(i),out,level+1); return;
+        }
+        if("title".equals(n)){
+            String t=node.getTextContent().trim(); if(!t.isEmpty()){int h=Math.min(4,Math.max(2,level+1)); out.append("<h").append(h).append(">").append(esc(t)).append("</h").append(h).append(">");} return;
+        }
+        if("subtitle".equals(n)){String t=node.getTextContent().trim(); if(!t.isEmpty()) out.append("<h3>").append(esc(t)).append("</h3>"); return;}
+        if("epigraph".equals(n) || "cite".equals(n)){out.append("<blockquote>"); NodeList ch=node.getChildNodes(); for(int i=0;i<ch.getLength();i++) appendFb2Node(ch.item(i),out,level); out.append("</blockquote>"); return;}
+        if("poem".equals(n) || "stanza".equals(n)){out.append("<div class='poem'>"); NodeList ch=node.getChildNodes(); for(int i=0;i<ch.getLength();i++) appendFb2Node(ch.item(i),out,level); out.append("</div>"); return;}
+        if("v".equals(n)){String t=node.getTextContent().trim(); if(!t.isEmpty()) out.append("<div>").append(esc(t)).append("</div>"); return;}
+        if("empty-line".equals(n)){o
