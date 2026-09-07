@@ -7,6 +7,7 @@ on:
       - 'inkflow_build_parts/**'
       - 'inkflow_patch_120/**'
       - 'inkflow_patch_130/**'
+      - 'inkflow_patch_140/**'
       - '.github/workflows/inkflow-reader-apk.yml'
   workflow_dispatch:
 
@@ -26,7 +27,7 @@ jobs:
           unzip -tq InkFlowBuild.zip
           unzip -q -o InkFlowBuild.zip
 
-      - name: Add advanced book reader and settings
+      - name: Add advanced reader and torrent center
         run: |
           TARGET=InkFlowReader/app/src/main/java/app/inkflow/reader
           cp inkflow_patch_120/BookContent.java "$TARGET/BookContent.java"
@@ -34,8 +35,12 @@ jobs:
           cp inkflow_patch_130/BookProgressStore.java "$TARGET/BookProgressStore.java"
           cat inkflow_patch_130/BookReaderActivity.java.part00 inkflow_patch_130/BookReaderActivity.java.part01 inkflow_patch_130/BookReaderActivity.java.part02 inkflow_patch_130/BookReaderActivity.java.part03 > "$TARGET/BookReaderActivity.java"
           cp inkflow_patch_130/BookSettingsActivity.java "$TARGET/BookSettingsActivity.java"
+          cp inkflow_patch_140/TorrentService.java "$TARGET/TorrentService.java"
+          cp inkflow_patch_140/TorrentActivity.java "$TARGET/TorrentActivity.java"
+          cp inkflow_patch_140/InternetArchiveSearch.java "$TARGET/InternetArchiveSearch.java"
           python3 inkflow_patch_120/apply_120.py
           python3 inkflow_patch_130/apply_130.py
+          python3 inkflow_patch_140/apply_140.py
           rm -f InkFlowReader/app/src/main/res/drawable/ic_launcher.png
           cat > InkFlowReader/app/src/main/res/drawable/ic_launcher.xml <<'XML'
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -44,19 +49,13 @@ jobs:
               <path android:fillColor="#090D17" android:pathData="M0,0h108v108h-108z"/>
               <path android:fillColor="#151B2B" android:pathData="M8,8h92v92h-92z"/>
               <path android:fillColor="#8A63FF" android:pathData="M54,24C43,17 30,17 20,21v55c10,-4 23,-4 34,4z"/>
-              <path android:fillColor="#B49AFF" android:pathData="M54,29C44,23 33,22 25,25v43c9,-2 20,0 29,6z"/>
               <path android:fillColor="#F3C75F" android:pathData="M54,24C65,17 78,17 88,21v55c-10,-4 -23,-4 -34,4z"/>
-              <path android:fillColor="#FFE29A" android:pathData="M54,29C64,23 75,22 83,25v43c-9,-2 -20,0 -29,6z"/>
-              <path android:fillColor="#FFFFFF" android:fillAlpha="0.82" android:pathData="M31,35h15v3h-15zM31,43h17v3h-17zM31,51h13v3h-13z"/>
               <path android:fillColor="#5B3ED7" android:pathData="M62,36h14a6,6 0,0 1,6 6v9a6,6 0,0 1,-6 6h-6l-6,7 1,-7h-3a6,6 0,0 1,-6 -6v-9a6,6 0,0 1,6 -6z"/>
-              <path android:fillColor="#FFF2C8" android:pathData="M63,43h12v3h-12zM63,49h9v3h-9z"/>
-              <path android:fillColor="#FFB64D" android:pathData="M49,78h10v8h-10z"/>
           </vector>
           XML
-          test -s InkFlowReader/app/src/main/res/drawable/ic_launcher.xml
-          grep -q 'versionName .1.3.0.' InkFlowReader/app/build.gradle
-          grep -q 'BookSettingsActivity' InkFlowReader/app/src/main/AndroidManifest.xml
-          grep -q 'startActivity(new Intent(this,BookSettingsActivity.class))' "$TARGET/MainActivity.java" || grep -q 'BookSettingsActivity' "$TARGET/MainActivity.java"
+          grep -q 'versionName .1.4.0.' InkFlowReader/app/build.gradle
+          grep -q 'TorrentService' InkFlowReader/app/src/main/AndroidManifest.xml
+          grep -q 'libtorrent4j' InkFlowReader/app/build.gradle
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -82,15 +81,15 @@ jobs:
         run: |
           APK=$(find InkFlowReader/app/build/outputs/apk/release -name '*.apk' | head -1)
           test -n "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.3.0-aligned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.3.0-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.4.0-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.4.0-aligned.apk
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" ./apksigner.jar
 
       - name: Upload aligned release
         uses: actions/upload-artifact@v4
         with:
-          name: Chitai-Vse-Release-Aligned-1.3.0
+          name: Chitai-Vse-Release-Aligned-1.4.0
           path: |
-            Chitai-Vse-1.3.0-aligned.apk
+            Chitai-Vse-1.4.0-aligned.apk
             apksigner.jar
           if-no-files-found: error
