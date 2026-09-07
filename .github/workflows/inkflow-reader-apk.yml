@@ -6,6 +6,7 @@ on:
     paths:
       - 'inkflow_build_parts/**'
       - 'inkflow_patch_120/**'
+      - 'inkflow_patch_130/**'
       - '.github/workflows/inkflow-reader-apk.yml'
   workflow_dispatch:
 
@@ -25,14 +26,16 @@ jobs:
           unzip -tq InkFlowBuild.zip
           unzip -q -o InkFlowBuild.zip
 
-      - name: Add book reader and branding
+      - name: Add advanced book reader and settings
         run: |
           TARGET=InkFlowReader/app/src/main/java/app/inkflow/reader
           cp inkflow_patch_120/BookContent.java "$TARGET/BookContent.java"
-          cp inkflow_patch_120/BookProgressStore.java "$TARGET/BookProgressStore.java"
           cat inkflow_patch_120/BookSourceFactory.java.part00 inkflow_patch_120/BookSourceFactory.java.part01 inkflow_patch_120/BookSourceFactory.java.part02 > "$TARGET/BookSourceFactory.java"
-          cat inkflow_patch_120/BookReaderActivity.java.part00 inkflow_patch_120/BookReaderActivity.java.part01 inkflow_patch_120/BookReaderActivity.java.part02 > "$TARGET/BookReaderActivity.java"
+          cp inkflow_patch_130/BookProgressStore.java "$TARGET/BookProgressStore.java"
+          cat inkflow_patch_130/BookReaderActivity.java.part00 inkflow_patch_130/BookReaderActivity.java.part01 inkflow_patch_130/BookReaderActivity.java.part02 inkflow_patch_130/BookReaderActivity.java.part03 > "$TARGET/BookReaderActivity.java"
+          cp inkflow_patch_130/BookSettingsActivity.java "$TARGET/BookSettingsActivity.java"
           python3 inkflow_patch_120/apply_120.py
+          python3 inkflow_patch_130/apply_130.py
           rm -f InkFlowReader/app/src/main/res/drawable/ic_launcher.png
           cat > InkFlowReader/app/src/main/res/drawable/ic_launcher.xml <<'XML'
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -51,8 +54,9 @@ jobs:
           </vector>
           XML
           test -s InkFlowReader/app/src/main/res/drawable/ic_launcher.xml
-          grep -q 'versionName .1.2.0.' InkFlowReader/app/build.gradle
-          grep -q 'Читай Всё' InkFlowReader/app/src/main/AndroidManifest.xml
+          grep -q 'versionName .1.3.0.' InkFlowReader/app/build.gradle
+          grep -q 'BookSettingsActivity' InkFlowReader/app/src/main/AndroidManifest.xml
+          grep -q 'startActivity(new Intent(this,BookSettingsActivity.class))' "$TARGET/MainActivity.java" || grep -q 'BookSettingsActivity' "$TARGET/MainActivity.java"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -78,15 +82,15 @@ jobs:
         run: |
           APK=$(find InkFlowReader/app/build/outputs/apk/release -name '*.apk' | head -1)
           test -n "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.2.0-aligned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.2.0-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.3.0-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.3.0-aligned.apk
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" ./apksigner.jar
 
       - name: Upload aligned release
         uses: actions/upload-artifact@v4
         with:
-          name: Chitai-Vse-Release-Aligned-1.2.0
+          name: Chitai-Vse-Release-Aligned-1.3.0
           path: |
-            Chitai-Vse-1.2.0-aligned.apk
+            Chitai-Vse-1.3.0-aligned.apk
             apksigner.jar
           if-no-files-found: error
