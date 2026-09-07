@@ -74,21 +74,19 @@ jobs:
       - name: Build unsigned release APK
         run: gradle --no-daemon -p InkFlowReader assembleRelease --stacktrace
 
-      - name: Prepare signing package
+      - name: Align release and prepare signer
         run: |
           APK=$(find InkFlowReader/app/build/outputs/apk/release -name '*.apk' | head -1)
           test -n "$APK"
-          cp "$APK" Chitai-Vse-1.2.0-unsigned.apk
-          cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" ./zipalign
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.2.0-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.2.0-aligned.apk
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" ./apksigner.jar
-          chmod +x ./zipalign
 
-      - name: Upload unsigned release
+      - name: Upload aligned release
         uses: actions/upload-artifact@v4
         with:
-          name: Chitai-Vse-Release-Unsigned-1.2.0
+          name: Chitai-Vse-Release-Aligned-1.2.0
           path: |
-            Chitai-Vse-1.2.0-unsigned.apk
-            zipalign
+            Chitai-Vse-1.2.0-aligned.apk
             apksigner.jar
           if-no-files-found: error
