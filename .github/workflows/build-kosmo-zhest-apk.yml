@@ -59,31 +59,24 @@ jobs:
             adb logcat -c
             adb shell am start -W -n com.artem.kosmozhest/.MainActivity
             sleep 12
-            PID=$(adb shell pidof com.artem.kosmozhest | tr -d '\r')
-            echo "App PID: $PID"
-            if [ -z "$PID" ]; then
-              adb logcat -d -t 1000 > smoke-log.txt
-              cat smoke-log.txt
-              echo "App process is not alive after launch"
-              exit 1
-            fi
-            adb logcat -d -t 1000 > smoke-log.txt
-            if grep -E "FATAL EXCEPTION|AndroidRuntime: FATAL|Process: com\.artem\.kosmozhest" smoke-log.txt; then
-              cat smoke-log.txt
-              echo "Fatal exception detected"
-              exit 1
-            fi
-            echo "Smoke test passed"
+            adb logcat -d -t 2500 > smoke-log.txt
+            adb shell pidof com.artem.kosmozhest
+            grep -E "FATAL EXCEPTION|AndroidRuntime: FATAL|Process: com\.artem\.kosmozhest|crash|WebView" smoke-log.txt > smoke-important.txt || true
+            cat smoke-important.txt || true
+            ! grep -E "FATAL EXCEPTION|AndroidRuntime: FATAL|Process: com\.artem\.kosmozhest" smoke-log.txt
 
       - name: Upload smoke log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: kosmo-zhest-smoke-log
-          path: smoke-log.txt
+          path: |
+            smoke-log.txt
+            smoke-important.txt
           if-no-files-found: ignore
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: kosmo-zhest-ar-apk-v2
