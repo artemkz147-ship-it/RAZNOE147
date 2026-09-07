@@ -1,0 +1,9 @@
+;}
+    private String hex(int c){return String.format("#%06X",0xFFFFFF&c);}
+
+    @Override public boolean onKeyDown(int keyCode,KeyEvent event){ if(volumeKeys&&mode==0&&(keyCode==KeyEvent.KEYCODE_VOLUME_DOWN||keyCode==KeyEvent.KEYCODE_VOLUME_UP)){turnPage(keyCode==KeyEvent.KEYCODE_VOLUME_DOWN?1:-1);return true;}return super.onKeyDown(keyCode,event); }
+    @Override public void onConfigurationChanged(Configuration c){ int r=currentRatio();super.onConfigurationChanged(c);pendingRatio=r;handler.postDelayed(()->{if(book!=null)loadCurrentHtml();},100); }
+    @Override protected void onPause(){saveNow();super.onPause();}
+    @Override protected void onStop(){saveNow();super.onStop();}
+    @Override protected void onDestroy(){if(saver!=null)handler.removeCallbacks(saver);saveNow();if(web!=null)web.destroy();super.onDestroy();}
+}
