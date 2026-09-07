@@ -1,0 +1,48 @@
+name: Build Kosmo Zhest APK
+
+on:
+  push:
+    branches:
+      - build/kosmo-zhest-apk-20260907
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Rebuild embedded game HTML
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat kosmo-zhest-apk/app/src/main/assets/game.html.gz.b64.part* \
+            | base64 -d \
+            | gzip -d > kosmo-zhest-apk/app/src/main/assets/index.html
+          echo "44178ec067abce09f11c7587c7ed1ad7cacf9a78f92f3699372934eb39fc185f  kosmo-zhest-apk/app/src/main/assets/index.html" | sha256sum -c -
+
+      - name: Build installable debug APK
+        working-directory: kosmo-zhest-apk
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Rename APK
+        run: cp kosmo-zhest-apk/app/build/outputs/apk/debug/app-debug.apk kosmo-zhest-ar-v1.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: kosmo-zhest-ar-apk
+          path: kosmo-zhest-ar-v1.apk
+          if-no-files-found: error
