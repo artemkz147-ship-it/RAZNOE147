@@ -118,7 +118,8 @@ public class TorrentService extends Service {
         try{
             if(session!=null&&session.isRunning()){
                 down=session.downloadRate();up=session.uploadRate();dht=session.dhtNodes();
-                TorrentHandle[] hs=session.getTorrentHandles();
+                List<TorrentHandle> hs=new SessionHandle(session.swig()).torrents();
+                boolean paused=session.isPaused();
                 for(TorrentHandle h:hs){
                     try{
                         TorrentStatus s=h.status();
@@ -126,7 +127,7 @@ public class TorrentService extends Service {
                         String name=s.name(); if(name==null||name.isEmpty())name="Получение метаданных…";
                         o.put("name",name);o.put("progress",Math.max(0,Math.min(100,(int)(s.progress()*100f))));
                         o.put("down",s.downloadRate());o.put("up",s.uploadRate());o.put("peers",s.numPeers());
-                        o.put("finished",s.isFinished());o.put("paused",s.isPaused());
+                        o.put("finished",s.isFinished());o.put("paused",paused);
                         String tr=s.currentTracker(); if(tr!=null&&!tr.isEmpty()){o.put("tracker",tr);if(tracker.isEmpty())tracker=tr;}else o.put("tracker","");
                         o.put("done",s.totalWantedDone());o.put("total",s.totalWanted());
                         arr.put(o);totalPeers+=s.numPeers();active++;
