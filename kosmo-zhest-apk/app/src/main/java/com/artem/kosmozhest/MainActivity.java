@@ -4,7 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
@@ -18,16 +18,16 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
-import java.io.IOException;
-import java.io.InputStream;
+import androidx.annotation.NonNull;
+import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
     private static final int CAMERA_PERMISSION_REQUEST = 147;
-    private static final String APP_HOST = "appassets.androidplatform.net";
-    private static final String START_URL = "https://" + APP_HOST + "/assets/index.html";
+    private static final String START_URL = "https://appassets.androidplatform.net/assets/index.html";
 
     private WebView webView;
     private PermissionRequest pendingWebPermission;
+    private WebViewAssetLoader assetLoader;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,7 +38,11 @@ public class MainActivity extends Activity {
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         enterImmersiveMode();
 
-        webView = new WebView(this);
+        assetLoader = new WebViewAssetLoader.Builder()
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
+
+        webView = new WebView(getApplicationContext());
         webView.setBackgroundColor(Color.BLACK);
         setContentView(webView);
 
@@ -48,8 +52,13 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setLoadsImagesAutomatically(true);
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        }
 
         webView.setWebViewClient(new LocalAssetWebViewClient());
         webView.setWebChromeClient(new CameraWebChromeClient());
@@ -57,21 +66,25 @@ public class MainActivity extends Activity {
     }
 
     private void enterImmersiveMode() {
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
-            WindowInsetsController controller = getWindow().getInsetsController();
-            if (controller != null) {
-                controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
-                controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                WindowInsetsController controller = getWindow().getInsetsController();
+                if (controller != null) {
+                    controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                    controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                }
+            } else {
+                getWindow().getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                );
             }
-        } else {
-            getWindow().getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_FULLSCREEN
-                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            );
+        } catch (Throwable ignored) {
+            // Immersive UI must never be able to crash the game.
         }
     }
 
@@ -84,18 +97,11 @@ public class MainActivity extends Activity {
     private class LocalAssetWebViewClient extends WebViewClient {
         @Override
         public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-            Uri uri = request.getUrl();
-            if (APP_HOST.equalsIgnoreCase(uri.getHost()) && "/assets/index.html".equals(uri.getPath())) {
-                try {
-                    InputStream stream = getAssets().open("index.html");
-                    WebResourceResponse response = new WebResourceResponse("text/html", "UTF-8", stream);
-                    response.setStatusCodeAndReasonPhrase(200, "OK");
-                    return response;
-                } catch (IOException ignored) {
-                    return new WebResourceResponse("text/plain", "UTF-8", 404, "Not Found", null, null);
-                }
+            try {
+                return assetLoader.shouldInterceptRequest(request.getUrl());
+            } catch (Throwable ignored) {
+                return super.shouldInterceptRequest(view, request);
             }
-            return super.shouldInterceptRequest(view, request);
         }
     }
 
@@ -103,24 +109,30 @@ public class MainActivity extends Activity {
         @Override
         public void onPermissionRequest(final PermissionRequest request) {
             runOnUiThread(() -> {
-                boolean wantsVideo = false;
-                for (String resource : request.getResources()) {
-                    if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
-                        wantsVideo = true;
-                        break;
+                try {
+                    boolean wantsVideo = false;
+                    for (String resource : request.getResources()) {
+                        if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
+                            wantsVideo = true;
+                            break;
+                        }
                     }
-                }
 
-                if (!wantsVideo || !APP_HOST.equalsIgnoreCase(request.getOrigin().getHost())) {
-                    request.deny();
-                    return;
-                }
+                    String host = request.getOrigin() != null ? request.getOrigin().getHost() : null;
+                    if (!wantsVideo || !"appassets.androidplatform.net".equalsIgnoreCase(host)) {
+                        request.deny();
+                        return;
+                    }
 
-                if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                    request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
-                } else {
-                    pendingWebPermission = request;
-                    requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+                            || checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                    } else {
+                        pendingWebPermission = request;
+                        requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
+                    }
+                } catch (Throwable ignored) {
+                    try { request.deny(); } catch (Throwable ignoredAgain) { }
                 }
             });
         }
@@ -132,16 +144,18 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == CAMERA_PERMISSION_REQUEST && pendingWebPermission != null) {
             PermissionRequest request = pendingWebPermission;
             pendingWebPermission = null;
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
-            } else {
-                request.deny();
-            }
+            try {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                } else {
+                    request.deny();
+                }
+            } catch (Throwable ignored) { }
         }
     }
 
@@ -160,10 +174,18 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (pendingWebPermission != null) {
+            try { pendingWebPermission.deny(); } catch (Throwable ignored) { }
+            pendingWebPermission = null;
+        }
         if (webView != null) {
-            webView.loadUrl("about:blank");
-            webView.stopLoading();
-            webView.destroy();
+            try {
+                webView.stopLoading();
+                webView.loadUrl("about:blank");
+                webView.setWebChromeClient(null);
+                webView.setWebViewClient(null);
+                webView.destroy();
+            } catch (Throwable ignored) { }
             webView = null;
         }
         super.onDestroy();
