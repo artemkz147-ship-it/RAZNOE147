@@ -3,8 +3,8 @@ root=Path('InkFlowReader')
 main=root/'app/src/main/java/app/inkflow/reader/MainActivity.java'
 s=main.read_text()
 needle='        root.addView(actions);\n'
-add='''        root.addView(actions);\n\n        TextView torrents=action("⇩  Торрент-центр • поиск • magnet",false);\n        torrents.setOnClickListener(v->startActivity(new Intent(this,TorrentActivity.class)));\n        LinearLayout.LayoutParams tcp=new LinearLayout.LayoutParams(-1,Ui.dp(this,52));tcp.setMargins(0,0,0,Ui.dp(this,14));root.addView(torrents,tcp);\n'''
-if 'Торрент-центр • поиск • magnet' not in s:
+add='''        root.addView(actions);\n\n        TextView torrents=action("⇩  Торрент-загрузки • magnet • .torrent",false);\n        torrents.setOnClickListener(v->startActivity(new Intent(this,TorrentActivity.class)));\n        LinearLayout.LayoutParams tcp=new LinearLayout.LayoutParams(-1,Ui.dp(this,52));tcp.setMargins(0,0,0,Ui.dp(this,14));root.addView(torrents,tcp);\n'''
+if 'Торрент-загрузки • magnet • .torrent' not in s:
     s=s.replace(needle,add,1)
 main.write_text(s)
 
@@ -22,5 +22,5 @@ build=root/'app/build.gradle'
 s=build.read_text()
 if 'libtorrent4j' not in s:
     s=s.replace("    implementation 'org.tukaani:xz:1.12'","    implementation 'org.tukaani:xz:1.12'\n    implementation 'org.libtorrent4j:libtorrent4j:2.1.0-39'\n    implementation 'org.libtorrent4j:libtorrent4j-android-arm:2.1.0-39'\n    implementation 'org.libtorrent4j:libtorrent4j-android-arm64:2.1.0-39'\n    implementation 'org.libtorrent4j:libtorrent4j-android-x86:2.1.0-39'\n    implementation 'org.libtorrent4j:libtorrent4j-android-x86_64:2.1.0-39'")
-s=s.replace('versionCode 6','versionCode 8').replace("versionName '1.3.0'","versionName '1.4.1'")
+s=s.replace('versionCode 6','versionCode 9').replace("versionName '1.3.0'","versionName '1.4.2'")
 build.write_text(s)
