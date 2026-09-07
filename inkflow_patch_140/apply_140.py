@@ -22,5 +22,5 @@ build=root/'app/build.gradle'
 s=build.read_text()
 if 'libtorrent4j' not in s:
     s=s.replace("    implementation 'org.tukaani:xz:1.12'","    implementation 'org.tukaani:xz:1.12'\n    implementation 'org.libtorrent4j:libtorrent4j:2.1.0-39'\n    implementation 'org.libtorrent4j:libtorrent4j-android-arm:2.1.0-39'\n    implementation 'org.libtorrent4j:libtorrent4j-android-arm64:2.1.0-39'\n    implementation 'org.libtorrent4j:libtorrent4j-android-x86:2.1.0-39'\n    implementation 'org.libtorrent4j:libtorrent4j-android-x86_64:2.1.0-39'")
-s=s.replace('versionCode 6','versionCode 7').replace("versionName '1.3.0'","versionName '1.4.0'")
+s=s.replace('versionCode 6','versionCode 8').replace("versionName '1.3.0'","versionName '1.4.1'")
 build.write_text(s)
