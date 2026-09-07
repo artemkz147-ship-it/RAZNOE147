@@ -40,13 +40,15 @@ jobs:
           python3 inkflow_patch_120/apply_120.py
           python3 inkflow_patch_130/apply_130.py
           python3 inkflow_patch_140/apply_140.py
+          python3 inkflow_patch_140/fix_book_pagination.py
           rm -f InkFlowReader/app/src/main/res/drawable/ic_launcher.xml InkFlowReader/app/src/main/res/drawable/ic_launcher.png
           cat inkflow_patch_140/icon64.part00 inkflow_patch_140/icon64.part01 inkflow_patch_140/icon64.part02 inkflow_patch_140/icon64.part03 | base64 --decode > InkFlowReader/app/src/main/res/drawable/ic_launcher.png
           test -s InkFlowReader/app/src/main/res/drawable/ic_launcher.png
           file InkFlowReader/app/src/main/res/drawable/ic_launcher.png | grep -q 'PNG image data'
-          grep -q 'versionName .1.4.2.' InkFlowReader/app/build.gradle
+          grep -q 'versionName .1.4.3.' InkFlowReader/app/build.gradle
           grep -q 'TorrentService' InkFlowReader/app/src/main/AndroidManifest.xml
           grep -q 'libtorrent4j' InkFlowReader/app/build.gradle
+          grep -q 'r.style.width=content' "$TARGET/BookReaderActivity.java"
           ! test -f "$TARGET/InternetArchiveSearch.java"
 
       - name: Set up JDK 17
@@ -73,15 +75,15 @@ jobs:
         run: |
           APK=$(find InkFlowReader/app/build/outputs/apk/release -name '*.apk' | head -1)
           test -n "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.4.2-aligned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.4.2-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.4.3-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.4.3-aligned.apk
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" ./apksigner.jar
 
       - name: Upload aligned release
         uses: actions/upload-artifact@v4
         with:
-          name: Chitai-Vse-Release-Aligned-1.4.2
+          name: Chitai-Vse-Release-Aligned-1.4.3
           path: |
-            Chitai-Vse-1.4.2-aligned.apk
+            Chitai-Vse-1.4.3-aligned.apk
             apksigner.jar
           if-no-files-found: error
