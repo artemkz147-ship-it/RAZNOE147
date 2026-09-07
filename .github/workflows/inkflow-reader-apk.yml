@@ -41,18 +41,10 @@ jobs:
           python3 inkflow_patch_120/apply_120.py
           python3 inkflow_patch_130/apply_130.py
           python3 inkflow_patch_140/apply_140.py
-          rm -f InkFlowReader/app/src/main/res/drawable/ic_launcher.png
-          cat > InkFlowReader/app/src/main/res/drawable/ic_launcher.xml <<'XML'
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="108dp" android:height="108dp"
-              android:viewportWidth="108" android:viewportHeight="108">
-              <path android:fillColor="#090D17" android:pathData="M0,0h108v108h-108z"/>
-              <path android:fillColor="#151B2B" android:pathData="M8,8h92v92h-92z"/>
-              <path android:fillColor="#8A63FF" android:pathData="M54,24C43,17 30,17 20,21v55c10,-4 23,-4 34,4z"/>
-              <path android:fillColor="#F3C75F" android:pathData="M54,24C65,17 78,17 88,21v55c-10,-4 -23,-4 -34,4z"/>
-              <path android:fillColor="#5B3ED7" android:pathData="M62,36h14a6,6 0,0 1,6 6v9a6,6 0,0 1,-6 6h-6l-6,7 1,-7h-3a6,6 0,0 1,-6 -6v-9a6,6 0,0 1,6 -6z"/>
-          </vector>
-          XML
+          rm -f InkFlowReader/app/src/main/res/drawable/ic_launcher.xml InkFlowReader/app/src/main/res/drawable/ic_launcher.png
+          cat inkflow_patch_140/icon64.part00 inkflow_patch_140/icon64.part01 inkflow_patch_140/icon64.part02 inkflow_patch_140/icon64.part03 | base64 --decode > InkFlowReader/app/src/main/res/drawable/ic_launcher.png
+          test -s InkFlowReader/app/src/main/res/drawable/ic_launcher.png
+          file InkFlowReader/app/src/main/res/drawable/ic_launcher.png | grep -q 'PNG image data'
           grep -q 'versionName .1.4.0.' InkFlowReader/app/build.gradle
           grep -q 'TorrentService' InkFlowReader/app/src/main/AndroidManifest.xml
           grep -q 'libtorrent4j' InkFlowReader/app/build.gradle
