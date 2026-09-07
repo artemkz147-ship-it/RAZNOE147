@@ -1,0 +1,60 @@
+w(next,np);
+        root.addView(bottomBar,new FrameLayout.LayoutParams(-1,Ui.dp(this,56),Gravity.BOTTOM));
+    }
+
+    private TextView actionButton(String txt,boolean gold,float size){ TextView t=Ui.text(this,txt,size,gold?0xFF201400:Ui.TEXT); t.setTypeface(Typeface.DEFAULT_BOLD); t.setGravity(Gravity.CENTER); t.setBackground(gold?Ui.goldButton(this):Ui.softButton(this)); return t; }
+
+    private void loadBook(){
+        ProgressBar pb=new ProgressBar(this); root.addView(pb,new FrameLayout.LayoutParams(Ui.dp(this,50),Ui.dp(this,50),Gravity.CENTER));
+        new Thread(()->{ try{ BookContent b=BookSourceFactory.open(this,android.net.Uri.parse(uri)); runOnUiThread(()->{ book=b; if(b.title!=null) titleView.setText(b.title); pendingRatio=store.getRatio(uri); loadCurrentHtml(); root.removeView(pb); }); }catch(Exception e){ runOnUiThread(()->{ root.removeView(pb); new AlertDialog.Builder(this).setTitle("Не удалось открыть книгу").setMessage(e.getMessage()).setPositiveButton("Закрыть",(d,w)->finish()).show(); }); } }).start();
+    }
+
+    private void loadCurrentHtml(){ if(book==null)return; loaded=false; web.setBackgroundColor(bookBg()); modeView.setText(mode==0?"КНИГА":"ЛЕНТА"); themeView.setText(themeName()); web.loadDataWithBaseURL("https://appassets.androidplatform.net/",wrapHtml(book.html),"text/html","utf-8",null); updateSpine(); }
+
+    private String wrapHtml(String body){
+        String family=fontFamily==1?"sans-serif":fontFamily==2?"monospace":"Georgia,serif";
+        String align=justify?"justify":"left";
+        String common="color:"+hex(textColor())+";background:"+hex(bookBg())+";font-family:"+family+";font-size:"+fontSp+"px;line-height:"+(linePct/100.0)+";word-wrap:break-word;text-align:"+align+";";
+        String typography="h1,h2,h3,h4{line-height:1.25;color:"+hex(headColor())+";margin:1.15em 0 .55em;font-family:sans-serif;break-after:avoid;}h1{font-size:1.55em}h2{font-size:1.28em}h3{font-size:1.12em}p{margin:.68em 0;text-indent:"+indent+"px;orphans:2;widows:2;}blockquote{margin:1em 0;padding:.75em 1em;border-left:4px solid "+hex(accentColor())+";background:"+hex(cardColor())+";border-radius:12px;}img{max-width:100%;height:auto;border-radius:10px;}a{color:"+hex(accentColor())+";text-decoration:none}.poem{margin:1em 0;padding-left:1em}.sp{height:1em}*{-webkit-tap-highlight-color:transparent;}";
+        if(mode==1){
+            return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=4'><style>html,body{margin:0;min-height:100%;background:"+hex(bookBg())+";}body{"+common+"}#reader{box-sizing:border-box;max-width:900px;margin:0 auto;padding:18px "+margins+"px 100px;}"+typography+"</style></head><body><div id='reader'>"+body+"</div></body></html>";
+        }
+        return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:"+hex(bookBg())+";}body{"+common+"}#reader{box-sizing:border-box;height:100vh;column-fill:auto;padding-top:14px;padding-bottom:18px;will-change:transform;}"+typography+"</style></head><body><div id='reader'>"+body+"</div><script>(function(){window.BookPager={pages:1,step:1,cell:window.innerWidth,current:0,layout:function(){var r=document.getElementById('reader');var two="+(twoPage?"true":"false")+"&&innerWidth>innerHeight;this.step=two?2:1;this.cell=innerWidth/this.step;var m="+margins+";r.style.columnWidth=Math.max(120,this.cell-2*m)+'px';r.style.columnGap=(2*m)+'px';r.style.marginLeft=m+'px';r.style.transform='translate3d(0,0,0)';var self=this;setTimeout(function(){self.pages=Math.max(1,Math.ceil((r.scrollWidth+m)/self.cell));NativeReader.layoutReady(self.pages,self.step);},60);},go:function(p){p=Math.max(0,Math.min(this.pages-1,p));this.current=p;document.getElementById('reader').style.transform='translate3d('+(-p*this.cell)+'px,0,0)';return p;}};addEventListener('load',function(){setTimeout(function(){BookPager.layout();},30)});})();</script></body></html>";
+    }
+
+    public final class Bridge {
+        @JavascriptInterface public void layoutReady(int pages,int step){ runOnUiThread(()->{ pageCount=Math.max(1,pages); pageStep=Math.max(1,step); int ratio=pendingRatio>=0?pendingRatio:store.getRatio(uri); pendingRatio=-1; currentPage=pageCount<=1?0:(int)Math.round((ratio/1000000.0)*(pageCount-1)); setPageInternal(currentPage,false); loaded=true; updateSpine(); }); }
+    }
+
+    private void setPageInternal(int p,boolean save){ currentPage=Math.max(0,Math.min(pageCount-1,p)); web.evaluateJavascript("window.BookPager&&BookPager.go("+currentPage+")",null); if(save)saveNow(); updateProgressText(); }
+    private void turnPage(int dir){
+        if(mode!=0 || animating || pageCount<=1)return; int target=Math.max(0,Math.min(pageCount-1,currentPage+dir*pageStep)); if(target==currentPage){ web.performHapticFeedback(HapticFeedbackConstants.REJECT); return; }
+        web.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); if(animation==3){ setPageInternal(target,true); return; }
+        animating=true; long half=Math.max(70,turnMs/2L); web.setLayerType(View.LAYER_TYPE_HARDWARE,null);
+        if(animation==0){
+            float out=dir>0?-82f:82f; web.setCameraDistance(getResources().getDisplayMetrics().density*9000f); web.setPivotX(dir>0?0:web.getWidth()); web.setPivotY(web.getHeight()/2f);
+            web.animate().rotationY(out).alpha(.52f).setDuration(half).setInterpolator(new AccelerateInterpolator()).withEndAction(()->{ setPageInternal(target,false); web.setPivotX(dir>0?web.getWidth():0); web.setRotationY(-out); web.animate().rotationY(0).alpha(1f).setDuration(half).setInterpolator(new DecelerateInterpolator()).withEndAction(()->finishTurn()).start(); }).start();
+        }else if(animation==1){
+            float out=dir>0?-web.getWidth():web.getWidth(); web.animate().translationX(out).alpha(.82f).setDuration(half).setInterpolator(new AccelerateInterpolator()).withEndAction(()->{ setPageInternal(target,false); web.setTranslationX(-out); web.animate().translationX(0).alpha(1f).setDuration(half).setInterpolator(new DecelerateInterpolator()).withEndAction(()->finishTurn()).start(); }).start();
+        }else{
+            web.animate().alpha(0f).setDuration(half).withEndAction(()->{ setPageInternal(target,false); web.animate().alpha(1f).setDuration(half).withEndAction(()->finishTurn()).start(); }).start();
+        }
+    }
+    private void finishTurn(){ animating=false; web.setRotationY(0);web.setTranslationX(0);web.setAlpha(1f);saveNow(); }
+
+    private int currentRatio(){
+        if(mode==0){ if(pageCount<=1)return 0; return Math.max(0,Math.min(1000000,(int)(currentPage*1000000L/(pageCount-1)))); }
+        int range=(int)(web.getContentHeight()*web.getScale())-web.getHeight(); if(range<=0)return 0; return Math.max(0,Math.min(1000000,(int)(web.getScrollY()*1000000L/range)));
+    }
+    private void restoreContinuous(){ int ratio=pendingRatio>=0?pendingRatio:store.getRatio(uri); pendingRatio=-1; handler.postDelayed(()->web.evaluateJavascript("(function(){var m=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);window.scrollTo(0,Math.floor(m*"+(ratio/1000000.0)+"));})()",null),120); updateProgressText(); }
+    private void saveNow(){ if(!loaded)return; store.setRatio(uri,currentRatio()); updateProgressText(); }
+    private void scheduleSave(){ if(saver!=null)handler.removeCallbacks(saver); saver=this::saveNow;handler.postDelayed(saver,250);updateProgressText(); }
+    private void reloadPreservingProgress(){ if(book==null)return; pendingRatio=currentRatio(); store.setRatio(uri,pendingRatio); loadCurrentHtml(); }
+    private void setMode(int m){ if(m==mode)return; pendingRatio=currentRatio(); store.setRatio(uri,pendingRatio); mode=m;store.setMode(mode);loadCurrentHtml(); }
+
+    private void updateProgressText(){
+        if(progressView==null)return; int pct=currentRatio()/10000;
+        if(mode==0){ int a=Math.min(pageCount,currentPage+1); if(pageStep==2 && currentPage+1<pageCount)progressView.setText(a+"–"+Math.min(pageCount,currentPage+2)+" / "+pageCount+"  •  "+pct+"%"); else progressView.setText(a+" / "+pageCount+"  •  "+pct+"%"); }
+        else progressView.setText(pct+"%  •  ЛЕНТА");
+    }
+    private void updateSpine(){ boolean show=mode==0 && twoPage && getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE; spine.setVis
