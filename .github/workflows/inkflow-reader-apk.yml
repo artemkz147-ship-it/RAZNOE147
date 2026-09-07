@@ -35,6 +35,14 @@ jobs:
           python3 inkflow_patch_120/apply_120.py
           rm -f InkFlowReader/app/src/main/res/drawable/ic_launcher.xml
           cat inkflow_patch_120/icon.part00 inkflow_patch_120/icon.part01 inkflow_patch_120/icon.part02 | base64 --decode > InkFlowReader/app/src/main/res/drawable/ic_launcher.png
+          python3 -m pip install --quiet pillow
+          python3 - <<'PY'
+          from PIL import Image
+          p='InkFlowReader/app/src/main/res/drawable/ic_launcher.png'
+          im=Image.open(p).convert('RGBA')
+          im.save(p, format='PNG', optimize=True)
+          print('icon', im.mode, im.size)
+          PY
           test -s InkFlowReader/app/src/main/res/drawable/ic_launcher.png
           grep -q 'versionName .1.2.0.' InkFlowReader/app/build.gradle
           grep -q 'Читай Всё' InkFlowReader/app/src/main/AndroidManifest.xml
