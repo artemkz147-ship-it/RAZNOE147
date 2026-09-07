@@ -1,0 +1,51 @@
+ibility(show?View.VISIBLE:View.GONE); }
+    private void toggleBars(){ bars=!bars; topBar.animate().alpha(bars?1:0).translationY(bars?0:-topBar.getHeight()).setDuration(180).start(); bottomBar.animate().alpha(bars?1:0).translationY(bars?0:bottomBar.getHeight()).setDuration(180).start(); }
+
+    private void showSettings(){
+        ScrollView scroll=new ScrollView(this); LinearLayout box=new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setPadding(Ui.dp(this,16),Ui.dp(this,12),Ui.dp(this,16),Ui.dp(this,20)); box.setBackgroundColor(Ui.BG); scroll.addView(box);
+        TextView h=Ui.text(this,"Настройки чтения",21,Ui.TEXT); h.setTypeface(Typeface.DEFAULT_BOLD); box.addView(h); TextView hint=Ui.text(this,"Все параметры настоящие и сохраняются для следующих книг.",12,Ui.MUTED); addWithTop(box,hint,4);
+        section(box,"РЕЖИМ И ПЕРЕЛИСТЫВАНИЕ");
+        TextView modeB=settingCycle(box,"Режим чтения","Страницы с книжным перелистыванием или непрерывная лента",mode==0?"КНИГА":"ЛЕНТА"); modeB.setOnClickListener(v->{ setMode(mode==0?1:0); modeB.setText(mode==0?"КНИГА":"ЛЕНТА"); });
+        TextView animB=settingCycle(box,"Анимация страниц","3D имитация листа, слайд, затухание или без анимации",animationName(),null); animB.setOnClickListener(v->{ animation=(animation+1)%4;store.setAnimation(animation);animB.setText(animationName()); });
+        addSeek(box,"Скорость перелистывания",160,700,turnMs, v->{turnMs=v;store.setTurnMs(v);}, v->v+" мс");
+        addSwitch(box,"Две страницы в альбомной","Автоматический книжный разворот на широком экране",twoPage,v->{twoPage=v;store.setTwoPage(v);reloadPreservingProgress();});
+        addSwitch(box,"Тап-зоны","Левый край — назад, правый — вперёд, центр — панели",tapZones,v->{tapZones=v;store.setTapZones(v);});
+        addSwitch(box,"Кнопки громкости","Листать страницы аппаратными кнопками",volumeKeys,v->{volumeKeys=v;store.setVolumeKeys(v);});
+
+        section(box,"ТЕКСТ");
+        addSeek(box,"Размер шрифта",14,36,fontSp,v->{fontSp=v;store.setFontSp(v);reloadPreservingProgress();},v->v+" sp");
+        addSeek(box,"Межстрочный интервал",120,210,linePct,v->{linePct=v;store.setLinePct(v);reloadPreservingProgress();},v->v+"%");
+        addSeek(box,"Поля страницы",6,42,margins,v->{margins=v;store.setMargins(v);reloadPreservingProgress();},v->v+" px");
+        addSeek(box,"Абзацный отступ",0,42,indent,v->{indent=v;store.setIndent(v);reloadPreservingProgress();},v->v+" px");
+        TextView fontB=settingCycle(box,"Шрифт","Книжный, без засечек или моноширинный",fontName(),null); fontB.setOnClickListener(v->{fontFamily=(fontFamily+1)%3;store.setFontFamily(fontFamily);fontB.setText(fontName());reloadPreservingProgress();});
+        addSwitch(box,"Выравнивание по ширине","Ровный книжный край текста",justify,v->{justify=v;store.setJustify(v);reloadPreservingProgress();});
+
+        section(box,"ЭКРАН");
+        TextView themeB=settingCycle(box,"Тема","Сепия, ночь, день или чистый чёрный",themeName(),null); themeB.setOnClickListener(v->{theme=(theme+1)%4;store.setTheme(theme);themeB.setText(themeName());reloadPreservingProgress();});
+        addSeek(box,"Яркость",0,100,brightness,v->{brightness=v;store.setBrightness(v);applyWindowSettings(false);},v->v==0?"СИСТЕМНАЯ":v+"%");
+        TextView orB=settingCycle(box,"Ориентация","Авто, только портрет или только альбом",orientationName(),null); orB.setOnClickListener(v->{orientationMode=(orientationMode+1)%3;store.setOrientation(orientationMode);orB.setText(orientationName());applyWindowSettings(true);});
+        addSwitch(box,"Не выключать экран","Экран остаётся включённым во время чтения",keepScreen,v->{keepScreen=v;store.setKeepScreen(v);applyWindowSettings(false);});
+        TextView reset=actionButton("СБРОСИТЬ НАСТРОЙКИ",false,12); LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,Ui.dp(this,48)); rp.topMargin=Ui.dp(this,18); box.addView(reset,rp);
+        AlertDialog dialog=new AlertDialog.Builder(this).setView(scroll).setPositiveButton("ГОТОВО",null).create(); reset.setOnClickListener(v->{store.resetReaderSettings();readSettings();applyWindowSettings(true);reloadPreservingProgress();dialog.dismiss();}); dialog.setOnShowListener(x->{ if(dialog.getWindow()!=null)dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Ui.BG)); }); dialog.show();
+    }
+
+    private void section(LinearLayout box,String s){ TextView t=Ui.text(this,s,11,Ui.GOLD);t.setTypeface(Typeface.DEFAULT_BOLD);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=Ui.dp(this,18);p.bottomMargin=Ui.dp(this,6);box.addView(t,p); }
+    private TextView settingCycle(LinearLayout box,String title,String desc,String value){ return settingCycle(box,title,desc,value,null); }
+    private TextView settingCycle(LinearLayout box,String title,String desc,String value,Object unused){
+        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(Ui.dp(this,12),Ui.dp(this,10),Ui.dp(this,12),Ui.dp(this,10));card.setBackground(Ui.panel(this));
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL); TextView a=Ui.text(this,title,14,Ui.TEXT);a.setTypeface(Typeface.DEFAULT_BOLD);row.addView(a,new LinearLayout.LayoutParams(0,-2,1));TextView b=actionButton(value,true,10);row.addView(b,new LinearLayout.LayoutParams(Ui.dp(this,112),Ui.dp(this,38)));card.addView(row);TextView d=Ui.text(this,desc,11,Ui.MUTED);addWithTop(card,d,4);addCard(box,card);return b;
+    }
+    private interface BoolChange{void set(boolean v);} private void addSwitch(LinearLayout box,String title,String desc,boolean checked,BoolChange cb){ LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(Ui.dp(this,12),Ui.dp(this,8),Ui.dp(this,12),Ui.dp(this,8));card.setBackground(Ui.panel(this));Switch sw=new Switch(this);sw.setText(title);sw.setTextColor(Ui.TEXT);sw.setTextSize(14);sw.setChecked(checked);sw.setOnCheckedChangeListener((b,c)->cb.set(c));card.addView(sw);TextView d=Ui.text(this,desc,11,Ui.MUTED);addWithTop(card,d,2);addCard(box,card); }
+    private interface IntChange{void set(int v);} private interface ValText{String text(int v);} private void addSeek(LinearLayout box,String title,int min,int max,int val,IntChange cb,ValText fmt){ LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(Ui.dp(this,12),Ui.dp(this,9),Ui.dp(this,12),Ui.dp(this,9));card.setBackground(Ui.panel(this));LinearLayout row=new LinearLayout(this);TextView a=Ui.text(this,title,14,Ui.TEXT);a.setTypeface(Typeface.DEFAULT_BOLD);row.addView(a,new LinearLayout.LayoutParams(0,-2,1));TextView value=Ui.text(this,fmt.text(val),12,Ui.GOLD);row.addView(value);card.addView(row);SeekBar seek=new SeekBar(this);seek.setMax(max-min);seek.setProgress(val-min);seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){int last=val;public void onProgressChanged(SeekBar s,int p,boolean from){last=min+p;value.setText(fmt.text(last));}public void onStartTrackingTouch(SeekBar s){}public void onStopTrackingTouch(SeekBar s){cb.set(last);}});card.addView(seek);addCard(box,card); }
+    private void addCard(LinearLayout box,View v){ LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=Ui.dp(this,7);box.addView(v,p); }
+    private void addWithTop(LinearLayout box,View v,int dp){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=Ui.dp(this,dp);box.addView(v,p);}
+
+    private String animationName(){return animation==0?"КНИГА 3D":animation==1?"СЛАЙД":animation==2?"ЗАТУХАНИЕ":"БЕЗ";}
+    private String fontName(){return fontFamily==0?"КНИЖНЫЙ":fontFamily==1?"БЕЗ ЗАСЕЧЕК":"МОНО";}
+    private String themeName(){return theme==0?"СЕПИЯ":theme==1?"НОЧЬ":theme==2?"ДЕНЬ":"ЧЁРНЫЙ";}
+    private String orientationName(){return orientationMode==0?"АВТО":orientationMode==1?"ПОРТРЕТ":"АЛЬБОМ";}
+    private int bookBg(){return theme==0?0xFFF3E7CF:theme==1?0xFF121720:theme==2?0xFFF7F5EF:0xFF050505;}
+    private int textColor(){return theme==0?0xFF2F241A:theme==1?0xFFE9ECF2:theme==2?0xFF1E1C19:0xFFE8E8E8;}
+    private int headColor(){return theme==0?0xFF6A3F12:theme==1?0xFFFFD36E:theme==2?0xFF4A3426:0xFFFFD36E;}
+    private int accentColor(){return theme==0?0xFF9D5D15:theme==1?0xFF8B75FF:theme==2?0xFF7A4A20:0xFF9A82FF;}
+    private int cardColor(){return theme==0?0x22A35D00:theme==1?0x331F2A44:theme==2?0x22A36B33:0x332C2450
