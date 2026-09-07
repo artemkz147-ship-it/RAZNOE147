@@ -45,7 +45,7 @@ jobs:
           cat inkflow_patch_140/icon64.part00 inkflow_patch_140/icon64.part01 inkflow_patch_140/icon64.part02 inkflow_patch_140/icon64.part03 | base64 --decode > InkFlowReader/app/src/main/res/drawable/ic_launcher.png
           test -s InkFlowReader/app/src/main/res/drawable/ic_launcher.png
           file InkFlowReader/app/src/main/res/drawable/ic_launcher.png | grep -q 'PNG image data'
-          grep -q 'versionName .1.4.0.' InkFlowReader/app/build.gradle
+          grep -q 'versionName .1.4.1.' InkFlowReader/app/build.gradle
           grep -q 'TorrentService' InkFlowReader/app/src/main/AndroidManifest.xml
           grep -q 'libtorrent4j' InkFlowReader/app/build.gradle
 
@@ -73,15 +73,15 @@ jobs:
         run: |
           APK=$(find InkFlowReader/app/build/outputs/apk/release -name '*.apk' | head -1)
           test -n "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.4.0-aligned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.4.0-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.4.1-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.4.1-aligned.apk
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" ./apksigner.jar
 
       - name: Upload aligned release
         uses: actions/upload-artifact@v4
         with:
-          name: Chitai-Vse-Release-Aligned-1.4.0
+          name: Chitai-Vse-Release-Aligned-1.4.1
           path: |
-            Chitai-Vse-1.4.0-aligned.apk
+            Chitai-Vse-1.4.1-aligned.apk
             apksigner.jar
           if-no-files-found: error
