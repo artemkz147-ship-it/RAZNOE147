@@ -38,13 +38,54 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Rename APK
-        run: cp kosmo-zhest-apk/app/build/outputs/apk/debug/app-debug.apk kosmo-zhest-ar-v1.apk
+        run: cp kosmo-zhest-apk/app/build/outputs/apk/debug/app-debug.apk kosmo-zhest-ar-v2.apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Smoke test app launch on Android 15 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install -r kosmo-zhest-ar-v2.apk
+            adb shell pm grant com.artem.kosmozhest android.permission.CAMERA || true
+            adb logcat -c
+            adb shell am start -W -n com.artem.kosmozhest/.MainActivity
+            sleep 12
+            PID=$(adb shell pidof com.artem.kosmozhest | tr -d '\r')
+            echo "App PID: $PID"
+            if [ -z "$PID" ]; then
+              adb logcat -d -t 1000 > smoke-log.txt
+              cat smoke-log.txt
+              echo "App process is not alive after launch"
+              exit 1
+            fi
+            adb logcat -d -t 1000 > smoke-log.txt
+            if grep -E "FATAL EXCEPTION|AndroidRuntime: FATAL|Process: com\.artem\.kosmozhest" smoke-log.txt; then
+              cat smoke-log.txt
+              echo "Fatal exception detected"
+              exit 1
+            fi
+            echo "Smoke test passed"
+
+      - name: Upload smoke log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kosmo-zhest-smoke-log
+          path: smoke-log.txt
+          if-no-files-found: ignore
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: kosmo-zhest-ar-apk
-          path: kosmo-zhest-ar-v1.apk
+          name: kosmo-zhest-ar-apk-v2
+          path: kosmo-zhest-ar-v2.apk
           if-no-files-found: error
-
-# Rebuild after embedding the complete game payload.
