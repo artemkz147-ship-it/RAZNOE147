@@ -17,14 +17,12 @@ lib.write_text(s)
 # Main library: long-press menu with remove-from-library and physical delete when provider allows it.
 main=target/'MainActivity.java'
 s=main.read_text()
-click='        adapter=new ComicAdapter();grid.setAdapter(adapter);grid.setOnItemClickListener((a,v,pos,id)->openItem(adapter.items.get(pos)));\n'
 if 'setOnItemLongClickListener' not in s:
-    repl=click+'        grid.setOnItemLongClickListener((a,v,pos,id)->{showItemMenu(adapter.items.get(pos));return true;});\n'
-    if click not in s: raise SystemExit('MainActivity grid marker not found')
-    s=s.replace(click,repl,1)
+    pat=re.compile(r'(adapter=new ComicAdapter\(\);grid\.setAdapter\(adapter\);grid\.setOnItemClickListener\(\(a,v,pos,id\)->openItem\(adapter\.items\.get\(pos\)\)\);)')
+    if not pat.search(s): raise SystemExit('MainActivity grid marker not found')
+    s=pat.sub(r'\1\n        grid.setOnItemLongClickListener((a,v,pos,id)->{showItemMenu(adapter.items.get(pos));return true;});',s,count=1)
 
 if 'private void showItemMenu(LibraryStore.Item item)' not in s:
-    marker='    private void openItem(LibraryStore.Item i){openUri(Uri.parse(i.uri),i.name);}\n'
     methods=r'''    private void showItemMenu(LibraryStore.Item item){
         new AlertDialog.Builder(this)
             .setTitle(item.name)
@@ -77,8 +75,9 @@ if 'private void showItemMenu(LibraryStore.Item item)' not in s:
     }
 
 '''
-    if marker not in s: raise SystemExit('MainActivity openItem marker not found')
-    s=s.replace(marker,marker+methods,1)
+    marker='    private void openUri(Uri uri,String name)'
+    if marker not in s: raise SystemExit('MainActivity openUri marker not found')
+    s=s.replace(marker,methods+marker,1)
 main.write_text(s)
 
 # Centralize all external file opening in one router so Android shows a single "Читай Всё" target.
@@ -86,7 +85,7 @@ manifest=root/'app/src/main/AndroidManifest.xml'
 ms=manifest.read_text()
 
 def strip_reader_filter(text,name):
-    pat=re.compile(r'(<activity\s+[^>]*android:name="\\.'+re.escape(name)+r'"[^>]*>)(.*?)(</activity>)',re.S)
+    pat=re.compile(r'(<activity\s+[^>]*android:name="\.'+re.escape(name)+r'"[^>]*>)(.*?)(</activity>)',re.S)
     m=pat.search(text)
     if not m: raise SystemExit('Activity not found: '+name)
     head,body,tail=m.group(1),m.group(2),m.group(3)
