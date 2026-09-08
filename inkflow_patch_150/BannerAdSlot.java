@@ -3,12 +3,14 @@ package app.inkflow.reader;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -24,7 +26,7 @@ import com.yandex.mobile.ads.common.YandexAds;
 public final class BannerAdSlot extends FrameLayout {
     public static final String AD_UNIT_ID = "R-M-20002801-1";
     public static final long REFRESH_MS = 35_000L;
-    private static final int SLOT_DP = 64;
+    private static final int DEFAULT_BANNER_DP = 50;
 
     private final Activity activity;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -32,6 +34,8 @@ public final class BannerAdSlot extends FrameLayout {
     private BannerAdView banner;
     private boolean active = false;
     private boolean initRequested = false;
+    private int bannerHeightDp = DEFAULT_BANNER_DP;
+    private int navigationInsetPx = 0;
 
     private final Runnable refresh = new Runnable() {
         @Override public void run() {
@@ -56,6 +60,20 @@ public final class BannerAdSlot extends FrameLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 Gravity.CENTER));
+
+        setOnApplyWindowInsetsListener((v, insets) -> {
+            int bottom;
+            if (Build.VERSION.SDK_INT >= 30) {
+                bottom = insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+            } else {
+                bottom = insets.getSystemWindowInsetBottom();
+            }
+            if (bottom != navigationInsetPx) {
+                navigationInsetPx = Math.max(0, bottom);
+                updateReservedHeight();
+            }
+            return insets;
+        });
     }
 
     public static View wrap(Activity activity, View content) {
@@ -73,7 +91,7 @@ public final class BannerAdSlot extends FrameLayout {
         BannerAdSlot slot = new BannerAdSlot(activity);
         shell.addView(slot, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(activity, SLOT_DP)));
+                dp(activity, DEFAULT_BANNER_DP)));
         return shell;
     }
 
@@ -81,8 +99,34 @@ public final class BannerAdSlot extends FrameLayout {
         return Math.round(value * c.getResources().getDisplayMetrics().density);
     }
 
+    private void updateReservedHeight() {
+        int adPx = dp(activity, bannerHeightDp);
+        setPadding(0, 0, 0, navigationInsetPx);
+        ViewGroup.LayoutParams lp = getLayoutParams();
+        if (lp != null) {
+            int wanted = adPx + navigationInsetPx;
+            if (lp.height != wanted) {
+                lp.height = wanted;
+                setLayoutParams(lp);
+            }
+        }
+        requestLayout();
+    }
+
+    private void syncLoadedBannerHeight(BannerAdView view) {
+        try {
+            int h = view.getAdSize().getHeight();
+            if (h > 0 && h != bannerHeightDp) {
+                bannerHeightDp = h;
+                updateReservedHeight();
+            }
+        } catch (Throwable ignored) { }
+    }
+
     @Override protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        requestApplyInsets();
+        updateReservedHeight();
         start();
     }
 
@@ -144,7 +188,7 @@ public final class BannerAdSlot extends FrameLayout {
         final DisplayMetrics dm = getResources().getDisplayMetrics();
         int widthPx = getWidth() > 0 ? getWidth() : dm.widthPixels;
         int widthDp = Math.max(1, Math.round(widthPx / dm.density));
-        BannerAdSize size = BannerAdSize.inline(activity, widthDp, SLOT_DP);
+        BannerAdSize size = BannerAdSize.inline(activity, widthDp, DEFAULT_BANNER_DP);
 
         BannerAdView view = new BannerAdView(activity);
         banner = view;
@@ -156,6 +200,7 @@ public final class BannerAdSlot extends FrameLayout {
                     view.destroy();
                     return;
                 }
+                syncLoadedBannerHeight(view);
                 placeholder.setVisibility(GONE);
                 view.setVisibility(VISIBLE);
             }
@@ -173,7 +218,7 @@ public final class BannerAdSlot extends FrameLayout {
         addView(view, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                Gravity.CENTER));
+                Gravity.TOP));
 
         view.loadAd(new AdRequest.Builder(AD_UNIT_ID).build());
     }
