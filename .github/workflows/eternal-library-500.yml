@@ -22,6 +22,15 @@ jobs:
       - name: Restore project bundle
         run: |
           cat eternal500_bundle/chunk* > eternal500-source.b64
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('eternal500-source.b64')
+          s=p.read_text()
+          if len(s)==65919:
+              s=s[:11546]+'a'+s[11546:]
+              p.write_text(s)
+          assert len(s)==65920, len(s)
+          PY
           base64 --decode eternal500-source.b64 > eternal500-source.zip
           echo '1847a48666f12fa71b4454e434ed2b6d1fcefec16c4ac5edfeb897436a75f1e5  eternal500-source.zip' | sha256sum -c -
           rm -rf eternal500
