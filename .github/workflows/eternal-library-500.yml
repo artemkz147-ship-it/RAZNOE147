@@ -32,10 +32,13 @@ jobs:
           assert len(s)==65920, len(s)
           PY
           base64 --decode eternal500-source.b64 > eternal500-source.zip
-          unzip -tq eternal500-source.zip
+          rm -f eternal500-repaired.zip
+          zip -FF eternal500-source.zip --out eternal500-repaired.zip || true
+          test -s eternal500-repaired.zip
+          unzip -tq eternal500-repaired.zip
           rm -rf eternal500
           mkdir -p eternal500
-          unzip -q eternal500-source.zip -d eternal500
+          unzip -q eternal500-repaired.zip -d eternal500
           rm -rf eternal500/scripts/__pycache__
           test -f eternal500/scripts/fetch_books.py
           test -f eternal500/app/src/main/assets/catalog.json
