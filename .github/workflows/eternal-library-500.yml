@@ -1,0 +1,89 @@
+name: Build Eternal Library 500
+
+on:
+  push:
+    branches: [eternal-library-500]
+    paths:
+      - 'eternal500_bundle/**'
+      - '.github/workflows/eternal-library-500.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore project bundle
+        run: |
+          cat eternal500_bundle/chunk* > eternal500-source.b64
+          base64 --decode eternal500-source.b64 > eternal500-source.zip
+          echo '1847a48666f12fa71b4454e434ed2b6d1fcefec16c4ac5edfeb897436a75f1e5  eternal500-source.zip' | sha256sum -c -
+          rm -rf eternal500
+          mkdir -p eternal500
+          unzip -q eternal500-source.zip -d eternal500
+          rm -rf eternal500/scripts/__pycache__
+          test -f eternal500/scripts/fetch_books.py
+          test -f eternal500/app/src/main/assets/catalog.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install corpus tools
+        run: pip install requests beautifulsoup4 lxml
+
+      - name: Build verified offline corpus
+        run: python eternal500/scripts/fetch_books.py --root eternal500 --workers 6
+
+      - name: Corpus summary
+        run: |
+          cat eternal500/corpus-report.txt || true
+          if [ -f eternal500/CORPUS_INCOMPLETE ]; then
+            echo 'Corpus is incomplete; APK will contain only verified books.'
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android API 35
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build APK
+        run: gradle --no-daemon -p eternal500 assembleDebug --stacktrace
+
+      - name: Collect APK and reports
+        run: |
+          cp eternal500/app/build/outputs/apk/debug/app-debug.apk Eternal-Library-500-v1.0.0.apk
+          cp eternal500/corpus-report.json corpus-report.json
+          cp eternal500/corpus-report.txt corpus-report.txt
+          cp eternal500/CORPUS_INCOMPLETE CORPUS_INCOMPLETE 2>/dev/null || true
+          ls -lh Eternal-Library-500-v1.0.0.apk corpus-report.*
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Eternal-Library-500-v1.0.0
+          path: |
+            Eternal-Library-500-v1.0.0.apk
+            corpus-report.json
+            corpus-report.txt
+            CORPUS_INCOMPLETE
+          if-no-files-found: warn
