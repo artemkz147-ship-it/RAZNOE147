@@ -85,11 +85,12 @@ jobs:
           cp inkflow_patch_165/BannerAdSlot.java "$TARGET/BannerAdSlot.java"
           python3 inkflow_patch_165/apply_165.py
 
-          # 1.6.6: true illustrated fallback covers and full-screen reader settings.
+          # 1.6.6: illustrated fallback covers + full-screen reader settings.
           cp inkflow_patch_166/CoverPlaceholderView.java "$TARGET/CoverPlaceholderView.java"
-          base64 --decode inkflow_patch_166/covers166.b64 > /tmp/covers166.zip
-          unzip -tq /tmp/covers166.zip
-          unzip -q -o /tmp/covers166.zip -d "$RES"
+          cp inkflow_patch_166/cover_placeholder_book.xml "$RES/cover_placeholder_book.xml"
+          cp inkflow_patch_166/cover_placeholder_comic.xml "$RES/cover_placeholder_comic.xml"
+          cp inkflow_patch_166/cover_placeholder_document.xml "$RES/cover_placeholder_document.xml"
+          cp inkflow_patch_166/cover_placeholder_archive.xml "$RES/cover_placeholder_archive.xml"
           python3 inkflow_patch_166/apply_166.py
 
           rm -f "$RES/ic_launcher.xml" "$RES/ic_launcher.png"
@@ -98,10 +99,10 @@ jobs:
 
           test -s "$RES/ic_launcher.png"
           test -s "$RES/ad_loading.webp"
-          test -s "$RES/cover_book.webp"
-          test -s "$RES/cover_comic.webp"
-          test -s "$RES/cover_document.webp"
-          test -s "$RES/cover_archive.webp"
+          test -s "$RES/cover_placeholder_book.xml"
+          test -s "$RES/cover_placeholder_comic.xml"
+          test -s "$RES/cover_placeholder_document.xml"
+          test -s "$RES/cover_placeholder_archive.xml"
           grep -q 'versionName .1.6.6.' InkFlowReader/app/build.gradle
           grep -q 'buildEmergency' "$TARGET/MainActivity.java"
           grep -q 'cover_placeholder_book' "$TARGET/CoverPlaceholderView.java"
