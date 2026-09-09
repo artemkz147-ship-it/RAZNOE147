@@ -11,6 +11,7 @@ on:
       - 'inkflow_patch_150/**'
       - 'inkflow_patch_151/**'
       - 'inkflow_patch_152/**'
+      - 'inkflow_patch_153/**'
       - '.github/workflows/inkflow-reader-apk.yml'
   workflow_dispatch:
 
@@ -30,7 +31,7 @@ jobs:
           unzip -tq InkFlowBuild.zip
           unzip -q -o InkFlowBuild.zip
 
-      - name: Add reader, torrent, ads, deletion and file associations
+      - name: Add reader, torrent, ads and document support
         run: |
           TARGET=InkFlowReader/app/src/main/java/app/inkflow/reader
           RES=InkFlowReader/app/src/main/res/drawable
@@ -50,6 +51,8 @@ jobs:
           cp inkflow_patch_151/OpenFileActivity.java "$TARGET/OpenFileActivity.java"
           python3 inkflow_patch_151/apply_151.py
           python3 inkflow_patch_152/apply_152.py
+          cp inkflow_patch_153/DocumentSourceFactory.fixed.java "$TARGET/DocumentSourceFactory.java"
+          python3 inkflow_patch_153/apply_153.py
 
           rm -f "$RES/ic_launcher.xml" "$RES/ic_launcher.png"
           cat inkflow_patch_140/icon64.part00 inkflow_patch_140/icon64.part01 inkflow_patch_140/icon64.part02 inkflow_patch_140/icon64.part03 | base64 --decode > "$RES/ic_launcher.png"
@@ -58,18 +61,15 @@ jobs:
           test -s "$RES/ic_launcher.png"
           test -s "$RES/ad_loading.webp"
           file "$RES/ad_loading.webp" | grep -qi 'Web/P image\|WebP'
-          grep -q 'versionName .1.5.2.' InkFlowReader/app/build.gradle
-          grep -q "com.yandex.android:mobileads:8.2.0" InkFlowReader/app/build.gradle
-          grep -q 'R-M-20002801-1' "$TARGET/BannerAdSlot.java"
-          grep -q 'REFRESH_MS = 35_000L' "$TARGET/BannerAdSlot.java"
+          grep -q 'versionName .1.5.3.' InkFlowReader/app/build.gradle
+          grep -q "org.apache.poi:poi-scratchpad:5.2.5" InkFlowReader/app/build.gradle
+          grep -q 'wordprocessingml.document' InkFlowReader/app/src/main/AndroidManifest.xml
+          grep -q 'application/msword' InkFlowReader/app/src/main/AndroidManifest.xml
+          grep -q 'DocumentSourceFactory.isDocumentFormat' "$TARGET/BookSourceFactory.java"
+          grep -q 'docx|docm|doc|rtf|odt' "$TARGET/OpenFileActivity.java"
           grep -q 'DEFAULT_BANNER_DP = 50' "$TARGET/BannerAdSlot.java"
-          grep -q 'navigationBars' "$TARGET/BannerAdSlot.java"
-          grep -q 'public synchronized void remove(String uri)' "$TARGET/LibraryStore.java"
-          grep -q 'setOnItemLongClickListener' "$TARGET/MainActivity.java"
-          grep -q 'OpenFileActivity' InkFlowReader/app/src/main/AndroidManifest.xml
-          grep -q 'application/x-7z-compressed' InkFlowReader/app/src/main/AndroidManifest.xml
+          grep -q 'REFRESH_MS = 35_000L' "$TARGET/BannerAdSlot.java"
           ! grep -R -q 'R-M-20002801-2' InkFlowReader/app/src/main || true
-          ! test -f "$TARGET/InternetArchiveSearch.java"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -95,15 +95,15 @@ jobs:
         run: |
           APK=$(find InkFlowReader/app/build/outputs/apk/release -name '*.apk' | head -1)
           test -n "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.5.2-aligned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.5.2-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.5.3-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.5.3-aligned.apk
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" ./apksigner.jar
 
       - name: Upload aligned release
         uses: actions/upload-artifact@v4
         with:
-          name: Chitai-Vse-Release-Aligned-1.5.2
+          name: Chitai-Vse-Release-Aligned-1.5.3
           path: |
-            Chitai-Vse-1.5.2-aligned.apk
+            Chitai-Vse-1.5.3-aligned.apk
             apksigner.jar
           if-no-files-found: error
