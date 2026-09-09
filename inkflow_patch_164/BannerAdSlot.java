@@ -13,9 +13,6 @@ public final class BannerAdSlot extends FrameLayout {
     public static final String AD_UNIT_ID="R-M-20002801-1";
     public static final long REFRESH_MS=35_000L;
 
-    // Keep the larger reserved area exactly as requested. The Yandex banner
-    // is laid over it from the bottom; the single placeholder always remains
-    // behind the banner and fills the whole visual slot.
     private static final int RESERVED_SLOT_DP=88;
     private static final int FALLBACK_BANNER_DP=50;
 
@@ -24,7 +21,6 @@ public final class BannerAdSlot extends FrameLayout {
     private final ImageView placeholder;
     private BannerAdView banner;
     private boolean active=false, initRequested=false;
-    private int navigationInsetPx=0;
     private int actualBannerHeightDp=FALLBACK_BANNER_DP;
 
     private final Runnable refresh=new Runnable(){
@@ -42,6 +38,7 @@ public final class BannerAdSlot extends FrameLayout {
         setClipToPadding(true);
         setBackground(Ui.gradient(new int[]{Ui.BG2,Ui.SURFACE2,Ui.SURFACE3},0,a));
 
+        // ONE placeholder image, always full-size and always behind Yandex.
         placeholder=new ImageView(a);
         placeholder.setImageResource(R.drawable.ad_loading);
         placeholder.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -49,18 +46,6 @@ public final class BannerAdSlot extends FrameLayout {
         placeholder.setContentDescription("Спасибо, что вы с нами");
         placeholder.setBackground(Ui.gradient(new int[]{Ui.SURFACE3,Ui.SURFACE2,Ui.BG2},0,a));
         addView(placeholder,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
-
-        setOnApplyWindowInsetsListener((v,insets)->{
-            try{
-                int bottom=Build.VERSION.SDK_INT>=30
-                        ?insets.getInsets(WindowInsets.Type.navigationBars()).bottom
-                        :insets.getSystemWindowInsetBottom();
-                navigationInsetPx=Math.max(0,bottom);
-                setPadding(0,0,0,navigationInsetPx);
-                updateGeometry();
-            }catch(Throwable ignored){}
-            return insets;
-        });
     }
 
     public static View wrap(Activity a,View content){
@@ -80,24 +65,16 @@ public final class BannerAdSlot extends FrameLayout {
         return shell;
     }
 
-    private static int dp(Context c,int v){
-        return Math.round(v*c.getResources().getDisplayMetrics().density);
-    }
-
-    private int visualSlotHeightDp(){
-        return Math.max(RESERVED_SLOT_DP,actualBannerHeightDp);
-    }
+    private static int dp(Context c,int v){return Math.round(v*c.getResources().getDisplayMetrics().density);}
+    private int visualSlotHeightDp(){return Math.max(RESERVED_SLOT_DP,actualBannerHeightDp);}
 
     private void updateGeometry(){
         ViewGroup.LayoutParams lp=getLayoutParams();
         if(lp!=null){
-            int wanted=dp(activity,visualSlotHeightDp())+navigationInsetPx;
+            int wanted=dp(activity,visualSlotHeightDp());
             if(lp.height!=wanted){lp.height=wanted;setLayoutParams(lp);}
         }
 
-        // Important: banner height is its REAL height, not the reserved slot
-        // height. This keeps the top part of the same placeholder visible
-        // whenever Yandex returns a smaller creative.
         if(banner!=null){
             try{
                 FrameLayout.LayoutParams blp=(FrameLayout.LayoutParams)banner.getLayoutParams();
@@ -113,7 +90,7 @@ public final class BannerAdSlot extends FrameLayout {
 
     @Override protected void onAttachedToWindow(){
         super.onAttachedToWindow();
-        try{requestApplyInsets();updateGeometry();start();}catch(Throwable ignored){}
+        try{updateGeometry();start();}catch(Throwable ignored){}
     }
     @Override protected void onDetachedFromWindow(){stop();super.onDetachedFromWindow();}
     @Override protected void onWindowVisibilityChanged(int visibility){
@@ -167,7 +144,6 @@ public final class BannerAdSlot extends FrameLayout {
         int widthPx=getWidth()>0?getWidth():dm.widthPixels;
         int widthDp=Math.max(1,Math.round(widthPx/dm.density));
 
-        // Allow Yandex to return creatives up to the full reserved height.
         BannerAdSize size=BannerAdSize.inline(activity,widthDp,RESERVED_SLOT_DP);
         BannerAdView view=new BannerAdView(activity);
         banner=view;
