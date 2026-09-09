@@ -16,6 +16,7 @@ on:
       - 'inkflow_patch_161/**'
       - 'inkflow_patch_162/**'
       - 'inkflow_patch_163/**'
+      - 'inkflow_patch_164/**'
       - '.github/workflows/inkflow-reader-apk.yml'
   workflow_dispatch:
 
@@ -35,7 +36,7 @@ jobs:
           unzip -tq InkFlowBuild.zip
           unzip -q -o InkFlowBuild.zip
 
-      - name: Add reader and bottom inset fix
+      - name: Add reader and layered ad placeholder fix
         run: |
           TARGET=InkFlowReader/app/src/main/java/app/inkflow/reader
           RES=InkFlowReader/app/src/main/res/drawable
@@ -76,20 +77,26 @@ jobs:
           python3 inkflow_patch_162/apply_162.py
           python3 inkflow_patch_163/apply_163.py
 
+          cp inkflow_patch_164/BannerAdSlot.java "$TARGET/BannerAdSlot.java"
+          python3 inkflow_patch_164/apply_164.py
+
           rm -f "$RES/ic_launcher.xml" "$RES/ic_launcher.png"
           cat inkflow_patch_140/icon64.part00 inkflow_patch_140/icon64.part01 inkflow_patch_140/icon64.part02 inkflow_patch_140/icon64.part03 | base64 --decode > "$RES/ic_launcher.png"
           cat inkflow_patch_150/ad_loading.part00 inkflow_patch_150/ad_loading.part01 inkflow_patch_150/ad_loading.part02 | base64 --decode > "$RES/ad_loading.webp"
 
           test -s "$RES/ic_launcher.png"
           test -s "$RES/ad_loading.webp"
-          grep -q 'versionName .1.6.3.' InkFlowReader/app/build.gradle
+          grep -q 'versionName .1.6.4.' InkFlowReader/app/build.gradle
           grep -q 'buildEmergency' "$TARGET/MainActivity.java"
           grep -q 'ImageView placeholder' "$TARGET/BannerAdSlot.java"
-          grep -q 'BASE_SLOT_DP=50' "$TARGET/BannerAdSlot.java"
+          grep -q 'RESERVED_SLOT_DP=88' "$TARGET/BannerAdSlot.java"
+          grep -q 'FALLBACK_BANNER_DP=50' "$TARGET/BannerAdSlot.java"
           grep -q 'Gravity.BOTTOM' "$TARGET/BannerAdSlot.java"
+          grep -q 'bringToFront' "$TARGET/BannerAdSlot.java"
           grep -q 'REFRESH_MS=35_000L' "$TARGET/BannerAdSlot.java"
           grep -q 'ad_content' "$TARGET/Ui.java"
           grep -q 'content.setTag("ad_content")' "$TARGET/BannerAdSlot.java"
+          ! grep -q 'navigationInsetPx' "$TARGET/BannerAdSlot.java"
           grep -q 'LibraryActivity' InkFlowReader/app/src/main/AndroidManifest.xml
           ! grep -R -q 'R-M-20002801-2' InkFlowReader/app/src/main || true
 
@@ -117,15 +124,15 @@ jobs:
         run: |
           APK=$(find InkFlowReader/app/build/outputs/apk/release -name '*.apk' | head -1)
           test -n "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.6.3-aligned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.6.3-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.6.4-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.6.4-aligned.apk
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" ./apksigner.jar
 
       - name: Upload aligned release
         uses: actions/upload-artifact@v4
         with:
-          name: Chitai-Vse-Release-Aligned-1.6.3
+          name: Chitai-Vse-Release-Aligned-1.6.4
           path: |
-            Chitai-Vse-1.6.3-aligned.apk
+            Chitai-Vse-1.6.4-aligned.apk
             apksigner.jar
           if-no-files-found: error
