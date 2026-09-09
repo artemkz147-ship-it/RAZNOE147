@@ -86,7 +86,7 @@ jobs:
 
           rm -f "$RES/ic_launcher.xml" "$RES/ic_launcher.png"
           cat inkflow_patch_140/icon64.part00 inkflow_patch_140/icon64.part01 inkflow_patch_140/icon64.part02 inkflow_patch_140/icon64.part03 | base64 --decode > "$RES/ic_launcher.png"
-          base64 --decode inkflow_patch_165/ad_loading_165.b64 > "$RES/ad_loading.webp"
+          cat inkflow_patch_150/ad_loading.part00 inkflow_patch_150/ad_loading.part01 inkflow_patch_150/ad_loading.part02 | base64 --decode > "$RES/ad_loading.webp"
 
           test -s "$RES/ic_launcher.png"
           test -s "$RES/ad_loading.webp"
@@ -95,6 +95,7 @@ jobs:
           grep -q 'RESERVED_SLOT_DP=88' "$TARGET/BannerAdSlot.java"
           grep -q 'FALLBACK_BANNER_DP=50' "$TARGET/BannerAdSlot.java"
           grep -q 'nav_guard' "$TARGET/BannerAdSlot.java"
+          grep -q 'buildCropSafePlaceholder' "$TARGET/BannerAdSlot.java"
           grep -q 'WindowInsets.Type.navigationBars' "$TARGET/BannerAdSlot.java"
           grep -q 'Gravity.BOTTOM' "$TARGET/BannerAdSlot.java"
           grep -q 'REFRESH_MS=35_000L' "$TARGET/BannerAdSlot.java"
