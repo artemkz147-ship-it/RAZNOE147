@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 root=Path('InkFlowReader')
 target=root/'app/src/main/java/app/inkflow/reader'
@@ -20,7 +21,6 @@ if old not in s:
     raise SystemExit('BookReader settings click marker missing')
 s=s.replace(old,new,1)
 
-marker='    @Override protected void onPause(){saveNow();super.onPause();}'
 resume='''    @Override protected void onResume(){
         super.onResume();
         if(settingsLaunched && store!=null){
@@ -33,9 +33,12 @@ resume='''    @Override protected void onResume(){
         }
     }
 '''
-if marker not in s:
+# 1.6.0 added a library-update hook inside onPause, so match the method
+# generically instead of assuming the old exact one-line body.
+m=re.search(r'    @Override protected void onPause\(\)\{[^\n]*\}',s)
+if not m:
     raise SystemExit('BookReader onPause marker missing')
-s=s.replace(marker,resume+marker,1)
+s=s[:m.start()]+resume+s[m.start():]
 p.write_text(s)
 
 # Release bump.
