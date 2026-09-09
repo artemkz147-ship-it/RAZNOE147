@@ -2,6 +2,14 @@ package app.inkflow.reader;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -47,15 +55,70 @@ public final class BannerAdSlot extends FrameLayout {
         activity=a;
         setClipChildren(true);
         setClipToPadding(true);
-        setBackground(Ui.gradient(new int[]{Ui.BG2,Ui.SURFACE2,Ui.SURFACE3},0,a));
+        setBackgroundColor(Ui.BG2);
 
+        // One single placeholder image always remains behind Yandex Ads.
+        // Its important text is deliberately placed in the TOP 40% so that
+        // it still looks complete when a 50dp Yandex banner covers the bottom.
         placeholder=new ImageView(a);
-        placeholder.setImageResource(R.drawable.ad_loading);
-        placeholder.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        placeholder.setImageBitmap(buildCropSafePlaceholder(a));
+        placeholder.setScaleType(ImageView.ScaleType.FIT_XY);
         placeholder.setAdjustViewBounds(false);
-        placeholder.setContentDescription("Спасибо, что вы с нами");
-        placeholder.setBackground(Ui.gradient(new int[]{Ui.SURFACE3,Ui.SURFACE2,Ui.BG2},0,a));
+        placeholder.setContentDescription("Спасибо, что вы с нами. Приятного чтения");
         addView(placeholder,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
+    }
+
+    private Bitmap buildCropSafePlaceholder(Context c){
+        final int w=1600,h=360;
+        Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
+        Canvas canvas=new Canvas(out);
+        Paint p=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+        canvas.drawColor(Color.rgb(6,8,15));
+
+        Bitmap src=null;
+        try{src=BitmapFactory.decodeResource(c.getResources(),R.drawable.ad_loading);}catch(Throwable ignored){}
+        if(src!=null && src.getWidth()>20 && src.getHeight()>20){
+            int sw=src.getWidth(),sh=src.getHeight();
+            // Cat scene on the left. Central text from the source asset is not used.
+            Rect catSrc=new Rect(Math.max(0,sw*8/100),Math.max(0,sh*43/100),Math.min(sw,sw*43/100),sh);
+            RectF catDst=new RectF(0,0,w*0.46f,h);
+            canvas.drawBitmap(src,catSrc,catDst,p);
+            // Glowing book/comic scene on the right.
+            Rect bookSrc=new Rect(Math.max(0,sw*59/100),Math.max(0,sh*28/100),sw,sh);
+            RectF bookDst=new RectF(w*0.54f,0,w,h);
+            canvas.drawBitmap(src,bookSrc,bookDst,p);
+        }
+
+        // Dark center/top keeps the message readable in both full and partly-covered states.
+        Paint shade=new Paint(Paint.ANTI_ALIAS_FLAG);
+        shade.setColor(0xA6060912);
+        canvas.drawRect(0,0,w,h,shade);
+        shade.setColor(0xD9060912);
+        canvas.drawRect(w*0.23f,0,w*0.77f,h*0.46f,shade);
+
+        Paint title=new Paint(Paint.ANTI_ALIAS_FLAG);
+        title.setColor(0xFFFFD36A);
+        title.setTextAlign(Paint.Align.CENTER);
+        title.setTypeface(Typeface.create(Typeface.DEFAULT,Typeface.BOLD));
+        title.setTextSize(48f);
+        title.setShadowLayer(4f,0,2f,0xCC000000);
+        canvas.drawText("СПАСИБО, ЧТО ВЫ С НАМИ",w/2f,62f,title);
+
+        Paint sub=new Paint(Paint.ANTI_ALIAS_FLAG);
+        sub.setColor(0xFFF5F7FB);
+        sub.setTextAlign(Paint.Align.CENTER);
+        sub.setTypeface(Typeface.create(Typeface.DEFAULT,Typeface.NORMAL));
+        sub.setTextSize(28f);
+        sub.setShadowLayer(3f,0,2f,0xCC000000);
+        canvas.drawText("Приятного чтения",w/2f,108f,sub);
+
+        Paint line=new Paint(Paint.ANTI_ALIAS_FLAG);
+        line.setColor(0xFFFFC24B);
+        line.setStrokeWidth(5f);
+        line.setStrokeCap(Paint.Cap.ROUND);
+        canvas.drawLine(w/2f-105f,128f,w/2f+105f,128f,line);
+
+        return out;
     }
 
     public static View wrap(Activity a,View content){
@@ -70,11 +133,12 @@ public final class BannerAdSlot extends FrameLayout {
         shell.setBackgroundColor(Ui.BG);
         shell.addView(content,new LinearLayout.LayoutParams(-1,0,1f));
 
+        // Visual ad area remains EXACTLY 88dp unless Yandex itself returns a taller ad.
         BannerAdSlot slot=new BannerAdSlot(a);
         shell.addView(slot,new LinearLayout.LayoutParams(-1,dp(a,RESERVED_SLOT_DP)));
 
-        // Separate system-navigation guard. The 88dp advertising area itself
-        // stays unchanged and is always placed fully ABOVE Android buttons.
+        // Android navigation-bar inset is a separate spacer BELOW the ad slot.
+        // Therefore the full 88dp slot is always visible above virtual buttons.
         View navGuard=new View(a);
         navGuard.setTag("nav_guard");
         navGuard.setBackgroundColor(Ui.BG);
