@@ -1,0 +1,53 @@
+name: Dump current generated source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/dump-current-source.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore and patch source
+        run: |
+          cat inkflow_build_parts/part00 inkflow_build_parts/part01 inkflow_build_parts/part02 inkflow_build_parts/part03 inkflow_build_parts/part04 | base64 --decode > InkFlowBuild.zip
+          unzip -q -o InkFlowBuild.zip
+          TARGET=InkFlowReader/app/src/main/java/app/inkflow/reader
+          cp inkflow_patch_120/BookContent.java "$TARGET/BookContent.java"
+          cat inkflow_patch_120/BookSourceFactory.java.part00 inkflow_patch_120/BookSourceFactory.java.part01 inkflow_patch_120/BookSourceFactory.java.part02 > "$TARGET/BookSourceFactory.java"
+          cp inkflow_patch_130/BookProgressStore.java "$TARGET/BookProgressStore.java"
+          cat inkflow_patch_130/BookReaderActivity.java.part00 inkflow_patch_130/BookReaderActivity.java.part01 inkflow_patch_130/BookReaderActivity.java.part02 inkflow_patch_130/BookReaderActivity.java.part03 > "$TARGET/BookReaderActivity.java"
+          cp inkflow_patch_130/BookSettingsActivity.java "$TARGET/BookSettingsActivity.java"
+          cp inkflow_patch_140/TorrentService.java "$TARGET/TorrentService.java"
+          cp inkflow_patch_140/TorrentActivity.java "$TARGET/TorrentActivity.java"
+          cp inkflow_patch_150/BannerAdSlot.java "$TARGET/BannerAdSlot.java"
+          python3 inkflow_patch_120/apply_120.py
+          python3 inkflow_patch_130/apply_130.py
+          python3 inkflow_patch_140/apply_140.py
+          python3 inkflow_patch_140/fix_book_pagination.py
+          python3 inkflow_patch_150/apply_150.py
+          cp inkflow_patch_151/OpenFileActivity.java "$TARGET/OpenFileActivity.java"
+          python3 inkflow_patch_151/apply_151.py
+          python3 inkflow_patch_152/apply_152.py
+          cp inkflow_patch_153/DocumentSourceFactory.java "$TARGET/DocumentSourceFactory.java"
+          python3 inkflow_patch_153/apply_153.py
+          mkdir dump
+          cp "$TARGET/MainActivity.java" dump/
+          cp "$TARGET/LibraryStore.java" dump/
+          cp "$TARGET/Ui.java" dump/
+          cp "$TARGET/ReaderActivity.java" dump/
+          cp "$TARGET/SourceFactory.java" dump/
+          cp "$TARGET/ComicAdapter.java" dump/ 2>/dev/null || true
+          cp "$TARGET/BookReaderActivity.java" dump/
+          cp "$TARGET/BookSettingsActivity.java" dump/
+          cp InkFlowReader/app/src/main/AndroidManifest.xml dump/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: current-generated-source
+          path: dump
