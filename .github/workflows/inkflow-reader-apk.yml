@@ -19,6 +19,7 @@ on:
       - 'inkflow_patch_164/**'
       - 'inkflow_patch_165/**'
       - 'inkflow_patch_166/**'
+      - 'inkflow_patch_167/**'
       - '.github/workflows/inkflow-reader-apk.yml'
   workflow_dispatch:
 
@@ -85,7 +86,7 @@ jobs:
           cp inkflow_patch_165/BannerAdSlot.java "$TARGET/BannerAdSlot.java"
           python3 inkflow_patch_165/apply_165.py
 
-          # 1.6.6: illustrated fallback covers + full-screen reader settings.
+          # 1.6.6: full-screen reader settings.
           cp inkflow_patch_166/CoverPlaceholderView.java "$TARGET/CoverPlaceholderView.java"
           cp inkflow_patch_166/cover_placeholder_book.xml "$RES/cover_placeholder_book.xml"
           cp inkflow_patch_166/cover_placeholder_comic.xml "$RES/cover_placeholder_comic.xml"
@@ -93,17 +94,24 @@ jobs:
           cp inkflow_patch_166/cover_placeholder_archive.xml "$RES/cover_placeholder_archive.xml"
           python3 inkflow_patch_166/apply_166.py
 
+          # 1.6.7: replace fallback vectors with actual illustrated WebP covers.
+          python3 inkflow_patch_167/apply_167.py
+
           rm -f "$RES/ic_launcher.xml" "$RES/ic_launcher.png"
           cat inkflow_patch_140/icon64.part00 inkflow_patch_140/icon64.part01 inkflow_patch_140/icon64.part02 inkflow_patch_140/icon64.part03 | base64 --decode > "$RES/ic_launcher.png"
           cat inkflow_patch_150/ad_loading.part00 inkflow_patch_150/ad_loading.part01 inkflow_patch_150/ad_loading.part02 | base64 --decode > "$RES/ad_loading.webp"
 
           test -s "$RES/ic_launcher.png"
           test -s "$RES/ad_loading.webp"
-          test -s "$RES/cover_placeholder_book.xml"
-          test -s "$RES/cover_placeholder_comic.xml"
-          test -s "$RES/cover_placeholder_document.xml"
-          test -s "$RES/cover_placeholder_archive.xml"
-          grep -q 'versionName .1.6.6.' InkFlowReader/app/build.gradle
+          test -s "$RES/cover_placeholder_book.webp"
+          test -s "$RES/cover_placeholder_comic.webp"
+          test -s "$RES/cover_placeholder_document.webp"
+          test -s "$RES/cover_placeholder_archive.webp"
+          test ! -e "$RES/cover_placeholder_book.xml"
+          test ! -e "$RES/cover_placeholder_comic.xml"
+          test ! -e "$RES/cover_placeholder_document.xml"
+          test ! -e "$RES/cover_placeholder_archive.xml"
+          grep -q 'versionName .1.6.7.' InkFlowReader/app/build.gradle
           grep -q 'buildEmergency' "$TARGET/MainActivity.java"
           grep -q 'cover_placeholder_book' "$TARGET/CoverPlaceholderView.java"
           grep -q 'settingsLaunched=true' "$TARGET/BookReaderActivity.java"
@@ -145,15 +153,15 @@ jobs:
         run: |
           APK=$(find InkFlowReader/app/build/outputs/apk/release -name '*.apk' | head -1)
           test -n "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.6.6-aligned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.6.6-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" Chitai-Vse-1.6.7-aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 Chitai-Vse-1.6.7-aligned.apk
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" ./apksigner.jar
 
       - name: Upload aligned release
         uses: actions/upload-artifact@v4
         with:
-          name: Chitai-Vse-Release-Aligned-1.6.6
+          name: Chitai-Vse-Release-Aligned-1.6.7
           path: |
-            Chitai-Vse-1.6.6-aligned.apk
+            Chitai-Vse-1.6.7-aligned.apk
             apksigner.jar
           if-no-files-found: error
