@@ -38,6 +38,7 @@ jobs:
           rm -rf transcriber-build
           mkdir transcriber-build
           unzip -q /tmp/offline-video-transcriber-v0.1.zip -d transcriber-build
+          sed -i 's/a53ba2a773bba730f0d3abda3211d951d0aa7ee9146e0715220cf21ae82c9ec4/d582f4b4c6b48205de7e0643c57df0df5615a3c176189be3fc461e9d18827b5d/' transcriber-build/scripts/prepare_models.sh
 
       - uses: actions/setup-java@v4
         with:
