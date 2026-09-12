@@ -1,0 +1,7 @@
+status=FAILURE
+build=1.0.5-exynos-safe-v29
+workflow_run_id=31665130640
+source_commit=b7c3fba1a5a020d189428b097de025544ce674dc
+upstream_ref=2.4.8
+actions_url=https://github.com/artemkz147-ship-it/RAZNOE147/actions/runs/31665130640
+finished_utc=2026-08-13T03:52:55Z

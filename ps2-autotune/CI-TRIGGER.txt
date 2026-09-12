@@ -1,0 +1,3 @@
+PS2 AutoTune Android validation trigger
+Reason: compile current source-only build after optional Discord SDK fallback fix.
+Do not use as runtime data.
