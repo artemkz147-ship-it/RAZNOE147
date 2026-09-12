@@ -1,0 +1,106 @@
+name: Build and launch-test Offline100 v1.2
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'offline100-stable/**'
+      - '.github/workflows/offline100-stable.yml'
+  workflow_dispatch:
+
+jobs:
+  launch-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager --licenses >/dev/null || true; sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '9.1.0' }
+
+      - name: Restore and validate v1.2 assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASSETS=offline100-stable/app/src/main/assets
+          mkdir -p "$ASSETS"
+          cat offline100-stable/.payload/app.* | base64 -d | gzip -d > "$ASSETS/app.js"
+          cat offline100-stable/.payload/style.* | base64 -d | gzip -d > "$ASSETS/styles.css"
+          cat offline100-stable/.payload/index.* | base64 -d | gzip -d > "$ASSETS/index.html"
+          base64 -d < offline100-stable/.payload/v11-app.patch.gz.b64 | gzip -d > /tmp/v11-app.patch
+          base64 -d < offline100-stable/.payload/v11-styles.patch.gz.b64 | gzip -d > /tmp/v11-styles.patch
+          patch "$ASSETS/app.js" < /tmp/v11-app.patch
+          patch "$ASSETS/styles.css" < /tmp/v11-styles.patch
+
+          cat offline100-stable/.payload/v12-app.00 offline100-stable/.payload/v12-app.01 offline100-stable/.payload/v12-app.02 offline100-stable/.payload/v12-app.03 offline100-stable/.payload/v12-app.04 > /tmp/v12-app.b64
+          cp offline100-stable/.payload/v12-style.00 /tmp/v12-style.b64
+          cp offline100-stable/.payload/v12-index.00 /tmp/v12-index.b64
+          test $(wc -c < /tmp/v12-app.b64) -eq 28020
+          test $(wc -c < /tmp/v12-style.b64) -eq 5348
+          test $(wc -c < /tmp/v12-index.b64) -eq 916
+          echo '33e840ec829b9e0ea53dfb17ab3d03dd868613577d51c43e1ec43ac6df0f78fb  /tmp/v12-app.b64' | sha256sum -c -
+          echo 'de7ea8bde80786e0878ca55fd5371d7ae693014d79f37113417a395695563ee6  /tmp/v12-style.b64' | sha256sum -c -
+          echo '90d2de50950830db02cbe1b341b1f5b8f40f70007b1ba7ad93114276b3a34e03  /tmp/v12-index.b64' | sha256sum -c -
+          base64 -d < /tmp/v12-app.b64 | gzip -d > /tmp/v12-app.patch
+          base64 -d < /tmp/v12-style.b64 | gzip -d > /tmp/v12-style.patch
+          base64 -d < /tmp/v12-index.b64 | gzip -d > /tmp/v12-index.patch
+          patch "$ASSETS/app.js" < /tmp/v12-app.patch
+          patch "$ASSETS/styles.css" < /tmp/v12-style.patch
+          patch "$ASSETS/index.html" < /tmp/v12-index.patch
+
+          # Permanent post-patch responsive layer for the Android container.
+          cat offline100-stable/static/v12-responsive.css >> "$ASSETS/styles.css"
+
+          # v1.2 startup fix: visual-set must not read games before its declaration.
+          sed -i "s/const FEATURED_VISUAL=new Set(games.map(g=>g.id));/const FEATURED_VISUAL={has:()=>true};/" "$ASSETS/app.js"
+
+          cp offline100-stable/static/manifest.webmanifest "$ASSETS/manifest.webmanifest"
+          cp offline100-stable/static/sw.js "$ASSETS/sw.js"
+          grep -q "APP_VERSION='1.2.0'" "$ASSETS/app.js"
+          grep -q 'FEATURED_VISUAL={has:()=>true}' "$ASSETS/app.js"
+          grep -q 'AI_GAME_IDS' "$ASSETS/app.js"
+          grep -q 'game-objective' "$ASSETS/app.js"
+          grep -q 'parking-exit' "$ASSETS/app.js"
+          grep -q 'pipe-terminal' "$ASSETS/app.js"
+          grep -q 'sudoku-board' "$ASSETS/styles.css"
+          node --check "$ASSETS/app.js"
+
+      - name: Build APK
+        working-directory: offline100-stable
+        run: gradle --no-daemon :app:assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: offline100-v1.2.0-rebuild-apk
+          path: offline100-stable/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Emulator QA - all 100 games and all 100 results
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: bash offline100-stable/qa.sh
+
+      - name: Upload QA proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline100-v1.2.0-qa-proof
+          path: |
+            qa-*.png
+            qa-*.log
+          if-no-files-found: warn
+          retention-days: 7
