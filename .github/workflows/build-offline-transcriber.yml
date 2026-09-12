@@ -14,7 +14,18 @@ jobs:
 
       - name: Restore and verify project archive
         run: |
-          cat transcriber_build/transcriber.part.* | base64 -d > /tmp/offline-video-transcriber-v0.1.zip
+          cat \
+            transcriber_build/transcriber.part.00 \
+            transcriber_build/transcriber.part.01 \
+            transcriber_build/transcriber.part.02 \
+            transcriber_build/transcriber.part.03a \
+            transcriber_build/transcriber.part.03b0 \
+            transcriber_build/transcriber.part.03b1 \
+            transcriber_build/transcriber.part.03b2 \
+            transcriber_build/transcriber.part.03b3 \
+            transcriber_build/transcriber.part.04 \
+            | base64 -d > /tmp/offline-video-transcriber-v0.1.zip
+          echo "3bd721832a64892969e95555e8ca7b33a0270b5fd281b780b90e7926a941c0c8  /tmp/offline-video-transcriber-v0.1.zip" | sha256sum -c -
           unzip -t /tmp/offline-video-transcriber-v0.1.zip
           rm -rf transcriber-build
           mkdir transcriber-build
