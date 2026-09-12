@@ -1,0 +1,80 @@
+name: Magnetic Scrap Android Build
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'magnetic-scrap-android/**'
+      - '.github/workflows/magnetic-scrap-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Generate v5 static game assets
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 magnetic-scrap-android/tools/gen_assets.py
+          COUNT=$(find magnetic-scrap-android/app/src/main/res/drawable-nodpi -name '*.png' | wc -l)
+          echo "Static PNG assets: $COUNT"
+          test "$COUNT" -ge 40
+
+      - name: Patch v5 gameplay
+        run: |
+          python3 magnetic-scrap-android/tools/patch_v5.py
+          GAME=magnetic-scrap-android/app/src/main/java/com/artem/magneticscrap/GameView.java
+          grep -q 'SHOTGUN=9,PLASMA=10,MORTAR=11' "$GAME"
+          grep -q 'private float\[\] partPos' "$GAME"
+          grep -q 'private void startTutorial' "$GAME"
+          grep -q 'bossArtillery' "$GAME"
+          grep -q 'floorWasteland' "$GAME"
+          grep -q 'tutorialPickupConnected' "$GAME"
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK 35
+        run: yes | sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Build release APK
+        working-directory: magnetic-scrap-android
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify v5 APK
+        run: |
+          APK=magnetic-scrap-android/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "package: name='com.artem.magneticscrap.rebuild' versionCode='50' versionName='5.0.0-rebuild'" /tmp/badging.txt
+          grep -q "targetSdkVersion:'35'" /tmp/badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump resources "$APK" > /tmp/resources.txt
+          grep -q 'drawable/shotgun' /tmp/resources.txt
+          grep -q 'drawable/plasma' /tmp/resources.txt
+          grep -q 'drawable/mortar' /tmp/resources.txt
+          grep -q 'drawable/boss_artillery' /tmp/resources.txt
+          grep -q 'drawable/boss_storm' /tmp/resources.txt
+          grep -q 'drawable/floor_lab' /tmp/resources.txt
+          grep -q 'drawable/proj_rocket' /tmp/resources.txt
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MagneticScrap-v5.0-REBUILD
+          path: magnetic-scrap-android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
