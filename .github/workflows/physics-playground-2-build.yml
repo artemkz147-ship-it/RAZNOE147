@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - physics-playground-2.0-build
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
