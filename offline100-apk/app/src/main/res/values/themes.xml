@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.Offline100" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:navigationBarColor">#101323</item>
+        <item name="android:statusBarColor">#101323</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#101323</item>
+    </style>
+</resources>
