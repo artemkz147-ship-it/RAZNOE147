@@ -1,0 +1,69 @@
+name: Build Physics Playground 2.0 APK
+
+on:
+  push:
+    branches:
+      - physics-playground-2.0-build
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout build branch
+        uses: actions/checkout@v4
+
+      - name: Reconstruct Physics Playground source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p physics-build
+          cat physics-playground-build/part*.b64 | tr -d '\r\n' | base64 -d > physics-build/Physics-Playground-2.0-source.zip
+          echo "bbf59db97d7b72468b20253be6e5be4dc73091f35ccab2c3f55a64584dc32b8e  physics-build/Physics-Playground-2.0-source.zip" | sha256sum -c -
+          unzip -t physics-build/Physics-Playground-2.0-source.zip
+          unzip -q physics-build/Physics-Playground-2.0-source.zip -d physics-build/src
+          test -f physics-build/src/physics2/settings.gradle.kts
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 35
+        shell: bash
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Run physics tests
+        shell: bash
+        run: cd physics-build/src/physics2 && gradle --no-daemon :core:runPhysicsCoreTest
+
+      - name: Build debug APK
+        shell: bash
+        run: cd physics-build/src/physics2 && gradle --no-daemon :app:assembleDebug
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=physics-build/src/physics2/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          sha256sum "$APK"
+          ls -lh "$APK"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Physics-Playground-2.0-debug
+          path: physics-build/src/physics2/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
