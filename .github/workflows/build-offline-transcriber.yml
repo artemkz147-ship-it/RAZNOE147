@@ -20,7 +20,10 @@ jobs:
             transcriber_build/transcriber.part.02 \
             transcriber_build/transcriber.part.03a \
             transcriber_build/transcriber.part.03b0 \
-            transcriber_build/transcriber.part.03b1 \
+            transcriber_build/transcriber.part.03b1a \
+            transcriber_build/transcriber.part.03b1b \
+            transcriber_build/transcriber.part.03b1c \
+            transcriber_build/transcriber.part.03b1d \
             transcriber_build/transcriber.part.03b2 \
             transcriber_build/transcriber.part.03b3 \
             transcriber_build/transcriber.part.04 \
