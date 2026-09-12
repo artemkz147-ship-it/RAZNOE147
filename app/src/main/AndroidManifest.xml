@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:name=".DokiApplication"
+        android:allowBackup="true"
+        android:enableOnBackInvokedCallback="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.FileMaster">
+
+        <meta-data android:name="com.yandex.mobile.ads.AUTOMATIC_SDK_INITIALIZATION" android:value="false" />
+
+        <activity android:name=".LaunchActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".DokiViewerActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/html" />
+                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/csv" />
+                <data android:mimeType="text/tab-separated-values" />
+                <data android:mimeType="application/rtf" />
+                <data android:mimeType="text/rtf" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                <data android:mimeType="application/vnd.oasis.opendocument.text" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="application/x-7z-compressed" />
+                <data android:mimeType="application/vnd.rar" />
+                <data android:mimeType="application/x-rar-compressed" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".ConvertersActivity" android:exported="false" />
+        <activity android:name=".PdfPageOrganizerActivity" android:exported="false" />
+        <activity android:name=".PdfPagePreviewActivity" android:exported="false" />
+        <activity android:name=".PptxSlideOrganizerActivity" android:exported="false" />
+        <activity android:name=".ImageCompressionActivity" android:exported="false" />
+        <activity android:name=".ImageResizeActivity" android:exported="false" />
+        <activity android:name=".ImageCropActivity" android:exported="false" />
+        <activity android:name=".BackgroundRemovalActivity" android:exported="false" />
+        <activity android:name=".SignatureFlowActivity" android:exported="false" />
+        <activity android:name=".SignatureLibraryActivity" android:exported="false" />
+        <activity android:name=".SignaturePlacementActivity" android:exported="false" />
+
+        <activity android:name=".ManualCropActivity" android:exported="false" />
+        <activity android:name=".PdfVisualEditorActivity" android:exported="false" />
+        <activity android:name=".PdfFormDesignerActivity" android:exported="false" />
+        <activity android:name=".PdfFormActivity" android:exported="false" />
+        <activity android:name=".PdfRedactActivity" android:exported="false" />
+        <activity android:name=".PdfAnnotateActivity" android:exported="false" />
+        <activity android:name=".ResultsActivity" android:exported="false" />
+        <activity android:name=".ScanSessionActivity" android:exported="false" />
+        <activity android:name=".DocumentEditorActivity" android:exported="false" />
+        <activity android:name=".TableEditorActivity" android:exported="false" />
+        <activity android:name=".EditableOpenActivity" android:exported="false" />
+        <activity android:name=".ZipEditorActivity" android:exported="false" />
+        <activity android:name=".ZipOpenActivity" android:exported="false" />
+        <activity android:name=".SignatureActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".MainActivity" android:exported="false" />
+    </application>
+</manifest>

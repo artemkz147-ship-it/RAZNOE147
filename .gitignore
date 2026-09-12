@@ -1,0 +1,18 @@
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+
+# Release signing secrets — never commit these
+*.jks
+*.keystore
+*.p12
+*.pfx
+release-signing.properties
+keystore.properties
+
+# Local OS/editor files
+.DS_Store
+Thumbs.db
