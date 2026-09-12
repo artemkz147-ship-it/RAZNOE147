@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+    <meta name="theme-color" content="#0d1320" />
+    <title>Drop Flow — Акробатический паркур</title>
+    <link rel="stylesheet" href="/src/visual-fix.css" />
+    <script src="/sdk.js"></script>
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="targetIndicator" aria-hidden="true">
+      <img src="assets3d/ui/landing-target.svg" alt="" />
+      <span>ЦЕЛЬ</span>
+    </div>
+
+    <div id="hud">
+      <div class="hud-left">
+        <span id="objective">01 · Первый спуск</span>
+        <b id="score">0</b>
+        <small>ОЧКОВ</small>
+      </div>
+      <div id="toast"></div>
+      <div id="chain"></div>
+      <div class="hud-right">
+        <div><small>ПРЫЖОК</small><b id="stage">1/1</b></div>
+        <div><small>ДО ЦЕЛИ ВНИЗ</small><b id="drop">0 м</b></div>
+        <div><small>КОМБО</small><b id="combo">×1</b></div>
+        <div class="state-box"><small>СОСТОЯНИЕ</small><b id="state">ГОТОВ</b><em id="target">ЦЕЛЬ</em></div>
+        <button id="pause" aria-label="Пауза">Ⅱ</button>
+      </div>
+    </div>
+
+    <div id="touchControls">
+      <div id="touchSteer"><span>ДВИЖЕНИЕ<br/>И КОРРЕКЦИЯ</span></div>
+      <button id="trickFront" class="trick t1">ФРОНТ</button>
+      <button id="trickBack" class="trick t2">БЭК</button>
+      <button id="trickSide" class="trick t3">БОК</button>
+      <button id="trickTwist" class="trick t4">360°</button>
+      <button id="touchLand" class="land">ПОСАДКА</button>
+      <button id="touchJump" class="jump">ПРЫЖОК</button>
+    </div>
+
+    <section id="menu" class="screen visible">
+      <div class="menu-shell">
+        <header class="brand">
+          <p>TOP → DOWN ACROBATIC PARKOUR</p>
+          <h1>DROP<br/>FLOW</h1>
+          <div class="brand-line"><span>САЛЬТО · ТОЧНОСТЬ · ВЫСОТА</span><b id="tokens">◆ 0</b></div>
+        </header>
+        <p class="intro">Ты всегда начинаешь <b>наверху</b>. Внизу — следующая точка посадки. Подойди к краю, выбери ракурс и прыгай с крыши на крышу, на техплощадки, балки и верхушки опор; в полёте собирай фронтфлипы, бэкфлипы, боковые сальто и твисты. Чем глубже кампания, тем выше перепад, меньше площадка и длиннее цепочка точных посадок.</p>
+        <div class="score-rules">
+          <span><b>500</b> центр мишени</span><span><b>250</b> среднее кольцо</span><span><b>100</b> внешнее кольцо</span><span><b>×COMBO</b> серия без ошибок</span>
+        </div>
+        <div id="levels" class="levels"></div>
+        <div class="controls-copy">
+          <b>УПРАВЛЕНИЕ</b>
+          <span>WASD — ходить по площадке до прыжка и корректировать полёт · зажать ЛКМ + вести мышью — вращать камеру · колесо — приблизить/отдалить · Space — прыжок · 1/Q — фронтфлип · 2/E — бэкфлип · 3/Z — боковое сальто · 4/X — твист 360° · C/Ctrl перед касанием — сгруппироваться и уйти в перекат. На телефоне: левый круг — движение, свайп по правой части сцены — камера.</span>
+        </div>
+        <div id="loading">Загрузка персонажа, акробатических анимаций и вертикальных уровней…</div>
+      </div>
+    </section>
+
+    <section id="finish" class="screen modal-screen">
+      <div class="finish-card">
+        <p>ВЕРТИКАЛЬНАЯ ЛИНИЯ ЗАКРЫТА</p>
+        <h2 id="finishTitle">Уровень пройден</h2>
+        <div id="finishStats" class="finish-stats"></div>
+        <div class="finish-actions">
+          <button id="next" class="primary">СЛЕДУЮЩИЙ СПУСК</button>
+          <button id="retry">ПЕРЕИГРАТЬ НА БОЛЬШЕ ОЧКОВ</button>
+          <button id="levelMenu">ВЫБОР УРОВНЯ</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="pauseOverlay" class="screen modal-screen">
+      <div class="pause-card">
+        <p>ПАУЗА</p>
+        <h2>Высота никуда не делась</h2>
+        <button id="resume" class="primary">ПРОДОЛЖИТЬ</button>
+      </div>
+    </section>
+
+    <script type="module" src="/src/drop/TargetIndicatorPatch.ts"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
