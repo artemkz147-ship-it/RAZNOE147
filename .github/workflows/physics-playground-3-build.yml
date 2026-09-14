@@ -1,14 +1,16 @@
-name: Build Physics Playground 3.0 3D APK
+name: Build Physics Playground 4.0 Quality APK
 
 on:
   push:
-    branches: [physics-playground-3.0-build2]
+    branches: [physics-playground-4.0-build]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -33,6 +35,7 @@ jobs:
           unzip -q /tmp/toy.zip -d /tmp/kenney/toy
           python3 -m pip install --quiet numpy trimesh
           python3 physics-playground-3-patch/prepare_assets.py
+          test "$(find physics-build/src/physics2/app/src/main/assets/models -name '*.obj' | wc -l)" -ge 18
 
       - name: Bundle recorded CC0 sounds
         shell: bash
@@ -76,24 +79,29 @@ jobs:
       - name: Physics regression tests
         run: cd physics-build/src/physics2 && gradle --no-daemon :core:runPhysicsCoreTest
 
-      - name: Build 3D debug APK
+      - name: Build 4.0 debug APK
         run: cd physics-build/src/physics2 && gradle --no-daemon :app:assembleDebug
 
-      - name: Verify APK
+      - name: Verify 4.0 APK content
         shell: bash
         run: |
           set -euo pipefail
           APK=physics-build/src/physics2/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
           unzip -l "$APK" | grep -q 'assets/models/wheel.obj'
+          unzip -l "$APK" | grep -q 'assets/models/wheel2.obj'
+          unzip -l "$APK" | grep -q 'assets/models/gear.obj'
+          unzip -l "$APK" | grep -q 'assets/models/barrel.obj'
+          unzip -l "$APK" | grep -q 'assets/models/platform.obj'
           unzip -l "$APK" | grep -q 'res/raw/sfx_wood_1.ogg'
+          unzip -l "$APK" | grep -q 'res/raw/sfx_explosion_1.ogg'
           sha256sum "$APK"
           ls -lh "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Physics-Playground-3.0-3D-debug
+          name: Physics-Playground-4.0-quality-debug
           path: physics-build/src/physics2/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
