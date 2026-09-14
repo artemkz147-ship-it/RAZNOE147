@@ -35,6 +35,8 @@ android {
 
 val litePoseModel = layout.projectDirectory.file("src/main/assets/pose_landmarker_lite.task").asFile
 val fullPoseModel = layout.projectDirectory.file("src/main/assets/pose_landmarker_full.task").asFile
+val threeModule = layout.projectDirectory.file("src/main/assets/web/vendor/three.module.js").asFile
+val threeCore = layout.projectDirectory.file("src/main/assets/web/vendor/three.core.js").asFile
 
 val downloadPoseModels by tasks.registering {
     outputs.files(litePoseModel, fullPoseModel)
@@ -54,8 +56,26 @@ val downloadPoseModels by tasks.registering {
     }
 }
 
+val downloadThreeJs by tasks.registering {
+    outputs.files(threeModule, threeCore)
+    doLast {
+        val files = listOf(
+            threeModule to "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+            threeCore to "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.core.js",
+        )
+        for ((file, url) in files) {
+            if (!file.exists() || file.length() < 100_000) {
+                file.parentFile.mkdirs()
+                URI(url).toURL().openStream().use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+        }
+    }
+}
+
 tasks.matching { it.name == "preBuild" }.configureEach {
-    dependsOn(downloadPoseModels)
+    dependsOn(downloadPoseModels, downloadThreeJs)
 }
 
 dependencies {
