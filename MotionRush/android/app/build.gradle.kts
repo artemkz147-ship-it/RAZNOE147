@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -37,7 +39,7 @@ val downloadPoseModel by tasks.registering {
     doLast {
         if (!poseModel.exists() || poseModel.length() < 1_000_000) {
             poseModel.parentFile.mkdirs()
-            val modelUrl = java.net.URI(
+            val modelUrl = URI(
                 "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
             ).toURL()
             modelUrl.openStream().use { input ->
