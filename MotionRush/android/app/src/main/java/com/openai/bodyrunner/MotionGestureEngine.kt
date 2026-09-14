@@ -12,12 +12,16 @@ data class MotionPose(
     val nose: MotionPoint,
     val leftShoulder: MotionPoint,
     val rightShoulder: MotionPoint,
+    val leftElbow: MotionPoint,
+    val rightElbow: MotionPoint,
     val leftWrist: MotionPoint,
     val rightWrist: MotionPoint,
     val leftHip: MotionPoint,
     val rightHip: MotionPoint,
     val leftKnee: MotionPoint,
     val rightKnee: MotionPoint,
+    val leftAnkle: MotionPoint,
+    val rightAnkle: MotionPoint,
 )
 
 internal class MotionGestureEngine {
@@ -29,7 +33,21 @@ internal class MotionGestureEngine {
     )
 
     private var baseline: Baseline? = null
+    private var smoothedPose: MotionPose? = null
+    private var previousRawPose: MotionPose? = null
+    private var previousPoseAtMs: Long? = null
+
     private val lastActionAt = mutableMapOf<String, Long>()
+
+    private var laneCandidate: String? = null
+    private var laneCandidateSince: Long? = null
+    private var laneArmed = true
+
+    private var jumpSince: Long? = null
+    private var jumpLatched = false
+    private var crouchSince: Long? = null
+    private var crouchLatched = false
+
     private var leftRaiseSince: Long? = null
     private var rightRaiseSince: Long? = null
     private var bothRaiseSince: Long? = null
@@ -48,10 +66,11 @@ internal class MotionGestureEngine {
             shoulderWidth = shoulderWidth,
             bodyHeight = bodyHeight,
         )
+        smoothedPose = pose
+        previousRawPose = null
+        previousPoseAtMs = null
         lastActionAt.clear()
-        leftRaiseSince = null
-        rightRaiseSince = null
-        bothRaiseSince = null
+        clearTemporalState()
         return true
     }
 
@@ -59,78 +78,214 @@ internal class MotionGestureEngine {
     fun update(pose: MotionPose, nowMs: Long): List<String> {
         val b = baseline ?: return emptyList()
         val actions = mutableListOf<String>()
-        val hip = midpoint(pose.leftHip, pose.rightHip)
+        val filtered = smooth(smoothedPose, pose, 0.82f).also { smoothedPose = it }
+        val hip = midpoint(filtered.leftHip, filtered.rightHip)
+        val rawHip = midpoint(pose.leftHip, pose.rightHip)
 
-        val laneThreshold = max(0.075f, b.shoulderWidth * 0.62f)
+        updateLane(filtered, rawHip, hip, b, nowMs, actions)
+        updateJump(filtered, hip, b, nowMs, actions)
+        updateCrouch(filtered, hip, b, nowMs, actions)
+        updatePunches(filtered, pose, b, nowMs, actions)
+        updateRaisedHands(filtered, b, nowMs, actions)
+
+        previousRawPose = pose
+        previousPoseAtMs = nowMs
+        return actions
+    }
+
+    private fun updateLane(
+        pose: MotionPose,
+        rawHip: MotionPoint,
+        hip: MotionPoint,
+        b: Baseline,
+        nowMs: Long,
+        actions: MutableList<String>,
+    ) {
+        val laneThreshold = max(0.07f, b.shoulderWidth * 0.52f)
+        val releaseThreshold = laneThreshold * 0.48f
+        val rawDx = rawHip.x - b.centerX
         val dx = hip.x - b.centerX
-        if (dx < -laneThreshold && ready("LANE", nowMs, 350)) {
-            actions += "MOVE_LEFT"
-            mark("LANE", nowMs)
-        } else if (dx > laneThreshold && ready("LANE", nowMs, 350)) {
-            actions += "MOVE_RIGHT"
-            mark("LANE", nowMs)
+
+        if (abs(rawDx) < releaseThreshold) {
+            laneArmed = true
+            laneCandidate = null
+            laneCandidateSince = null
         }
 
-        val jumpThreshold = max(0.09f, b.bodyHeight * 0.42f)
-        if (b.hipY - hip.y > jumpThreshold && ready("JUMP", nowMs, 220)) {
+        val side = when {
+            dx < -laneThreshold -> "LEFT"
+            dx > laneThreshold -> "RIGHT"
+            else -> null
+        }
+
+        if (side == null || !laneArmed) {
+            if (side == null) {
+                laneCandidate = null
+                laneCandidateSince = null
+            }
+            return
+        }
+
+        if (laneCandidate != side) {
+            laneCandidate = side
+            laneCandidateSince = nowMs
+            return
+        }
+
+        val since = laneCandidateSince ?: nowMs
+        if (nowMs - since >= 50L) {
+            actions += if (side == "LEFT") "MOVE_LEFT" else "MOVE_RIGHT"
+            laneArmed = false
+            laneCandidate = null
+            laneCandidateSince = null
+        }
+    }
+
+    private fun updateJump(
+        pose: MotionPose,
+        hip: MotionPoint,
+        b: Baseline,
+        nowMs: Long,
+        actions: MutableList<String>,
+    ) {
+        val threshold = max(0.075f, b.bodyHeight * 0.33f)
+        val rise = b.hipY - hip.y
+        val ankleY = (pose.leftAnkle.y + pose.rightAnkle.y) / 2f
+        val kneeY = (pose.leftKnee.y + pose.rightKnee.y) / 2f
+        val legsLifted = ankleY < b.hipY + b.bodyHeight * 0.84f || kneeY < b.hipY + b.bodyHeight * 0.43f
+        val active = rise > threshold && legsLifted
+
+        if (!active) {
+            jumpSince = null
+            if (rise < threshold * 0.42f) jumpLatched = false
+            return
+        }
+        if (jumpLatched) return
+        if (jumpSince == null) jumpSince = nowMs
+        if (nowMs - (jumpSince ?: nowMs) >= 35L && ready("JUMP", nowMs, 220L)) {
             actions += "JUMP"
             mark("JUMP", nowMs)
+            jumpLatched = true
+            jumpSince = null
         }
+    }
 
-        val crouchDrop = hip.y - b.hipY
+    private fun updateCrouch(
+        pose: MotionPose,
+        hip: MotionPoint,
+        b: Baseline,
+        nowMs: Long,
+        actions: MutableList<String>,
+    ) {
+        val dropThreshold = max(0.07f, b.bodyHeight * 0.30f)
+        val drop = hip.y - b.hipY
         val kneeGap = ((pose.leftKnee.y - pose.leftHip.y) + (pose.rightKnee.y - pose.rightHip.y)) / 2f
-        if (
-            crouchDrop > max(0.085f, b.bodyHeight * 0.36f) &&
-            kneeGap < b.bodyHeight * 0.78f &&
-            ready("CROUCH", nowMs, 500)
-        ) {
+        val active = drop > dropThreshold && kneeGap < b.bodyHeight * 0.90f
+
+        if (!active) {
+            crouchSince = null
+            if (drop < dropThreshold * 0.45f) crouchLatched = false
+            return
+        }
+        if (crouchLatched) return
+        if (crouchSince == null) crouchSince = nowMs
+        if (nowMs - (crouchSince ?: nowMs) >= 45L && ready("CROUCH", nowMs, 420L)) {
             actions += "CROUCH"
             mark("CROUCH", nowMs)
+            crouchLatched = true
+            crouchSince = null
         }
+    }
 
-        val punchReach = max(0.18f, b.shoulderWidth * 1.15f)
-        val punchWindow = max(0.11f, b.bodyHeight * 0.58f)
-        val leftRaised = pose.leftWrist.y < pose.leftShoulder.y - max(0.07f, b.bodyHeight * 0.28f)
-        val rightRaised = pose.rightWrist.y < pose.rightShoulder.y - max(0.07f, b.bodyHeight * 0.28f)
+    private fun updatePunches(
+        filtered: MotionPose,
+        raw: MotionPose,
+        b: Baseline,
+        nowMs: Long,
+        actions: MutableList<String>,
+    ) {
+        val previous = previousRawPose ?: return
+        val previousAt = previousPoseAtMs ?: return
+        val dtSeconds = (nowMs - previousAt).coerceAtLeast(1L) / 1000f
+        if (dtSeconds > 0.22f) return
+
+        val raiseThreshold = max(0.05f, b.bodyHeight * 0.20f)
+        val leftRaised = filtered.leftWrist.y < filtered.leftShoulder.y - raiseThreshold
+        val rightRaised = filtered.rightWrist.y < filtered.rightShoulder.y - raiseThreshold
+        val reach = max(0.16f, b.shoulderWidth * 0.95f)
+        val elbowReach = max(0.085f, b.shoulderWidth * 0.40f)
+        val verticalWindow = max(0.12f, b.bodyHeight * 0.62f)
+
+        fun speed(current: MotionPoint, old: MotionPoint) = abs(current.x - old.x) / dtSeconds
 
         val leftPunch = !leftRaised &&
-            abs(pose.leftWrist.x - pose.leftShoulder.x) > punchReach &&
-            abs(pose.leftWrist.y - pose.leftShoulder.y) < punchWindow
-        val rightPunch = !rightRaised &&
-            abs(pose.rightWrist.x - pose.rightShoulder.x) > punchReach &&
-            abs(pose.rightWrist.y - pose.rightShoulder.y) < punchWindow
+            abs(filtered.leftWrist.x - filtered.leftShoulder.x) > reach &&
+            abs(filtered.leftElbow.x - filtered.leftShoulder.x) > elbowReach &&
+            abs(filtered.leftWrist.y - filtered.leftShoulder.y) < verticalWindow &&
+            speed(raw.leftWrist, previous.leftWrist) > 1.65f
 
-        if (leftPunch && ready("PUNCH_LEFT", nowMs, 300)) {
+        val rightPunch = !rightRaised &&
+            abs(filtered.rightWrist.x - filtered.rightShoulder.x) > reach &&
+            abs(filtered.rightElbow.x - filtered.rightShoulder.x) > elbowReach &&
+            abs(filtered.rightWrist.y - filtered.rightShoulder.y) < verticalWindow &&
+            speed(raw.rightWrist, previous.rightWrist) > 1.65f
+
+        if (leftPunch && ready("PUNCH_LEFT", nowMs, 220L)) {
             actions += "PUNCH_LEFT"
             mark("PUNCH_LEFT", nowMs)
         }
-        if (rightPunch && ready("PUNCH_RIGHT", nowMs, 300)) {
+        if (rightPunch && ready("PUNCH_RIGHT", nowMs, 220L)) {
             actions += "PUNCH_RIGHT"
             mark("PUNCH_RIGHT", nowMs)
         }
+    }
 
-        val bothHeld = held("both", leftRaised && rightRaised, nowMs, 130)
-        val leftHeld = held("left", leftRaised && !rightRaised, nowMs, 130)
-        val rightHeld = held("right", rightRaised && !leftRaised, nowMs, 130)
+    private fun updateRaisedHands(
+        pose: MotionPose,
+        b: Baseline,
+        nowMs: Long,
+        actions: MutableList<String>,
+    ) {
+        val threshold = max(0.05f, b.bodyHeight * 0.20f)
+        val leftRaised = pose.leftWrist.y < pose.leftShoulder.y - threshold &&
+            pose.leftElbow.y < pose.leftShoulder.y + b.bodyHeight * 0.02f
+        val rightRaised = pose.rightWrist.y < pose.rightShoulder.y - threshold &&
+            pose.rightElbow.y < pose.rightShoulder.y + b.bodyHeight * 0.02f
 
-        if (bothHeld && ready("RAISE_BOTH", nowMs, 420)) {
+        val bothHeld = held("both", leftRaised && rightRaised, nowMs, 75L)
+        val leftHeld = held("left", leftRaised && !rightRaised, nowMs, 75L)
+        val rightHeld = held("right", rightRaised && !leftRaised, nowMs, 75L)
+
+        if (bothHeld && ready("RAISE_BOTH", nowMs, 300L)) {
             actions += "RAISE_BOTH"
             mark("RAISE_BOTH", nowMs)
-        } else if (leftHeld && ready("RAISE_LEFT", nowMs, 420)) {
+        } else if (leftHeld && ready("RAISE_LEFT", nowMs, 300L)) {
             actions += "RAISE_LEFT"
             mark("RAISE_LEFT", nowMs)
-        } else if (rightHeld && ready("RAISE_RIGHT", nowMs, 420)) {
+        } else if (rightHeld && ready("RAISE_RIGHT", nowMs, 300L)) {
             actions += "RAISE_RIGHT"
             mark("RAISE_RIGHT", nowMs)
         }
-
-        return actions
     }
 
     @Synchronized
     fun reset() {
         baseline = null
+        smoothedPose = null
+        previousRawPose = null
+        previousPoseAtMs = null
         lastActionAt.clear()
+        clearTemporalState()
+    }
+
+    private fun clearTemporalState() {
+        laneCandidate = null
+        laneCandidateSince = null
+        laneArmed = true
+        jumpSince = null
+        jumpLatched = false
+        crouchSince = null
+        crouchLatched = false
         leftRaiseSince = null
         rightRaiseSince = null
         bothRaiseSince = null
@@ -140,6 +295,29 @@ internal class MotionGestureEngine {
         x = (a.x + b.x) / 2f,
         y = (a.y + b.y) / 2f,
     )
+
+    private fun smooth(previous: MotionPose?, current: MotionPose, alpha: Float): MotionPose {
+        if (previous == null) return current
+        fun p(old: MotionPoint, fresh: MotionPoint) = MotionPoint(
+            x = old.x + (fresh.x - old.x) * alpha,
+            y = old.y + (fresh.y - old.y) * alpha,
+        )
+        return MotionPose(
+            nose = p(previous.nose, current.nose),
+            leftShoulder = p(previous.leftShoulder, current.leftShoulder),
+            rightShoulder = p(previous.rightShoulder, current.rightShoulder),
+            leftElbow = p(previous.leftElbow, current.leftElbow),
+            rightElbow = p(previous.rightElbow, current.rightElbow),
+            leftWrist = p(previous.leftWrist, current.leftWrist),
+            rightWrist = p(previous.rightWrist, current.rightWrist),
+            leftHip = p(previous.leftHip, current.leftHip),
+            rightHip = p(previous.rightHip, current.rightHip),
+            leftKnee = p(previous.leftKnee, current.leftKnee),
+            rightKnee = p(previous.rightKnee, current.rightKnee),
+            leftAnkle = p(previous.leftAnkle, current.leftAnkle),
+            rightAnkle = p(previous.rightAnkle, current.rightAnkle),
+        )
+    }
 
     private fun ready(action: String, nowMs: Long, cooldownMs: Long): Boolean {
         val previous = lastActionAt[action] ?: return true

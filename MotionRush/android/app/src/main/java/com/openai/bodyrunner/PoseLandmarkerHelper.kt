@@ -84,7 +84,7 @@ internal class PoseLandmarkerHelper(
         }
 
         val landmarks = result.landmarks().first()
-        if (landmarks.size < 27) {
+        if (landmarks.size < 29) {
             listener.onNoPose()
             return
         }
@@ -94,12 +94,16 @@ internal class PoseLandmarkerHelper(
             nose = p(0),
             leftShoulder = p(11),
             rightShoulder = p(12),
+            leftElbow = p(13),
+            rightElbow = p(14),
             leftWrist = p(15),
             rightWrist = p(16),
             leftHip = p(23),
             rightHip = p(24),
             leftKnee = p(25),
             rightKnee = p(26),
+            leftAnkle = p(27),
+            rightAnkle = p(28),
         )
         listener.onPose(pose, result.timestampMs(), input.width, input.height)
     }
