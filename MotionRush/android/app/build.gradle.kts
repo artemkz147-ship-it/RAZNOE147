@@ -13,8 +13,8 @@ android {
         applicationId = "com.openai.bodyrunner"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -33,24 +33,29 @@ android {
     kotlinOptions { jvmTarget = "17" }
 }
 
-val poseModel = layout.projectDirectory.file("src/main/assets/pose_landmarker_lite.task").asFile
-val downloadPoseModel by tasks.registering {
-    outputs.file(poseModel)
+val litePoseModel = layout.projectDirectory.file("src/main/assets/pose_landmarker_lite.task").asFile
+val fullPoseModel = layout.projectDirectory.file("src/main/assets/pose_landmarker_full.task").asFile
+
+val downloadPoseModels by tasks.registering {
+    outputs.files(litePoseModel, fullPoseModel)
     doLast {
-        if (!poseModel.exists() || poseModel.length() < 1_000_000) {
-            poseModel.parentFile.mkdirs()
-            val modelUrl = URI(
-                "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
-            ).toURL()
-            modelUrl.openStream().use { input ->
-                poseModel.outputStream().use { output -> input.copyTo(output) }
+        val models = listOf(
+            litePoseModel to "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+            fullPoseModel to "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
+        )
+        for ((file, url) in models) {
+            if (!file.exists() || file.length() < 1_000_000) {
+                file.parentFile.mkdirs()
+                URI(url).toURL().openStream().use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
             }
         }
     }
 }
 
 tasks.matching { it.name == "preBuild" }.configureEach {
-    dependsOn(downloadPoseModel)
+    dependsOn(downloadPoseModels)
 }
 
 dependencies {

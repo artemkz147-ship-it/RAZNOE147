@@ -18,36 +18,72 @@ internal class PoseLandmarkerHelper(
     private val listener: Listener,
 ) {
     private val landmarker: PoseLandmarker
+    val backendLabel: String
+
+    private var bitmapBuffer: Bitmap? = null
+    private var lastSubmittedAt = 0L
 
     init {
+        val gpuFull = runCatching {
+            createLandmarker(
+                context = context,
+                modelAsset = "pose_landmarker_full.task",
+                delegate = Delegate.GPU,
+            )
+        }.getOrNull()
+
+        if (gpuFull != null) {
+            landmarker = gpuFull
+            backendLabel = "GPU FULL"
+        } else {
+            landmarker = createLandmarker(
+                context = context,
+                modelAsset = "pose_landmarker_lite.task",
+                delegate = Delegate.CPU,
+            )
+            backendLabel = "CPU LITE"
+        }
+    }
+
+    private fun createLandmarker(
+        context: Context,
+        modelAsset: String,
+        delegate: Delegate,
+    ): PoseLandmarker {
         val baseOptions = BaseOptions.builder()
-            .setModelAssetPath("pose_landmarker_lite.task")
-            .setDelegate(Delegate.CPU)
+            .setModelAssetPath(modelAsset)
+            .setDelegate(delegate)
             .build()
 
         val options = PoseLandmarker.PoseLandmarkerOptions.builder()
             .setBaseOptions(baseOptions)
-            .setMinPoseDetectionConfidence(0.55f)
-            .setMinPosePresenceConfidence(0.55f)
-            .setMinTrackingConfidence(0.55f)
+            .setMinPoseDetectionConfidence(0.50f)
+            .setMinPosePresenceConfidence(0.50f)
+            .setMinTrackingConfidence(0.45f)
             .setRunningMode(RunningMode.LIVE_STREAM)
             .setResultListener(this::onResult)
             .setErrorListener { error -> listener.onError(error.message ?: "MediaPipe error") }
             .build()
 
-        landmarker = PoseLandmarker.createFromOptions(context, options)
+        return PoseLandmarker.createFromOptions(context, options)
     }
 
     fun detectLiveStream(imageProxy: ImageProxy, isFrontCamera: Boolean) {
         val frameTime = SystemClock.uptimeMillis()
+        if (frameTime - lastSubmittedAt < 28L) {
+            imageProxy.close()
+            return
+        }
+        lastSubmittedAt = frameTime
+
         val width = imageProxy.width
         val height = imageProxy.height
         val rotation = imageProxy.imageInfo.rotationDegrees
-        val bitmapBuffer = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val inputBitmap = obtainBitmap(width, height)
 
         try {
             imageProxy.planes[0].buffer.rewind()
-            bitmapBuffer.copyPixelsFromBuffer(imageProxy.planes[0].buffer)
+            inputBitmap.copyPixelsFromBuffer(imageProxy.planes[0].buffer)
         } finally {
             imageProxy.close()
         }
@@ -60,11 +96,11 @@ internal class PoseLandmarkerHelper(
         }
 
         val rotatedBitmap = Bitmap.createBitmap(
-            bitmapBuffer,
+            inputBitmap,
             0,
             0,
-            bitmapBuffer.width,
-            bitmapBuffer.height,
+            inputBitmap.width,
+            inputBitmap.height,
             matrix,
             true,
         )
@@ -73,8 +109,21 @@ internal class PoseLandmarkerHelper(
         landmarker.detectAsync(mpImage, frameTime)
     }
 
+    private fun obtainBitmap(width: Int, height: Int): Bitmap {
+        val current = bitmapBuffer
+        if (current != null && current.width == width && current.height == height && !current.isRecycled) {
+            return current
+        }
+        current?.recycle()
+        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
+            bitmapBuffer = it
+        }
+    }
+
     fun close() {
         landmarker.close()
+        bitmapBuffer?.recycle()
+        bitmapBuffer = null
     }
 
     private fun onResult(result: PoseLandmarkerResult, input: MPImage) {

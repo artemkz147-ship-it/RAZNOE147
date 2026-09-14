@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Size
 import android.view.Gravity
 import android.view.View
 import android.webkit.JavascriptInterface
@@ -20,6 +22,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
@@ -27,6 +31,7 @@ import androidx.webkit.WebViewAssetLoader
 import org.json.JSONObject
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
     private lateinit var webView: WebView
@@ -45,7 +50,14 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
     @Volatile
     private var trackingRequested = false
 
-    private var lastNoPoseStatusAt = 0L
+    @Volatile
+    private var poseVisible = false
+
+    private var noPoseReported = false
+    private var lastPoseSeenAt = 0L
+    private var lastTrackerUiAt = 0L
+    private var lastResultAt = 0L
+    private var smoothedFps = 0f
 
     private val assetLoader by lazy {
         WebViewAssetLoader.Builder()
@@ -158,6 +170,12 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
         trackingRequested = true
         gestureEngine.reset()
         latestPose = null
+        poseVisible = false
+        noPoseReported = false
+        lastPoseSeenAt = 0L
+        lastTrackerUiAt = 0L
+        lastResultAt = 0L
+        smoothedFps = 0f
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             initializeNativeTracking()
@@ -199,7 +217,17 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
 
+                val resolutionSelector = ResolutionSelector.Builder()
+                    .setResolutionStrategy(
+                        ResolutionStrategy(
+                            Size(480, 360),
+                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER,
+                        )
+                    )
+                    .build()
+
                 val analysis = ImageAnalysis.Builder()
+                    .setResolutionSelector(resolutionSelector)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                     .build()
@@ -237,19 +265,43 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
 
     override fun onPose(pose: MotionPose, timestampMs: Long, width: Int, height: Int) {
         latestPose = pose
-        setPreviewStatus("ТЕЛО В КАДРЕ")
-        sendStatus("pose-found", "Тело распознано")
+        val now = SystemClock.uptimeMillis()
+        lastPoseSeenAt = now
+
+        if (!poseVisible || noPoseReported) {
+            poseVisible = true
+            noPoseReported = false
+            sendStatus("pose-found", "Тело распознано")
+        }
+
+        if (lastResultAt > 0L) {
+            val dt = (now - lastResultAt).coerceAtLeast(1L)
+            val instantFps = 1000f / dt.toFloat()
+            smoothedFps = if (smoothedFps == 0f) instantFps else smoothedFps * 0.82f + instantFps * 0.18f
+        }
+        lastResultAt = now
+
+        if (now - lastTrackerUiAt >= 450L) {
+            lastTrackerUiAt = now
+            val fps = smoothedFps.coerceIn(0f, 60f).roundToInt()
+            val backend = poseHelper?.backendLabel ?: "ИИ"
+            val latency = (now - timestampMs).coerceAtLeast(0L)
+            setPreviewStatus("ТЕЛО • $backend • ${fps}FPS • ${latency}мс")
+        }
 
         val actions = gestureEngine.update(pose, timestampMs)
         for (action in actions) sendAction(action)
     }
 
     override fun onNoPose() {
-        val now = android.os.SystemClock.uptimeMillis()
-        if (now - lastNoPoseStatusAt < 700) return
-        lastNoPoseStatusAt = now
+        val now = SystemClock.uptimeMillis()
+        if (lastPoseSeenAt > 0L && now - lastPoseSeenAt < 450L) return
+        if (noPoseReported) return
+
+        noPoseReported = true
+        poseVisible = false
         setPreviewStatus("ВСТАНЬ В КАДР")
-        sendStatus("no-pose", "Отойди так, чтобы были видны плечи, таз и колени")
+        sendStatus("no-pose", "Отойди так, чтобы были видны плечи, таз и ноги")
     }
 
     override fun onError(message: String) {
@@ -292,6 +344,8 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
         trackingRequested = false
         gestureEngine.reset()
         latestPose = null
+        poseVisible = false
+        noPoseReported = false
         cameraProvider?.unbindAll()
         cameraProvider = null
         cameraExecutor.execute {
