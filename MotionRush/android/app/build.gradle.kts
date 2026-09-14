@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.openai.bodyrunner"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.openai.bodyrunner"
