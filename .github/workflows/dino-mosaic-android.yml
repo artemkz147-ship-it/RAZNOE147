@@ -55,11 +55,12 @@ jobs:
 
       - name: Prepare artifact and signing kit
         run: |
-          mkdir -p out/signing-kit/lib
+          mkdir -p out/signing-kit/lib out/signing-kit/lib64
           cp dino_mosaic_android/app/build/outputs/apk/debug/app-debug.apk out/DinoMosaic-base-debug.apk
           cp "$ANDROID_SDK_ROOT/build-tools/35.0.0/zipalign" out/signing-kit/zipalign
           cp "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" out/signing-kit/apksigner
           cp "$ANDROID_SDK_ROOT/build-tools/35.0.0/lib/apksigner.jar" out/signing-kit/lib/apksigner.jar
+          cp "$ANDROID_SDK_ROOT/build-tools/35.0.0/lib64/libc++.so" out/signing-kit/lib64/libc++.so
           cp dino_mosaic_android/dino-final.keystore out/signing-kit/dino-final.keystore
           chmod +x out/signing-kit/zipalign out/signing-kit/apksigner
 
