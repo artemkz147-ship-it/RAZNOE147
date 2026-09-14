@@ -39,5 +39,7 @@ game_rep('val right = world.add(dynamicCircle(0.48f, Vec2(chassis.position.x + 0
 game_rep('val wheel = world.add(dynamicCircle(0.9f, anchor.position.copy(), MaterialStyle.STEEL))','val wheel = world.add(dynamicCircle(0.9f, anchor.position.copy(), MaterialStyle.STEEL).also { (it.userData as? RenderTag)?.role = "wheel" })')
 p.write_text(s)
 
-p=ROOT/'app/build.gradle.kts'; s=p.read_text().replace('versionCode = 3','versionCode = 4').replace('versionName = "2.0.0"','versionName = "3.0.0"'); p.write_text(s)
-print('Physics Playground 3.0 source patch applied')
+p=ROOT/'app/build.gradle.kts'
+s=p.read_text().replace('versionCode = 3','versionCode = 5').replace('versionName = "2.0.0"','versionName = "4.0.0"')
+p.write_text(s)
+print('Physics Playground 4.0 source patch applied')
