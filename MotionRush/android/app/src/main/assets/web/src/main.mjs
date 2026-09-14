@@ -1,19 +1,18 @@
 import { createGameState, applyAction, stepGame, spawnEntity, snapshot } from './game.mjs';
-import { createGestureInterpreter } from './gestures.mjs';
 import { createRenderer } from './render.mjs';
-import { createPoseCamera } from './pose-camera.mjs';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
 const renderer = createRenderer(canvas);
 let state = createGameState(Date.now());
-let gesture = createGestureInterpreter();
-let camera = null;
-let latestPose = null;
 let lastTime = performance.now();
 let spawnTimer = 0.8;
 let running = false;
 let toastTimer = 0;
+let nativeCameraReady = false;
+let nativePoseFound = false;
+
+$('cameraCard').style.display = 'none';
 
 const actionLabels = {
   MOVE_LEFT: '← ВЛЕВО', MOVE_RIGHT: 'ВПРАВО →', JUMP: 'ПРЫЖОК ↑', CROUCH: 'ПРИСЕД ↓',
@@ -26,7 +25,7 @@ function toast(text) {
   el.textContent = text;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 320);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 420);
 }
 
 function dispatch(action, show = true) {
@@ -96,42 +95,79 @@ function loop(now) {
 }
 requestAnimationFrame(loop);
 
-async function enableCamera() {
-  try {
-    $('cameraStatus').textContent = 'ЗАПРОС КАМЕРЫ';
-    camera = await createPoseCamera({
-      video: $('camera'),
-      onFrame(frame, now) {
-        latestPose = frame;
-        if (!gesture.calibrated) return;
-        const actions = gesture.update(frame, now);
-        for (const action of actions) dispatch(action);
-      },
-      onStatus(status) {
-        const labels = {
-          'requesting-camera': 'РАЗРЕШЕНИЕ…', 'loading-pose': 'ЗАГРУЗКА ИИ…', tracking: 'ТЕЛО В КАДРЕ',
-          'no-pose': 'ВСТАНЬ В КАДР', 'tracking-error': 'ОШИБКА ТРЕКИНГА',
-        };
-        $('cameraStatus').textContent = labels[status] || status;
-      },
-    });
-    await camera.start();
-    return true;
-  } catch (error) {
-    console.error(error);
-    $('cameraStatus').textContent = 'КАМЕРА НЕДОСТУПНА';
-    toast('КАМЕРА НЕДОСТУПНА');
-    return false;
-  }
+function setStartStatus(text) {
+  $('startButton').textContent = text;
 }
 
-$('startButton').addEventListener('click', async () => {
+window.onNativeMotionStatus = (code, message = '') => {
+  switch (code) {
+    case 'requesting-permission':
+      setStartStatus('РАЗРЕШИ КАМЕРУ');
+      break;
+    case 'initializing':
+      setStartStatus('ЗАПУСК КАМЕРЫ И ИИ…');
+      break;
+    case 'camera-ready':
+      nativeCameraReady = true;
+      $('startOverlay').classList.remove('visible');
+      $('calibrationOverlay').classList.add('visible');
+      $('calibrationText').textContent = 'Отойди так, чтобы были видны плечи, таз и колени.';
+      break;
+    case 'pose-found':
+      nativePoseFound = true;
+      if ($('calibrationOverlay').classList.contains('visible')) {
+        $('calibrationText').textContent = 'Тело найдено. Стой прямо, руки опущены, затем нажми «Калибровать».';
+      }
+      break;
+    case 'no-pose':
+      nativePoseFound = false;
+      if ($('calibrationOverlay').classList.contains('visible')) {
+        $('calibrationText').textContent = message || 'Тело не найдено. Отойди чуть дальше.';
+      }
+      break;
+    case 'permission-denied':
+      $('startButton').disabled = false;
+      setStartStatus('ВКЛЮЧИТЬ КАМЕРУ И ИГРАТЬ');
+      toast('НУЖНО РАЗРЕШЕНИЕ НА КАМЕРУ');
+      break;
+    case 'error':
+      $('startButton').disabled = false;
+      setStartStatus('ПОВТОРИТЬ ЗАПУСК КАМЕРЫ');
+      $('calibrationText').textContent = message || 'Ошибка камеры или распознавания.';
+      toast(message || 'ОШИБКА КАМЕРЫ');
+      break;
+    case 'calibrated':
+      toast('КАЛИБРОВКА ГОТОВА');
+      break;
+  }
+};
+
+window.onNativeMotionAction = (action) => {
+  if (!running) return;
+  dispatch(action);
+};
+
+window.onNativeCalibrationResult = (ok) => {
+  if (!ok) {
+    $('calibrationText').textContent = nativePoseFound
+      ? 'Не удалось зафиксировать стойку. Встань ровно и повтори.'
+      : 'Тело не найдено. Отойди так, чтобы были видны плечи, таз и колени.';
+    return;
+  }
+  $('calibrationOverlay').classList.remove('visible');
+  running = true;
+  lastTime = performance.now();
+};
+
+$('startButton').addEventListener('click', () => {
+  const bridge = window.AndroidMotion;
+  if (!bridge?.startTracking) {
+    toast('НАТИВНАЯ КАМЕРА НЕДОСТУПНА');
+    return;
+  }
   $('startButton').disabled = true;
-  const ok = await enableCamera();
-  $('startButton').disabled = false;
-  if (!ok) return;
-  $('startOverlay').classList.remove('visible');
-  $('calibrationOverlay').classList.add('visible');
+  setStartStatus('ЗАПУСК КАМЕРЫ…');
+  bridge.startTracking();
 });
 
 $('demoButton').addEventListener('click', () => {
@@ -142,18 +178,21 @@ $('demoButton').addEventListener('click', () => {
 });
 
 $('calibrateButton').addEventListener('click', () => {
-  if (!latestPose) {
+  if (!nativeCameraReady) {
+    $('calibrationText').textContent = 'Камера ещё не готова.';
+    return;
+  }
+  if (!nativePoseFound) {
     $('calibrationText').textContent = 'Тело пока не найдено. Отойди чуть дальше.';
     return;
   }
-  if (!gesture.calibrate(latestPose)) {
-    $('calibrationText').textContent = 'Не вижу тело достаточно уверенно.';
+  const bridge = window.AndroidMotion;
+  if (!bridge?.calibrate) {
+    $('calibrationText').textContent = 'Нативное распознавание недоступно.';
     return;
   }
-  $('calibrationOverlay').classList.remove('visible');
-  running = true;
-  lastTime = performance.now();
-  toast('КАЛИБРОВКА ГОТОВА');
+  $('calibrationText').textContent = 'Фиксирую нейтральную стойку…';
+  bridge.calibrate();
 });
 
 $('restartButton').addEventListener('click', () => {
@@ -163,8 +202,6 @@ $('restartButton').addEventListener('click', () => {
   running = true;
   lastTime = performance.now();
 });
-
-$('cameraToggle').addEventListener('click', () => $('cameraCard').classList.toggle('hidden-preview'));
 
 const keyMap = {
   ArrowLeft: 'MOVE_LEFT', KeyA: 'MOVE_LEFT', ArrowRight: 'MOVE_RIGHT', KeyD: 'MOVE_RIGHT',
@@ -190,5 +227,3 @@ canvas.addEventListener('pointerup', (event) => {
   else if (dy > 35) dispatch('CROUCH');
   touchStart = null;
 });
-
-window.addEventListener('beforeunload', () => camera?.stop());

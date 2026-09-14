@@ -1,21 +1,51 @@
 package com.openai.bodyrunner
 
 import android.Manifest
-import android.app.Activity
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.webkit.PermissionRequest
-import android.webkit.WebChromeClient
+import android.view.Gravity
+import android.view.View
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
+import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.core.content.ContextCompat
 import androidx.webkit.WebViewAssetLoader
+import org.json.JSONObject
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
     private lateinit var webView: WebView
-    private var pendingWebPermission: PermissionRequest? = null
-    private val cameraRequestCode = 701
+    private lateinit var previewContainer: FrameLayout
+    private lateinit var previewView: PreviewView
+    private lateinit var previewStatus: TextView
+    private lateinit var cameraExecutor: ExecutorService
+
+    private var cameraProvider: ProcessCameraProvider? = null
+    private var poseHelper: PoseLandmarkerHelper? = null
+    private val gestureEngine = MotionGestureEngine()
+
+    @Volatile
+    private var latestPose: MotionPose? = null
+
+    @Volatile
+    private var trackingRequested = false
+
+    private var lastNoPoseStatusAt = 0L
 
     private val assetLoader by lazy {
         WebViewAssetLoader.Builder()
@@ -23,84 +53,300 @@ class MainActivity : Activity() {
             .build()
     }
 
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) initializeNativeTracking() else {
+            trackingRequested = false
+            setPreviewStatus("НЕТ ДОСТУПА")
+            sendStatus("permission-denied", "Разрешение на камеру не выдано")
+        }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        cameraExecutor = Executors.newSingleThreadExecutor()
 
-        webView = WebView(this)
-        setContentView(webView)
-
-        webView.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            mediaPlaybackRequiresUserGesture = false
-            allowFileAccess = false
-            allowContentAccess = false
-            setSupportZoom(false)
-        }
-
-        webView.webViewClient = object : WebViewClient() {
-            override fun shouldInterceptRequest(
-                view: WebView?,
-                request: WebResourceRequest
-            ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
-        }
-
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onPermissionRequest(request: PermissionRequest) {
-                runOnUiThread {
-                    val asksForCamera = request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
-                    if (!asksForCamera) {
-                        request.deny()
-                        return@runOnUiThread
-                    }
-
-                    if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                        request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
-                    } else {
-                        pendingWebPermission?.deny()
-                        pendingWebPermission = request
-                        requestPermissions(arrayOf(Manifest.permission.CAMERA), cameraRequestCode)
-                    }
-                }
+        val root = FrameLayout(this)
+        webView = WebView(this).apply {
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                mediaPlaybackRequiresUserGesture = false
+                allowFileAccess = false
+                allowContentAccess = false
+                setSupportZoom(false)
             }
-
-            override fun onPermissionRequestCanceled(request: PermissionRequest) {
-                if (pendingWebPermission == request) pendingWebPermission = null
+            webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(
+                    view: WebView?,
+                    request: WebResourceRequest,
+                ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
             }
+            addJavascriptInterface(MotionBridge(), "AndroidMotion")
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
+        root.addView(
+            webView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
+
+        previewContainer = FrameLayout(this).apply {
+            visibility = View.GONE
+            elevation = dp(20).toFloat()
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(7, 18, 41))
+                cornerRadius = dp(18).toFloat()
+                setStroke(dp(2), Color.rgb(101, 239, 255))
+            }
+            clipToOutline = true
+            outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
         }
 
+        previewView = PreviewView(this).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            isClickable = false
+            isFocusable = false
+        }
+        previewContainer.addView(
+            previewView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
+
+        previewStatus = TextView(this).apply {
+            text = "КАМЕРА"
+            setTextColor(Color.WHITE)
+            textSize = 9f
+            gravity = Gravity.CENTER
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            setBackgroundColor(0xAA030816.toInt())
+        }
+        previewContainer.addView(
+            previewStatus,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(28),
+                Gravity.BOTTOM,
+            ),
+        )
+
+        root.addView(
+            previewContainer,
+            FrameLayout.LayoutParams(dp(126), dp(172), Gravity.END or Gravity.BOTTOM).apply {
+                marginEnd = dp(12)
+                bottomMargin = dp(18)
+            },
+        )
+
+        setContentView(root)
         webView.loadUrl("https://appassets.androidplatform.net/assets/web/index.html")
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode != cameraRequestCode) return
+    private fun requestTracking() {
+        if (trackingRequested) {
+            sendStatus("initializing", "Камера уже запускается")
+            return
+        }
+        trackingRequested = true
+        gestureEngine.reset()
+        latestPose = null
 
-        val request = pendingWebPermission ?: return
-        pendingWebPermission = null
-        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-            request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            initializeNativeTracking()
         } else {
-            request.deny()
+            setPreviewStatus("РАЗРЕШЕНИЕ")
+            sendStatus("requesting-permission", "Нужно разрешение на фронтальную камеру")
+            permissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
-    override fun onBackPressed() {
-        if (::webView.isInitialized && webView.canGoBack()) webView.goBack() else super.onBackPressed()
+    private fun initializeNativeTracking() {
+        runOnUiThread {
+            previewContainer.visibility = View.VISIBLE
+            setPreviewStatus("ЗАПУСК ИИ")
+            sendStatus("initializing", "Запускаю нативное распознавание тела")
+        }
+
+        cameraExecutor.execute {
+            try {
+                poseHelper?.close()
+                poseHelper = PoseLandmarkerHelper(applicationContext, this)
+                runOnUiThread { bindCamera() }
+            } catch (error: Throwable) {
+                trackingRequested = false
+                setPreviewStatus("ОШИБКА ИИ")
+                sendStatus("error", error.message ?: "Не удалось запустить MediaPipe")
+            }
+        }
+    }
+
+    private fun bindCamera() {
+        val providerFuture = ProcessCameraProvider.getInstance(this)
+        providerFuture.addListener({
+            try {
+                val provider = providerFuture.get()
+                cameraProvider = provider
+
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(previewView.surfaceProvider)
+                }
+
+                val analysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                    .build()
+
+                analysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                    val helper = poseHelper
+                    if (helper == null) imageProxy.close()
+                    else {
+                        try {
+                            helper.detectLiveStream(imageProxy, true)
+                        } catch (error: Throwable) {
+                            runCatching { imageProxy.close() }
+                            sendStatus("error", error.message ?: "Ошибка обработки кадра")
+                        }
+                    }
+                }
+
+                provider.unbindAll()
+                provider.bindToLifecycle(
+                    this,
+                    CameraSelector.DEFAULT_FRONT_CAMERA,
+                    preview,
+                    analysis,
+                )
+
+                setPreviewStatus("ИЩУ ТЕЛО")
+                sendStatus("camera-ready", "Фронтальная камера запущена")
+            } catch (error: Throwable) {
+                trackingRequested = false
+                setPreviewStatus("ОШИБКА КАМЕРЫ")
+                sendStatus("error", error.message ?: "Не удалось открыть фронтальную камеру")
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    override fun onPose(pose: MotionPose, timestampMs: Long, width: Int, height: Int) {
+        latestPose = pose
+        setPreviewStatus("ТЕЛО В КАДРЕ")
+        sendStatus("pose-found", "Тело распознано")
+
+        val actions = gestureEngine.update(pose, timestampMs)
+        for (action in actions) sendAction(action)
+    }
+
+    override fun onNoPose() {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastNoPoseStatusAt < 700) return
+        lastNoPoseStatusAt = now
+        setPreviewStatus("ВСТАНЬ В КАДР")
+        sendStatus("no-pose", "Отойди так, чтобы были видны плечи, таз и колени")
+    }
+
+    override fun onError(message: String) {
+        setPreviewStatus("ОШИБКА ИИ")
+        sendStatus("error", message)
+    }
+
+    private fun calibrate(): Boolean {
+        val pose = latestPose ?: return false
+        return gestureEngine.calibrate(pose)
+    }
+
+    private fun sendAction(action: String) {
+        runOnUiThread {
+            if (!::webView.isInitialized) return@runOnUiThread
+            webView.evaluateJavascript(
+                "window.onNativeMotionAction?.(${JSONObject.quote(action)})",
+                null,
+            )
+        }
+    }
+
+    private fun sendStatus(code: String, message: String = "") {
+        runOnUiThread {
+            if (!::webView.isInitialized) return@runOnUiThread
+            webView.evaluateJavascript(
+                "window.onNativeMotionStatus?.(${JSONObject.quote(code)}, ${JSONObject.quote(message)})",
+                null,
+            )
+        }
+    }
+
+    private fun setPreviewStatus(text: String) {
+        runOnUiThread {
+            if (::previewStatus.isInitialized) previewStatus.text = text
+        }
+    }
+
+    private fun stopTracking() {
+        trackingRequested = false
+        gestureEngine.reset()
+        latestPose = null
+        cameraProvider?.unbindAll()
+        cameraProvider = null
+        cameraExecutor.execute {
+            poseHelper?.close()
+            poseHelper = null
+        }
+        previewContainer.visibility = View.GONE
+        sendStatus("stopped", "Камера остановлена")
+    }
+
+    inner class MotionBridge {
+        @JavascriptInterface
+        fun startTracking() {
+            runOnUiThread { requestTracking() }
+        }
+
+        @JavascriptInterface
+        fun calibrate() {
+            val ok = calibrate()
+            runOnUiThread {
+                val script = "window.onNativeCalibrationResult?.(${if (ok) "true" else "false"})"
+                webView.evaluateJavascript(script, null)
+                if (ok) {
+                    setPreviewStatus("ГОТОВО")
+                    sendStatus("calibrated", "Калибровка завершена")
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun setPreviewVisible(visible: Boolean) {
+            runOnUiThread {
+                previewContainer.visibility = if (visible) View.VISIBLE else View.GONE
+            }
+        }
+
+        @JavascriptInterface
+        fun stopTracking() {
+            runOnUiThread { this@MainActivity.stopTracking() }
+        }
     }
 
     override fun onDestroy() {
-        pendingWebPermission?.deny()
-        pendingWebPermission = null
+        cameraProvider?.unbindAll()
+        poseHelper?.close()
+        poseHelper = null
+        cameraExecutor.shutdownNow()
         if (::webView.isInitialized) {
+            webView.removeJavascriptInterface("AndroidMotion")
             webView.loadUrl("about:blank")
             webView.stopLoading()
             webView.destroy()
         }
         super.onDestroy()
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }
