@@ -257,7 +257,7 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
         sendStatus("error", message)
     }
 
-    private fun calibrate(): Boolean {
+    private fun calibrateCurrentPose(): Boolean {
         val pose = latestPose ?: return false
         return gestureEngine.calibrate(pose)
     }
@@ -310,7 +310,7 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
 
         @JavascriptInterface
         fun calibrate() {
-            val ok = calibrate()
+            val ok = this@MainActivity.calibrateCurrentPose()
             runOnUiThread {
                 val script = "window.onNativeCalibrationResult?.(${if (ok) "true" else "false"})"
                 webView.evaluateJavascript(script, null)

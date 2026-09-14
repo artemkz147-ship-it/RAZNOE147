@@ -3,12 +3,12 @@ package com.openai.bodyrunner
 import kotlin.math.abs
 import kotlin.math.max
 
-internal data class MotionPoint(
+data class MotionPoint(
     val x: Float,
     val y: Float,
 )
 
-internal data class MotionPose(
+data class MotionPose(
     val nose: MotionPoint,
     val leftShoulder: MotionPoint,
     val rightShoulder: MotionPoint,
