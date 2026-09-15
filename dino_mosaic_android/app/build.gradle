@@ -10,8 +10,8 @@ android {
         applicationId 'com.dinomosaic.kids.clean20260914'
         minSdk 23
         targetSdk 35
-        versionCode 7
-        versionName '1.1.0'
+        versionCode 8
+        versionName '1.2.0'
     }
 
     buildTypes {
@@ -22,4 +22,9 @@ android {
             minifyEnabled false
         }
     }
+}
+
+dependencies {
+    implementation 'com.yandex.android:mobileads:8.4.0'
+    implementation 'ru.rustore.sdk:review:10.0.0'
 }
