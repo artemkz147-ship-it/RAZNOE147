@@ -3,7 +3,7 @@ name: Zoo Mosaic Android Build
 on:
   push:
     branches:
-      - dino-mosaic-android-fix
+      - zoo-mosaic-portrait-noads
     paths:
       - 'dino_mosaic_android/**'
       - '.github/workflows/dino-mosaic-android.yml'
@@ -71,7 +71,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: zoo-mosaic-base-and-signing-kit
+          name: zoo-mosaic-portrait-noads-base-and-signing-kit
           path: out/
           if-no-files-found: error
           retention-days: 7
