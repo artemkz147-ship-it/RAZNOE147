@@ -392,10 +392,7 @@ public class MainActivity extends Activity {
         reviewManager.requestReviewFlow()
                 .addOnSuccessListener(reviewInfo ->
                         reviewManager.launchReviewFlow(reviewInfo)
-                                .addOnSuccessListener(unit -> {
-                                    markReviewCompletedInWeb();
-                                    onDone.run();
-                                })
+                                .addOnSuccessListener(unit -> onDone.run())
                                 .addOnFailureListener(throwable -> {
                                     if (isReviewAlreadyExists(throwable)) {
                                         markReviewCompletedInWeb();
