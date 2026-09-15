@@ -10,7 +10,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url "https://artifactory-external.vkpartner.ru/artifactory/maven" }
     }
 }
-rootProject.name = 'DinoMosaic'
+rootProject.name = 'ZooMosaic'
 include ':app'
