@@ -1,4 +1,4 @@
-name: Dino Mosaic Android Build
+name: Zoo Mosaic Android Build
 
 on:
   push:
@@ -8,6 +8,10 @@ on:
       - 'dino_mosaic_android/**'
       - '.github/workflows/dino-mosaic-android.yml'
   workflow_dispatch:
+
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
 jobs:
   build:
@@ -27,11 +31,11 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Android platform and build tools
-        run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+        run: |
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
 
       - name: Generate final signing key
         run: |
@@ -41,7 +45,7 @@ jobs:
             -storepass android \
             -alias dino \
             -keypass android \
-            -dname "CN=DinoMosaic,O=DinoMosaic,C=US" \
+            -dname "CN=ZooMosaic,O=ZooMosaic,C=US" \
             -keyalg RSA -keysize 2048 -validity 10000
 
       - name: Build debug APK
@@ -56,7 +60,7 @@ jobs:
       - name: Prepare artifact and signing kit
         run: |
           mkdir -p out/signing-kit/lib out/signing-kit/lib64
-          cp dino_mosaic_android/app/build/outputs/apk/debug/app-debug.apk out/DinoMosaic-base-debug.apk
+          cp dino_mosaic_android/app/build/outputs/apk/debug/app-debug.apk out/ZooMosaic-base-debug.apk
           cp "$ANDROID_SDK_ROOT/build-tools/35.0.0/zipalign" out/signing-kit/zipalign
           cp "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" out/signing-kit/apksigner
           cp "$ANDROID_SDK_ROOT/build-tools/35.0.0/lib/apksigner.jar" out/signing-kit/lib/apksigner.jar
@@ -67,7 +71,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dino-mosaic-base-and-signing-kit
+          name: zoo-mosaic-base-and-signing-kit
           path: out/
           if-no-files-found: error
           retention-days: 7
