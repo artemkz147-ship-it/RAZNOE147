@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - motionrush-build
+      - motionrush-v0.4
     paths:
       - 'MotionRush/**'
       - '.github/workflows/motionrush-apk.yml'
