@@ -55,7 +55,6 @@ public class MainActivity extends Activity {
     private FrameLayout placeholderView;
     private BannerAdView bannerAd;
     private String currentScreen = "menu";
-    private String currentPuzzleId = "";
     private boolean yandexReady = false;
 
     private InterstitialAdLoader interstitialAdLoader;
@@ -134,7 +133,6 @@ public class MainActivity extends Activity {
 
         ImageView image = new ImageView(this);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        image.setAdjustViewBounds(false);
         boolean loadedImage = false;
         try (InputStream input = getAssets().open("promo-banner.png")) {
             image.setImageBitmap(BitmapFactory.decodeStream(input));
@@ -219,7 +217,6 @@ public class MainActivity extends Activity {
         public void newPuzzle(String puzzleId) {
             runOnUiThread(() -> {
                 currentScreen = "puzzle";
-                currentPuzzleId = puzzleId == null ? "" : puzzleId;
                 showPlaceholder();
                 destroyBanner();
                 loadBannerForCurrentPuzzle();
@@ -249,7 +246,6 @@ public class MainActivity extends Activity {
             int widthDp = Math.max(1, Math.round(widthPx / metrics.density));
 
             final BannerAdView newBanner = new BannerAdView(this);
-            newBanner.setAdUnitId(BANNER_AD_UNIT);
             newBanner.setAdSize(BannerAdSize.sticky(this, widthDp));
             newBanner.setVisibility(View.INVISIBLE);
             newBanner.setBannerAdEventListener(new BannerAdEventListener() {
@@ -271,8 +267,6 @@ public class MainActivity extends Activity {
                 }
 
                 @Override public void onAdClicked() {}
-                @Override public void onLeftApplication() {}
-                @Override public void onReturnedToApplication() {}
                 @Override public void onImpression(ImpressionData impressionData) {}
             });
 
@@ -283,7 +277,7 @@ public class MainActivity extends Activity {
                     Gravity.CENTER
             );
             adSlot.addView(newBanner, params);
-            newBanner.loadAd(new AdRequest.Builder().build());
+            newBanner.loadAd(new AdRequest.Builder(BANNER_AD_UNIT).build());
         });
     }
 
@@ -306,21 +300,9 @@ public class MainActivity extends Activity {
     }
 
     private void setupInterstitialLoader() {
-        if (interstitialAdLoader != null) return;
-        interstitialAdLoader = new InterstitialAdLoader(this);
-        interstitialAdLoader.setAdLoadListener(new InterstitialAdLoadListener() {
-            @Override
-            public void onAdLoaded(InterstitialAd ad) {
-                interstitialLoading = false;
-                interstitialAd = ad;
-            }
-
-            @Override
-            public void onAdFailedToLoad(AdRequestError adRequestError) {
-                interstitialLoading = false;
-                interstitialAd = null;
-            }
-        });
+        if (interstitialAdLoader == null) {
+            interstitialAdLoader = new InterstitialAdLoader(this);
+        }
     }
 
     private void preloadInterstitial() {
@@ -328,7 +310,22 @@ public class MainActivity extends Activity {
         setupInterstitialLoader();
         if (interstitialAdLoader == null) return;
         interstitialLoading = true;
-        interstitialAdLoader.loadAd(new AdRequest.Builder(INTERSTITIAL_AD_UNIT).build());
+        interstitialAdLoader.loadAd(
+                new AdRequest.Builder(INTERSTITIAL_AD_UNIT).build(),
+                new InterstitialAdLoadListener() {
+                    @Override
+                    public void onAdLoaded(InterstitialAd ad) {
+                        interstitialLoading = false;
+                        interstitialAd = ad;
+                    }
+
+                    @Override
+                    public void onAdFailedToLoad(AdRequestError adRequestError) {
+                        interstitialLoading = false;
+                        interstitialAd = null;
+                    }
+                }
+        );
     }
 
     private void handleAfterWin(int winCount, boolean alreadyRated) {
@@ -422,19 +419,13 @@ public class MainActivity extends Activity {
 
     private void markReviewCompletedInWeb() {
         if (webView != null) {
-            webView.evaluateJavascript(
-                    "window.nativeMarkRated && window.nativeMarkRated();",
-                    null
-            );
+            webView.evaluateJavascript("window.nativeMarkRated && window.nativeMarkRated();", null);
         }
     }
 
     private void continueAfterWin() {
         if (webView != null) {
-            webView.evaluateJavascript(
-                    "window.nativeAfterWinDone && window.nativeAfterWinDone();",
-                    null
-            );
+            webView.evaluateJavascript("window.nativeAfterWinDone && window.nativeAfterWinDone();", null);
         }
     }
 
@@ -515,10 +506,7 @@ public class MainActivity extends Activity {
             interstitialAd.setAdEventListener(null);
             interstitialAd = null;
         }
-        if (interstitialAdLoader != null) {
-            interstitialAdLoader.setAdLoadListener(null);
-            interstitialAdLoader = null;
-        }
+        interstitialAdLoader = null;
 
         if (pendingFileChooser != null) {
             pendingFileChooser.onReceiveValue(null);
