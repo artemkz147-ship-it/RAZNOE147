@@ -37,14 +37,26 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
 
+      - name: Restore launcher icon
+        run: |
+          mkdir -p dino_mosaic_android/app/src/main/res/drawable
+          cat dino_mosaic_android/icon/app_icon.part1 \
+              dino_mosaic_android/icon/app_icon.part2 \
+              dino_mosaic_android/icon/app_icon.part3 \
+            | base64 -d > dino_mosaic_android/app/src/main/res/drawable/app_icon.webp
+          test -s dino_mosaic_android/app/src/main/res/drawable/app_icon.webp
+
       - name: Build release APK
         working-directory: dino_mosaic_android
         run: gradle --no-daemon :app:assembleRelease
 
-      - name: Verify release base
+      - name: Verify release base and launcher icon
         run: |
-          test -f dino_mosaic_android/app/build/outputs/apk/release/app-release-unsigned.apk
-          "$ANDROID_SDK_ROOT/build-tools/35.0.0/zipalign" -c -v 4 dino_mosaic_android/app/build/outputs/apk/release/app-release-unsigned.apk
+          APK=dino_mosaic_android/app/build/outputs/apk/release/app-release-unsigned.apk
+          test -f "$APK"
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/zipalign" -c -v 4 "$APK"
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "application-icon" /tmp/badging.txt
 
       - name: Prepare artifact
         run: |
