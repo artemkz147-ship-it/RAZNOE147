@@ -1,9 +1,11 @@
 import { createGameState, applyAction, stepGame, spawnEntity, snapshot } from './game.mjs';
 import { createRenderer } from './render.mjs';
+import { createMotionInterpolator } from './motion-state.mjs';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
 const renderer = createRenderer(canvas);
+const motion = createMotionInterpolator();
 let state = createGameState(Date.now());
 let lastTime = performance.now();
 let spawnTimer = 0.8;
@@ -84,7 +86,8 @@ function loop(now) {
     }
   }
   const view = snapshot(state);
-  renderer.render(view, now / 1000);
+  const motionState = motion.sample(now);
+  renderer.render(view, now / 1000, motionState);
   updateHud(view);
   if (state.gameOver && running) {
     running = false;
@@ -119,6 +122,11 @@ window.onNativeMotionStatus = (code, message = '') => {
         $('calibrationText').textContent = 'Тело найдено. Стой прямо, руки опущены, затем нажми «Калибровать».';
       }
       break;
+    case 'calibrating':
+      if ($('calibrationOverlay').classList.contains('visible')) {
+        $('calibrationText').textContent = message || 'Стой прямо и спокойно несколько кадров…';
+      }
+      break;
     case 'no-pose':
       nativePoseFound = false;
       if ($('calibrationOverlay').classList.contains('visible')) {
@@ -145,6 +153,15 @@ window.onNativeMotionStatus = (code, message = '') => {
 window.onNativeMotionAction = (action) => {
   if (!running) return;
   dispatch(action);
+};
+
+window.onNativeMotionState = (payload) => {
+  try {
+    const parsed = typeof payload === 'string' ? JSON.parse(payload) : payload;
+    motion.push(parsed, performance.now());
+  } catch {
+    // Ignore malformed native frames; discrete actions remain independent.
+  }
 };
 
 window.onNativeCalibrationResult = (ok) => {
@@ -191,7 +208,7 @@ $('calibrateButton').addEventListener('click', () => {
     $('calibrationText').textContent = 'Нативное распознавание недоступно.';
     return;
   }
-  $('calibrationText').textContent = 'Фиксирую нейтральную стойку…';
+  $('calibrationText').textContent = 'Набираю стабильную нейтральную стойку…';
   bridge.calibrate();
 });
 

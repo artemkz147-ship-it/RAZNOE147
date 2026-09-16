@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var poseHelper: PoseLandmarkerHelper? = null
-    private val gestureEngine = MotionGestureEngine()
+    private val motionEstimator = MotionStateEstimator()
 
     @Volatile
     private var latestPose: MotionPose? = null
@@ -53,10 +53,15 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
     @Volatile
     private var poseVisible = false
 
+    @Volatile
+    private var calibrationRequested = false
+
     private var noPoseReported = false
     private var lastPoseSeenAt = 0L
     private var lastTrackerUiAt = 0L
     private var lastResultAt = 0L
+    private var lastMotionBridgeAt = 0L
+    private var lastCalibrationUiAt = 0L
     private var smoothedFps = 0f
 
     private val assetLoader by lazy {
@@ -168,13 +173,16 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
             return
         }
         trackingRequested = true
-        gestureEngine.reset()
+        motionEstimator.reset()
+        calibrationRequested = false
         latestPose = null
         poseVisible = false
         noPoseReported = false
         lastPoseSeenAt = 0L
         lastTrackerUiAt = 0L
         lastResultAt = 0L
+        lastMotionBridgeAt = 0L
+        lastCalibrationUiAt = 0L
         smoothedFps = 0f
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -220,7 +228,7 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
                 val resolutionSelector = ResolutionSelector.Builder()
                     .setResolutionStrategy(
                         ResolutionStrategy(
-                            Size(480, 360),
+                            Size(640, 480),
                             ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER,
                         )
                     )
@@ -281,16 +289,41 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
         }
         lastResultAt = now
 
+        val backend = poseHelper?.backendLabel ?: "ИИ"
+        val latency = poseHelper?.latestLatencyMs ?: (now - timestampMs).coerceAtLeast(0L)
         if (now - lastTrackerUiAt >= 450L) {
             lastTrackerUiAt = now
             val fps = smoothedFps.coerceIn(0f, 60f).roundToInt()
-            val backend = poseHelper?.backendLabel ?: "ИИ"
-            val latency = (now - timestampMs).coerceAtLeast(0L)
             setPreviewStatus("ТЕЛО • $backend • ${fps}FPS • ${latency}мс")
         }
 
-        val actions = gestureEngine.update(pose, timestampMs)
-        for (action in actions) sendAction(action)
+        if (calibrationRequested) {
+            val accepted = motionEstimator.addCalibrationSample(pose)
+            if (accepted && motionEstimator.finishCalibration()) {
+                calibrationRequested = false
+                setPreviewStatus("ГОТОВО")
+                sendCalibrationResult(true)
+                sendStatus("calibrated", "Калибровка завершена по стабильной серии кадров")
+                return
+            }
+            if (now - lastCalibrationUiAt >= 350L) {
+                lastCalibrationUiAt = now
+                setPreviewStatus("КАЛИБРОВКА")
+                sendStatus(
+                    "calibrating",
+                    if (accepted) "Стой ровно, набираю стабильные кадры…" else "Не двигайся: нужна стабильная нейтральная стойка",
+                )
+            }
+            return
+        }
+
+        val frame = motionEstimator.push(pose, timestampMs) ?: return
+        for (action in frame.actions) sendAction(action)
+
+        if (now - lastMotionBridgeAt >= 30L) {
+            lastMotionBridgeAt = now
+            sendMotionState(frame.state, backend, latency)
+        }
     }
 
     override fun onNoPose() {
@@ -309,9 +342,14 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
         sendStatus("error", message)
     }
 
-    private fun calibrateCurrentPose(): Boolean {
-        val pose = latestPose ?: return false
-        return gestureEngine.calibrate(pose)
+    private fun beginCalibration(): Boolean {
+        if (!poseVisible || latestPose == null) return false
+        motionEstimator.reset()
+        calibrationRequested = true
+        lastCalibrationUiAt = 0L
+        setPreviewStatus("КАЛИБРОВКА")
+        sendStatus("calibrating", "Стой прямо и спокойно несколько кадров")
+        return true
     }
 
     private fun sendAction(action: String) {
@@ -321,6 +359,29 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
                 "window.onNativeMotionAction?.(${JSONObject.quote(action)})",
                 null,
             )
+        }
+    }
+
+    private fun sendMotionState(state: MotionState, backend: String, latencyMs: Long) {
+        val packet = MotionPacketEncoder.encode(
+            state = state,
+            backend = backend,
+            poseFps = smoothedFps.coerceIn(0f, 60f),
+            latencyMs = latencyMs,
+        )
+        runOnUiThread {
+            if (!::webView.isInitialized) return@runOnUiThread
+            webView.evaluateJavascript(
+                "window.onNativeMotionState?.(${JSONObject.quote(packet)})",
+                null,
+            )
+        }
+    }
+
+    private fun sendCalibrationResult(ok: Boolean) {
+        runOnUiThread {
+            if (!::webView.isInitialized) return@runOnUiThread
+            webView.evaluateJavascript("window.onNativeCalibrationResult?.($ok)", null)
         }
     }
 
@@ -342,10 +403,12 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
 
     private fun stopTracking() {
         trackingRequested = false
-        gestureEngine.reset()
+        calibrationRequested = false
+        motionEstimator.reset()
         latestPose = null
         poseVisible = false
         noPoseReported = false
+        lastMotionBridgeAt = 0L
         cameraProvider?.unbindAll()
         cameraProvider = null
         cameraExecutor.execute {
@@ -364,14 +427,8 @@ class MainActivity : ComponentActivity(), PoseLandmarkerHelper.Listener {
 
         @JavascriptInterface
         fun calibrate() {
-            val ok = this@MainActivity.calibrateCurrentPose()
-            runOnUiThread {
-                val script = "window.onNativeCalibrationResult?.(${if (ok) "true" else "false"})"
-                webView.evaluateJavascript(script, null)
-                if (ok) {
-                    setPreviewStatus("ГОТОВО")
-                    sendStatus("calibrated", "Калибровка завершена")
-                }
+            if (!this@MainActivity.beginCalibration()) {
+                sendCalibrationResult(false)
             }
         }
 
