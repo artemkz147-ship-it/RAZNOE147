@@ -16,13 +16,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Test web game JavaScript
         run: |
-          node --check MotionRush/android/app/src/main/assets/web/src/main.mjs
-          node --check MotionRush/android/app/src/main/assets/web/src/game.mjs
-          node --check MotionRush/android/app/src/main/assets/web/src/render.mjs
+          set -e
+          for file in MotionRush/android/app/src/main/assets/web/src/*.mjs; do
+            node --check "$file"
+          done
           node --test MotionRush/web-test/*.test.mjs
 
       - name: Set up Java 17
