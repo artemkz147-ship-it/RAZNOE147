@@ -1,4 +1,4 @@
-name: Zoo Mosaic Android Build
+name: Zoo Mosaic Android Release Base
 
 on:
   push:
@@ -37,41 +37,29 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
 
-      - name: Generate final signing key
-        run: |
-          keytool -genkeypair -noprompt \
-            -keystore dino_mosaic_android/dino-final.keystore \
-            -storetype JKS \
-            -storepass android \
-            -alias dino \
-            -keypass android \
-            -dname "CN=ZooMosaic,O=ZooMosaic,C=US" \
-            -keyalg RSA -keysize 2048 -validity 10000
-
-      - name: Build debug APK
+      - name: Build release APK
         working-directory: dino_mosaic_android
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon :app:assembleRelease
 
-      - name: Verify base APK
+      - name: Verify release base
         run: |
-          test -f dino_mosaic_android/app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify --verbose --print-certs dino_mosaic_android/app/build/outputs/apk/debug/app-debug.apk
+          test -f dino_mosaic_android/app/build/outputs/apk/release/app-release-unsigned.apk
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/zipalign" -c -v 4 dino_mosaic_android/app/build/outputs/apk/release/app-release-unsigned.apk
 
-      - name: Prepare artifact and signing kit
+      - name: Prepare artifact
         run: |
           mkdir -p out/signing-kit/lib out/signing-kit/lib64
-          cp dino_mosaic_android/app/build/outputs/apk/debug/app-debug.apk out/ZooMosaic-base-debug.apk
+          cp dino_mosaic_android/app/build/outputs/apk/release/app-release-unsigned.apk out/ZooMosaic-base-release-unsigned.apk
           cp "$ANDROID_SDK_ROOT/build-tools/35.0.0/zipalign" out/signing-kit/zipalign
           cp "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" out/signing-kit/apksigner
           cp "$ANDROID_SDK_ROOT/build-tools/35.0.0/lib/apksigner.jar" out/signing-kit/lib/apksigner.jar
           cp "$ANDROID_SDK_ROOT/build-tools/35.0.0/lib64/libc++.so" out/signing-kit/lib64/libc++.so
-          cp dino_mosaic_android/dino-final.keystore out/signing-kit/dino-final.keystore
           chmod +x out/signing-kit/zipalign out/signing-kit/apksigner
 
-      - name: Upload build artifact
+      - name: Upload release base
         uses: actions/upload-artifact@v4
         with:
-          name: zoo-mosaic-base-and-signing-kit
+          name: zoo-mosaic-release-base
           path: out/
           if-no-files-found: error
           retention-days: 7
