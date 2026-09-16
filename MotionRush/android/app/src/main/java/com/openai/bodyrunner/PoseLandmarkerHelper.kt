@@ -2,13 +2,15 @@ package com.openai.bodyrunner
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Matrix
 import android.os.SystemClock
 import androidx.camera.core.ImageProxy
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
+import com.google.mediapipe.tasks.components.containers.Landmark
+import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.core.Delegate
+import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
@@ -17,32 +19,60 @@ internal class PoseLandmarkerHelper(
     context: Context,
     private val listener: Listener,
 ) {
+    private data class Backend(
+        val label: String,
+        val modelAsset: String,
+        val delegate: Delegate,
+    )
+
+    private data class Submission(
+        val submittedAtMs: Long,
+        val mirrorX: Boolean,
+    )
+
+    private val candidates = listOf(
+        Backend("GPU FULL", "pose_landmarker_full.task", Delegate.GPU),
+        Backend("GPU LITE", "pose_landmarker_lite.task", Delegate.GPU),
+        Backend("CPU FULL", "pose_landmarker_full.task", Delegate.CPU),
+        Backend("CPU LITE", "pose_landmarker_lite.task", Delegate.CPU),
+    )
+
     private val landmarker: PoseLandmarker
     val backendLabel: String
 
+    @Volatile
+    var latestLatencyMs: Long = 0L
+        private set
+
     private var bitmapBuffer: Bitmap? = null
     private var lastSubmittedAt = 0L
+    private val submissions = LinkedHashMap<Long, Submission>()
 
     init {
-        val gpuFull = runCatching {
-            createLandmarker(
-                context = context,
-                modelAsset = "pose_landmarker_full.task",
-                delegate = Delegate.GPU,
-            )
-        }.getOrNull()
+        val failures = mutableListOf<String>()
+        var selected: Pair<Backend, PoseLandmarker>? = null
 
-        if (gpuFull != null) {
-            landmarker = gpuFull
-            backendLabel = "GPU FULL"
-        } else {
-            landmarker = createLandmarker(
-                context = context,
-                modelAsset = "pose_landmarker_lite.task",
-                delegate = Delegate.CPU,
-            )
-            backendLabel = "CPU LITE"
+        for (backend in candidates) {
+            val attempt = runCatching {
+                createLandmarker(
+                    context = context,
+                    modelAsset = backend.modelAsset,
+                    delegate = backend.delegate,
+                )
+            }
+            if (attempt.isSuccess) {
+                selected = backend to attempt.getOrThrow()
+                break
+            }
+            val message = attempt.exceptionOrNull()?.message ?: "unknown error"
+            failures += "${backend.label}: $message"
         }
+
+        val chosen = selected ?: throw IllegalStateException(
+            "MediaPipe backend initialization failed: ${failures.joinToString(" | ")}",
+        )
+        landmarker = chosen.second
+        backendLabel = chosen.first.label
     }
 
     private fun createLandmarker(
@@ -88,25 +118,13 @@ internal class PoseLandmarkerHelper(
             imageProxy.close()
         }
 
-        val matrix = Matrix().apply {
-            postRotate(rotation.toFloat())
-            if (isFrontCamera) {
-                postScale(-1f, 1f, width.toFloat(), height.toFloat())
-            }
-        }
+        val mpImage = BitmapImageBuilder(inputBitmap).build()
+        val processingOptions = ImageProcessingOptions.builder()
+            .setRotationDegrees(rotation)
+            .build()
 
-        val rotatedBitmap = Bitmap.createBitmap(
-            inputBitmap,
-            0,
-            0,
-            inputBitmap.width,
-            inputBitmap.height,
-            matrix,
-            true,
-        )
-
-        val mpImage = BitmapImageBuilder(rotatedBitmap).build()
-        landmarker.detectAsync(mpImage, frameTime)
+        rememberSubmission(frameTime, isFrontCamera)
+        landmarker.detectAsync(mpImage, processingOptions, frameTime)
     }
 
     private fun obtainBitmap(width: Int, height: Int): Bitmap {
@@ -120,25 +138,74 @@ internal class PoseLandmarkerHelper(
         }
     }
 
+    private fun rememberSubmission(timestampMs: Long, mirrorX: Boolean) {
+        synchronized(submissions) {
+            submissions[timestampMs] = Submission(
+                submittedAtMs = SystemClock.uptimeMillis(),
+                mirrorX = mirrorX,
+            )
+            while (submissions.size > 12) {
+                val firstKey = submissions.keys.firstOrNull() ?: break
+                submissions.remove(firstKey)
+            }
+        }
+    }
+
+    private fun consumeSubmission(timestampMs: Long): Submission? = synchronized(submissions) {
+        val matched = submissions.remove(timestampMs)
+        val iterator = submissions.entries.iterator()
+        while (iterator.hasNext()) {
+            if (iterator.next().key <= timestampMs) iterator.remove()
+        }
+        matched
+    }
+
     fun close() {
         landmarker.close()
         bitmapBuffer?.recycle()
         bitmapBuffer = null
+        synchronized(submissions) { submissions.clear() }
     }
 
     private fun onResult(result: PoseLandmarkerResult, input: MPImage) {
+        val submission = consumeSubmission(result.timestampMs())
+        val now = SystemClock.uptimeMillis()
+        latestLatencyMs = (now - (submission?.submittedAtMs ?: result.timestampMs())).coerceAtLeast(0L)
+
         if (result.landmarks().isEmpty()) {
             listener.onNoPose()
             return
         }
 
-        val landmarks = result.landmarks().first()
-        if (landmarks.size < 29) {
+        val normalized = result.landmarks().first()
+        if (normalized.size < 29) {
             listener.onNoPose()
             return
         }
+        val world = result.worldLandmarks().firstOrNull()
+        val mirrorX = submission?.mirrorX ?: true
 
-        fun p(index: Int) = MotionPoint(landmarks[index].x(), landmarks[index].y())
+        fun raw(landmark: NormalizedLandmark) = RawLandmark(
+            x = landmark.x(),
+            y = landmark.y(),
+            z = landmark.z(),
+            visibility = if (landmark.visibility().isPresent) landmark.visibility().get() else null,
+            presence = if (landmark.presence().isPresent) landmark.presence().get() else null,
+        )
+
+        fun raw(landmark: Landmark) = RawLandmark(
+            x = landmark.x(),
+            y = landmark.y(),
+            z = landmark.z(),
+            visibility = if (landmark.visibility().isPresent) landmark.visibility().get() else null,
+            presence = if (landmark.presence().isPresent) landmark.presence().get() else null,
+        )
+
+        fun p(index: Int): MotionPoint {
+            val worldPoint = world?.getOrNull(index)?.let { raw(it) }
+            return PoseLandmarkMapper.mapPoint(raw(normalized[index]), worldPoint, mirrorX)
+        }
+
         val pose = MotionPose(
             nose = p(0),
             leftShoulder = p(11),
