@@ -43,9 +43,13 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Run unit tests and build debug APK
+      - name: Run Android unit tests
         working-directory: MotionRush/android
-        run: gradle testDebugUnitTest assembleDebug --stacktrace
+        run: gradle testDebugUnitTest --stacktrace
+
+      - name: Build debug APK
+        working-directory: MotionRush/android
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
