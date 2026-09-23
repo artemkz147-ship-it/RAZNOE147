@@ -23,48 +23,118 @@ function mixColor(target, a, b, t) {
 
 function createPlayer() {
   const root = new THREE.Group();
-  const body = new THREE.Group(); root.add(body);
-  const cyan = mat(0x38bdf8, .28, .36, 0x075b72, .75);
-  const dark = mat(0x0c1426, .54, .48);
-  const pink = mat(0xf472b6, .28, .34, 0x75144d, .9);
-  const skin = mat(0xe8b58f, .68, .03);
-  const shoe = mat(0xeaf8ff, .34, .22, 0x4bb6ff, .18);
-  const pelvis = mesh(body, new THREE.BoxGeometry(.72, .38, .44), dark, 0, .88, 0);
-  const spine = new THREE.Group(); spine.position.set(0, 1.0, 0); body.add(spine);
-  const torso = mesh(spine, new THREE.BoxGeometry(.94, 1.02, .50), cyan, 0, .5, 0);
-  mesh(spine, new THREE.BoxGeometry(.62, .09, .515), pink, 0, .57, .01);
-  const neck = new THREE.Group(); neck.position.set(0, 1.06, 0); spine.add(neck);
-  mesh(neck, new THREE.CylinderGeometry(.12, .13, .18, 10), skin, 0, .05, 0);
-  const head = mesh(neck, new THREE.SphereGeometry(.31, 20, 14), skin, 0, .34, 0);
-  head.scale.z = .92;
-  mesh(neck, new THREE.BoxGeometry(.40, .13, .22), dark, 0, .57, -.03);
-  mesh(spine, new THREE.BoxGeometry(.60, .76, .20), dark, 0, .48, .35);
+  const body = new THREE.Group();
+  root.add(body);
+
+  const suit = mat(0x16243a, .58, .34);
+  const fabric = mat(0x263a55, .72, .16);
+  const armor = mat(0x42c9e8, .24, .62, 0x0c6680, .58);
+  const accent = mat(0xff4f9a, .26, .42, 0x8d184f, .95);
+  const skin = mat(0xdba27e, .72, .02);
+  const glove = mat(0x151b28, .48, .44);
+  const boot = mat(0xe9f6ff, .30, .28, 0x42a8d8, .20);
+  const sole = mat(0x101722, .72, .12);
+  const visor = new THREE.MeshStandardMaterial({
+    color: 0x67e8f9, roughness: .12, metalness: .46,
+    emissive: 0x0a7184, emissiveIntensity: 1.1,
+    transparent: true, opacity: .78
+  });
+
+  const round = (parent, sx, sy, sz, material, x=0, y=0, z=0, segments=18) => {
+    const m = mesh(parent, new THREE.SphereGeometry(.5, segments, Math.max(10, Math.floor(segments*.7))), material, x, y, z);
+    m.scale.set(sx, sy, sz);
+    return m;
+  };
+  const limb = (parent, radiusTop, radiusBottom, length, material, x=0, y=0, z=0) =>
+    mesh(parent, new THREE.CylinderGeometry(radiusTop, radiusBottom, length, 14), material, x, y, z);
+
+  const pelvis = round(body, .52, .31, .36, suit, 0, .87, 0);
+  mesh(body, new THREE.BoxGeometry(.82, .16, .48), armor, 0, .93, -.02);
+
+  const spine = new THREE.Group();
+  spine.position.set(0, 1.02, 0);
+  body.add(spine);
+
+  const torso = round(spine, .64, .78, .36, fabric, 0, .48, 0);
+  round(spine, .69, .38, .39, armor, 0, .66, -.015);
+  mesh(spine, new THREE.BoxGeometry(.74, .10, .40), accent, 0, .47, -.34);
+  mesh(spine, new THREE.BoxGeometry(.48, .66, .10), suit, 0, .47, .34);
+
+  const neck = new THREE.Group();
+  neck.position.set(0, 1.05, 0);
+  spine.add(neck);
+  limb(neck, .105, .12, .19, skin, 0, .06, 0);
+
+  const head = round(neck, .34, .40, .31, skin, 0, .37, 0, 22);
+  round(neck, .355, .19, .325, suit, 0, .54, .005, 20);
+  const face = round(neck, .285, .18, .275, visor, 0, .39, -.245, 20);
+  face.scale.z = .34;
+  mesh(neck, new THREE.BoxGeometry(.18, .055, .08), accent, 0, .60, -.27);
 
   function arm(side) {
-    const shoulder = new THREE.Group(); shoulder.position.set(side * .57, .91, 0); spine.add(shoulder);
-    mesh(shoulder, new THREE.SphereGeometry(.14, 10, 8), cyan, 0, 0, 0);
-    mesh(shoulder, new THREE.CylinderGeometry(.11, .135, .62, 10), cyan, 0, -.31, 0);
-    const elbow = new THREE.Group(); elbow.position.y = -.62; shoulder.add(elbow);
-    mesh(elbow, new THREE.SphereGeometry(.13, 10, 8), cyan, 0, 0, 0);
-    mesh(elbow, new THREE.CylinderGeometry(.09, .11, .58, 10), skin, 0, -.29, 0);
-    const wrist = new THREE.Group(); wrist.position.y = -.61; elbow.add(wrist);
-    mesh(wrist, new THREE.SphereGeometry(.13, 12, 9), skin, 0, 0, 0);
+    const shoulder = new THREE.Group();
+    shoulder.position.set(side * .60, .90, 0);
+    spine.add(shoulder);
+
+    round(shoulder, .18, .18, .18, armor, 0, 0, 0, 14);
+    limb(shoulder, .135, .115, .57, fabric, 0, -.29, 0);
+    mesh(shoulder, new THREE.BoxGeometry(.15, .38, .10), armor, side*.06, -.25, -.10);
+
+    const elbow = new THREE.Group();
+    elbow.position.y = -.58;
+    shoulder.add(elbow);
+    round(elbow, .135, .135, .135, suit, 0, 0, 0, 12);
+    limb(elbow, .105, .085, .53, skin, 0, -.27, 0);
+
+    const wrist = new THREE.Group();
+    wrist.position.y = -.55;
+    elbow.add(wrist);
+    limb(wrist, .11, .10, .14, glove, 0, -.07, 0);
+    round(wrist, .15, .17, .13, glove, 0, -.19, -.01, 12);
+    mesh(wrist, new THREE.BoxGeometry(.17, .055, .10), accent, 0, -.10, -.11);
     return { shoulder, elbow, wrist };
   }
+
   function leg(side) {
-    const hip = new THREE.Group(); hip.position.set(side * .25, .78, 0); body.add(hip);
-    mesh(hip, new THREE.CylinderGeometry(.15, .18, .73, 10), dark, 0, -.36, 0);
-    const knee = new THREE.Group(); knee.position.y = -.72; hip.add(knee);
-    mesh(knee, new THREE.SphereGeometry(.15, 10, 8), dark, 0, 0, 0);
-    mesh(knee, new THREE.CylinderGeometry(.12, .14, .68, 10), dark, 0, -.34, 0);
-    const ankle = new THREE.Group(); ankle.position.y = -.67; knee.add(ankle);
-    const foot = mesh(ankle, new THREE.BoxGeometry(.34, .19, .56), shoe, 0, -.08, -.14); foot.rotation.x = .06;
+    const hip = new THREE.Group();
+    hip.position.set(side * .26, .77, 0);
+    body.add(hip);
+
+    round(hip, .18, .18, .18, suit, 0, 0, 0, 12);
+    limb(hip, .17, .145, .69, fabric, 0, -.35, 0);
+    mesh(hip, new THREE.BoxGeometry(.18, .38, .12), armor, side*.045, -.28, -.11);
+
+    const knee = new THREE.Group();
+    knee.position.y = -.69;
+    hip.add(knee);
+    round(knee, .16, .145, .16, armor, 0, 0, -.03, 12);
+    limb(knee, .13, .105, .64, suit, 0, -.32, 0);
+
+    const ankle = new THREE.Group();
+    ankle.position.y = -.63;
+    knee.add(ankle);
+    limb(ankle, .11, .10, .18, boot, 0, -.08, 0);
+    const foot = round(ankle, .21, .13, .34, boot, 0, -.19, -.12, 14);
+    foot.rotation.x = -.12;
+    const footSole = mesh(ankle, new THREE.BoxGeometry(.39, .075, .61), sole, 0, -.29, -.15);
+    footSole.rotation.x = -.03;
     return { hip, knee, ankle };
   }
+
   const leftArm = arm(-1), rightArm = arm(1), leftLeg = leg(-1), rightLeg = leg(1);
-  const shield = mesh(root, new THREE.SphereGeometry(1.36, 24, 18), new THREE.MeshBasicMaterial({ color: 0x66efff, transparent: true, opacity: .12, wireframe: true, depthWrite: false, blending: THREE.AdditiveBlending }), 0, 1.2, 0);
+
+  const shield = mesh(root, new THREE.SphereGeometry(1.38, 28, 20), new THREE.MeshBasicMaterial({
+    color: 0x66efff, transparent: true, opacity: .12, wireframe: true,
+    depthWrite: false, blending: THREE.AdditiveBlending
+  }), 0, 1.22, 0);
   shield.visible = false;
-  const shadow = mesh(root, new THREE.CircleGeometry(.65, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .34, depthWrite: false }), 0, .015, .03); shadow.rotation.x = -Math.PI / 2;
+
+  const shadow = mesh(root, new THREE.CircleGeometry(.72, 30), new THREE.MeshBasicMaterial({
+    color: 0x000000, transparent: true, opacity: .31, depthWrite: false
+  }), 0, .015, .04);
+  shadow.scale.set(1, .58, 1);
+  shadow.rotation.x = -Math.PI / 2;
+
   return { root, body, spine, torso, pelvis, leftArm, rightArm, leftLeg, rightLeg, shield, shadow, laneX: 0 };
 }
 
