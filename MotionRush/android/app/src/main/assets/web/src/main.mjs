@@ -21,7 +21,7 @@ let lastAction = '—';
 let nativePreviewVisible = true;
 
 $('cameraCard').style.display = 'none';
-const actionLabels = { MOVE_LEFT:'← ВЛЕВО',MOVE_RIGHT:'ВПРАВО →',JUMP:'ПРЫЖОК ↑',CROUCH:'ПРИСЕД ↓',PUNCH_LEFT:'✊ ЛЕВЫЙ УДАР',PUNCH_RIGHT:'ПРАВЫЙ УДАР ✊',RAISE_LEFT:'🙋 ЛЕВАЯ РУКА',RAISE_RIGHT:'ПРАВАЯ РУКА 🙋',RAISE_BOTH:'🙌 ДВЕ РУКИ' };
+const actionLabels = { MOVE_LEFT:'← ВЛЕВО',MOVE_RIGHT:'ВПРАВО →',JUMP:'ПРЫЖОК ↑',CROUCH:'ПРИСЕД ↓',PUNCH_LEFT:'ЛЕВЫЙ УДАР',PUNCH_RIGHT:'ПРАВЫЙ УДАР',RAISE_LEFT:'ЛЕВАЯ РУКА ↑',RAISE_RIGHT:'ПРАВАЯ РУКА ↑',RAISE_BOTH:'ОБЕ РУКИ ↑' };
 function toast(text){const el=$('actionToast');el.textContent=text;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),420);}
 function dispatch(action,show=true){lastAction=action;applyAction(state,action);if(show&&actionLabels[action])toast(actionLabels[action]);}
 function difficultyFor(s){return Math.max(0,Math.min(4,Math.floor(s.elapsed/28)+Math.floor(s.streak/18)));}
