@@ -1,4 +1,4 @@
-# Motion Rush v0.4
+# Motion Rush v0.5
 
 Android full-body runner controlled through the front camera.
 
@@ -21,7 +21,7 @@ Android full-body runner controlled through the front camera.
 ## Visuals
 
 - Three.js/WebGL renderer packaged locally in the APK.
-- Body-driven procedural character animation layered over running, jump, crouch and punch animation.
+- Upgraded articulated 3D runner with rounded human proportions, layered suit/armor materials, gloves, boots and emissive visor; body-driven animation remains layered over running, jump, crouch and punch motion.
 - Five seamless visual zones: neon city, industrial, tunnel, rooftop and megacity.
 - Pooled gameplay objects, instanced zone props, dynamic FOV/camera impulses, particles, shield/boost feedback and adaptive render quality.
 
@@ -41,3 +41,10 @@ Tap the compact diagnostics bar in the lower-left corner to view game FPS, pose 
 ## Verification
 
 GitHub Actions runs JavaScript syntax checks, all Node tests, Kotlin/JUnit tests, `assembleDebug`, and uploads `motionrush-v0.4-debug-apk` only after the build succeeds.
+
+
+## v0.5 visual pass
+
+- Reworked the runner from boxy primitives into a denser articulated model while keeping it generated locally and fully offline.
+- Preserved the existing pose-driven shoulder, elbow, hip and knee rig so camera controls still drive the same gameplay actions.
+- This branch is the active visual/model upgrade line for Motion Rush.
