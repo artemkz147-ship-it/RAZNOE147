@@ -1,4 +1,4 @@
-# Motion Rush v0.6
+# Motion Rush v0.7
 
 Android full-body runner controlled through the front camera.
 
@@ -61,3 +61,11 @@ This visual pass deliberately avoids Blender-authored assets, marketplace packs 
 - HUD uses locally-rendered CSS geometry for primary health/currency icons instead of emoji or downloaded icon packs.
 - No minimap is used.
 - All visual content remains bundled with the APK and works offline.
+
+
+## v0.7 world-density pass
+
+- Added foreground procedural building facades with emissive window bands and occasional vertical signs.
+- Added repeating roadside streetlights for stronger depth and speed cues.
+- Added industrial pipe/fan/gantry modules that appear in industrial and tunnel zones.
+- Kept all new visuals geometry-driven and bundled locally with no external model packs.
