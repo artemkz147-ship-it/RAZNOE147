@@ -1,4 +1,4 @@
-# Motion Rush v0.5
+# Motion Rush v0.6
 
 Android full-body runner controlled through the front camera.
 
@@ -48,3 +48,16 @@ GitHub Actions runs JavaScript syntax checks, all Node tests, Kotlin/JUnit tests
 - Reworked the runner from boxy primitives into a denser articulated model while keeping it generated locally and fully offline.
 - Preserved the existing pose-driven shoulder, elbow, hip and knee rig so camera controls still drive the same gameplay actions.
 - This branch is the active visual/model upgrade line for Motion Rush.
+
+
+## v0.6 procedural premium visual pass
+
+This visual pass deliberately avoids Blender-authored assets, marketplace packs and external 3D model vendors.
+
+- Procedural cars, trucks and train cars are assembled at runtime from local Three.js geometry.
+- Added side rail beds, moving train traffic and repeating illuminated gantries.
+- Rebuilt gameplay barriers into heavier road/industrial structures while preserving their existing collision semantics.
+- Added a darker reflective road surface and stronger material separation for a richer mobile look.
+- HUD uses locally-rendered CSS geometry for primary health/currency icons instead of emoji or downloaded icon packs.
+- No minimap is used.
+- All visual content remains bundled with the APK and works offline.
