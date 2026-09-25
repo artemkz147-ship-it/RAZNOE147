@@ -319,6 +319,76 @@ function createIndustrialModule(seedIndex=0) {
   return g;
 }
 
+function createRain(scene, count=180) {
+  const positions=new Float32Array(count*6);
+  const speeds=new Float32Array(count);
+  const seeds=new Float32Array(count*3);
+  for(let i=0;i<count;i++){
+    seeds[i*3]=(seeded(i,121)-.5)*13;
+    seeds[i*3+1]=1.2+seeded(i,122)*7.2;
+    seeds[i*3+2]=-3-seeded(i,123)*34;
+    speeds[i]=8+seeded(i,124)*10;
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  const material=new THREE.LineBasicMaterial({color:0x9fdcff,transparent:true,opacity:.23,depthWrite:false,blending:THREE.AdditiveBlending});
+  const lines=new THREE.LineSegments(geo,material);
+  lines.frustumCulled=false;
+  scene.add(lines);
+  return {
+    update(time,dt,intensity=1,low=false){
+      const active=low?Math.floor(count*.46):count;
+      material.opacity=.05+.20*intensity;
+      lines.visible=intensity>.03;
+      for(let i=0;i<count;i++){
+        const p=i*6;
+        if(i>=active){positions[p+1]=positions[p+4]=-100;continue;}
+        const sx=seeds[i*3], sy=seeds[i*3+1], sz=seeds[i*3+2];
+        const fall=((time*speeds[i])%(sy+7));
+        const y=sy-fall+1.2;
+        const wind=Math.sin(time*.7+i*.19)*.10;
+        positions[p]=sx+wind; positions[p+1]=y; positions[p+2]=sz;
+        positions[p+3]=sx+wind-.08; positions[p+4]=y-.72; positions[p+5]=sz+.10;
+      }
+      geo.attributes.position.needsUpdate=true;
+    }
+  };
+}
+
+function createRoadPatches(scene) {
+  const patches=[];
+  const colors=[0x27c8ff,0xff4ea6,0xffa73c];
+  for(let i=0;i<16;i++){
+    const material=new THREE.MeshStandardMaterial({
+      color:colors[i%colors.length],roughness:.10,metalness:.52,
+      emissive:colors[i%colors.length],emissiveIntensity:.10,
+      transparent:true,opacity:.10,depthWrite:false
+    });
+    const patch=mesh(scene,new THREE.PlaneGeometry(.8+seeded(i,131)*1.5,2.0+seeded(i,132)*3.4),material,0,.018,0);
+    patch.rotation.x=-Math.PI/2;
+    patch.rotation.z=(seeded(i,133)-.5)*.18;
+    patch.userData.base=(i*7.2+seeded(i,134)*5)%WORLD_SPAN;
+    patch.userData.x=(seeded(i,135)-.5)*6.6;
+    patches.push(patch);
+  }
+  return patches;
+}
+
+function createNeonBillboard(seedIndex=0) {
+  const g=new THREE.Group();
+  const frame=mat(0x303946,.32,.72);
+  const palette=[0x55dfff,0xff5aa7,0xffb34c,0x8f7dff];
+  const color=palette[seedIndex%palette.length];
+  const glow=mat(color,.12,.18,color,2.1,true); glow.opacity=.80;
+  mesh(g,new THREE.BoxGeometry(1.95,1.12,.12),frame,0,0,0);
+  mesh(g,new THREE.BoxGeometry(1.72,.88,.055),glow,0,0,-.09);
+  const stripe=mesh(g,new THREE.BoxGeometry(1.20,.09,.065),frame,0,-.22,-.125);
+  stripe.rotation.z=(seedIndex%2?.04:-.04);
+  const bar=mesh(g,new THREE.BoxGeometry(.68,.07,.065),frame,-.30,.10,-.125);
+  bar.rotation.z=.03;
+  return g;
+}
+
 function createParticles(scene) {
   const count=160, pos=new Float32Array(count*3), col=new Float32Array(count*3), life=new Float32Array(count), vel=new Float32Array(count*3); for(let i=0;i<count;i++)pos[i*3+1]=-100;
   const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(pos,3)); geo.setAttribute('color',new THREE.BufferAttribute(col,3));
@@ -420,6 +490,16 @@ export function createRenderer(canvas) {
     g.userData.side=i%2?-1:1;
     scene.add(g); industrialModules.push(g);
   }
+  const billboards=[];
+  for(let i=0;i<10;i++){
+    const g=createNeonBillboard(i);
+    g.userData.base=(i*11.4+seeded(i,141)*6)%WORLD_SPAN;
+    g.userData.side=i%2?-1:1;
+    g.userData.y=2.2+seeded(i,142)*3.5;
+    scene.add(g); billboards.push(g);
+  }
+  const roadPatches=createRoadPatches(scene);
+  const rain=createRain(scene,180);
   const player=createPlayer(); player.root.position.set(0,.04,PLAYER_Z); scene.add(player.root);
   const particles=createParticles(scene); const entityObjects=new Map(), pools=new Map();
   const speedMat=new THREE.MeshBasicMaterial({color:0xb8fbff,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending}); const speedLines=[];for(let i=0;i<28;i++){const m=mesh(scene,new THREE.BoxGeometry(.025,.025,2.5+seeded(i,14)*4),speedMat);m.userData.base=seeded(i,15)*42;m.userData.x=(seeded(i,16)-.5)*8.3;m.userData.y=.3+seeded(i,17)*3.5;speedLines.push(m);}
@@ -456,6 +536,22 @@ export function createRenderer(canvas) {
     updateZone(view);
     const urbanVisible=['neon-city','rooftop','megacity'].includes(currentZone);
     const industrialVisible=['industrial','tunnel'].includes(currentZone);
+    const rainIntensity=currentZone==='tunnel'?.08:currentZone==='industrial'?.55:currentZone==='rooftop'?1:.78;
+    rain.update(view.elapsed,dt,rainIntensity,quality==='low');
+    for(let i=0;i<roadPatches.length;i++){
+      const patch=roadPatches[i];
+      let depth=(patch.userData.base-view.distance)%WORLD_SPAN;if(depth<0)depth+=WORLD_SPAN;
+      patch.position.set(patch.userData.x,.018,PLAYER_Z+2.4-depth);
+      patch.visible=currentZone!=='tunnel'&&(quality==='high'||i%2===0);
+      patch.material.opacity=currentZone==='rooftop'?.16:.09;
+    }
+    for(let i=0;i<billboards.length;i++){
+      const board=billboards[i];
+      board.visible=urbanVisible&&(quality==='high'||i%2===0);
+      let depth=(board.userData.base-view.distance*.97)%WORLD_SPAN;if(depth<0)depth+=WORLD_SPAN;
+      board.position.set(board.userData.side*6.1,board.userData.y,PLAYER_Z+2.6-depth);
+      board.rotation.y=board.userData.side>0?-Math.PI/2:Math.PI/2;
+    }
     for(let i=0;i<facades.length;i++){
       const building=facades[i];
       building.visible=urbanVisible&&(quality==='high'||i%2===0);
