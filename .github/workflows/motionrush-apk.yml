@@ -8,6 +8,7 @@ on:
       - motionrush-v0.5
       - motionrush-v0.6
       - motionrush-v0.7
+      - motionrush-v0.8
     paths:
       - 'MotionRush/**'
       - '.github/workflows/motionrush-apk.yml'
@@ -58,6 +59,6 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: motionrush-v0.7-debug-apk
+          name: motionrush-v0.8-debug-apk
           path: MotionRush/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
