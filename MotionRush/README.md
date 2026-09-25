@@ -1,4 +1,4 @@
-# Motion Rush v0.7
+# Motion Rush v0.8
 
 Android full-body runner controlled through the front camera.
 
@@ -69,3 +69,12 @@ This visual pass deliberately avoids Blender-authored assets, marketplace packs 
 - Added repeating roadside streetlights for stronger depth and speed cues.
 - Added industrial pipe/fan/gantry modules that appear in industrial and tunnel zones.
 - Kept all new visuals geometry-driven and bundled locally with no external model packs.
+
+
+## v0.8 atmosphere pass
+
+- Added a lightweight procedural 3D rain field with reduced intensity inside tunnels.
+- Added moving reflective road patches that pick up the neon palette without external textures.
+- Added procedural neon billboard structures in urban zones.
+- Added a subtle screen-space vignette/contrast layer for stronger depth and focus.
+- Quality fallback reduces decorative density and rain count on slower devices.
