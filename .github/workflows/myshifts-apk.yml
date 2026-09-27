@@ -33,6 +33,115 @@ jobs:
           sed -i 's/androidx.core:core-ktx:1.19.1/androidx.core:core-ktx:1.17.0/' MyShiftsPro/app/build.gradle.kts
           sed -i 's/androidx.compose.material.icons.filled.HomeRounded/androidx.compose.material.icons.filled.Home/' MyShiftsPro/app/src/main/java/ru/myshifts/app/MainActivity.kt
           sed -i 's/Icons.Default.HomeRounded/Icons.Default.Home/g' MyShiftsPro/app/src/main/java/ru/myshifts/app/MainActivity.kt
+          cat > MyShiftsPro/app/src/main/java/ru/myshifts/app/ShiftWidget.kt <<'KOT'
+          package ru.myshifts.app
+
+          import android.content.Context
+          import androidx.compose.runtime.Composable
+          import androidx.compose.ui.unit.dp
+          import androidx.glance.Button
+          import androidx.glance.GlanceId
+          import androidx.glance.GlanceModifier
+          import androidx.glance.LocalContext
+          import androidx.glance.action.actionStartActivity
+          import androidx.glance.appwidget.GlanceAppWidget
+          import androidx.glance.appwidget.GlanceAppWidgetReceiver
+          import androidx.glance.appwidget.SizeMode
+          import androidx.glance.appwidget.provideContent
+          import androidx.glance.appwidget.updateAll
+          import androidx.glance.background
+          import androidx.glance.layout.Box
+          import androidx.glance.layout.Column
+          import androidx.glance.layout.Spacer
+          import androidx.glance.layout.fillMaxSize
+          import androidx.glance.layout.height
+          import androidx.glance.layout.padding
+          import androidx.glance.state.PreferencesGlanceStateDefinition
+          import androidx.glance.text.FontWeight
+          import androidx.glance.text.Text
+          import androidx.glance.text.TextStyle
+          import androidx.glance.unit.ColorProvider
+          import java.text.NumberFormat
+          import java.time.LocalDate
+          import java.time.YearMonth
+          import java.util.Locale
+
+          class ShiftWidget : GlanceAppWidget() {
+              override val stateDefinition = PreferencesGlanceStateDefinition
+              override val sizeMode = SizeMode.Exact
+
+              override suspend fun provideGlance(context: Context, id: GlanceId) {
+                  provideContent { WidgetContent() }
+              }
+
+              @Composable
+              private fun WidgetContent() {
+                  val context = LocalContext.current
+                  val prefs = AppPreferences(context)
+                  val settings = prefs.loadSettings()
+                  val overrides = prefs.loadOverrides()
+                  val next = ShiftCalculator.nextWorkingShift(LocalDate.now(), settings, overrides)
+                  val monthSummary = ShiftCalculator.monthSummary(YearMonth.now(), settings, overrides)
+
+                  Box(
+                      modifier = GlanceModifier
+                          .fillMaxSize()
+                          .background(ColorProvider(android.graphics.Color.rgb(54, 92, 245)))
+                          .padding(16.dp)
+                  ) {
+                      Column {
+                          Text(
+                              text = "Мои смены",
+                              style = TextStyle(
+                                  color = ColorProvider(android.graphics.Color.WHITE),
+                                  fontWeight = FontWeight.Bold
+                              )
+                          )
+                          Spacer(GlanceModifier.height(8.dp))
+                          Text(
+                              text = next?.let {
+                                  when (it.daysUntil) {
+                                      0L -> "Сегодня: ${it.type.title}"
+                                      1L -> "Завтра: ${it.type.title}"
+                                      else -> "Через ${it.daysUntil} дн.: ${it.type.title}"
+                                  }
+                              } ?: "Смен не найдено",
+                              style = TextStyle(color = ColorProvider(android.graphics.Color.WHITE))
+                          )
+                          Spacer(GlanceModifier.height(4.dp))
+                          Text(
+                              text = "За месяц: ${NumberFormat.getCurrencyInstance(Locale("ru", "RU")).format(monthSummary.totalPay)}",
+                              style = TextStyle(color = ColorProvider(android.graphics.Color.WHITE))
+                          )
+                          Spacer(GlanceModifier.height(12.dp))
+                          Button(text = "Открыть", onClick = actionStartActivity<MainActivity>())
+                      }
+                  }
+              }
+          }
+
+          class ShiftWidgetReceiver : GlanceAppWidgetReceiver() {
+              override val glanceAppWidget: GlanceAppWidget = ShiftWidget()
+
+              companion object {
+                  fun updateAll(context: Context) {
+                      kotlinx.coroutines.runBlocking {
+                          ShiftWidget().updateAll(context)
+                      }
+                  }
+              }
+          }
+          KOT
+          cat > MyShiftsPro/app/src/main/res/values/themes.xml <<'XML'
+          <resources>
+              <style name="Theme.MyShifts" parent="@android:style/Theme.Material.Light.NoActionBar" />
+          </resources>
+          XML
+          cat > MyShiftsPro/app/src/main/res/values-night/themes.xml <<'XML'
+          <resources>
+              <style name="Theme.MyShifts" parent="@android:style/Theme.Material.NoActionBar" />
+          </resources>
+          XML
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
