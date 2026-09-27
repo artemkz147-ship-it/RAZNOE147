@@ -1,0 +1,8 @@
+{
+	"appId": "com.worlds.cinematicguess",
+	"appName": "Worlds",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	}
+}
