@@ -28,6 +28,7 @@ jobs:
           base64 --decode myshifts_build/source.b64 > MyShiftsPro-source.zip
           unzip -tq MyShiftsPro-source.zip
           unzip -q -o MyShiftsPro-source.zip
+          sed -i '/org.jetbrains.kotlin.android/d' MyShiftsPro/app/build.gradle.kts
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
