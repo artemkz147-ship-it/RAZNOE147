@@ -4,12 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - 'myshifts_build/**'
+      - 'myshifts_build/source.part*'
       - '.github/workflows/myshifts-apk.yml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -66,3 +66,14 @@ jobs:
           name: MyShifts-APK
           path: MyShifts.apk
           if-no-files-found: error
+
+      - name: Record workflow run ID
+        if: always()
+        run: |
+          mkdir -p build_status
+          echo "$GITHUB_RUN_ID" > build_status/myshifts_last_run.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add build_status/myshifts_last_run.txt
+          git commit -m "Record MyShifts build run $GITHUB_RUN_ID" || exit 0
+          git push
