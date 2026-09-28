@@ -1,0 +1,160 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { freshState } from '../src/systems/state.js';
+import { GameEngine } from '../src/systems/engine.js';
+import { dailySettlement,districtUnlocked,netWorth,settleMatureInvestments } from '../src/systems/economy.js';
+import { districts } from '../src/data/world.js';
+import { events } from '../src/data/events.js';
+import { validate } from '../src/systems/save.js';
+import { casinoOutcome,casinoRemaining } from '../src/data/casino.js';
+import { shell } from '../src/ui/views.js';
+
+globalThis.localStorage={data:new Map(),setItem(k,v){this.data.set(k,v)},getItem(k){return this.data.get(k)||null},removeItem(k){this.data.delete(k)}};
+
+test('first shifts consume time and energy and pay earned money',()=>{
+  const game=new GameEngine(freshState(),()=>.9);
+  const result=game.completeJob('scrap',.95);
+  assert.equal(result.ok,true);
+  assert.ok(game.state.money>870);
+  assert.equal(game.state.hour,10);
+  assert.ok(game.state.stats.energy<73);
+  assert.equal(game.state.jobsDone,1);
+});
+
+test('story decisions unlock the market only after progress and respect',()=>{
+  const state=freshState();const game=new GameEngine(state,()=>.9);
+  const market=districts.find(x=>x.id==='market');
+  assert.equal(districtUnlocked(state,market),false);
+  state.day=2;state.money=5000;state.stats.respect=8;
+  game.checkStory();assert.equal(state.pending?.id,1);
+  game.resolveChoice(0);game.checkStory();assert.equal(state.pending?.id,2);
+  game.resolveChoice(0);
+  assert.equal(state.story,2);
+  assert.equal(districtUnlocked(state,market),true);
+});
+
+test('business settlements include maintenance and condition',()=>{
+  const state=freshState();state.money=20000;state.businesses.stall={level:2,staff:true,condition:100};
+  const before=state.money;
+  const result=dailySettlement(state,{rng:()=>.9});
+  assert.ok(result.business>0);
+  assert.equal(state.money,before+result.business-result.expenses);
+  assert.equal(state.businesses.stall.condition,99);
+  assert.ok(netWorth(state)>state.money);
+});
+
+test('zero health can recover through rest instead of soft locking',()=>{
+  const state=freshState();state.stats.health=0;
+  const game=new GameEngine(state,()=>.9);
+  const result=game.activity('sleep');
+  assert.equal(result.ok,true);
+  assert.ok(state.stats.health>0);
+});
+
+test('import validation rejects incompatible saves and preserves nested defaults',()=>{
+  assert.throws(()=>validate({version:999}),/Неверный/);
+  const state=validate({...freshState(),stats:{health:55}});
+  assert.equal(state.stats.health,55);
+  assert.equal(state.stats.energy,73);
+});
+
+test('every random event offers a decision without upfront cash',()=>{
+  for (const event of events) assert.ok(event.choices.some(choice=>!choice.cost),event.id);
+});
+
+test('mature investments pay out and leave the portfolio',()=>{
+  const state=freshState();state.day=8;state.investments=[{id:'bonds',amount:15000,maturity:8}];
+  settleMatureInvestments(state,()=>0);
+  assert.equal(state.money,870+Math.round(15000*1.07));
+  assert.equal(state.investments.length,0);
+});
+
+test('crime can end in arrest, fine, injury and a served sentence',()=>{
+  const state=freshState();const game=new GameEngine(state,()=>0);
+  const outcome=game.completeCrime('parcel',.4);
+  assert.equal(outcome.ok,true);
+  assert.equal(state.arrestCount,1);
+  assert.equal(state.jailDays,2);
+  assert.ok(state.money<870);
+  assert.ok(state.stats.health<82);
+  assert.equal(game.completeJob('scrap',1).ok,false);
+  game.serveSentence();game.serveSentence();
+  assert.equal(state.jailDays,0);
+});
+
+test('successful crime earns more than nearby legal work and raises heat',()=>{
+  const state=freshState();const game=new GameEngine(state,()=>.99);
+  game.completeCrime('parcel',.9);
+  assert.ok(state.money>2000);
+  assert.ok(state.heat>0);
+  assert.equal(state.arrestCount,0);
+});
+
+test('district activities are gated and spend their visible cost',()=>{
+  const state=freshState();
+  const game=new GameEngine(state,()=>.9);
+  assert.equal(game.activity('centerdate').ok,false);
+  const before=state.money;
+  assert.equal(game.activity('yardtea').ok,true);
+  assert.equal(state.money,before-180);
+  assert.ok(state.stats.contacts>0);
+});
+
+test('business strategy changes projected daily result',()=>{
+  const state=freshState();
+  state.money=100000;
+  state.businesses.stall={level:1,staff:false,condition:100,strategy:'safe'};
+  const safe=dailySettlement(state,{rng:()=>.99}).business;
+  state.businesses.stall.strategy='growth';
+  const growth=dailySettlement(state,{rng:()=>.99}).business;
+  assert.ok(growth>safe);
+});
+
+test('expanded content keeps multiple progression layers available',async()=>{
+  const world=await import('../src/data/world.js');
+  const activities=await import('../src/data/activities.js');
+  const story=await import('../src/data/story.js');
+  assert.ok(world.jobs.length>=25);
+  assert.ok(world.businesses.length>=12);
+  assert.ok(activities.activities.length>=15);
+  assert.ok(story.chapters.length>=16);
+});
+
+test('casino displays deterministic payout and tracks a daily budget',()=>{
+  const state=freshState();state.money=100000;
+  const game=new GameEngine(state,()=>.04); // roulette pocket 1: red
+  const result=game.playCasino('roulette',1000);
+  assert.equal(result.ok,true);
+  assert.equal(state.money,100900);
+  assert.equal(state.casino.wins,1);
+  assert.equal(state.casino.history[0].net,900);
+  assert.equal(state.casinoDaily.limit,15000);
+  assert.equal(casinoRemaining(state),14000);
+  assert.equal(game.playCasino('roulette',14001).ok,false);
+  assert.equal(state.casino.rounds,1);
+});
+
+test('casino losses and invalid stakes cannot create money',()=>{
+  const state=freshState();const game=new GameEngine(state,()=>0); // roulette zero
+  assert.equal(game.playCasino('roulette',0).ok,false);
+  assert.equal(game.playCasino('roulette','oops').ok,false);
+  assert.equal(game.playCasino('roulette',100).ok,true);
+  assert.equal(state.money,770);
+  assert.equal(state.casino.returned,0);
+  assert.equal(state.casino.history[0].result,'Зеро');
+  assert.equal(casinoOutcome('cards',()=>0).gross,0);
+});
+
+test('older saves acquire casino state without losing progress',()=>{
+  const old=freshState();old.day=9;old.money=7777;delete old.casino;delete old.casinoDaily;
+  const restored=validate(old);
+  assert.equal(restored.money,7777);
+  assert.equal(restored.casino.rounds,0);
+  assert.equal(restored.casinoDaily.wagered,0);
+});
+
+test('all home cards have an actual raster image reference',()=>{
+  const html=shell(freshState(),'assets','home',null);
+  assert.equal((html.match(/class="asset-raster"/g)||[]).length,8);
+  assert.doesNotMatch(html,/src="undefined"/);
+});
