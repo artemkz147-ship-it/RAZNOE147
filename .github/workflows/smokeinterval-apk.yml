@@ -23,7 +23,7 @@ jobs:
 
       - name: Restore source
         run: |
-          cat smokeinterval_v2/source.part00 smokeinterval_v2/source.part01 smokeinterval_v2/source.part02 smokeinterval_v2/source.part03 smokeinterval_v2/source.part04 smokeinterval_v2/source.part05 smokeinterval_v2/source.part06 smokeinterval_v2/source.part07 > smokeinterval_v2/source.b64
+          cat smokeinterval_v2/source.part00 smokeinterval_v2/source.part01 smokeinterval_v2/source.part02a smokeinterval_v2/source.part02b smokeinterval_v2/source.part03 smokeinterval_v2/source.part04 smokeinterval_v2/source.part05 smokeinterval_v2/source.part06 smokeinterval_v2/source.part07 > smokeinterval_v2/source.b64
           base64 --decode smokeinterval_v2/source.b64 > SmokeInterval-v1.1-source.zip
           unzip -tq SmokeInterval-v1.1-source.zip
           unzip -q -o SmokeInterval-v1.1-source.zip
