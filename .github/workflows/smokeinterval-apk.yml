@@ -74,14 +74,8 @@ jobs:
           s = manifest.read_text()
           s = s.replace('android:icon="@drawable/ic_launcher"\n        android:label',
                         'android:icon="@drawable/ic_launcher"\n        android:roundIcon="@drawable/ic_launcher"\n        android:label')
-          marker = '''        <activity
-              android:name=".MainActivity"'''
-          replacement = '''        <activity
-              android:name=".SettingsActivity"
-              android:exported="false" />
-
-          <activity
-              android:name=".MainActivity"'''
+          marker = '        <activity\n            android:name=".MainActivity"'
+          replacement = '        <activity\n            android:name=".SettingsActivity"\n            android:exported="false" />\n\n        <activity\n            android:name=".MainActivity"'
           s = s.replace(marker, replacement)
           manifest.write_text(s)
 
