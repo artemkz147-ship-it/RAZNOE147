@@ -31,6 +31,7 @@ jobs:
         working-directory: iz-gryazi-v-knyazi
       - name: Bundle offline game
         run: |
+          test -s iz-gryazi-v-knyazi/android/app/src/main/java/com/izgryazivknyazi/game/MainActivity.java
           mkdir -p iz-gryazi-v-knyazi/android/app/src/main/assets/game
           cp iz-gryazi-v-knyazi/index.html iz-gryazi-v-knyazi/android/app/src/main/assets/game/
           cp -R iz-gryazi-v-knyazi/src iz-gryazi-v-knyazi/android/app/src/main/assets/game/
@@ -42,3 +43,4 @@ jobs:
           name: iz-gryazi-v-knyazi-apk
           path: iz-gryazi-v-knyazi/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
