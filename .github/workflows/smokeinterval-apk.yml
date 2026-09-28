@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'smokeinterval_build/**'
+      - 'smokeinterval_v2/**'
       - '.github/workflows/smokeinterval-apk.yml'
   workflow_dispatch:
 
@@ -23,10 +23,10 @@ jobs:
 
       - name: Restore source
         run: |
-          cat smokeinterval_build/source.part00 smokeinterval_build/source.part01 smokeinterval_build/source.part02 smokeinterval_build/source.part03 > smokeinterval_build/source.b64
-          base64 --decode smokeinterval_build/source.b64 > SmokeInterval-source.zip
-          unzip -tq SmokeInterval-source.zip
-          unzip -q -o SmokeInterval-source.zip
+          cat smokeinterval_v2/source.part00 smokeinterval_v2/source.part01 smokeinterval_v2/source.part02 smokeinterval_v2/source.part03 smokeinterval_v2/source.part04 smokeinterval_v2/source.part05 smokeinterval_v2/source.part06 smokeinterval_v2/source.part07 > smokeinterval_v2/source.b64
+          base64 --decode smokeinterval_v2/source.b64 > SmokeInterval-v1.1-source.zip
+          unzip -tq SmokeInterval-v1.1-source.zip
+          unzip -q -o SmokeInterval-v1.1-source.zip
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -53,12 +53,12 @@ jobs:
         run: |
           APK=$(find SmokeInterval/app/build/outputs/apk/debug -name '*.apk' | head -1)
           test -n "$APK"
-          cp "$APK" SmokeInterval.apk
-          sha256sum SmokeInterval.apk
+          cp "$APK" SmokeInterval-v1.1.apk
+          sha256sum SmokeInterval-v1.1.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SmokeInterval-APK
-          path: SmokeInterval.apk
+          name: SmokeInterval-v1.1-APK
+          path: SmokeInterval-v1.1.apk
           if-no-files-found: error
