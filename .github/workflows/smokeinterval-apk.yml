@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'smokeinterval_patch_v12/**'
+      - 'smokeinterval_v12/**'
       - '.github/workflows/smokeinterval-apk.yml'
   workflow_dispatch:
 
@@ -21,85 +21,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore v1.1 source
+      - name: Restore source
         run: |
-          cat smokeinterval_v2/source.part00 smokeinterval_v2/source.part01 smokeinterval_v2/source.part02a smokeinterval_v2/source.part02b smokeinterval_v2/source.part03 smokeinterval_v2/source.part04 smokeinterval_v2/source.part05 smokeinterval_v2/source.part06 smokeinterval_v2/source.part07 > smokeinterval_v2/source.b64
-          base64 --decode smokeinterval_v2/source.b64 > SmokeInterval-v1.1-source.zip
-          unzip -tq SmokeInterval-v1.1-source.zip
-          unzip -q -o SmokeInterval-v1.1-source.zip
-
-      - name: Apply v1.2 redesign
-        run: |
-          TARGET=SmokeInterval/app/src/main/java/com/example/smokeinterval
-          RES=SmokeInterval/app/src/main/res
-          cp smokeinterval_patch_v12/MainActivity.java "$TARGET/MainActivity.java"
-          cp smokeinterval_patch_v12/SettingsActivity.java "$TARGET/SettingsActivity.java"
-          cp smokeinterval_patch_v12/StatsChartView.java "$TARGET/StatsChartView.java"
-
-          mkdir -p "$RES/drawable-nodpi"
-          base64 --decode smokeinterval_patch_v12/ic_launcher.webp.b64 > "$RES/drawable-nodpi/ic_launcher.webp"
-          rm -f "$RES/drawable/ic_launcher.xml"
-
-          cat > "$RES/values/strings.xml" <<'EOF'
-          <resources>
-              <string name="app_name">SmokeInterval</string>
-          </resources>
-          EOF
-
-          cat > "$RES/values/styles.xml" <<'EOF'
-          <resources>
-              <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
-                  <item name="android:fontFamily">sans</item>
-                  <item name="android:windowLightStatusBar">false</item>
-                  <item name="android:windowActionModeOverlay">true</item>
-                  <item name="android:colorAccent">#54E68A</item>
-                  <item name="android:navigationBarColor">#08110D</item>
-                  <item name="android:statusBarColor">#08110D</item>
-                  <item name="android:windowBackground">#08110D</item>
-              </style>
-          </resources>
-          EOF
-
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          build = Path("SmokeInterval/app/build.gradle")
-          s = build.read_text()
-          s = s.replace("versionCode 2", "versionCode 3")
-          s = s.replace("versionName '1.1.0'", "versionName '1.2.0'")
-          build.write_text(s)
-
-          manifest = Path("SmokeInterval/app/src/main/AndroidManifest.xml")
-          s = manifest.read_text()
-          s = s.replace('android:icon="@drawable/ic_launcher"\n        android:label',
-                        'android:icon="@drawable/ic_launcher"\n        android:roundIcon="@drawable/ic_launcher"\n        android:label')
-          marker = '        <activity\n            android:name=".MainActivity"'
-          replacement = '        <activity\n            android:name=".SettingsActivity"\n            android:exported="false" />\n\n        <activity\n            android:name=".MainActivity"'
-          s = s.replace(marker, replacement)
-          manifest.write_text(s)
-
-          notif = Path("SmokeInterval/app/src/main/java/com/example/smokeinterval/NotificationHelper.java")
-          s = notif.read_text()
-          if "import android.graphics.BitmapFactory;" not in s:
-              s = s.replace("import android.graphics.Bitmap;\n", "import android.graphics.Bitmap;\nimport android.graphics.BitmapFactory;\n")
-          new_method = '''    private static Bitmap buildLargeIcon(Context context) {
-              int size = Math.round(64f * context.getResources().getDisplayMetrics().density);
-              Bitmap source = BitmapFactory.decodeResource(context.getResources(), com.example.smokeinterval.R.drawable.ic_launcher);
-              if (source != null) return Bitmap.createScaledBitmap(source, size, size, true);
-              return Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-          }
-
-          '''
-          s = re.sub(r'    private static Bitmap buildLargeIcon\(Context context\) \{.*?(?=    public static void cancel)',
-                     new_method, s, flags=re.S)
-          notif.write_text(s)
-          PY
-
-          grep -q 'versionName .1.2.0.' SmokeInterval/app/build.gradle
-          grep -q 'SettingsActivity' SmokeInterval/app/src/main/AndroidManifest.xml
-          grep -q 'SmokeInterval' "$RES/values/strings.xml"
-          test -s "$RES/drawable-nodpi/ic_launcher.webp"
+          cat smokeinterval_v12/source.part00 smokeinterval_v12/source.part01 smokeinterval_v12/source.part02 smokeinterval_v12/source.part03 > smokeinterval_v12/source.b64
+          base64 --decode smokeinterval_v12/source.b64 > SmokeInterval-v1.2-source.zip
+          unzip -tq SmokeInterval-v1.2-source.zip
+          unzip -q -o SmokeInterval-v1.2-source.zip
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -122,20 +49,11 @@ jobs:
       - name: Build installable debug APK
         run: gradle --no-daemon -p SmokeInterval assembleDebug --stacktrace
 
-      - name: Sign stable v1.2 APK
+      - name: Prepare APK
         run: |
           APK=$(find SmokeInterval/app/build/outputs/apk/debug -name '*.apk' | head -1)
           test -n "$APK"
-          base64 --decode smokeinterval_patch_v12/smokeinterval-dev.keystore.b64 > smokeinterval-dev.keystore
-          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -p -f 4 "$APK" SmokeInterval-v1.2-aligned.apk
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
-            --ks smokeinterval-dev.keystore \
-            --ks-key-alias smokeinterval \
-            --ks-pass pass:smokeinterval12 \
-            --key-pass pass:smokeinterval12 \
-            --out SmokeInterval-v1.2.apk \
-            SmokeInterval-v1.2-aligned.apk
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs SmokeInterval-v1.2.apk
+          cp "$APK" SmokeInterval-v1.2.apk
           sha256sum SmokeInterval-v1.2.apk
 
       - name: Upload APK
