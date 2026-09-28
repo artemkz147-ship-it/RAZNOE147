@@ -11,18 +11,18 @@ import { MiniGame } from './ui/minigames.js';
 const app=document.getElementById('app');
 const loaded=loadGame();
 const game=new GameEngine(loaded.state);
-let tab='city',shopType='home',earningMode='legal',mini=null,menuOpen=false;
+let tab='city',shopType='home',earningMode='legal',mini=null,menuOpen=false,dialogueId=null,dialogueResult=null;
 
 function render() {
   document.body.className=`tab-${tab}`;
-  app.innerHTML=shell(game.state,tab,shopType,mini,earningMode);
+  app.innerHTML=shell(game.state,tab,shopType,mini,earningMode,dialogueId,dialogueResult);
   const district=byId(districts,game.state.district);
   document.getElementById('scene').innerHTML=artScene(district,game.state);
   if(menuOpen)document.getElementById('modal-root').innerHTML=menuModal(game.state);
 }
 function renderModal() {
   const root=document.getElementById('modal-root');
-  if(root)root.innerHTML=menuOpen?menuModal(game.state):modal(game.state,mini);
+  if(root)root.innerHTML=menuOpen?menuModal(game.state):modal(game.state,mini,dialogueId,dialogueResult);
 }
 function toast(message,tone='good') {
   if(!message)return;
@@ -35,7 +35,7 @@ function toast(message,tone='good') {
     setTimeout(()=>scene.classList.remove('scene-shake','scene-glow'),520);
   }
 }
-game.subscribe((_,result)=>{render();if(result)toast(result.message,result.tone);});
+game.subscribe((_,result)=>{render();if(result&&!result.dialogueReply)toast(result.message,result.tone);});
 render();
 if(loaded.offlineDays)toast(`Пока тебя не было, прошло ${loaded.offlineDays} дн. Доходы и расходы учтены.`,'story');
 
@@ -68,7 +68,9 @@ function perform(action,id) {
   if(action.startsWith('buy-')){game.buy(action.slice(4),id);return;}
   if(action.startsWith('equip-')){game.equip(action.slice(6),id);return;}
   if(action.startsWith('manage-')){game.manageBusiness(id,action.slice(7));return;}
-  if(action==='talk'||action==='favor'){game.person(id,action);return;}
+  if(action==='talk'){dialogueId=id;dialogueResult=null;renderModal();return;}
+  if(action==='close-dialogue'){dialogueId=null;dialogueResult=null;renderModal();return;}
+  if(action==='favor'){game.person(id,action);return;}
   if(action==='invest'){const amount=document.getElementById(`invest-${id}`)?.value;game.invest(id,amount);return;}
   if(action==='pay-debt'){game.payDebt(document.getElementById('debt-amount')?.value);return;}
   if(action==='save'){saveGame(game.state);menuOpen=false;renderModal();toast('Прогресс сохранён.');return;}
@@ -84,10 +86,12 @@ function perform(action,id) {
   if(action==='import'){document.getElementById('import-file')?.click();return;}
   if(action==='reset'){
     if(!window.confirm('Начать новую игру? Текущий прогресс в браузере будет перезаписан.'))return;
-    menuOpen=false;tab='city';game.replaceState(freshState());return;
+    menuOpen=false;dialogueId=null;dialogueResult=null;tab='city';game.replaceState(freshState());return;
   }
 }
 document.addEventListener('click',event=>{
+  const dialogueChoice=event.target.closest('[data-dialogue-choice]');
+  if(dialogueChoice&&dialogueId){const result=game.person(dialogueId,'talk',Number(dialogueChoice.dataset.dialogueChoice));if(result.ok){dialogueResult=result;renderModal();}return;}
   const choice=event.target.closest('[data-choice]');
   if(choice){game.resolveChoice(Number(choice.dataset.choice));return;}
   const miniButton=event.target.closest('[data-mini]');
@@ -109,7 +113,7 @@ document.addEventListener('input',event=>{
 });
 document.addEventListener('change',async event=>{
   if(event.target.id!=='import-file'||!event.target.files?.length)return;
-  try {const state=await importGame(event.target.files[0]);menuOpen=false;tab='city';game.replaceState(state);}
+  try {const state=await importGame(event.target.files[0]);menuOpen=false;dialogueId=null;dialogueResult=null;tab='city';game.replaceState(state);}
   catch(error){toast(`Не удалось загрузить: ${error.message}`,'bad');}
 });
 document.addEventListener('keydown',event=>{
@@ -117,6 +121,7 @@ document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){
     if(menuOpen){menuOpen=false;renderModal();}
     else if(mini)mini.input('exit');
+    else if(dialogueId){dialogueId=null;dialogueResult=null;renderModal();}
   }
 });
 window.addEventListener('beforeunload',()=>saveGame(game.state));

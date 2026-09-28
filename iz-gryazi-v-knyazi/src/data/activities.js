@@ -1,4 +1,5 @@
 export const activities = [
+  {id:'rest',name:'Перевести дух',hours:1,cost:0,effect:{energy:22,stress:-3,mood:1},description:'Час передышки: силы возвращаются, город подождёт.'},
   {id:'sleep',name:'Выспаться',hours:8,cost:0,effect:{health:9,stress:-10,mood:4},restoreSleep:true,description:'Сон восстановил силы. Письма от банка подождут.'},
   {id:'food',name:'Поесть горячего',hours:1,cost:260,effect:{energy:12,health:5,mood:3},description:'Горячая еда победила холодный день.'},
   {id:'clinic',name:'К врачу',hours:2,cost:1700,effect:{health:30,stress:-5},description:'Врач сказал отдыхать. Ты записал это как совет по инвестициям.'},

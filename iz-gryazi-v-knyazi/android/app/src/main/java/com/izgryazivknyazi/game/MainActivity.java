@@ -102,4 +102,3 @@ public class MainActivity extends Activity {
         webView.evaluateJavascript("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))", null);
     }
 }
-

@@ -1,5 +1,6 @@
 import { districts,jobs,homes,vehicles,businesses,upgrades } from '../data/world.js';
 import { people } from '../data/people.js';
+import { nextDialogue } from '../data/dialogues.js';
 import { chapters } from '../data/story.js';
 import { events } from '../data/events.js';
 import { investments } from '../data/investments.js';
@@ -103,7 +104,7 @@ export class GameEngine {
     const j=byId(jobs,id),s=this.state;
     if (!j) return fail('Работа не найдена.');
     if (s.district!==j.district) return fail('Эта работа находится в другом районе.');
-    if (s.stats.energy<j.energy) return fail('Не хватает энергии.');
+    if (s.stats.energy<j.energy) return fail(`Нужно ${j.energy} энергии, сейчас ${s.stats.energy}. Сделай передышку (+22) или выспись.`);
     if (s.stats.health<12) return fail('Здоровье слишком низкое.');
     if (s.hour+j.hours>26) return fail('Поздно для этой смены. Выспись.');
     return success('Можно начинать.');
@@ -134,7 +135,7 @@ export class GameEngine {
     if (s.jailDays) return fail('Сначала выйди на свободу.');
     if (s.pending) return fail('Сначала прими решение в истории.');
     if (s.district!==gig.district) return fail('Этот заказ в другом районе.');
-    if (s.stats.energy<gig.energy) return fail('Не хватает энергии.');
+    if (s.stats.energy<gig.energy) return fail(`Нужно ${gig.energy} энергии, сейчас ${s.stats.energy}. Отдохни или выспись.`);
     if (s.stats.health<20) return fail('Со сломанными рёбрами это плохая идея.');
     return success('Можно начинать.');
   }
@@ -163,7 +164,7 @@ export class GameEngine {
     const s=this.state,game=byId(casinoGames,id),stake=Number(amount);
     if(!game)return this.emit(fail('Такой игры в казино нет.'));
     if(!Number.isSafeInteger(stake)||stake<50)return this.emit(fail('Минимальная ставка — 50 ₽.'));
-    if(s.stats.energy<4)return this.emit(fail('Нужны силы, чтобы следить за игрой.'));
+    if(s.stats.energy<4)return this.emit(fail('Нужны 4 энергии. Переведи дух или выспись.'));
     if(s.money<stake)return this.emit(fail('Не хватает денег на ставку.'));
     if(stake>casinoRemaining(s))return this.emit(fail('Дневной лимит ставок исчерпан.'));
     if(s.casinoDaily.day!==s.day)s.casinoDaily={day:s.day,wagered:0,limit:casinoRemaining(s)};
@@ -188,9 +189,15 @@ export class GameEngine {
     const s=this.state;
     const a=byId(activities,id); if (!a) return this.emit(fail('Неизвестное действие.'));
     if (a.district && a.district!==s.district) return this.emit(fail('Это занятие доступно в другом районе.'));
+    if (id==='rest' && s.lastRestDay===s.day) return this.emit(fail('Передышка сегодня уже была. Выспись, чтобы вернуть силы.'));
     if (!this.spend(a.cost)) return this.emit(fail('Не хватает денег.'));
     const effect={...a.effect};
-    if (a.restoreSleep) effect.energy=byId(homes,s.home).restore+Math.round(s.stats.life*.08);
+    if (a.restoreSleep) {
+      const home=byId(homes,s.home);
+      const target=clamp(75+Math.round(home.restore*.2)+Math.round(s.stats.life*.08),0,100);
+      effect.energy=Math.max(0,target-s.stats.energy);
+    }
+    if(id==='rest')s.lastRestDay=s.day;
     adjust(s,effect); this.tick(a.hours); addLog(s,a.description,a.cost?'neutral':'good');
     return this.emit(success(a.description));
   }
@@ -234,14 +241,29 @@ export class GameEngine {
     this.tick(2); addLog(s,`${item.name}: ${action==='upgrade'?'расширение':action==='staff'?'наём команды':'ремонт'}.`,'good');
     return this.emit(success(`${item.name}: дело развивается.`));
   }
-  person(id,action) {
+  person(id,action,choiceIndex) {
     const blocked=this.guard(); if (blocked) return this.emit(blocked);
     const s=this.state,p=byId(people,id);
     if (!p||s.district!==p.district && !(p.id==='valera' && s.district==='market') && !(p.id==='azamat' && s.district==='industrial') && !(p.id==='lida' && s.district==='center') && !(p.id==='vera' && s.district==='glass') && !(p.id==='artur' && s.district==='heights')) return this.emit(fail('Этого человека здесь нет.'));
     if (s.stats.respect<p.threshold) return this.emit(fail('Он пока не хочет разговаривать.'));
     const rel=s.relations[id]||0;
-    if (action==='talk') { if(s.stats.energy<5)return this.emit(fail('Нет сил на разговор.')); s.relations[id]=clamp(rel+1+(s.stats.appeal>=35?1:0),0,100); adjust(s,{energy:-5,mood:2,contacts:rel%4===3?1:0}); this.tick(1); const line=p.lines[Math.min(2,Math.floor((s.stats.respect+s.stats.fame*.25)/55))]; addLog(s,`${p.name}: «${line}»`,'neutral'); return this.emit(success(`«${line}»`)); }
-    if (action==='favor') { if(rel<2)return this.emit(fail('Сначала познакомься получше — поговори дважды.')); const price=Math.round(p.cost*(1-Math.min(.22,s.stats.contacts*.002+s.stats.appeal*.001))); if(!this.spend(price))return this.emit(fail('Не хватает денег.')); adjust(s,p.effect); s.relations[id]=clamp(rel+p.relation,0,100); this.tick(2); addLog(s,`${p.name}: ${p.favor}. Услуга обошлась в ${price.toLocaleString('ru-RU')} ₽.`,'good'); return this.emit(success(`${p.name} оценил помощь.`)); }
+    if (action==='talk') {
+      const scene=nextDialogue(s,id),choice=scene?.choices[choiceIndex];
+      if(!scene)return this.emit(fail('Все темы уже обсуждены. Новые дела с этим человеком доступны через услуги.'));
+      if(!choice)return this.emit(fail('Выбери ответ в разговоре.'));
+      if(s.stats.energy<5)return this.emit(fail('На разговор нужны 5 энергии. Переведи дух (+22) или выспись.'));
+      if(choice.cost&&!this.spend(choice.cost))return this.emit(fail('На этот ответ не хватает денег.'));
+      const before=s.relations[id]||0;
+      adjust(s,choice.effect);
+      adjust(s,{energy:-5});
+      s.relations[id]=clamp(before+choice.relation,0,100);
+      s.dialogueProgress[id]=(s.dialogueProgress[id]||0)+1;
+      s.dialogueLast[id]=choice.reply;
+      this.tick(1);
+      addLog(s,`${p.name} — ${scene.topic}: ${choice.reply} Отношения +${s.relations[id]-before}.`,'story');
+      return this.emit({...success(choice.reply),dialogueReply:choice.reply,dialogueTopic:scene.topic,relationGain:s.relations[id]-before,effects:choice.effect});
+    }
+    if (action==='favor') { if(rel<2)return this.emit(fail('Сначала наладь отношения в разговоре.')); const price=Math.round(p.cost*(1-Math.min(.22,s.stats.contacts*.002+s.stats.appeal*.001))); if(!this.spend(price))return this.emit(fail('Не хватает денег.')); adjust(s,p.effect); s.relations[id]=clamp(rel+p.relation,0,100); this.tick(2); addLog(s,`${p.name}: ${p.favor}. Услуга обошлась в ${price.toLocaleString('ru-RU')} ₽.`,'good'); return this.emit(success(`${p.name} оценил помощь.`)); }
     return this.emit(fail('Неизвестный выбор.'));
   }
   invest(id,amount) {

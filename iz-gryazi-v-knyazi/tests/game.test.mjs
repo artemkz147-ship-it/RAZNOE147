@@ -7,7 +7,8 @@ import { districts } from '../src/data/world.js';
 import { events } from '../src/data/events.js';
 import { validate } from '../src/systems/save.js';
 import { casinoOutcome,casinoRemaining } from '../src/data/casino.js';
-import { shell } from '../src/ui/views.js';
+import { shell,modal } from '../src/ui/views.js';
+import { dialogues } from '../src/data/dialogues.js';
 
 globalThis.localStorage={data:new Map(),setItem(k,v){this.data.set(k,v)},getItem(k){return this.data.get(k)||null},removeItem(k){this.data.delete(k)}};
 
@@ -157,4 +158,51 @@ test('all home cards have an actual raster image reference',()=>{
   const html=shell(freshState(),'assets','home',null);
   assert.equal((html.match(/class="asset-raster"/g)||[]).length,8);
   assert.doesNotMatch(html,/src="undefined"/);
+});
+
+test('exhausted player can recover immediately and sleep reaches a useful energy level',()=>{
+  const state=freshState();state.stats.energy=0;
+  const game=new GameEngine(state,()=>.99);
+  assert.match(shell(state,'work','home',null),/СИЛЫ НА ИСХОДЕ/);
+  assert.match(shell(state,'work','home',null),/data-id="rest"/);
+  assert.equal(game.activity('rest').ok,true);
+  assert.equal(state.stats.energy,22);
+  assert.equal(state.hour,8);
+  assert.equal(game.activity('rest').ok,false);
+  assert.equal(state.stats.energy,22);
+  assert.equal(game.activity('sleep').ok,true);
+  assert.ok(state.stats.energy>=80);
+  assert.ok(state.stats.energy<=100);
+  assert.ok(game.jobReady('scrap').ok);
+});
+
+test('conversations have authored choices, persistent effects and no repeated topic farming',()=>{
+  const state=freshState();const game=new GameEngine(state,()=>.99);
+  const first=game.person('valera','talk',0);
+  assert.equal(first.ok,true);
+  assert.match(first.dialogueReply,/инструменты/);
+  assert.equal(state.dialogueProgress.valera,1);
+  assert.equal(state.relations.valera,3);
+  assert.equal(state.stats.respect,2);
+  assert.equal(state.stats.energy,66);
+  assert.match(state.log[0].text,/Чужой диван/);
+  assert.match(shell(state,'people','home',null),/Работа без вывески/);
+  for(let i=1;i<dialogues.valera.length;i++)assert.equal(game.person('valera','talk',0).ok,true);
+  const energy=state.stats.energy,relationship=state.relations.valera;
+  assert.equal(game.person('valera','talk',0).ok,false);
+  assert.equal(state.stats.energy,energy);
+  assert.equal(state.relations.valera,relationship);
+  const loaded=validate(JSON.parse(JSON.stringify(state)));
+  assert.equal(loaded.dialogueProgress.valera,dialogues.valera.length);
+  assert.equal(loaded.dialogueLast.valera,state.dialogueLast.valera);
+});
+
+test('dialogue panel shows the speaker, alternatives and the chosen outcome',()=>{
+  const state=freshState();
+  assert.match(modal(state,null,'tamara'),/СВЕТ В ПОДЪЕЗДЕ/);
+  assert.equal((modal(state,null,'tamara').match(/data-dialogue-choice=/g)||[]).length,2);
+  const game=new GameEngine(state,()=>.99);
+  const result=game.person('tamara','talk',1);
+  assert.match(modal(state,null,'tamara',result),/ОТНОШЕНИЯ \+3/);
+  assert.match(modal(state,null,'tamara',result),/попадает в дневник|ЗАКОНЧИТЬ РАЗГОВОР/i);
 });

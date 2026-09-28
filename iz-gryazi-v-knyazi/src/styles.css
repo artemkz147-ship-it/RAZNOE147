@@ -225,6 +225,11 @@
   .earning-paths button{min-height:64px}
 }
 .stat-short{display:none}
+.recovery-strip{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 20px;background:linear-gradient(100deg,#66442f,#34302b);border-top:2px solid #e1ab71;border-bottom:1px solid #a17852;box-shadow:0 5px 16px #0a0e10a6}
+.recovery-copy{display:grid;gap:3px;min-width:0}.recovery-copy strong{color:#ffe0b1;font:800 14px var(--body);letter-spacing:.6px}.recovery-copy span{color:#f1dbc2;font-size:12px;line-height:1.2}
+.recovery-actions{display:flex;gap:8px;flex:none}.recovery-actions button{border:1px solid #edc593;background:#e8b77d;color:#201b18;padding:9px 13px;font:800 11px var(--body);letter-spacing:.4px}.recovery-actions .sleep-button{background:#283735;color:#f5dcbb;border-color:#c7a277}
+.dialogue-progress{display:flex;justify-content:space-between;gap:6px;margin-top:9px;color:#d9b682;font:700 10px var(--body);line-height:1.2}.dialogue-progress span{white-space:nowrap}.person-hint{display:block;margin-top:7px;color:#f0b78e;font-size:11px}
+.dialogue-modal{max-width:560px}.dialogue-person{display:grid;grid-template-columns:88px minmax(0,1fr);gap:14px;align-items:center;padding-right:22px}.dialogue-person img{width:88px;height:94px;object-fit:cover;object-position:center top;border:1px solid #a88c66;background:#39403a}.dialogue-person h2{font-size:29px;margin:4px 0}.dialogue-person small{color:#d7c09c;font-size:11px}.dialogue-question,.dialogue-reply{margin-top:18px;padding:16px;background:#26312f;border-left:3px solid #d9aa70}.dialogue-question p,.dialogue-reply p{color:#f2e5cf;font-size:17px;line-height:1.4;margin:8px 0 0}.dialogue-choices{display:grid;gap:8px;margin-top:16px}.dialogue-choices button{display:grid;grid-template-columns:31px 1fr;gap:3px 9px;text-align:left;align-items:center;background:#d9c19a;border:1px solid #e9d2ae;color:#192222;padding:12px;min-height:61px}.dialogue-choices button:hover:not(:disabled){background:#f3d5a7}.dialogue-choices button>span{grid-row:1/3;font:700 21px var(--title);color:#8e5f42}.dialogue-choices strong{font-size:14px}.dialogue-choices small{font-size:10px;letter-spacing:1px}.dialogue-note{margin-top:15px;color:#aeb7aa;font:700 10px var(--body);letter-spacing:.7px}.dialogue-gains{display:grid;gap:5px;margin:15px 0;color:#d0d4c3;font-size:12px}.dialogue-gains strong{color:#e8c18c}
 @media(max-width:760px){
   :root{--body:system-ui,'Segoe UI',sans-serif}
   .stat-full{display:none}.stat-short{display:inline}
@@ -233,4 +238,9 @@
   .job-card p,.crime-consequence,.casino-card p{line-height:1.34}
   .subtabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible;white-space:normal;gap:3px}
   .subtabs button{min-width:0;min-height:48px;padding:6px 3px;font-size:10px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}
+  .recovery-strip{position:fixed;left:0;right:0;bottom:calc(66px + env(safe-area-inset-bottom));z-index:27;display:grid;gap:5px;padding:7px 10px;min-height:88px}
+  .recovery-copy strong{font-size:11px}.recovery-copy span{font-size:11px}
+  .recovery-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}.recovery-actions button{min-height:35px;padding:6px;font-size:11px}
+  .recovery-strip+.view{padding-bottom:calc(190px + env(safe-area-inset-bottom))}
+  .dialogue-modal{padding:16px}.dialogue-person{grid-template-columns:64px minmax(0,1fr);gap:9px}.dialogue-person img{width:64px;height:72px}.dialogue-person h2{font-size:23px}.dialogue-person .eyebrow{font-size:8px;letter-spacing:1px}.dialogue-person small{font-size:9px}.dialogue-question,.dialogue-reply{margin-top:12px;padding:11px}.dialogue-question p,.dialogue-reply p{font-size:14px}.dialogue-choices{gap:6px;margin-top:11px}.dialogue-choices button{padding:9px;min-height:57px}.dialogue-choices strong{font-size:12px}.dialogue-note{font-size:9px;margin-top:10px}
 }
