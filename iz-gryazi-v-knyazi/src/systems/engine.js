@@ -43,7 +43,8 @@ export class GameEngine {
     while (s.hour>=24) {
       s.hour-=24; s.day++;
       dailySettlement(s,{rng:this.rng});
-      if(!quiet){romanceDay(s,this.rng);socialDay(s,this.rng);}
+      romanceDay(s,this.rng);
+      if(!quiet)socialDay(s,this.rng);
       settleMatureInvestments(s,this.rng);
       if (!quiet&&s.day%6===0) this.crisis();
       if (!quiet&&!s.pending && !s.jailDays && this.rng()<.42) this.queueEvent();
@@ -237,13 +238,15 @@ export class GameEngine {
       s.vitals.strain=clamp(s.vitals.strain+(c.id==='janitor'||c.id==='mechanic'?1:0),0,100);
       this.tick(24,true);worked++;
       if(worked%30===0){const salary=Math.round(c.salary*(.8+Math.min(.3,(s.skills[c.skill]-1)*.04)));s.money+=salary;s.totalEarned+=salary;paid+=salary;s.careerMonths++;gainSkill(s,c.skill,3);}
-      if(s.death)break;
+      if(s.death||s.recentIncident||s.romance?.conflict)break;
     }
+    const remaining=worked%30;
+    if(remaining&&!s.death){const partial=Math.round(c.salary*remaining/30*(.8+Math.min(.3,(s.skills[c.skill]-1)*.04)));s.money+=partial;s.totalEarned+=partial;paid+=partial;}
     const net=s.money-start;
-    const detail=`${c.name}: прошло ${worked} дн. Зарплата +${paid.toLocaleString('ru-RU')} ₽; еда, жильё и прочие расходы учтены. Баланс ${net>=0?'+':''}${net.toLocaleString('ru-RU')} ₽.`;
+    const detail=`${c.name}: прошло ${worked} дн.${worked<count*30?' Контракт прерван событием.':''} Зарплата +${paid.toLocaleString('ru-RU')} ₽; еда, жильё и прочие расходы учтены. Баланс ${net>=0?'+':''}${net.toLocaleString('ru-RU')} ₽.`;
     s.lastWorkResult={kind:'career',title:c.name,earned:paid,day:s.day,detail};
     addLog(s,detail,net>=0?'good':'bad');
-    if(!s.death)this.maybeIncident(c.respect>=18?'office':'job',.12);
+    if(!s.death&&!s.recentIncident&&!s.romance?.conflict)this.maybeIncident(c.respect>=18?'office':'job',.32);
     return this.emit(success(detail,net>=0?'good':'bad'));
   }
   startCasino(id,amount){

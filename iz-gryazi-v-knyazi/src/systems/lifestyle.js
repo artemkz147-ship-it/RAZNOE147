@@ -15,7 +15,11 @@ export function dailyVitals(state,rng=Math.random){
   v.fitness=clamp(v.fitness-(state.day%5===0?1:0),0,100);
   adjust(state,{health:diet.health,energy:diet.energy,mood:diet.mood});
   const illnessChance=(v.immunity<25?.055:0)+(v.exposure>45?.035:0)+(v.nutrition<15?.04:0);
-  if(state.stats.health<55&&rng()<illnessChance){v.illness=clamp(v.illness+1,0,10);adjust(state,{health:-6,energy:-6});addLog(state,'Ночью поднялась температура. Условия жизни и питание сказались на здоровье.','bad');}
+  if(state.stats.health<55&&rng()<illnessChance){
+    v.illness=clamp(v.illness+1,0,10);adjust(state,{health:-6,energy:-6});
+    addLog(state,'Ночью поднялась температура. Условия жизни и питание сказались на здоровье.','bad');
+    if(!state.recentIncident)state.recentIncident={title:'Ночная температура',text:'Ты проснулся с жаром. Впереди был рабочий день, но тело требует внимания.',art:0,choices:[{text:'Остаться дома и восстановиться',effect:{health:8,energy:12,stress:-3},reply:'Ты дал себе время отлежаться.'},{text:'Сходить к врачу · 1 700 ₽',cost:1700,effect:{health:18,energy:5,stress:-5},reply:'Врач помог быстрее прийти в себя.'}]};
+  }
   else if(v.illness>0&&state.stats.health>65)v.illness--;
   const age=ageOf(state);
   if(age>60&&state.day%30===0){const agePressure=Math.min(9,Math.floor((age-60)/5));v.immunity=clamp(v.immunity-agePressure,0,100);if(age>75)adjust(state,{health:-Math.ceil((age-75)/8)});}

@@ -41,6 +41,13 @@ test('casino entrance requires status and clean clothing',()=>{
   assert.equal(game.startCasino('roulette',100).ok,true);
 });
 
+test('month skip advances an existing relationship',()=>{
+  const s=freshState();s.romance.partner='nina';s.romance.partners=['nina'];s.romance.profiles.nina={rapport:80,lastDay:1,days:0,met:true};
+  const game=new GameEngine(s,()=>.99);
+  assert.equal(game.workCareer('janitor',1).ok,true);
+  assert.equal(s.romance.profiles.nina.days,30);
+});
+
 test('first shifts consume time and energy and pay earned money',()=>{
   const game=new GameEngine(freshState(),()=>.9);
   const result=game.completeJob('scrap',.95);
