@@ -1,10 +1,10 @@
 export const districts = [
   { id:'yard', name:'Район Пятиэтажек', short:'Пятиэтажки', subtitle:'Где каждый подъезд знает твои долги', tier:0, fare:0, required:{}, palette:['#71777a','#2e3438','#bb8056'], weather:'Грязный снег', places:['Подъезд № 7','Ларёк «24 часа»','Гаражный ряд'], jobs:['scrap','courier','cleaner'], npcs:['valera','tamara'] },
-  { id:'market', name:'Вокзальный рынок', short:'Рынок', subtitle:'Здесь продают даже чужую уверенность', tier:1, fare:65, required:{ respect:8, story:2 }, palette:['#8a7460','#35383a','#d69353'], weather:'Слякоть', places:['Рынок','Шиномонтаж','Маршрутная стоянка'], jobs:['loader','driver','reseller'], npcs:['azamat','valera'] },
-  { id:'industrial', name:'Промзона «Надежда»', short:'Промзона', subtitle:'Надежда здесь — название забора', tier:2, fare:120, required:{ respect:24, story:4 }, palette:['#696f72','#292e33','#dc7e4d'], weather:'Кислый дождь', places:['Склад № 4','Автосервис','Заводоуправление'], jobs:['warehouse','mechanic','contract'], npcs:['lida','azamat'] },
-  { id:'center', name:'Старый центр', short:'Центр', subtitle:'Кофе дорогой. Совесть — по акции', tier:3, fare:220, required:{ respect:48, story:6 }, palette:['#777c82','#252c35','#daa66b'], weather:'Холодный туман', places:['Кафе «Сделка»','Мэрия','Салон связи'], jobs:['barista','sales','consultant'], npcs:['vera','lida'] },
-  { id:'glass', name:'Стеклянный квартал', short:'Квартал', subtitle:'Вид на город включён в стоимость кредита', tier:4, fare:450, required:{ respect:82, story:8 }, palette:['#617780','#19232d','#e3bc88'], weather:'Дорогой дождь', places:['Бизнес-центр','Клуб «Высота»','Галерея'], jobs:['manager','pitch'], npcs:['artur','vera'] },
-  { id:'heights', name:'Верхний берег', short:'Берег', subtitle:'Отсюда лужи похожи на архитектуру', tier:5, fare:900, required:{ respect:135, story:10 }, palette:['#697e8a','#18212b','#e8c596'], weather:'Золотой час', places:['Резиденция','Казино «Зеро»','Панорамная башня'], jobs:['board','summit'], npcs:['artur','minister'] }
+  { id:'market', name:'Вокзальный рынок', short:'Рынок', subtitle:'Здесь продают даже чужую уверенность', tier:1, fare:65, required:{ respect:8, wealth:5000, contacts:3 }, palette:['#8a7460','#35383a','#d69353'], weather:'Слякоть', places:['Рынок','Шиномонтаж','Маршрутная стоянка'], jobs:['loader','driver','reseller'], npcs:['azamat','valera'] },
+  { id:'industrial', name:'Промзона «Надежда»', short:'Промзона', subtitle:'Надежда здесь — название забора', tier:2, fare:120, required:{ respect:24, wealth:35000, contacts:8 }, palette:['#696f72','#292e33','#dc7e4d'], weather:'Кислый дождь', places:['Склад № 4','Автосервис','Заводоуправление'], jobs:['warehouse','mechanic','contract'], npcs:['lida','azamat'] },
+  { id:'center', name:'Старый центр', short:'Центр', subtitle:'Кофе дорогой. Совесть — по акции', tier:3, fare:220, required:{ respect:48, wealth:200000, contacts:15 }, palette:['#777c82','#252c35','#daa66b'], weather:'Холодный туман', places:['Кафе «Сделка»','Мэрия','Салон связи'], jobs:['barista','sales','consultant'], npcs:['vera','lida'] },
+  { id:'glass', name:'Стеклянный квартал', short:'Квартал', subtitle:'Вид на город включён в стоимость кредита', tier:4, fare:450, required:{ respect:82, wealth:2000000, contacts:28 }, palette:['#617780','#19232d','#e3bc88'], weather:'Дорогой дождь', places:['Бизнес-центр','Клуб «Высота»','Галерея'], jobs:['manager','pitch'], npcs:['artur','vera'] },
+  { id:'heights', name:'Верхний берег', short:'Берег', subtitle:'Отсюда лужи похожи на архитектуру', tier:5, fare:900, required:{ respect:135, wealth:12000000, contacts:45 }, palette:['#697e8a','#18212b','#e8c596'], weather:'Золотой час', places:['Резиденция','Казино «Зеро»','Панорамная башня'], jobs:['board','summit'], npcs:['artur','minister'] }
 ];
 
 export const jobs = [
@@ -109,4 +109,5 @@ export const upgrades = [
 ];
 
 export const marketLabels = ['Затишье','Обычный день','Суета','Бум'];
+
 

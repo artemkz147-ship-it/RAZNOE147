@@ -1,7 +1,7 @@
 import { districts,jobs,homes,vehicles,businesses,upgrades } from '../data/world.js';
 import { people } from '../data/people.js';
 import { nextDialogue } from '../data/dialogues.js';
-import { chapters } from '../data/story.js';
+import { successRoute } from '../data/goals.js';
 import { events } from '../data/events.js';
 import { incidents } from '../data/incidents.js';
 import { investments } from '../data/investments.js';
@@ -21,7 +21,7 @@ export class GameEngine {
     this.state=state; this.rng=rng; this.listeners=new Set();
   }
   subscribe(fn) { this.listeners.add(fn); return ()=>this.listeners.delete(fn); }
-  emit(result) { saveGame(this.state); for (const fn of this.listeners) fn(this.state,result); return result; }
+  emit(result) { const won=successRoute(this.state);if(won&&!this.state.ending){this.state.ending=true;addLog(this.state,`Успех достигнут: ${won.name}. Можно продолжать играть и развивать город.`,'story');}saveGame(this.state); for (const fn of this.listeners) fn(this.state,result); return result; }
   guard() {
     if (this.state.jailDays>0) return fail(`Ты под арестом. Осталось ${this.state.jailDays} дн.`);
     if (this.state.pending) return fail('Сначала прими решение в открытой истории.');
@@ -39,7 +39,6 @@ export class GameEngine {
       if (s.day%6===0) this.crisis();
       if (!s.pending && !s.jailDays && this.rng()<.42) this.queueEvent();
     }
-    this.checkStory();
   }
   maybeIncident(context,chance) {
     const s=this.state;
@@ -86,48 +85,31 @@ export class GameEngine {
     s.pending={type:'event',id:event.id}; s.eventHistory.push(event.id);
     addLog(s,`Событие: ${event.title}.`,'story');
   }
-  meets(chapter) {
-    const s=this.state, n=chapter.need;
-    return (!n.day||s.day>=n.day) && (!n.money||s.money>=n.money) && (!n.respect||s.stats.respect>=n.respect)
-      && (!n.contacts||s.stats.contacts>=n.contacts)
-      && (!n.fame||s.stats.fame>=n.fame) && (!n.home||homeRank(s.home)>=homeRank(n.home))
-      && (!n.businessCount||Object.keys(s.businesses).length>=n.businessCount);
-  }
-  checkStory() {
-    const s=this.state;
-    if (s.pending || s.story>=chapters.length) return;
-    const chapter=chapters[s.story];
-    if (this.meets(chapter)) { s.pending={type:'story',id:chapter.id}; addLog(s,`Открыта глава: ${chapter.title}.`,'story'); }
-  }
   resolveChoice(index) {
     const s=this.state,p=s.pending;
     if (!p) return this.emit(fail('Сейчас нет решения.'));
-    const data=p.type==='story'?chapters.find(x=>x.id===p.id):events.find(x=>x.id===p.id);
+    const data=events.find(x=>x.id===p.id);
     const choice=data?.choices[index];
     if (!choice) return this.emit(fail('Такого варианта нет.'));
     if (choice.cost && !this.spend(choice.cost)) return this.emit(fail('На это решение не хватает денег.'));
     adjust(s,choice.effects||choice.effect);
-    if (p.type==='story') {
-      s.story++; if (choice.flag) s.flags.push(choice.flag);
-      if (s.story===chapters.length) s.ending=true;
-      addLog(s,`Глава ${p.id}: ${choice.text}.`,'story');
-    } else addLog(s,choice.log||choice.text,'story');
+    addLog(s,choice.log||choice.text,'story');
     s.pending=null;
-    return this.emit(success(p.type==='story'?'История продолжается.':'Решение принято.'));
+    return this.emit(success('Решение принято.'));
   }
   travel(id,mode='walk') {
     const blocked=this.guard(); if (blocked) return this.emit(blocked);
     const s=this.state,d=byId(districts,id);
     if (!d) return this.emit(fail('Район не найден.'));
     if (s.district===id) return this.emit(fail('Ты уже здесь.'));
-    if (!districtUnlocked(s,d)) return this.emit(fail('Район пока закрыт: нужны уважение и сюжетный прогресс.'));
+    if (!districtUnlocked(s,d)) return this.emit(fail('Район пока закрыт: нужны деньги, уважение или связи.'));
     const trip=travelOptions(s,id).find(x=>x.id===mode);
     if(!trip)return this.emit(fail('Такого способа добраться нет.'));
     if(s.stats.energy<trip.energy)return this.emit(fail(`Нужно ${trip.energy} энергии. Передохни или выспись.`));
     if(!this.spend(trip.cost))return this.emit(fail('Не хватает денег на билет или топливо. Можно пойти пешком.'));
     const distance=Math.abs(d.tier-(byId(districts,s.district)?.tier||0));
     const caught=mode==='fare-dodge'&&this.rng()<trip.risk;
-    s.district=id;adjust(s,{energy:-trip.energy,stress:caught?5:0});
+    s.district=id;s.visitedDistricts ||= ['yard'];if(!s.visitedDistricts.includes(id))s.visitedDistricts.push(id);adjust(s,{energy:-trip.energy,stress:caught?5:0});
     if(mode==='walk'){s.conditions.walkTrips++;s.conditions.shoes=clamp(s.conditions.shoes-(s.upgrades.includes('boots')?3:6)*Math.max(1,distance),0,100);}
     this.tick(trip.hours);
     if(caught){
@@ -302,7 +284,7 @@ export class GameEngine {
     const blocked=this.guard(); if (blocked) return this.emit(blocked);
     const s=this.state,p=byId(people,id);
     if (!p||s.district!==p.district && !(p.id==='valera' && s.district==='market') && !(p.id==='azamat' && s.district==='industrial') && !(p.id==='lida' && s.district==='center') && !(p.id==='vera' && s.district==='glass') && !(p.id==='artur' && s.district==='heights')) return this.emit(fail('Этого человека здесь нет.'));
-    if (s.stats.respect<p.threshold) return this.emit(fail('Он пока не хочет разговаривать.'));
+    if (s.stats.respect<p.threshold&&s.stats.contacts<Math.ceil(p.threshold/3)&&netWorth(s)<p.threshold*18000) return this.emit(fail('Нужно больше уважения, связей или денег, чтобы заинтересовать этого человека.'));
     const rel=s.relations[id]||0;
     if (action==='talk') {
       const scene=nextDialogue(s,id),choice=scene?.choices[choiceIndex];
@@ -343,6 +325,6 @@ export class GameEngine {
     return this.emit(success(`Погашено ${paid.toLocaleString('ru-RU')} ₽ долга.`));
   }
   replaceState(state) { this.state=state; return this.emit(success('Сохранение загружено.')); }
-  summary() { return {netWorth:netWorth(this.state),story:chapters[this.state.story]||null}; }
+  summary() { return {netWorth:netWorth(this.state),success:successRoute(this.state)?.name||null}; }
 }
 

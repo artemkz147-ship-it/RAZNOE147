@@ -2,7 +2,7 @@ export const VERSION = 1;
 
 export function freshState() {
   return {
-    version: VERSION, day: 1, hour: 7, district: 'yard', money: 870, debt: 0,
+    version: VERSION, day: 1, hour: 7, district: 'yard', visitedDistricts:['yard'], money: 870, debt: 0,
     stats: { health: 82, energy: 73, mood: 48, respect: 0, fame: 0, stress: 19, appeal: 5, contacts: 0, crime: 0, business: 0, life: 8 },
     skills: { grit: 1, charm: 1, focus: 1 }, xp: { grit: 0, charm: 0, focus: 0 },
     home: 'sofa', vehicle: 'feet', ownedHomes: ['sofa'], ownedVehicles: ['feet'], businesses: {}, upgrades: [], lastRestDay: 0,

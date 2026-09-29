@@ -5,6 +5,7 @@ import { GameEngine } from '../src/systems/engine.js';
 import { dailySettlement,districtUnlocked,netWorth,settleMatureInvestments,travelOptions } from '../src/systems/economy.js';
 import { districts } from '../src/data/world.js';
 import { events } from '../src/data/events.js';
+import { milestones,routesToSuccess,successRoute } from '../src/data/goals.js';
 import { incidents } from '../src/data/incidents.js';
 import { validate } from '../src/systems/save.js';
 import { casinoOutcome,casinoRemaining } from '../src/data/casino.js';
@@ -24,16 +25,23 @@ test('first shifts consume time and energy and pay earned money',()=>{
   assert.equal(game.state.jobsDone,1);
 });
 
-test('story decisions unlock the market only after progress and respect',()=>{
-  const state=freshState();const game=new GameEngine(state,()=>.9);
+test('districts unlock through independent money, respect or contacts paths',()=>{
+  const state=freshState();
   const market=districts.find(x=>x.id==='market');
   assert.equal(districtUnlocked(state,market),false);
-  state.day=2;state.money=5000;state.stats.respect=8;
-  game.checkStory();assert.equal(state.pending?.id,1);
-  game.resolveChoice(0);game.checkStory();assert.equal(state.pending?.id,2);
-  game.resolveChoice(0);
-  assert.equal(state.story,2);
-  assert.equal(districtUnlocked(state,market),true);
+  state.money=5000;assert.equal(districtUnlocked(state,market),true);
+  state.money=0;state.stats.contacts=3;assert.equal(districtUnlocked(state,market),true);
+  state.stats.contacts=0;state.stats.respect=8;assert.equal(districtUnlocked(state,market),true);
+  state.stats.respect=0;state.visitedDistricts.push('market');assert.equal(districtUnlocked(state,market),true);
+  assert.equal(state.pending,null);
+});
+
+test('old chapter prompt disappears when a save moves to free play',()=>{
+  const old=freshState();old.pending={type:'story',id:3};old.district='market';old.ending=true;
+  const migrated=validate(old);
+  assert.equal(migrated.pending,null);
+  assert.equal(migrated.ending,false);
+  assert.ok(migrated.visitedDistricts.includes('market'));
 });
 
 test('business settlements include maintenance and condition',()=>{
@@ -179,11 +187,24 @@ test('business strategy changes projected daily result',()=>{
 test('expanded content keeps multiple progression layers available',async()=>{
   const world=await import('../src/data/world.js');
   const activities=await import('../src/data/activities.js');
-  const story=await import('../src/data/story.js');
   assert.ok(world.jobs.length>=25);
   assert.ok(world.businesses.length>=12);
   assert.ok(activities.activities.length>=15);
-  assert.ok(story.chapters.length>=16);
+  assert.ok(milestones.length>=10);
+  assert.equal(routesToSuccess.length,3);
+});
+
+test('success can be reached by different routes without ending play',()=>{
+  const business=freshState();business.money=30000000;business.stats.respect=100;
+  for(const id of ['stall','garage','shop','cafe'])business.businesses[id]={level:1,condition:100};
+  assert.equal(successRoute(business)?.id,'builder');
+  const civic=freshState();civic.money=20000000;civic.stats.respect=150;civic.stats.contacts=35;
+  assert.equal(successRoute(civic)?.id,'civic');
+  const shadow=freshState();shadow.money=50000000;shadow.stats.crime=45;
+  for(const id of ['stall','garage'])shadow.businesses[id]={level:1,condition:100};
+  assert.equal(successRoute(shadow)?.id,'shadow');
+  const game=new GameEngine(civic,()=>.99);assert.equal(game.activity('rest').ok,true);assert.equal(civic.ending,true);
+  assert.equal(game.activity('sleep').ok,true);
 });
 
 test('casino displays deterministic payout and tracks a daily budget',()=>{

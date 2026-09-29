@@ -28,12 +28,12 @@ function addCarouselControls() {
       const current=rail.querySelector('.here');
       if(current)rail.scrollLeft=current.offsetLeft-rail.offsetLeft;
     }
+    else rail.scrollLeft=0;
     rail.addEventListener('scroll',()=>railPositions.set(`${tab}:${i}`,rail.scrollLeft),{passive:true});
   });
 }
 
 function render() {
-  document.querySelectorAll('[id^="scroll-rail-"]').forEach((rail,i)=>{if(!(focusCurrentDistrict&&tab==='city'&&i===0))railPositions.set(`${tab}:${i}`,rail.scrollLeft);});
   document.body.className=`tab-${tab}`;
   app.innerHTML=shell(game.state,tab,shopType,mini,earningMode,dialogueId,dialogueResult,travelId);
   const district=byId(districts,game.state.district);

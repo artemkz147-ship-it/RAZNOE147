@@ -33,7 +33,9 @@ export function travelOptions(state,districtId) {
 }
 export function districtUnlocked(state,district) {
   const r = district.required;
-  return (!r.story || state.story >= r.story) && (!r.respect || state.stats.respect >= r.respect);
+  if(state.visitedDistricts?.includes(district.id))return true;
+  if(!r.respect&&!r.wealth&&!r.contacts)return true;
+  return (r.respect&&state.stats.respect>=r.respect)||(r.wealth&&netWorth(state)>=r.wealth)||(r.contacts&&state.stats.contacts>=r.contacts);
 }
 export function skillLevel(state,skill) { return state.skills[skill] || 1; }
 export function gainSkill(state,skill,amount=1) {

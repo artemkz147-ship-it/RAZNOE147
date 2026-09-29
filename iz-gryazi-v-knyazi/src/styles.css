@@ -275,3 +275,6 @@
 @media(max-width:760px){.district-grid,.job-grid,.asset-grid,.business-grid,.people-grid,.invest-grid,.two-column,.story-list,.activity-grid,.casino-grid{scrollbar-width:none}.district-grid::-webkit-scrollbar,.job-grid::-webkit-scrollbar,.asset-grid::-webkit-scrollbar,.business-grid::-webkit-scrollbar,.people-grid::-webkit-scrollbar,.invest-grid::-webkit-scrollbar,.two-column::-webkit-scrollbar,.story-list::-webkit-scrollbar,.activity-grid::-webkit-scrollbar,.casino-grid::-webkit-scrollbar{display:none}}
 
 
+.goal-route{min-height:170px;border-left-color:#cc9b67}.goal-requirements{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}.goal-requirements span{display:inline-block;border:1px solid #a28d6b;padding:4px 6px;background:#202b29;color:#edd0a0;font:700 10px var(--body)}.goal-requirements span.met{border-color:#8bad83;color:#d5efcf}.chapter-row.goal-route>div{min-width:0}.chapter-row.goal-route .chapter-state{max-width:62px;white-space:normal;text-align:right}
+
+
