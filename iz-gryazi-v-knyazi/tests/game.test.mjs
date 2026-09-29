@@ -4,6 +4,7 @@ import { freshState } from '../src/systems/state.js';
 import { GameEngine } from '../src/systems/engine.js';
 import { dailySettlement,districtUnlocked,netWorth,settleMatureInvestments,travelOptions } from '../src/systems/economy.js';
 import { districts } from '../src/data/world.js';
+import { people } from '../src/data/people.js';
 import { events } from '../src/data/events.js';
 import { milestones,routesToSuccess,successRoute,successRoutes } from '../src/data/goals.js';
 import { createCasinoTable,actCasinoTable,blackjackValue,pokerScore } from '../src/systems/casinoTable.js';
@@ -11,10 +12,11 @@ import { incidents } from '../src/data/incidents.js';
 import { validate } from '../src/systems/save.js';
 import { casinoOutcome,casinoRemaining } from '../src/data/casino.js';
 import { shell,modal } from '../src/ui/views.js';
-import { dialogues } from '../src/data/dialogues.js';
+import { dialogues,nextDialogue } from '../src/data/dialogues.js';
 import { MiniGame } from '../src/ui/minigames.js';
 import { activePartners,socialGroup,socialValue } from '../src/systems/social.js';
 import { ageOf } from '../src/systems/lifestyle.js';
+import { populationDay,personAge,livingPeople,livingRomancePeople,knownDepartures } from '../src/systems/population.js';
 
 globalThis.localStorage={data:new Map(),setItem(k,v){this.data.set(k,v)},getItem(k){return this.data.get(k)||null},removeItem(k){this.data.delete(k)}};
 
@@ -46,6 +48,45 @@ test('month skip advances an existing relationship',()=>{
   const game=new GameEngine(s,()=>.99);
   assert.equal(game.workCareer('janitor',1).ok,true);
   assert.equal(s.romance.profiles.nina.days,30);
+});
+
+test('everyone ages with game time and new generations enter the city',()=>{
+  const s=freshState(),valera=people.find(p=>p.id==='valera');
+  assert.equal(personAge(s,valera),48);
+  s.day=181;populationDay(s,()=>.99);
+  assert.equal(s.population.residents.length,1);
+  assert.equal(s.population.residents[0].name,'Данил Орлов');
+  assert.ok(livingPeople(s).some(p=>p.id==='resident-1'));
+  s.day=361;populationDay(s,()=>.99);
+  assert.equal(personAge(s,valera),49);
+  assert.equal(personAge(s,s.population.residents[0]),24);
+  assert.ok(livingRomancePeople(s).some(p=>p.id==='resident-2'));
+  assert.match(nextDialogue(s,'resident-1').prompt,/Данил/);
+  const migrated=validate({...freshState(),day:800});
+  assert.equal(migrated.population.nextArrivalDay,181);
+  populationDay(migrated,()=>.99);
+  assert.equal(migrated.population.residents.length,4);
+});
+
+test('aging can remove old contacts and changes the free sofa',()=>{
+  const s=freshState();s.day=10830;s.population.nextArrivalDay=20000;
+  populationDay(s,()=>0);
+  assert.ok(!livingPeople(s).some(p=>p.id==='valera'));
+  assert.equal(s.home,'hostel');
+  assert.equal(knownDepartures(s)[0].person.name,'Валера «Ключ»');
+  assert.match(shell(s,'people','home',null,'legal',null,null,null,'contacts'),/ПАМЯТЬ ГОРОДА/);
+});
+
+test('a newly arrived partner can join relationships and ages with the hero',()=>{
+  const s=freshState();s.day=361;populationDay(s,()=>.99);s.district='market';s.visitedDistricts.push('market');
+  const newcomer=livingRomancePeople(s).find(p=>p.id==='resident-2');
+  assert.equal(newcomer.name,'Оксана Орлова');
+  s.romance.profiles[newcomer.id]={rapport:55,meetings:3,lastDay:0,days:0,spent:0,appearance:0,last:'Вы знакомы.',met:true};
+  const game=new GameEngine(s,()=>.99);
+  assert.equal(game.romanceAction(newcomer.id,'commit').ok,true);
+  assert.ok(activePartners(s).includes(newcomer.id));
+  assert.match(shell(s,'people','home',null,'legal',null,null,null,'romance'),/Оксана/);
+  s.day=721;assert.equal(personAge(s,newcomer),38);
 });
 
 test('first shifts consume time and energy and pay earned money',()=>{

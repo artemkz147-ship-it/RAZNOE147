@@ -151,5 +151,27 @@ export const dialogues = {
 };
 
 export function nextDialogue(state,id) {
-  return dialogues[id]?.[state.dialogueProgress?.[id]||0]||null;
+  const resident=state.population?.residents?.find(p=>p.id===id);
+  const scenes=resident?residentDialogues(resident):dialogues[id];
+  return scenes?.[state.dialogueProgress?.[id]||0]||null;
+}
+export function dialogueCount(state,id){
+  return state.population?.residents?.some(p=>p.id===id)?3:dialogues[id]?.length||0;
+}
+function residentDialogues(person){
+  const setting={yard:'дворе',market:'рынке',industrial:'промзоне',center:'центре',glass:'деловом квартале',heights:'верхнем районе'}[person.district]||'городе';
+  return [
+    {topic:'Новое лицо',prompt:`${person.name} недавно появился в ${setting}. «Тут все друг друга знают или только делают вид?»`,choices:[
+      {text:'Показать полезные места',reply:'Вы прошли по району и обменялись настоящими адресами, а не слухами.',relation:5,effect:{contacts:1,energy:-4}},
+      {text:'Посоветовать сначала присмотреться',reply:'Совет оказался осторожным, но честным. Новый знакомый это запомнил.',relation:2,effect:{respect:1,stress:-1}}
+    ]},
+    {topic:'Сложный день',prompt:`${person.name} рассказывает о тяжёлом дне: «В этой работе главное — не потерять людей по пути».`,choices:[
+      {text:'Помочь с делом без оплаты',reply:'Вы справились вместе. Для нового человека это оказалось важнее денег.',relation:7,effect:{energy:-7,contacts:2,mood:2}},
+      {text:'Поделиться своим опытом',reply:'Разговор дал обоим пару полезных идей.',relation:3,effect:{business:1,stress:-2}}
+    ]},
+    {topic:'Кому доверять',prompt:`${person.name} получил странное предложение от местных. «Ты бы связался с ними?»`,choices:[
+      {text:'Предупредить о подводных камнях',reply:'Предупреждение оказалось вовремя. Доверия между вами стало больше.',relation:6,effect:{respect:2,contacts:1}},
+      {text:'Предложить проверить условия вместе',reply:'Вы нашли неприятный пункт до подписи. Теперь у вас есть общая история.',relation:5,effect:{business:2,energy:-3}}
+    ]}
+  ];
 }

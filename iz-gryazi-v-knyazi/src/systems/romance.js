@@ -1,12 +1,12 @@
 import { netWorth } from './economy.js';
 import { adjust,addLog,clamp } from './state.js';
-import { romancePeople } from '../data/romance.js';
+import { livingRomancePeople,isPresent } from './population.js';
 import { activePartners,dropPartner,changeSocial } from './social.js';
 
 const notice=(state,title,text,portrait,choices)=>{if(!state.recentIncident)state.recentIncident={title,text,portrait,art:portrait,choices};};
 export function romanceConflictChoices(state){
   const c=state.romance?.conflict;if(!c)return [];
-  const person=romancePeople.find(x=>x.id===c.partnerId);
+  const person=livingRomancePeople(state).find(x=>x.id===c.partnerId);
   if(c.kind==='affair')return [
     {text:'Признаться честно',cost:0,rapport:person.id==='nina'?-100:-18,effect:{stress:6,respect:person.id==='nina'?-2:0},leave:person.id==='nina',reply:person.id==='nina'?'Нина ушла. Предательство перечеркнуло доверие.':'Правда прозвучала больно, но разговор состоялся.'},
     {text:'Скрыть встречу',cost:0,rapport:person.id==='nina'?-100:-30,effect:{stress:11,contacts:-2,respect:-4},leave:person.id==='nina',reply:'Ложь быстро стала ещё одной причиной не доверять тебе.'},
@@ -23,7 +23,7 @@ export function romanceDay(state,rng){
   const r=state.romance;if(!r)return;
   const partners=activePartners(state);
   if(!partners.length){
-    if(netWorth(state)>=100000&&!r.profiles.irina?.met&&rng()<.035){
+    if(netWorth(state)>=100000&&isPresent(state,'irina')&&!r.profiles.irina?.met&&rng()<.035){
       r.profiles.irina={rapport:0,meetings:0,lastDay:0,days:0,spent:0,appearance:0,last:'Ирина будто знала, где тебя искать.',met:true};
       notice(state,'Неожиданное знакомство','Ирина встретила тебя у выхода. Говорит, что это совпадение.',4,[{text:'Поговорить спокойно',effect:{contacts:1,stress:1},rapport:{id:'irina',delta:4},reply:'Разговор закончился, вопросы — нет.'},{text:'Уйти',effect:{stress:3,energy:-2},reply:'Она проводила взглядом до поворота.'}]);
     }
@@ -35,9 +35,10 @@ function romancePartnerDay(state,rng,id){
   const r=state.romance,p=r.profiles[id];if(!p){dropPartner(r,id);return;}
   p.days++;p.appearance=Math.min(2,Math.floor(p.days/8));
   const apart=state.day-(p.lastDay||state.day),conflictChance=.07+(apart>=3?.15:0)+(p.rapport<25?.1:0)+(state.stats.stress>70?.1:0);
+  if(id.startsWith('resident-')&&p.days%7===0){p.rapport=clamp(p.rapport+(apart<3?1:-2),0,100);adjust(state,{mood:apart<3?2:-1});}
   if(p.days>=2&&!r.conflict&&rng()<conflictChance){
     const cause=apart>=3?'Ты давно не находил времени на встречу.':state.stats.stress>70?'Напряжение после тяжёлого дня перешло в разговор на повышенных тонах.':'Неосторожная фраза испортила общий вечер.';
-    r.conflict={kind:'quarrel',partnerId:id,title:`Ссора с ${romancePeople.find(x=>x.id===id)?.name}`,text:cause,day:state.day};
+    r.conflict={kind:'quarrel',partnerId:id,title:`Ссора с ${livingRomancePeople(state).find(x=>x.id===id)?.name}`,text:cause,day:state.day};
     p.quarrels=(p.quarrels||0)+1;addLog(state,`${r.conflict.title}: ${cause}`,'bad');
   }
   if(id==='marina'){

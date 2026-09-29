@@ -1,13 +1,13 @@
-import { people } from '../data/people.js';
 import { romancePeople } from '../data/romance.js';
 import { addLog,clamp } from './state.js';
+import { livingPeople,livingRomancePeople,isPresent } from './population.js';
 
 export const activePartners=state=>[...new Set([...(state.romance?.partners||[]),state.romance?.partner].filter(Boolean))];
 export function addPartner(romance,id){romance.partners=[...new Set([...(romance.partners||[]),romance.partner,id].filter(Boolean))];romance.partner=id;}
 export function dropPartner(romance,id){romance.partners=[...new Set([...(romance.partners||[]),romance.partner].filter(Boolean))].filter(other=>other!==id);romance.partner=romance.partners.at(-1)||null;}
 export function socialValue(state,id){
   if(Number.isFinite(state.social?.[id]?.score))return state.social[id].score;
-  if(romancePeople.some(person=>person.id===id))return state.romance?.profiles?.[id]?.rapport||0;
+  if(romancePeople.some(person=>person.id===id)||state.population?.residents?.some(person=>person.id===id&&person.romance))return state.romance?.profiles?.[id]?.rapport||0;
   return state.relations?.[id]||0;
 }
 export function socialGroup(state,id){
@@ -27,9 +27,9 @@ export function changeSocial(state,id,delta){
 }
 export function socialDay(state,rng){
   if(state.recentIncident||state.pending||state.romance?.conflict||state.jailDays||state.day<3||state.day%3!==0)return;
-  const pool=Object.keys(state.social||{}).filter(id=>socialMet(state,id)&&!activePartners(state).includes(id)&&Math.abs(socialValue(state,id))>=20);
+  const pool=Object.keys(state.social||{}).filter(id=>isPresent(state,id)&&socialMet(state,id)&&!activePartners(state).includes(id)&&Math.abs(socialValue(state,id))>=20);
   if(!pool.length||rng()>=.28)return;
-  const id=pool[Math.floor(rng()*pool.length)],score=socialValue(state,id),person=[...people,...romancePeople].find(p=>p.id===id);
+  const id=pool[Math.floor(rng()*pool.length)],score=socialValue(state,id),person=[...livingPeople(state),...livingRomancePeople(state)].find(p=>p.id===id);
   if(!person)return;
   const friend=score>=30,portrait=romancePeople.find(p=>p.id===id)?.portrait;
   state.recentIncident=friend?{
