@@ -117,9 +117,9 @@ document.addEventListener('click',event=>{
   const romanceChoice=event.target.closest('[data-romance-choice]');
   if(romanceChoice){game.resolveRomanceConflict(Number(romanceChoice.dataset.romanceChoice));return;}
   const romanceAction=event.target.closest('[data-romance-action]');
-  if(romanceAction){game.romanceAction(romanceAction.dataset.id,romanceAction.dataset.romanceAction);return;}
+  if(romanceAction){const result=game.romanceAction(romanceAction.dataset.id,romanceAction.dataset.romanceAction);if(result.ok&&romanceAction.dataset.romanceAction==='commit'){peopleMode='romance';railPositions.delete('people:0');render();}return;}
   const peopleTab=event.target.closest('[data-people-mode]');
-  if(peopleTab){peopleMode=peopleTab.dataset.peopleMode;render();return;}
+  if(peopleTab){peopleMode=peopleTab.dataset.peopleMode;railPositions.delete('people:0');render();return;}
   const casinoAction=event.target.closest('[data-casino-action]');
   if(casinoAction){if(casinoAction.dataset.casinoAction==='close')game.closeCasino();else game.casinoAct(casinoAction.dataset.casinoAction,casinoAction.dataset.casinoValue);return;}
   const carousel=event.target.closest('[data-carousel]');

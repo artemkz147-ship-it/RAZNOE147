@@ -345,7 +345,7 @@ export class GameEngine {
       if(r.partner)return this.emit(fail('Сначала реши отношения с нынешним партнёром.'));
       if(!p.met||p.rapport<person.commit)return this.emit(fail(`Нужно доверие ${person.commit}. Сейчас ${p.rapport}.`));
       if(id==='nina'&&(s.jobsDone<8||homes.findIndex(x=>x.id===s.home)<2||r.betrayedNina))return this.emit(fail('Нине нужны устойчивость, честность и своё жильё. После измены доверие не вернуть подарком.'));
-      r.partner=id;p.days=0;p.last=`Вы с ${person.name} решили быть вместе.`;r.profiles[id]=p;adjust(s,{mood:8,stress:-3});addLog(s,p.last,'good');return this.emit(success(p.last));
+      r.partner=id;p.days=0;p.everPartner=true;p.last=`Вы с ${person.name} решили быть вместе.`;r.profiles[id]=p;adjust(s,{mood:8,stress:-3});addLog(s,p.last,'good');return this.emit(success(p.last));
     }
     if(action==='marry'){
       if(r.partner!==id||p.days<8||p.rapport<80)return this.emit(fail('Для общего будущего нужны время и доверие 80.'));

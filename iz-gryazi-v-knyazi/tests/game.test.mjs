@@ -284,6 +284,25 @@ test('romance trust unlocks commitment and daily consequences',()=>{
   assert.match(shell(s,'people','home',null,'legal',null,null,null,'romance'),/romance-card/);
 });
 
+test('relationship tab shows only started relationships, while dating stays with contacts',()=>{
+  const s=freshState(),game=new GameEngine(s,()=>.99);
+  const relationshipView=()=>shell(s,'people','home',null,'legal',null,null,null,'romance');
+  const contactView=()=>shell(s,'people','home',null,'legal',null,null,null,'contacts');
+  assert.doesNotMatch(relationshipView(),/class="romance-card/);
+  assert.match(relationshipView(),/Пока нет отношений/);
+  assert.match(contactView(),/data-romance-action="meet" data-id="marina"/);
+  assert.doesNotMatch(contactView(),/data-id="irina"/);
+  assert.equal(game.romanceAction('marina','meet').ok,true);
+  assert.doesNotMatch(relationshipView(),/class="romance-card/);
+  assert.match(contactView(),/data-romance-action="talk" data-id="marina"/);
+  s.romance.profiles.marina.rapport=30;
+  assert.equal(game.romanceAction('marina','commit').ok,true);
+  assert.match(relationshipView(),/class="romance-card/);
+  assert.doesNotMatch(contactView(),/data-romance-action="talk" data-id="marina"/);
+  assert.equal(game.romanceAction('marina','separate').ok,true);
+  assert.match(relationshipView(),/БЫЛИ ВМЕСТЕ/);
+});
+
 test('card tables contain three distinct rivals and settle the shared pot',()=>{
   const blackjack=createCasinoTable('blackjack',200,()=>.43);
   assert.equal(blackjack.opponents.length,3);
