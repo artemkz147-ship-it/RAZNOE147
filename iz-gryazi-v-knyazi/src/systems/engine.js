@@ -1,13 +1,16 @@
 import { districts,jobs,homes,vehicles,businesses,upgrades } from '../data/world.js';
 import { people } from '../data/people.js';
 import { nextDialogue } from '../data/dialogues.js';
-import { successRoute } from '../data/goals.js';
+import { successRoute,successRoutes } from '../data/goals.js';
 import { events } from '../data/events.js';
 import { incidents } from '../data/incidents.js';
 import { investments } from '../data/investments.js';
 import { crimes } from '../data/crime.js';
 import { activities } from '../data/activities.js';
 import { casinoGames,casinoOutcome,casinoRemaining } from '../data/casino.js';
+import { createCasinoTable,actCasinoTable } from './casinoTable.js';
+import { romancePeople,romanceAccess } from '../data/romance.js';
+import { romanceDay } from './romance.js';
 import { freshState,adjust,addLog,clamp } from './state.js';
 import { byId,districtUnlocked,travelOptions,gainSkill,dailySettlement,settleMatureInvestments,netWorth,businessStrategies } from './economy.js';
 import { saveGame } from './save.js';
@@ -21,11 +24,12 @@ export class GameEngine {
     this.state=state; this.rng=rng; this.listeners=new Set();
   }
   subscribe(fn) { this.listeners.add(fn); return ()=>this.listeners.delete(fn); }
-  emit(result) { const won=successRoute(this.state);if(won&&!this.state.ending){this.state.ending=true;addLog(this.state,`Успех достигнут: ${won.name}. Можно продолжать играть и развивать город.`,'story');}saveGame(this.state); for (const fn of this.listeners) fn(this.state,result); return result; }
+  emit(result) { const s=this.state;s.achievedRoutes ||= [];for(const route of successRoutes(s)){if(!s.achievedRoutes.includes(route.id)){s.achievedRoutes.push(route.id);addLog(s,`Достигнут путь: ${route.name}. Другие направления можно развивать одновременно.`,'story');}}s.ending=s.achievedRoutes.length>0;saveGame(s); for (const fn of this.listeners) fn(s,result); return result; }
   guard() {
     if (this.state.jailDays>0) return fail(`Ты под арестом. Осталось ${this.state.jailDays} дн.`);
     if (this.state.pending) return fail('Сначала прими решение в открытой истории.');
     if (this.state.recentIncident) return fail('Сначала разберись с неожиданным событием.');
+    if (this.state.casinoTable) return fail('Сначала закончи партию за игровым столом.');
     return null;
   }
   spend(cost) { if (this.state.money<cost) return false; this.state.money-=cost; return true; }
@@ -35,6 +39,7 @@ export class GameEngine {
     while (s.hour>=24) {
       s.hour-=24; s.day++;
       dailySettlement(s,{rng:this.rng});
+      romanceDay(s,this.rng);
       settleMatureInvestments(s,this.rng);
       if (s.day%6===0) this.crisis();
       if (!s.pending && !s.jailDays && this.rng()<.42) this.queueEvent();
@@ -53,7 +58,12 @@ export class GameEngine {
   }
   resolveIncident(index) {
     const s=this.state,item=incidents.find(x=>x.id===s.recentIncident?.id);
-    if(s.recentIncident&&!s.recentIncident.id){s.recentIncident=null;return this.emit(success('Продолжить.'));}
+    if(s.recentIncident&&!s.recentIncident.id){
+      const custom=s.recentIncident,choice=custom.choices?.[index];
+      if(choice?.cost&&!this.spend(choice.cost))return this.emit(fail('На это не хватает денег.'));
+      if(choice){adjust(s,choice.effect);if(choice.rapport){const profile=s.romance?.profiles[choice.rapport.id];if(profile)profile.rapport=clamp(profile.rapport+choice.rapport.delta,0,100);}addLog(s,`${custom.title}: ${choice.reply}`,'story');}
+      s.recentIncident=null;return this.emit(success(choice?.reply||'Продолжить.'));
+    }
     if(!item)return this.emit(fail('Событие уже завершилось.'));
     const choice=item.choices[index];
     if(!choice)return this.emit(fail('Выбери решение.'));
@@ -189,6 +199,48 @@ export class GameEngine {
     this.maybeIncident('crime',.14);
     return this.emit(success(`+${payout.toLocaleString('ru-RU')} ₽${injured?' · получена травма':''}`,injured?'bad':'good'));
   }
+  startCasino(id,amount){
+    const blocked=this.guard();if(blocked)return this.emit(blocked);
+    const s=this.state,stake=Number(amount),game=byId(casinoGames,id);
+    if(!game)return this.emit(fail('Игровой стол не найден.'));
+    if(!Number.isSafeInteger(stake)||stake<50)return this.emit(fail('Минимальная ставка — 50 ₽.'));
+    if(s.stats.energy<4)return this.emit(fail('Для партии нужны 4 энергии.'));
+    if(s.money<stake)return this.emit(fail('Не хватает денег на ставку.'));
+    if(stake>casinoRemaining(s))return this.emit(fail('Дневной лимит ставок исчерпан.'));
+    const dayLimit=casinoRemaining(s)+((s.casinoDaily.day===s.day&&s.casinoDaily.wagered)||0);
+    if(s.casinoDaily.day!==s.day)s.casinoDaily={day:s.day,wagered:0,limit:dayLimit};
+    else s.casinoDaily.limit ||= dayLimit;
+    s.money-=stake;s.casinoDaily.wagered+=stake;s.casino.wagered+=stake;
+    s.casinoTable=createCasinoTable(id,stake,this.rng);
+    return this.emit(success(`${game.name}: партия началась. Ставка ${stake.toLocaleString('ru-RU')} ₽.`,'neutral'));
+  }
+  casinoAct(action,value){
+    const s=this.state,table=s.casinoTable;if(!table)return this.emit(fail('Нет открытой партии.'));
+    const extra=['double','raise'].includes(action)?table.stake:0;
+    if(extra&&(s.money<extra||casinoRemaining(s)<extra))return this.emit(fail('На удвоение не хватает денег или дневного лимита.'));
+    const move=actCasinoTable(table,action,value,this.rng);
+    if(move.error)return this.emit(fail(move.error));
+    if(move.extraStake){s.money-=move.extraStake;s.casinoDaily.wagered+=move.extraStake;s.casino.wagered+=move.extraStake;}
+    if(move.done){
+      s.money+=table.returned;s.casino.rounds++;s.casino.returned+=table.returned;
+      const net=table.returned-table.wager;if(net>0){s.casino.wins++;s.totalEarned+=net;}
+      adjust(s,{energy:-4,stress:net<0?5:-2,mood:net<0?-4:4});
+      const game=byId(casinoGames,table.id);s.casino.history.unshift({day:s.day,game:game.name,result:table.result,net});s.casino.history=s.casino.history.slice(0,8);
+      addLog(s,`${game.name}: ${table.result} ${net>=0?'+':''}${net.toLocaleString('ru-RU')} ₽.`,net>=0?'good':'bad');
+      this.tick(1);
+      return this.emit(success(`${table.result} ${net>=0?'+':''}${net.toLocaleString('ru-RU')} ₽.`,net>=0?'good':'bad'));
+    }
+    return this.emit(success(move.message||'Ход принят.','neutral'));
+  }
+  closeCasino(){
+    const s=this.state,table=s.casinoTable;if(!table)return this.emit(fail('Нет открытой партии.'));
+    if(table.phase!=='done'){
+      table.returned=0;table.result='Партия прервана. Ставка осталась в банке.';table.phase='done';
+      s.casino.rounds++;s.casino.history.unshift({day:s.day,game:byId(casinoGames,table.id).name,result:table.result,net:-table.wager});s.casino.history=s.casino.history.slice(0,8);
+      adjust(s,{energy:-4,stress:4,mood:-3});addLog(s,table.result,'bad');
+    }
+    s.casinoTable=null;return this.emit(success('Ты вышел из-за стола.','neutral'));
+  }
   playCasino(id,amount) {
     const blocked=this.guard();if(blocked)return this.emit(blocked);
     const s=this.state,game=byId(casinoGames,id),stake=Number(amount);
@@ -280,6 +332,49 @@ export class GameEngine {
     this.tick(2); addLog(s,`${item.name}: ${action==='upgrade'?'расширение':action==='staff'?'наём команды':'ремонт'}.`,'good');
     return this.emit(success(`${item.name}: дело развивается.`));
   }
+  romanceAction(id,action){
+    const blocked=this.guard();if(blocked)return this.emit(blocked);
+    const s=this.state,person=byId(romancePeople,id);if(!person)return this.emit(fail('Этого человека нет в городе.'));
+    const r=s.romance,p=r.profiles[id]||{rapport:0,meetings:0,lastDay:0,days:0,spent:0,appearance:0,last:person.description,met:false};
+    if(action==='separate'){
+      if(r.partner!==id)return this.emit(fail('Вы не вместе.'));
+      r.partner=null;p.last='Вы решили разойтись.';r.profiles[id]=p;adjust(s,{stress:5,mood:-4});addLog(s,`${person.name}: вы расстались.`,'bad');return this.emit(success(p.last,'bad'));
+    }
+    if(action==='commit'){
+      if(r.partner)return this.emit(fail('Сначала реши отношения с нынешним партнёром.'));
+      if(!p.met||p.rapport<person.commit)return this.emit(fail(`Нужно доверие ${person.commit}. Сейчас ${p.rapport}.`));
+      if(id==='nina'&&(s.jobsDone<8||homes.findIndex(x=>x.id===s.home)<2||r.betrayedNina))return this.emit(fail('Нине нужны устойчивость, честность и своё жильё. После измены доверие не вернуть подарком.'));
+      r.partner=id;p.days=0;p.last=`Вы с ${person.name} решили быть вместе.`;r.profiles[id]=p;adjust(s,{mood:8,stress:-3});addLog(s,p.last,'good');return this.emit(success(p.last));
+    }
+    if(action==='marry'){
+      if(r.partner!==id||p.days<8||p.rapport<80)return this.emit(fail('Для общего будущего нужны время и доверие 80.'));
+      if(id==='nina'&&r.betrayedNina)return this.emit(fail('Нина не готова после измены.'));
+      p.married=true;p.last=`Вы с ${person.name} поженились.`;r.profiles[id]=p;adjust(s,{mood:10,respect:3});addLog(s,p.last,'good');return this.emit(success(p.last));
+    }
+    if(!['meet','date','gift'].includes(action))return this.emit(fail('Неизвестное действие.'));
+    if(!p.met){
+      const reason=romanceAccess(s,person);if(reason)return this.emit(fail(reason));
+      if(person.district&&s.district!==person.district)return this.emit(fail('Сначала доберись в её район для знакомства.'));
+      if(action!=='meet')return this.emit(fail('Сначала познакомьтесь.'));
+    }
+    if(p.lastDay===s.day)return this.emit(fail('Сегодня вы уже провели время вместе. Продолжи завтра.'));
+    const cost=action==='date'?person.dateCost:action==='gift'?person.giftCost:0;
+    if(s.money<cost)return this.emit(fail(`Нужно ${cost.toLocaleString('ru-RU')} ₽.`));
+    if(s.stats.energy<6)return this.emit(fail('Нужны силы на встречу. Переведи дух или выспись.'));
+    if(r.partner&&r.partner!==id&&action!=='meet'){
+      const old=r.profiles[r.partner];if(old)old.rapport=clamp(old.rapport-25,0,100);
+      if(r.partner==='nina'){r.betrayedNina=true;r.partner=null;addLog(s,'Нина узнала о тайной встрече и ушла.','bad');}
+      else addLog(s,'Встреча за спиной партнёра ударила по доверию.','bad');
+    }
+    s.money-=cost;p.spent+=cost;p.met=true;p.meetings++;p.lastDay=s.day;
+    const gain=action==='meet'?6:action==='date'?(id==='nina'?9:11):(id==='nina'?2:id==='viktoria'?10:5);
+    p.rapport=clamp(p.rapport+gain,0,100);
+    const line=person.lines[(p.meetings-1)%person.lines.length];p.last=`${line} ${action==='gift'?'Подарок принят.':action==='date'?'Вы провели вечер вместе.':'Вы познакомились.'}`;
+    r.profiles[id]=p;r.history.unshift({day:s.day,id,action,text:p.last});r.history=r.history.slice(0,20);
+    adjust(s,{energy:action==='date'?-9:-6,mood:action==='gift'?2:4,stress:action==='date'?-2:0});
+    this.tick(action==='date'?3:1);addLog(s,`${person.name}: ${p.last} Доверие ${p.rapport}/100.`,'story');
+    return this.emit(success(`${person.name}: ${p.last} Доверие ${p.rapport}/100.`));
+  }
   person(id,action,choiceIndex) {
     const blocked=this.guard(); if (blocked) return this.emit(blocked);
     const s=this.state,p=byId(people,id);
@@ -327,4 +422,3 @@ export class GameEngine {
   replaceState(state) { this.state=state; return this.emit(success('Сохранение загружено.')); }
   summary() { return {netWorth:netWorth(this.state),success:successRoute(this.state)?.name||null}; }
 }
-

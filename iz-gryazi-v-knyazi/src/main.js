@@ -11,13 +11,13 @@ import { MiniGame } from './ui/minigames.js';
 const app=document.getElementById('app');
 const loaded=loadGame();
 const game=new GameEngine(loaded.state);
-let tab='city',shopType='home',earningMode='legal',mini=null,menuOpen=false,dialogueId=null,dialogueResult=null,travelId=null;
+let tab='city',shopType='home',earningMode='legal',peopleMode='contacts',mini=null,menuOpen=false,dialogueId=null,dialogueResult=null,travelId=null;
 const railPositions=new Map();
 let focusCurrentDistrict=false;
 
 function addCarouselControls() {
   if(window.innerWidth>760)return;
-  document.querySelectorAll('.district-grid,.job-grid,.asset-grid,.business-grid,.people-grid,.invest-grid,.two-column,.story-list,.activity-grid,.casino-grid').forEach((rail,i)=>{
+  document.querySelectorAll('.district-grid,.job-grid,.asset-grid,.business-grid,.people-grid,.romance-grid,.invest-grid,.two-column,.story-list,.activity-grid,.casino-grid').forEach((rail,i)=>{
     if(rail.children.length<2)return;
     rail.id=`scroll-rail-${i}`;
     const controls=document.createElement('div');controls.className='carousel-controls';
@@ -35,7 +35,7 @@ function addCarouselControls() {
 
 function render() {
   document.body.className=`tab-${tab}`;
-  app.innerHTML=shell(game.state,tab,shopType,mini,earningMode,dialogueId,dialogueResult,travelId);
+  app.innerHTML=shell(game.state,tab,shopType,mini,earningMode,dialogueId,dialogueResult,travelId,peopleMode);
   const district=byId(districts,game.state.district);
   document.getElementById('scene').innerHTML=artScene(district,game.state);
   addCarouselControls();
@@ -86,7 +86,7 @@ function perform(action,id) {
   if(action==='travel'){travelId=null;focusCurrentDistrict=true;game.travel(id);return;}
   if(action==='job'){startJob(id);return;}
   if(action==='crime'){startCrime(id);return;}
-  if(action==='casino'){game.playCasino(id,document.getElementById('casino-stake')?.value);return;}
+  if(action==='casino'){game.startCasino(id,document.getElementById('casino-stake')?.value);return;}
   if(action==='serve'){game.serveSentence();return;}
   if(action==='activity'){game.activity(id);return;}
   if(action.startsWith('buy-')){game.buy(action.slice(4),id);return;}
@@ -114,6 +114,12 @@ function perform(action,id) {
   }
 }
 document.addEventListener('click',event=>{
+  const romanceAction=event.target.closest('[data-romance-action]');
+  if(romanceAction){game.romanceAction(romanceAction.dataset.id,romanceAction.dataset.romanceAction);return;}
+  const peopleTab=event.target.closest('[data-people-mode]');
+  if(peopleTab){peopleMode=peopleTab.dataset.peopleMode;render();return;}
+  const casinoAction=event.target.closest('[data-casino-action]');
+  if(casinoAction){if(casinoAction.dataset.casinoAction==='close')game.closeCasino();else game.casinoAct(casinoAction.dataset.casinoAction,casinoAction.dataset.casinoValue);return;}
   const carousel=event.target.closest('[data-carousel]');
   if(carousel){const rail=document.getElementById(carousel.dataset.rail);if(rail)rail.scrollBy({left:Number(carousel.dataset.carousel)*(rail.firstElementChild?.getBoundingClientRect().width||rail.clientWidth)+Number(carousel.dataset.carousel)*10,behavior:'smooth'});return;}
   const travelMode=event.target.closest('[data-travel-mode]');
@@ -157,4 +163,3 @@ document.addEventListener('keydown',event=>{
 });
 window.addEventListener('beforeunload',()=>saveGame(game.state));
 setInterval(()=>saveGame(game.state),30000);
-

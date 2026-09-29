@@ -28,4 +28,4 @@ export function goalReached(state,goal){
   return Object.entries(goal.need).every(([key,target])=>key==='district'?data.districts.includes(target):data[key]>=target);
 }
 export function successRoute(state){return routesToSuccess.find(route=>goalReached(state,route))||null;}
-
+export function successRoutes(state){return routesToSuccess.filter(route=>goalReached(state,route));}

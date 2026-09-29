@@ -1,13 +1,12 @@
-// Gross payouts include the original stake. Every game has a visible house edge.
 export const casinoGames = [
-  {id:'roulette',name:'Рулетка: красное',chance:'18 из 37 · 48,6%',payout:'×1,9',description:'Шарик может упасть на зеро. Тогда ставка уходит дому.',asset:'roulette'},
-  {id:'slots',name:'Автоматы',chance:'Пара 27% · джекпот 4,5%',payout:'×2 или ×8',description:'Три барабана. Красивый звук не означает прибыль.',asset:'slots'},
-  {id:'cards',name:'Старшая карта',chance:'78 из 169 · 46,2%',payout:'×2',description:'Твоя карта должна быть старше карты крупье. Ничья за домом.',asset:'cards'}
+  {id:'roulette',name:'Рулетка',chance:'Красное 18/37 · число 1/37',payout:'×2 или ×36',description:'Выбери цвет, чётность или конкретное число. Зеро забирает обычные ставки.',asset:'roulette'},
+  {id:'blackjack',name:'21 · Блэкджек',chance:'Решения меняют исход',payout:'×2 · натуральное 21 ×2,5',description:'Бери карту или остановись. Крупье добирает до 17. Можно удвоить.',asset:'cards'},
+  {id:'poker',name:'Покер · пять карт',chance:'Против Артура «Тихого»',payout:'Банк ×2 или ×4',description:'Замени до трёх карт. Откройся, повысь или сбрось. Артур может блефовать.',asset:'cards'}
 ];
 
 export function casinoLimit(state) {
   const assets=Math.max(0,state.money)+Object.values(state.businesses||{}).length*150000;
-  return Math.max(3000,Math.min(1000000,Math.round(assets*.15)));
+  return Math.max(3000,Math.min(100000000,Math.round(assets*.8)));
 }
 
 export function casinoRemaining(state) {

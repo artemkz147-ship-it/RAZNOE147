@@ -19,7 +19,7 @@ export function loadGame() {
 export function validate(input) {
   if (!input || input.version !== VERSION || typeof input.money !== 'number' || !input.stats || !input.skills || !Array.isArray(input.log)) throw new Error('Неверный формат сохранения');
   const fresh = freshState();
-  return {...fresh,...input,pending:input.pending?.type==='story'?null:input.pending,visitedDistricts:[...new Set(['yard',...(input.visitedDistricts||[]),input.district])],ending:false,stats:{...fresh.stats,...input.stats},skills:{...fresh.skills,...input.skills},xp:{...fresh.xp,...input.xp},relations:{...fresh.relations,...input.relations},dialogueProgress:{...fresh.dialogueProgress,...input.dialogueProgress},dialogueLast:{...fresh.dialogueLast,...input.dialogueLast},businesses:{...fresh.businesses,...input.businesses},casino:{...fresh.casino,...input.casino},casinoDaily:{...fresh.casinoDaily,...input.casinoDaily},conditions:{...fresh.conditions,...input.conditions},incidentHistory:Array.isArray(input.incidentHistory)?input.incidentHistory:[]};
+  return {...fresh,...input,pending:input.pending?.type==='story'?null:input.pending,visitedDistricts:[...new Set(['yard',...(input.visitedDistricts||[]),input.district])],ending:false,stats:{...fresh.stats,...input.stats},skills:{...fresh.skills,...input.skills},xp:{...fresh.xp,...input.xp},relations:{...fresh.relations,...input.relations},dialogueProgress:{...fresh.dialogueProgress,...input.dialogueProgress},dialogueLast:{...fresh.dialogueLast,...input.dialogueLast},businesses:{...fresh.businesses,...input.businesses},casino:{...fresh.casino,...input.casino},casinoDaily:{...fresh.casinoDaily,...input.casinoDaily},romance:{...fresh.romance,...input.romance,profiles:{...fresh.romance.profiles,...input.romance?.profiles}},conditions:{...fresh.conditions,...input.conditions},incidentHistory:Array.isArray(input.incidentHistory)?input.incidentHistory:[]};
 }
 export function saveGame(state) {
   state.lastSaved = Date.now();
@@ -30,4 +30,3 @@ export function exportGame(state) {
 }
 export async function importGame(file) { return validate(JSON.parse(await file.text())); }
 export function clearGame() { localStorage.removeItem(KEY); }
-
