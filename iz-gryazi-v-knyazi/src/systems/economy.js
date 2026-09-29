@@ -10,9 +10,26 @@ export function netWorth(state) {
   return Math.round(state.money + home + fleet + firms - state.debt);
 }
 export function travelPrice(state,districtId) {
-  const district = byId(districts,districtId);
-  const vehicle = byId(vehicles,state.vehicle);
-  return Math.ceil((district?.fare||0)*vehicle.fareFactor);
+  return travelOptions(state,districtId).find(option=>option.id==='bus')?.cost||0;
+}
+export function travelOptions(state,districtId) {
+  const from=byId(districts,state.district),to=byId(districts,districtId);
+  if(!from||!to||from.id===to.id)return [];
+  const distance=Math.abs(to.tier-from.tier);
+  const fare=35+distance*30;
+  const walkRisk=Math.min(.3,.025+distance*.018+(100-(state.conditions?.shoes??100))*.0014);
+  const badShoes=(state.conditions?.shoes??100)<20;
+  const options=[
+    {id:'walk',name:'Пешком',cost:0,hours:distance*2+1+(badShoes?1:0),energy:8+distance*6+(badShoes?4:0),risk:walkRisk,detail:badShoes?'Бесплатно, но рваная обувь замедляет путь и повышает риск.':'Бесплатно, долго. Обувь изнашивается.'},
+    {id:'bus',name:'Автобус · билет',cost:fare,hours:Math.max(1,distance),energy:3,risk:.06,detail:'Без штрафа. Возможны обычные дорожные задержки.'},
+    {id:'fare-dodge',name:'Автобус · зайцем',cost:0,hours:Math.max(1,distance),energy:3,risk:Math.min(.42,.14+distance*.035),fine:fare*10,detail:'Если поймают — штраф ×10; нет денег — арест.'},
+    {id:'taxi',name:'Такси',cost:fare*4,hours:1,energy:1,risk:.025,detail:'Дорого, зато до двери. Тариф известен заранее.'}
+  ];
+  if(state.vehicle!=='feet') {
+    const vehicle=byId(vehicles,state.vehicle);
+    options.push({id:'own',name:vehicle.name,cost:Math.max(10,Math.ceil(fare*vehicle.fareFactor)),hours:Math.max(1,Math.ceil(distance*vehicle.timeFactor)),energy:Math.max(2,Math.ceil(4*vehicle.timeFactor)),risk:Math.min(.16,.018+distance*.008),detail:'Топливо и износ за поездку.'});
+  }
+  return options;
 }
 export function districtUnlocked(state,district) {
   const r = district.required;
@@ -70,10 +87,11 @@ export function dailySettlement(state,{offline=false,rng=Math.random}={}) {
   state.money += business-expenses;
   state.debt += Math.ceil(state.debt*.012);
   state.heat = Math.max(0,(state.heat||0)-4);
+  if(state.conditions) {state.conditions.back=Math.max(0,state.conditions.back-1);state.conditions.hangover=Math.max(0,state.conditions.hangover-1);}
   state.stats.life = clamp(Math.round(8+home.prestige*.55+vehicle.prestige*.16+state.stats.mood*.1-state.stats.stress*.06),0,100);
   adjust(state,{energy:Math.round(home.restore*.43),health:state.money<0?-4:1,mood:state.money<0?-3:state.stats.life>55?1:0,stress:state.money<0?5:state.stats.life>55?0:1});
   if (business) addLog(state,`День ${state.day}: дела принесли ${business.toLocaleString('ru-RU')} ₽; быт и обязательства забрали ${expenses.toLocaleString('ru-RU')} ₽.`,business>=expenses?'good':'bad');
-  else addLog(state,`День ${state.day}: бытовые расходы ${expenses.toLocaleString('ru-RU')} ₽.`,'neutral');
+  else addLog(state,`День ${state.day}: питание и быт 110 ₽, жильё ${home.daily} ₽, транспорт ${vehicle.upkeep} ₽${state.debt?', долг и проценты учтены':''}. Всего ${expenses.toLocaleString('ru-RU')} ₽.`,'neutral');
   if (state.money < -12000) {
     state.debt += Math.abs(state.money)+12000; state.money = -12000;
     addLog(state,'Банк молча превратил минус на счёте в долг. Уведомление было удивительно вежливым.','bad');
@@ -92,3 +110,4 @@ export function settleMatureInvestments(state,rng=Math.random) {
   }
   state.investments=state.investments.filter(x=>x.maturity>state.day);
 }
+

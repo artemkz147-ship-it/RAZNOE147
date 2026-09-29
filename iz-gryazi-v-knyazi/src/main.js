@@ -11,18 +11,40 @@ import { MiniGame } from './ui/minigames.js';
 const app=document.getElementById('app');
 const loaded=loadGame();
 const game=new GameEngine(loaded.state);
-let tab='city',shopType='home',earningMode='legal',mini=null,menuOpen=false,dialogueId=null,dialogueResult=null;
+let tab='city',shopType='home',earningMode='legal',mini=null,menuOpen=false,dialogueId=null,dialogueResult=null,travelId=null;
+const railPositions=new Map();
+let focusCurrentDistrict=false;
+
+function addCarouselControls() {
+  if(window.innerWidth>760)return;
+  document.querySelectorAll('.district-grid,.job-grid,.asset-grid,.business-grid,.people-grid,.invest-grid,.two-column,.story-list,.activity-grid,.casino-grid').forEach((rail,i)=>{
+    if(rail.children.length<2)return;
+    rail.id=`scroll-rail-${i}`;
+    const controls=document.createElement('div');controls.className='carousel-controls';
+    controls.innerHTML=`<span>ЛИСТАЙ КАРТОЧКИ · ${rail.children.length}</span><div><button type="button" data-carousel="-1" data-rail="${rail.id}" aria-label="Предыдущая карточка">‹</button><button type="button" data-carousel="1" data-rail="${rail.id}" aria-label="Следующая карточка">›</button></div>`;
+    rail.before(controls);
+    if(!focusCurrentDistrict&&railPositions.has(`${tab}:${i}`))rail.scrollLeft=railPositions.get(`${tab}:${i}`);
+    else if(rail.classList.contains('district-grid')){
+      const current=rail.querySelector('.here');
+      if(current)rail.scrollLeft=current.offsetLeft-rail.offsetLeft;
+    }
+    rail.addEventListener('scroll',()=>railPositions.set(`${tab}:${i}`,rail.scrollLeft),{passive:true});
+  });
+}
 
 function render() {
+  document.querySelectorAll('[id^="scroll-rail-"]').forEach((rail,i)=>{if(!(focusCurrentDistrict&&tab==='city'&&i===0))railPositions.set(`${tab}:${i}`,rail.scrollLeft);});
   document.body.className=`tab-${tab}`;
-  app.innerHTML=shell(game.state,tab,shopType,mini,earningMode,dialogueId,dialogueResult);
+  app.innerHTML=shell(game.state,tab,shopType,mini,earningMode,dialogueId,dialogueResult,travelId);
   const district=byId(districts,game.state.district);
   document.getElementById('scene').innerHTML=artScene(district,game.state);
+  addCarouselControls();
+  focusCurrentDistrict=false;
   if(menuOpen)document.getElementById('modal-root').innerHTML=menuModal(game.state);
 }
 function renderModal() {
   const root=document.getElementById('modal-root');
-  if(root)root.innerHTML=menuOpen?menuModal(game.state):modal(game.state,mini,dialogueId,dialogueResult);
+  if(root)root.innerHTML=menuOpen?menuModal(game.state):modal(game.state,mini,dialogueId,dialogueResult,travelId);
 }
 function toast(message,tone='good') {
   if(!message)return;
@@ -56,10 +78,12 @@ function startCrime(id) {
 function perform(action,id) {
   if(action==='menu'){menuOpen=true;renderModal();return;}
   if(action==='close-menu'){menuOpen=false;renderModal();return;}
-  if(action==='tab-story'){tab='story';render();return;}
-  if(action==='tab-work'){tab='work';render();return;}
-  if(action==='tab-business'){tab='business';render();return;}
-  if(action==='travel'){game.travel(id);return;}
+  if(action==='tab-story'){tab='story';render();window.scrollTo(0,0);return;}
+  if(action==='tab-work'){tab='work';render();window.scrollTo(0,0);return;}
+  if(action==='tab-business'){tab='business';render();window.scrollTo(0,0);return;}
+  if(action==='choose-travel'){travelId=id;renderModal();return;}
+  if(action==='close-travel'){travelId=null;renderModal();return;}
+  if(action==='travel'){travelId=null;focusCurrentDistrict=true;game.travel(id);return;}
   if(action==='job'){startJob(id);return;}
   if(action==='crime'){startCrime(id);return;}
   if(action==='casino'){game.playCasino(id,document.getElementById('casino-stake')?.value);return;}
@@ -90,6 +114,12 @@ function perform(action,id) {
   }
 }
 document.addEventListener('click',event=>{
+  const carousel=event.target.closest('[data-carousel]');
+  if(carousel){const rail=document.getElementById(carousel.dataset.rail);if(rail)rail.scrollBy({left:Number(carousel.dataset.carousel)*(rail.firstElementChild?.getBoundingClientRect().width||rail.clientWidth)+Number(carousel.dataset.carousel)*10,behavior:'smooth'});return;}
+  const travelMode=event.target.closest('[data-travel-mode]');
+  if(travelMode){const id=travelMode.dataset.id,mode=travelMode.dataset.travelMode;travelId=null;focusCurrentDistrict=true;game.travel(id,mode);return;}
+  const incidentChoice=event.target.closest('[data-incident-choice]');
+  if(incidentChoice){game.resolveIncident(Number(incidentChoice.dataset.incidentChoice));return;}
   const dialogueChoice=event.target.closest('[data-dialogue-choice]');
   if(dialogueChoice&&dialogueId){const result=game.person(dialogueId,'talk',Number(dialogueChoice.dataset.dialogueChoice));if(result.ok){dialogueResult=result;renderModal();}return;}
   const choice=event.target.closest('[data-choice]');
@@ -97,7 +127,7 @@ document.addEventListener('click',event=>{
   const miniButton=event.target.closest('[data-mini]');
   if(miniButton){mini?.input(miniButton.dataset.mini,miniButton.dataset.value);return;}
   const tabButton=event.target.closest('[data-tab]');
-  if(tabButton){tab=tabButton.dataset.tab;render();if(tabButton.classList.contains('scene-map'))document.getElementById('view')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
+  if(tabButton){tab=tabButton.dataset.tab;render();if(tabButton.classList.contains('scene-map'))document.getElementById('view')?.scrollIntoView({behavior:'smooth',block:'start'});else window.scrollTo(0,0);return;}
   const shop=event.target.closest('[data-shop]');
   if(shop){shopType=shop.dataset.shop;render();return;}
   const earn=event.target.closest('[data-earn]');
@@ -121,8 +151,10 @@ document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){
     if(menuOpen){menuOpen=false;renderModal();}
     else if(mini)mini.input('exit');
+    else if(travelId){travelId=null;renderModal();}
     else if(dialogueId){dialogueId=null;dialogueResult=null;renderModal();}
   }
 });
 window.addEventListener('beforeunload',()=>saveGame(game.state));
 setInterval(()=>saveGame(game.state),30000);
+

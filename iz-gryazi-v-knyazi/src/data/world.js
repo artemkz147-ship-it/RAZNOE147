@@ -10,14 +10,14 @@ export const districts = [
 export const jobs = [
   {id:'scrap',name:'Сдать металл',district:'yard',hours:3,energy:18,pay:310,skill:'grit',game:'timing',risk:0.02,description:'Магнит ищет железо, дед ищет справедливость.'},
   {id:'courier',name:'Развозить заказы',district:'yard',hours:4,energy:26,pay:520,skill:'grit',game:'route',risk:0.03,description:'Клиент пишет «я у подъезда». Это ложь.'},
-  {id:'cleaner',name:'Убрать подъезд',district:'yard',hours:4,energy:29,pay:580,skill:'charm',game:'memory',risk:0.01,description:'Найди то, что было полом до ремонта.'},
+  {id:'cleaner',name:'Убрать подъезд',district:'yard',hours:4,energy:29,pay:580,skill:'charm',game:'sort',risk:0.01,description:'Найди то, что было полом до ремонта.'},
   {id:'loader',name:'Грузить коробки',district:'market',hours:4,energy:32,pay:900,skill:'grit',game:'timing',risk:0.04,description:'Внутри хрупкое. Снаружи — ты.'},
   {id:'driver',name:'Подменить водителя',district:'market',hours:5,energy:27,pay:1250,skill:'grit',game:'route',risk:0.04,description:'Маршрут — это теория, пробка — практика.'},
   {id:'reseller',name:'Перепродать партию',district:'market',hours:3,energy:16,pay:1050,skill:'charm',game:'bargain',risk:0.02,description:'Новая этикетка — новая жизнь.'},
-  {id:'warehouse',name:'Сортировать склад',district:'industrial',hours:5,energy:34,pay:1750,skill:'focus',game:'memory',risk:0.03,description:'Система учёта на бумаге в клетку.'},
+  {id:'warehouse',name:'Сортировать склад',district:'industrial',hours:5,energy:34,pay:1750,skill:'focus',game:'sort',risk:0.03,description:'Система учёта на бумаге в клетку.'},
   {id:'mechanic',name:'Починить движок',district:'industrial',hours:5,energy:30,pay:2200,skill:'focus',game:'timing',risk:0.05,description:'Шум пропал. Возможно, машина умерла.'},
   {id:'contract',name:'Сверить накладные',district:'industrial',hours:4,energy:24,pay:2500,skill:'focus',game:'audit',risk:0.01,description:'Если цифры сходятся, ищи ошибку.'},
-  {id:'barista',name:'Выйти в смену',district:'center',hours:5,energy:26,pay:3400,skill:'charm',game:'memory',risk:0.01,description:'Стакан подороже, кофе тот же.'},
+  {id:'barista',name:'Выйти в смену',district:'center',hours:5,energy:26,pay:3400,skill:'charm',game:'sort',risk:0.01,description:'Стакан подороже, кофе тот же.'},
   {id:'sales',name:'Закрыть продажу',district:'center',hours:4,energy:23,pay:4600,skill:'charm',game:'bargain',risk:0.02,description:'Бонус выплачивается оптимизмом.'},
   {id:'consultant',name:'Проверить проект',district:'center',hours:5,energy:27,pay:5300,skill:'focus',game:'audit',risk:0.01,description:'Презентация уже согласована с реальностью.'},
   {id:'manager',name:'Управлять сменой',district:'glass',hours:5,energy:32,pay:8000,skill:'focus',game:'route',risk:0.02,description:'Решения твои. Последствия отдела.'},
@@ -26,32 +26,32 @@ export const jobs = [
   {id:'summit',name:'Заключить партнёрство',district:'heights',hours:5,energy:35,pay:23500,skill:'charm',game:'bargain',risk:0.02,description:'Рукопожатие дороже договора.'},
   {id:'bottles',name:'Сдать стеклотару',district:'yard',hours:2,energy:12,pay:240,skill:'grit',game:'timing',risk:.01,description:'Каждая бутылка — чужой вечер и твой завтрак.'},
   {id:'dogwalk',name:'Выгулять чужих собак',district:'yard',hours:3,energy:21,pay:690,skill:'charm',game:'route',risk:.02,description:'Собаки слушаются лучше хозяев. Иногда.'},
-  {id:'packing',name:'Собрать заказы',district:'market',hours:4,energy:25,pay:1100,skill:'focus',game:'memory',risk:.02,description:'Кому-то опять нужен чайник к восьми утра.'},
+  {id:'packing',name:'Собрать заказы',district:'market',hours:4,energy:25,pay:1100,skill:'focus',game:'sort',risk:.02,description:'Кому-то опять нужен чайник к восьми утра.'},
   {id:'stocktake',name:'Пересчитать остатки',district:'market',hours:5,energy:22,pay:1450,skill:'focus',game:'audit',risk:.01,description:'Остатки считают тебя в ответ.'},
   {id:'dispatcher',name:'Дежурить диспетчером',district:'industrial',hours:5,energy:24,pay:2900,skill:'focus',game:'route',risk:.02,description:'Телефон звонит даже когда выключен.'},
-  {id:'safety',name:'Провести инструктаж',district:'industrial',hours:4,energy:22,pay:3100,skill:'charm',game:'memory',risk:.01,description:'Каска обязательна. Здравый смысл по желанию.'},
+  {id:'safety',name:'Провести инструктаж',district:'industrial',hours:4,energy:22,pay:3100,skill:'charm',game:'sort',risk:.01,description:'Каска обязательна. Здравый смысл по желанию.'},
   {id:'showing',name:'Показать квартиру',district:'center',hours:4,energy:21,pay:5100,skill:'charm',game:'bargain',risk:.01,description:'Вид во двор называют видом на историю.'},
   {id:'eventsetup',name:'Собрать мероприятие',district:'center',hours:5,energy:33,pay:5900,skill:'grit',game:'timing',risk:.04,description:'Главный спикер опоздал, баннер — нет.'},
   {id:'prcrisis',name:'Погасить скандал',district:'glass',hours:4,energy:27,pay:12500,skill:'charm',game:'bargain',risk:.02,description:'Слово «недоразумение» оплачивается отдельно.'},
   {id:'datacheck',name:'Проверить аналитику',district:'glass',hours:5,energy:24,pay:14200,skill:'focus',game:'audit',risk:.01,description:'График растёт, если повернуть экран.'},
-  {id:'gala',name:'Вести приём',district:'heights',hours:5,energy:31,pay:28000,skill:'charm',game:'memory',risk:.02,description:'Запомни имена тех, кто помнит твою фамилию.'},
+  {id:'gala',name:'Вести приём',district:'heights',hours:5,energy:31,pay:28000,skill:'charm',game:'sort',risk:.02,description:'Запомни имена тех, кто помнит твою фамилию.'},
   {id:'foundation',name:'Сверить фонд',district:'heights',hours:5,energy:27,pay:32000,skill:'focus',game:'audit',risk:.01,description:'Благотворительность начинается с бухгалтерии.'},
   {id:'snow',name:'Расчистить двор',district:'yard',hours:3,energy:24,pay:430,skill:'grit',game:'timing',risk:.03,description:'Снег убран. Машины заняли место быстрее.'},
   {id:'notice',name:'Разнести квитанции',district:'yard',hours:2,energy:14,pay:370,skill:'focus',game:'route',risk:.01,description:'Каждая дверь уверена, что платёж придумал ты.'},
-  {id:'repairphone',name:'Починить телефоны',district:'market',hours:4,energy:20,pay:1650,skill:'focus',game:'memory',risk:.02,description:'Экран разбит, но надежда клиента целая.'},
+  {id:'repairphone',name:'Починить телефоны',district:'market',hours:4,energy:20,pay:1650,skill:'focus',game:'sort',risk:.02,description:'Экран разбит, но надежда клиента целая.'},
   {id:'bake',name:'Ночная выпечка',district:'market',hours:5,energy:30,pay:1780,skill:'grit',game:'timing',risk:.03,description:'Самая свежая булка досталась начальнику.'},
   {id:'quality',name:'Проверить партию',district:'industrial',hours:5,energy:25,pay:3650,skill:'focus',game:'audit',risk:.02,description:'Брак считается допустимым, пока не твой.'},
   {id:'welding',name:'Сварить каркас',district:'industrial',hours:5,energy:34,pay:4100,skill:'grit',game:'timing',risk:.06,description:'Красиво получилось там, где не видно.'},
-  {id:'archive',name:'Разобрать архив',district:'center',hours:4,energy:22,pay:6200,skill:'focus',game:'memory',risk:.01,description:'Пыль знает историю мэрии лучше учебника.'},
+  {id:'archive',name:'Разобрать архив',district:'center',hours:4,energy:22,pay:6200,skill:'focus',game:'sort',risk:.01,description:'Пыль знает историю мэрии лучше учебника.'},
   {id:'host',name:'Встретить делегацию',district:'center',hours:4,energy:21,pay:7100,skill:'charm',game:'route',risk:.01,description:'Улыбка держится дольше согласованной речи.'},
   {id:'fundraise',name:'Найти спонсора',district:'glass',hours:4,energy:24,pay:17500,skill:'charm',game:'bargain',risk:.02,description:'Они хотят добра, желательно с логотипом.'},
   {id:'securityaudit',name:'Аудит доступа',district:'glass',hours:5,energy:27,pay:19200,skill:'focus',game:'audit',risk:.02,description:'Пароль сменили. Он всё ещё написан на стикере.'},
   {id:'artdeal',name:'Продать коллекцию',district:'heights',hours:4,energy:25,pay:36000,skill:'charm',game:'bargain',risk:.01,description:'Ценник зависит от того, кто на него смотрит.'},
-  {id:'arbitration',name:'Уладить спор',district:'heights',hours:5,energy:32,pay:41000,skill:'charm',game:'memory',risk:.02,description:'Обе стороны победили в пресс-релизе.'}
+  {id:'arbitration',name:'Уладить спор',district:'heights',hours:5,energy:32,pay:41000,skill:'charm',game:'sort',risk:.02,description:'Обе стороны победили в пресс-релизе.'}
 ];
 
 export const homes = [
-  {id:'sofa',name:'Диван у знакомого',price:0,daily:120,restore:28,prestige:0,description:'Твоя полка в холодильнике — слух.'},
+  {id:'sofa',name:'Диван у знакомого',price:0,daily:0,restore:28,prestige:0,description:'Валера пустил бесплатно. Еду и прочий быт ты оплачиваешь сам.'},
   {id:'hostel',name:'Койка без соседского дивана',price:2500,daily:155,restore:32,prestige:1,description:'Шторка — первая собственная граница.'},
   {id:'room',name:'Комната с ковром',price:7500,daily:190,restore:38,prestige:3,description:'Ковёр глушит соседей. Иногда.'},
   {id:'flat',name:'Однушка у кольца',price:90000,daily:520,restore:51,prestige:11,description:'Свой чайник. Чужой ипотечный страх.'},
@@ -109,3 +109,4 @@ export const upgrades = [
 ];
 
 export const marketLabels = ['Затишье','Обычный день','Суета','Бум'];
+

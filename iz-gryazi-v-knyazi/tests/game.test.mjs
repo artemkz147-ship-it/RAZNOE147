@@ -2,13 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshState } from '../src/systems/state.js';
 import { GameEngine } from '../src/systems/engine.js';
-import { dailySettlement,districtUnlocked,netWorth,settleMatureInvestments } from '../src/systems/economy.js';
+import { dailySettlement,districtUnlocked,netWorth,settleMatureInvestments,travelOptions } from '../src/systems/economy.js';
 import { districts } from '../src/data/world.js';
 import { events } from '../src/data/events.js';
+import { incidents } from '../src/data/incidents.js';
 import { validate } from '../src/systems/save.js';
 import { casinoOutcome,casinoRemaining } from '../src/data/casino.js';
 import { shell,modal } from '../src/ui/views.js';
 import { dialogues } from '../src/data/dialogues.js';
+import { MiniGame } from '../src/ui/minigames.js';
 
 globalThis.localStorage={data:new Map(),setItem(k,v){this.data.set(k,v)},getItem(k){return this.data.get(k)||null},removeItem(k){this.data.delete(k)}};
 
@@ -83,12 +85,75 @@ test('crime can end in arrest, fine, injury and a served sentence',()=>{
   assert.equal(state.jailDays,0);
 });
 
-test('successful crime earns more than nearby legal work and raises heat',()=>{
+test('successful crime earns more than nearby legal work without accumulating wanted level',()=>{
   const state=freshState();const game=new GameEngine(state,()=>.99);
   game.completeCrime('parcel',.9);
   assert.ok(state.money>2000);
-  assert.ok(state.heat>0);
+  assert.equal(state.heat,0);
   assert.equal(state.arrestCount,0);
+});
+
+test('walking is free and wears shoes; paid bus and fare dodging have consistent costs',()=>{
+  const walkState=freshState();walkState.story=2;walkState.stats.respect=8;
+  const options=travelOptions(walkState,'market');
+  assert.equal(options.find(x=>x.id==='walk').cost,0);
+  assert.equal(options.find(x=>x.id==='fare-dodge').fine,options.find(x=>x.id==='bus').cost*10);
+  const walk=new GameEngine(walkState,()=>.99);const cash=walkState.money;
+  assert.equal(walk.travel('market','walk').ok,true);
+  assert.equal(walkState.money,cash);assert.ok(walkState.conditions.shoes<100);
+  const busState=freshState();busState.story=2;busState.stats.respect=8;
+  const bus=new GameEngine(busState,()=>.99);assert.equal(bus.travel('market','bus').ok,true);
+  assert.equal(busState.money,870-options.find(x=>x.id==='bus').cost);
+  const evader=freshState();evader.story=2;evader.stats.respect=8;evader.money=0;
+  assert.equal(new GameEngine(evader,()=>0).travel('market','fare-dodge').ok,true);
+  assert.equal(evader.jailDays,1);
+});
+
+test('contextual incidents appear after a relevant action and can be resolved',()=>{
+  assert.ok(incidents.length>=40);
+  assert.ok(incidents.every(x=>x.choices.length>=2&&x.choices.some(choice=>!choice.cost)));
+  const state=freshState();state.story=2;state.stats.respect=8;
+  const game=new GameEngine(state,()=>0);
+  game.travel('market','walk');
+  assert.ok(state.recentIncident);
+  assert.equal(game.activity('rest').ok,false);
+  assert.equal(game.resolveIncident(0).ok,true);
+  assert.equal(state.recentIncident,null);
+});
+
+test('damaged shoes slow walking and suits prevent asking for handouts',()=>{
+  const state=freshState();state.story=2;state.stats.respect=8;
+  const normal=travelOptions(state,'market').find(x=>x.id==='walk');
+  state.conditions.shoes=10;
+  const damaged=travelOptions(state,'market').find(x=>x.id==='walk');
+  assert.ok(damaged.hours>normal.hours&&damaged.energy>normal.energy&&damaged.risk>normal.risk);
+  state.upgrades.push('office-suit');
+  assert.match(new GameEngine(state,()=>.9).activity('beg').message,/костюме/);
+});
+
+test('free sofa has no housing charge and formal work checks appearance',()=>{
+  const s=freshState();const before=s.money;
+  const settlement=dailySettlement(s,{rng:()=>.99});
+  assert.equal(settlement.expenses,110);
+  assert.equal(s.money,before-110);
+  s.district='center';const game=new GameEngine(s,()=>.99);
+  assert.match(game.jobReady('barista').message,/рубашка/);
+  s.upgrades.push('clean-shirt');assert.equal(game.jobReady('barista').ok,true);
+  s.conditions.hangover=1;assert.match(game.jobReady('barista').message,/перегар/);
+});
+
+test('new mini games resolve touch choices without word memory',()=>{
+  for(const gameType of ['sort','cipher','stealth']){
+    let outcome=null;const game=new MiniGame({game:gameType,name:'Проверка',district:'yard'},score=>outcome=score);
+    game.onRender=()=>{};
+    assert.ok(game.render().includes('data-mini'));
+    for(let i=0;i<3&&game.active;i++){
+      const choice=gameType==='sort'?game.sortRound().correct:gameType==='cipher'?game.cipherRound().correct:1;
+      game.input(gameType,String(choice));
+    }
+    assert.ok(Number.isFinite(outcome),gameType);
+    assert.ok(outcome>0,gameType);
+  }
 });
 
 test('district activities are gated and spend their visible cost',()=>{
@@ -206,3 +271,4 @@ test('dialogue panel shows the speaker, alternatives and the chosen outcome',()=
   assert.match(modal(state,null,'tamara',result),/ОТНОШЕНИЯ \+3/);
   assert.match(modal(state,null,'tamara',result),/попадает в дневник|ЗАКОНЧИТЬ РАЗГОВОР/i);
 });
+

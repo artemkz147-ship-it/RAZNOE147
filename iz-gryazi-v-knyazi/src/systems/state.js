@@ -6,6 +6,7 @@ export function freshState() {
     stats: { health: 82, energy: 73, mood: 48, respect: 0, fame: 0, stress: 19, appeal: 5, contacts: 0, crime: 0, business: 0, life: 8 },
     skills: { grit: 1, charm: 1, focus: 1 }, xp: { grit: 0, charm: 0, focus: 0 },
     home: 'sofa', vehicle: 'feet', ownedHomes: ['sofa'], ownedVehicles: ['feet'], businesses: {}, upgrades: [], lastRestDay: 0,
+    conditions: {shoes:100,back:0,hangover:0,loaderShifts:0,walkTrips:0}, incidentHistory: [], recentIncident: null,
     heat: 0, jailDays: 0, crimesDone: 0, arrestCount: 0,
     casino: {rounds:0,wins:0,wagered:0,returned:0,history:[]}, casinoDaily: {day:1,wagered:0},
     relations: {}, dialogueProgress: {}, dialogueLast: {}, story: 0, flags: [], log: [{ day:1, hour:7, text:'Проснулся на чужом диване. Город пока не в курсе, что ты собираешься его купить.', type:'story' }],
@@ -27,3 +28,4 @@ export function addLog(state,text,type='neutral') {
   state.log.unshift({day:state.day,hour:state.hour,text,type});
   state.log = state.log.slice(0,70);
 }
+

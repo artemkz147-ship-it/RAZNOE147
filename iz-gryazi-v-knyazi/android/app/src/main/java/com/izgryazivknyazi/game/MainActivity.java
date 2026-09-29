@@ -4,7 +4,11 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
+import android.graphics.Insets;
 import android.view.View;
+import android.view.WindowInsets;
+import android.widget.FrameLayout;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -79,7 +83,16 @@ public class MainActivity extends Activity {
                 });
             }
         }, "AndroidGame");
-        setContentView(webView);
+        FrameLayout container = new FrameLayout(this);
+        container.addView(webView, new FrameLayout.LayoutParams(-1, -1));
+        if (Build.VERSION.SDK_INT >= 35) {
+            container.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+                Insets safe = windowInsets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                container.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+                return windowInsets;
+            });
+        }
+        setContentView(container);
         webView.loadUrl("https://" + HOST + "/assets/game/index.html");
     }
 
@@ -102,3 +115,4 @@ public class MainActivity extends Activity {
         webView.evaluateJavascript("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))", null);
     }
 }
+

@@ -5,10 +5,12 @@ export const activities = [
   {id:'clinic',name:'К врачу',hours:2,cost:1700,effect:{health:30,stress:-5},description:'Врач сказал отдыхать. Ты записал это как совет по инвестициям.'},
   {id:'gym',name:'Тренировка',hours:2,cost:750,effect:{health:8,appeal:4,energy:-12,stress:-5},description:'Абонемент использован. Это уже достижение.'},
   {id:'walk',name:'Пройтись',hours:2,cost:0,effect:{mood:8,stress:-9,energy:-4},description:'Прогулка ничего не стоила. Город подозрительно молчал.'},
+  {id:'beg',name:'Просить мелочь',district:'yard',hours:2,cost:0,effect:{energy:-7,stress:5},description:'Два часа у перехода: прохожие делились мелочью и взглядами.'},
+  {id:'drink',name:'Выпить с приятелем',hours:2,cost:240,effect:{mood:7,stress:-4,energy:-5},description:'Вечер стал веселее. Завтра на приличной работе могут заметить перегар.'},
   {id:'network',name:'Знакомства',hours:3,cost:2100,effect:{contacts:2,appeal:2,fame:1,energy:-10,stress:2},description:'Обменялся контактами. Часть номеров даже настоящая.'},
   {id:'ad',name:'Дать рекламу',hours:2,cost:9800,effect:{fame:5,business:2,stress:2},description:'Купил рекламу. Теперь город знает твоё имя с опечаткой.'},
   {id:'yardtea',name:'Чай у соседей',district:'yard',hours:2,cost:180,effect:{mood:7,contacts:1,stress:-3},description:'Новости подъезда обновляются быстрее интернета.'},
-  {id:'yardrepair',name:'Починить ботинки',district:'yard',hours:2,cost:420,effect:{health:3,stress:-2},description:'Мастер прошил подошву и твою веру в вещи.'},
+  {id:'yardrepair',name:'Починить ботинки',district:'yard',hours:2,cost:420,effect:{health:3,stress:-2},description:'Мастер прошил подошву. Теперь снова можно много ходить.'},
   {id:'marketmeal',name:'Обед у рынка',district:'market',hours:1,cost:480,effect:{energy:18,health:4,mood:4},description:'Чек не дали, зато добавили хлеба.'},
   {id:'marketwatch',name:'Посмотреть торги',district:'market',hours:2,cost:0,effect:{business:2,contacts:1,energy:-5},description:'Купил только опыт. Он пока без гарантии.'},
   {id:'industrialrest',name:'Передышка в цехе',district:'industrial',hours:1,cost:120,effect:{energy:12,stress:-4,mood:2},description:'В автомате кофе, похожий на дисциплину.'},
@@ -20,3 +22,4 @@ export const activities = [
   {id:'heightswellness',name:'Тихий выходной',district:'heights',hours:4,cost:65000,effect:{health:18,mood:12,stress:-16},description:'Тишина оплачивается отдельно и заранее.'},
   {id:'heightsauction',name:'Вечер благотворителей',district:'heights',hours:3,cost:120000,effect:{fame:5,respect:4,contacts:3,stress:3},description:'Пожертвование объявили громче цели сбора.'}
 ];
+
