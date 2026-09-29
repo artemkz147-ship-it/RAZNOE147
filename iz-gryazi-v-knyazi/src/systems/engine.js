@@ -11,9 +11,11 @@ import { casinoGames,casinoOutcome,casinoRemaining } from '../data/casino.js';
 import { createCasinoTable,actCasinoTable } from './casinoTable.js';
 import { romancePeople,romanceAccess,romanceGifts,giftTaste } from '../data/romance.js';
 import { romanceDay,romanceConflictChoices } from './romance.js';
+import { activePartners,addPartner,dropPartner,changeSocial,socialDay,socialGroup,socialMet,socialValue } from './social.js';
 import { freshState,adjust,addLog,clamp } from './state.js';
 import { byId,districtUnlocked,travelOptions,gainSkill,dailySettlement,settleMatureInvestments,netWorth,businessStrategies } from './economy.js';
 import { saveGame } from './save.js';
+import { diets,careers } from '../data/lifestyle.js';
 
 const success = (message,tone='good') => ({ok:true,message,tone});
 const fail = message => ({ok:false,message,tone:'bad'});
@@ -26,6 +28,7 @@ export class GameEngine {
   subscribe(fn) { this.listeners.add(fn); return ()=>this.listeners.delete(fn); }
   emit(result) { const s=this.state;s.achievedRoutes ||= [];for(const route of successRoutes(s)){if(!s.achievedRoutes.includes(route.id)){s.achievedRoutes.push(route.id);addLog(s,`Достигнут путь: ${route.name}. Другие направления можно развивать одновременно.`,'story');}}s.ending=s.achievedRoutes.length>0;saveGame(s); for (const fn of this.listeners) fn(s,result); return result; }
   guard() {
+    if (this.state.death) return fail('История этой жизни завершилась. Начни новую игру в меню.');
     if (this.state.jailDays>0) return fail(`Ты под арестом. Осталось ${this.state.jailDays} дн.`);
     if (this.state.pending) return fail('Сначала прими решение в открытой истории.');
     if (this.state.recentIncident) return fail('Сначала разберись с неожиданным событием.');
@@ -34,16 +37,16 @@ export class GameEngine {
     return null;
   }
   spend(cost) { if (this.state.money<cost) return false; this.state.money-=cost; return true; }
-  tick(hours) {
+  tick(hours,quiet=false) {
     const s=this.state;
     s.hour += hours;
     while (s.hour>=24) {
       s.hour-=24; s.day++;
       dailySettlement(s,{rng:this.rng});
-      romanceDay(s,this.rng);
+      if(!quiet){romanceDay(s,this.rng);socialDay(s,this.rng);}
       settleMatureInvestments(s,this.rng);
-      if (s.day%6===0) this.crisis();
-      if (!s.pending && !s.jailDays && this.rng()<.42) this.queueEvent();
+      if (!quiet&&s.day%6===0) this.crisis();
+      if (!quiet&&!s.pending && !s.jailDays && this.rng()<.42) this.queueEvent();
     }
   }
   maybeIncident(context,chance) {
@@ -62,7 +65,7 @@ export class GameEngine {
     if(s.recentIncident&&!s.recentIncident.id){
       const custom=s.recentIncident,choice=custom.choices?.[index];
       if(choice?.cost&&!this.spend(choice.cost))return this.emit(fail('На это не хватает денег.'));
-      if(choice){adjust(s,choice.effect);if(choice.rapport){const profile=s.romance?.profiles[choice.rapport.id];if(profile)profile.rapport=clamp(profile.rapport+choice.rapport.delta,0,100);}addLog(s,`${custom.title}: ${choice.reply}`,'story');}
+      if(choice){adjust(s,choice.effect);if(choice.rapport){const profile=s.romance?.profiles[choice.rapport.id];if(profile)profile.rapport=clamp(profile.rapport+choice.rapport.delta,0,100);changeSocial(s,choice.rapport.id,choice.rapport.delta);}if(choice.socialDelta&&custom.socialId)changeSocial(s,custom.socialId,choice.socialDelta);addLog(s,`${custom.title}: ${choice.reply}`,'story');}
       s.recentIncident=null;return this.emit(success(choice?.reply||'Продолжить.'));
     }
     if(!item)return this.emit(fail('Событие уже завершилось.'));
@@ -155,17 +158,21 @@ export class GameEngine {
     const resilience=.72+s.stats.health*.0025-s.stats.stress*.0015+s.stats.life*.0009;
     const social=j.skill==='charm'?1+s.stats.appeal*.0015+s.stats.contacts*.001:1;
     const notoriety=j.id==='reseller'?1+s.stats.crime*.002:1;
-    const reward=Math.round(j.pay*(.48+performance*.85)*skill*mood*resilience*social*notoriety);
+    const allies=people.filter(p=>p.district===j.district&&socialGroup(s,p.id)==='friends').length;
+    const rivals=people.filter(p=>p.district===j.district&&socialGroup(s,p.id)==='enemies').length;
+    const network=1+Math.min(.15,allies*.05)-Math.min(.12,rivals*.04);
+    const reward=Math.round(j.pay*(.48+performance*.85)*skill*mood*resilience*social*notoriety*network);
     const tip=performance>.83?Math.round(j.pay*.13):0;
-    const accident=this.rng()<j.risk*(1-performance*.6)*(1+s.stats.stress*.004+s.stats.crime*.003+(j.id==='loader'?s.conditions.loaderShifts*.08:0));
+    const accident=this.rng()<j.risk*(1+(1-performance)*1.2)*(1+s.stats.stress*.004+s.stats.crime*.003+(j.id==='loader'?s.conditions.loaderShifts*.08:0));
     s.money+=reward+tip; s.totalEarned+=reward+tip; s.jobsDone++;
     adjust(s,{energy:-j.energy,stress:Math.round(2+j.hours*.6-performance*3),mood:performance>.65?2:-2,respect:performance>.74?2:0,health:accident?-Math.ceil(j.energy*.25):0});
     gainSkill(s,j.skill,performance>.75?2:1);
-    this.tick(j.hours);
+    this.tick(Math.max(j.hours,31-s.hour));
     addLog(s,`${j.name}: заработано ${(reward+tip).toLocaleString('ru-RU')} ₽${accident?', но досталось здоровью':''}.`,accident?'bad':'good');
     if(j.id==='loader')s.conditions.loaderShifts++;
     this.maybeIncident(j.id==='loader'?'loader':['center','glass','heights'].includes(j.district)?'office':'job',j.id==='loader'?Math.min(.42,.08+s.conditions.loaderShifts*.045):.13);
-    return this.emit(success(`+${(reward+tip).toLocaleString('ru-RU')} ₽${tip?' включая чаевые':''}`,accident?'bad':'good'));
+    s.lastWorkResult={kind:'job',title:j.name,earned:reward+tip,day:s.day,detail:`Заработано ${(reward+tip).toLocaleString('ru-RU')} ₽.${accident?' Получена травма.':''}${allies?' Помогли связи.':''}${rivals?' Помешала старая ссора.':''}`};
+    return this.emit(success(s.lastWorkResult.detail,accident?'bad':'good'));
   }
   crimeReady(id) {
     const gig=byId(crimes,id),s=this.state;
@@ -181,8 +188,10 @@ export class GameEngine {
   completeCrime(id,score) {
     const ready=this.crimeReady(id);if(!ready.ok)return this.emit(ready);
     const gig=byId(crimes,id),s=this.state,performance=clamp(score,0,1);
-    const arrestChance=clamp(gig.arrest*(1-performance*.38)*(1-s.stats.contacts*.0015),.04,.88);
-    const injuryChance=clamp(gig.injury*(1-performance*.32),.02,.7);
+    const allies=people.filter(p=>p.district===gig.district&&socialGroup(s,p.id)==='friends').length;
+    const rivals=people.filter(p=>p.district===gig.district&&socialGroup(s,p.id)==='enemies').length;
+    const arrestChance=clamp(gig.arrest*(.68+(1-performance)*1.12)*(1-s.stats.contacts*.0015)*(1-Math.min(.15,allies*.05)+Math.min(.24,rivals*.08)),.04,.95);
+    const injuryChance=clamp(gig.injury*(.72+(1-performance)*1.25),.02,.85);
     const arrested=this.rng()<arrestChance;
     const injured=this.rng()<injuryChance;
     const payout=Math.round(gig.pay*(.48+performance*.85)*(1+(s.skills[gig.skill]-1)*.045));
@@ -191,18 +200,56 @@ export class GameEngine {
     this.tick(gig.hours);
     if(arrested){
       s.arrestCount++;const penalty=this.rng();
-      if(penalty<.36){s.jailDays+=gig.jail;s.money-=gig.fine;addLog(s,`${gig.name}: задержание, штраф ${gig.fine.toLocaleString('ru-RU')} ₽ и ${gig.jail} дн. ареста.`,'bad');return this.emit(success(`Задержание: штраф ${gig.fine.toLocaleString('ru-RU')} ₽ и ${gig.jail} дн. ареста.`,'bad'));}
-      if(penalty<.78){s.money-=gig.fine;addLog(s,`${gig.name}: поймали и отпустили после штрафа ${gig.fine.toLocaleString('ru-RU')} ₽.`,'bad');return this.emit(success(`Задержание: штраф ${gig.fine.toLocaleString('ru-RU')} ₽, без ареста.`,'bad'));}
-      adjust(s,{health:-Math.max(8,Math.round(gig.energy*.55)),stress:8});addLog(s,`${gig.name}: остановили и избили. Денег не взяли, здоровье пострадало.`,'bad');return this.emit(success('Сделка сорвалась: досталось здоровью.','bad'));
+      if(penalty<.36){s.jailDays+=gig.jail;s.money-=gig.fine;s.lastWorkResult={kind:'crime',title:gig.name,earned:0,day:s.day,detail:`Заказ сорвался. Заработано 0 ₽. Штраф ${gig.fine.toLocaleString('ru-RU')} ₽ и ${gig.jail} дн. ареста.`};addLog(s,s.lastWorkResult.detail,'bad');return this.emit(success(s.lastWorkResult.detail,'bad'));}
+      if(penalty<.78){s.money-=gig.fine;s.lastWorkResult={kind:'crime',title:gig.name,earned:0,day:s.day,detail:`Заказ сорвался. Заработано 0 ₽. Штраф ${gig.fine.toLocaleString('ru-RU')} ₽.`};addLog(s,s.lastWorkResult.detail,'bad');return this.emit(success(s.lastWorkResult.detail,'bad'));}
+      adjust(s,{health:-Math.max(8,Math.round(gig.energy*.55)),stress:8});s.lastWorkResult={kind:'crime',title:gig.name,earned:0,day:s.day,detail:'Заказ сорвался. Заработано 0 ₽. Получены травмы.'};addLog(s,s.lastWorkResult.detail,'bad');return this.emit(success(s.lastWorkResult.detail,'bad'));
     }
     s.money+=payout;s.totalEarned+=payout;
     addLog(s,`${gig.name}: получено ${payout.toLocaleString('ru-RU')} ₽.${injured?' Пришлось лечить травму.':''}`,injured?'bad':'good');
     this.maybeIncident('crime',.14);
-    return this.emit(success(`+${payout.toLocaleString('ru-RU')} ₽${injured?' · получена травма':''}`,injured?'bad':'good'));
+    s.lastWorkResult={kind:'crime',title:gig.name,earned:payout,day:s.day,detail:`Получено ${payout.toLocaleString('ru-RU')} ₽.${injured?' Получена травма.':''}${allies?' Помогли связи.':''}${rivals?' Старая ссора повысила риск.':''}`};
+    return this.emit(success(s.lastWorkResult.detail,injured?'bad':'good'));
+  }
+  setDiet(id){
+    const blocked=this.guard();if(blocked)return this.emit(blocked);
+    const diet=byId(diets,id);if(!diet)return this.emit(fail('Такого режима питания нет.'));
+    this.state.diet=id;addLog(this.state,`Теперь питание: ${diet.name}, ${diet.daily.toLocaleString('ru-RU')} ₽ в день.`,'neutral');
+    return this.emit(success(`Питание изменено: ${diet.name}. Расход ${diet.daily.toLocaleString('ru-RU')} ₽ в день.`));
+  }
+  careerReady(id){
+    const s=this.state,career=byId(careers,id);
+    if(!career)return fail('Вакансия не найдена.');
+    const blocked=this.guard();if(blocked)return blocked;
+    if(s.district!==career.district)return fail('Для этой работы нужно быть в нужном районе.');
+    if(s.stats.respect<career.respect||s.skills[career.skill]<career.level)return fail(`Нужно уважение ${career.respect} и навык ${career.level}.`);
+    if(career.respect>=18&&!['clean-shirt','office-suit','tailored-suit','cashmere-coat'].some(x=>s.upgrades.includes(x)))return fail('На собеседование нужна чистая рубашка.');
+    if(s.conditions.hangover)return fail('С перегаром на постоянную работу не возьмут.');
+    if(s.stats.health<30)return fail('Сначала восстанови здоровье.');
+    return success('Можно работать.');
+  }
+  workCareer(id,months=1){
+    const ready=this.careerReady(id);if(!ready.ok)return this.emit(ready);
+    const s=this.state,c=byId(careers,id),count=Math.floor(Number(months));
+    if(![1,3,6].includes(count))return this.emit(fail('Выбери срок работы: 1, 3 или 6 месяцев.'));
+    const start=s.money;let paid=0,worked=0;
+    for(let i=0;i<count*30;i++){
+      s.stats.energy=clamp(s.stats.energy-8,0,100);
+      s.vitals.strain=clamp(s.vitals.strain+(c.id==='janitor'||c.id==='mechanic'?1:0),0,100);
+      this.tick(24,true);worked++;
+      if(worked%30===0){const salary=Math.round(c.salary*(.8+Math.min(.3,(s.skills[c.skill]-1)*.04)));s.money+=salary;s.totalEarned+=salary;paid+=salary;s.careerMonths++;gainSkill(s,c.skill,3);}
+      if(s.death)break;
+    }
+    const net=s.money-start;
+    const detail=`${c.name}: прошло ${worked} дн. Зарплата +${paid.toLocaleString('ru-RU')} ₽; еда, жильё и прочие расходы учтены. Баланс ${net>=0?'+':''}${net.toLocaleString('ru-RU')} ₽.`;
+    s.lastWorkResult={kind:'career',title:c.name,earned:paid,day:s.day,detail};
+    addLog(s,detail,net>=0?'good':'bad');
+    if(!s.death)this.maybeIncident(c.respect>=18?'office':'job',.12);
+    return this.emit(success(detail,net>=0?'good':'bad'));
   }
   startCasino(id,amount){
     const blocked=this.guard();if(blocked)return this.emit(blocked);
     const s=this.state,stake=Number(amount),game=byId(casinoGames,id);
+    if(s.stats.respect<8||!['clean-shirt','office-suit','tailored-suit','cashmere-coat'].some(x=>s.upgrades.includes(x)))return this.emit(fail('Охрана казино просит приличный вид и уважение в городе.'));
     if(!game)return this.emit(fail('Игровой стол не найден.'));
     if(!Number.isSafeInteger(stake)||stake<50)return this.emit(fail('Минимальная ставка — 50 ₽.'));
     if(s.stats.energy<4)return this.emit(fail('Для партии нужны 4 энергии.'));
@@ -282,9 +329,10 @@ export class GameEngine {
       effect.energy=Math.max(0,target-s.stats.energy);
     }
     if(id==='rest')s.lastRestDay=s.day;
-    if(id==='drink')s.conditions.hangover=1;
+    if(id==='drink'){s.conditions.hangover=1;s.vitals.immunity=clamp(s.vitals.immunity-3,0,100);s.vitals.strain=clamp(s.vitals.strain+4,0,100);}
     if(id==='sleep')s.conditions.hangover=0;
-    if(id==='clinic')s.conditions.back=0;
+    if(id==='clinic'){s.conditions.back=0;s.vitals.illness=0;s.vitals.immunity=clamp(s.vitals.immunity+18,0,100);}
+    if(id==='gym'){s.vitals.fitness=clamp(s.vitals.fitness+8,0,100);s.vitals.strain=clamp(s.vitals.strain-2,0,100);}
     if(id==='yardrepair')s.conditions.shoes=100;
     let outcome=a.description;
     if(id==='beg'){const coins=20+Math.floor(this.rng()*100);s.money+=coins;s.totalEarned+=coins;outcome=`За два часа собрал ${coins} ₽. Никакой гарантии на завтра.`;}
@@ -338,17 +386,20 @@ export class GameEngine {
     const s=this.state,person=byId(romancePeople,id);if(!person)return this.emit(fail('Этого человека нет в городе.'));
     const r=s.romance,p=r.profiles[id]||{rapport:0,meetings:0,lastDay:0,days:0,spent:0,appearance:0,last:person.description,met:false};
     if(action==='separate'){
-      if(r.partner!==id)return this.emit(fail('Вы не вместе.'));
-      r.partner=null;p.married=false;p.last='Вы решили разойтись.';r.profiles[id]=p;adjust(s,{stress:5,mood:-4});addLog(s,`${person.name}: вы расстались.`,'bad');return this.emit(success(p.last,'bad'));
+      if(!activePartners(s).includes(id))return this.emit(fail('Вы не вместе.'));
+      dropPartner(r,id);p.married=false;p.last='Вы решили разойтись.';r.profiles[id]=p;changeSocial(s,id,-28);adjust(s,{stress:5,mood:-4});addLog(s,`${person.name}: вы расстались.`,'bad');return this.emit(success(p.last,'bad'));
     }
     if(action==='commit'){
-      if(r.partner)return this.emit(fail('Сначала реши отношения с нынешним партнёром.'));
-      if(!p.met||p.rapport<person.commit)return this.emit(fail(`Нужно доверие ${person.commit}. Сейчас ${p.rapport}.`));
+      if(activePartners(s).includes(id))return this.emit(fail('Вы уже вместе.'));
+      if(!p.met||p.rapport<person.commit||socialValue(s,id)<=-20)return this.emit(fail(`Нужно доверие ${person.commit} и примирение. Сейчас ${p.rapport}.`));
       if(id==='nina'&&(s.jobsDone<8||homes.findIndex(x=>x.id===s.home)<2||r.betrayedNina))return this.emit(fail('Нине нужны устойчивость, честность и своё жильё. После измены доверие не вернуть подарком.'));
-      r.partner=id;p.days=0;p.everPartner=true;p.last=`Вы с ${person.name} решили быть вместе.`;r.profiles[id]=p;adjust(s,{mood:8,stress:-3});addLog(s,p.last,'good');return this.emit(success(p.last));
+      const others=activePartners(s);addPartner(r,id);p.days=0;p.everPartner=true;p.last=`Вы с ${person.name} решили быть вместе.`;r.profiles[id]=p;changeSocial(s,id,7);adjust(s,{mood:8,stress:-3});addLog(s,p.last,'good');
+      if(others.length&&this.rng()<.4){const other=others[Math.floor(this.rng()*others.length)],name=byId(romancePeople,other)?.name||other;r.conflict={kind:'affair',partnerId:other,targetId:id,title:'Разговор о ваших отношениях',text:`${name} узнала, что ты начал встречаться с ${person.name}. Придётся объясниться.`,day:s.day};addLog(s,r.conflict.text,'bad');}
+      return this.emit(success(p.last));
     }
     if(action==='marry'){
-      if(r.partner!==id||p.days<8||p.rapport<80)return this.emit(fail('Для общего будущего нужны время и доверие 80.'));
+      if(!activePartners(s).includes(id)||p.days<8||p.rapport<80)return this.emit(fail('Для общего будущего нужны время и доверие 80.'));
+      if(activePartners(s).some(other=>other!==id&&r.profiles[other]?.married))return this.emit(fail('Сначала реши вопрос с другим браком.'));
       if(id==='nina'&&r.betrayedNina)return this.emit(fail('Нина не готова после измены.'));
       p.married=true;p.last=`Вы с ${person.name} поженились.`;r.profiles[id]=p;adjust(s,{mood:10,respect:3});addLog(s,p.last,'good');return this.emit(success(p.last));
     }
@@ -363,15 +414,15 @@ export class GameEngine {
     const cost=action==='date'?person.dateCost:gift?Math.round(person.giftCost*gift.factor):0;
     if(s.money<cost)return this.emit(fail(`Нужно ${cost.toLocaleString('ru-RU')} ₽.`));
     if(s.stats.energy<6)return this.emit(fail('Нужны силы на встречу. Переведи дух или выспись.'));
-    const affair=!!(r.partner&&r.partner!==id&&action!=='meet');
+    const otherPartners=activePartners(s).filter(other=>other!==id),affair=otherPartners.length>0&&action!=='meet'&&this.rng()<.35;
     s.money-=cost;p.spent+=cost;p.met=true;p.meetings++;p.lastDay=s.day;
     const gain=gift?giftTaste[id][gift.id]:action==='meet'?6:action==='talk'?5:action==='date'?(id==='nina'?9:11):0;
-    p.rapport=clamp(p.rapport+gain,0,100);
+    changeSocial(s,id,gain);p.rapport=clamp(p.rapport+gain,0,100);
     const line=person.lines[(p.meetings-1)%person.lines.length];p.last=`${line} ${gift?`${gift.name}: ${gain>=0?'понравилось':'не попало в характер'}.`:action==='date'?'Вы провели вечер вместе.':action==='talk'||p.meetings>1?'Вы поговорили.':'Вы познакомились.'}`;
     if(gift){p.gifts=(p.gifts||0)+1;p.lastGift=gift.id;}
     r.profiles[id]=p;r.history.unshift({day:s.day,id,action,text:p.last});r.history=r.history.slice(0,20);
     adjust(s,{energy:action==='date'?-9:-6,mood:gift?2:4,stress:action==='date'?-2:0});
-    if(affair){r.affairs=(r.affairs||0)+1;const partner=byId(romancePeople,r.partner);r.conflict={kind:'affair',partnerId:r.partner,targetId:id,title:`Тайная встреча раскрыта`,text:`${partner.name} узнала о твоей встрече с ${person.name}. Реши, что сказать.`,day:s.day};addLog(s,r.conflict.text,'bad');}
+    if(affair){r.affairs=(r.affairs||0)+1;const betrayed=otherPartners[Math.floor(this.rng()*otherPartners.length)],partner=byId(romancePeople,betrayed);r.conflict={kind:'affair',partnerId:betrayed,targetId:id,title:'Тайная встреча раскрыта',text:`${partner.name} узнала о твоей встрече с ${person.name}. Реши, что сказать.`,day:s.day};addLog(s,r.conflict.text,'bad');}
     this.tick(action==='date'?3:1);addLog(s,`${person.name}: ${p.last} Доверие ${p.rapport}/100.`,'story');
     return this.emit(success(`${person.name}: ${p.last} Доверие ${p.rapport}/100.`));
   }
@@ -383,7 +434,7 @@ export class GameEngine {
     s.money-=choice.cost;p.spent=(p.spent||0)+choice.cost;p.rapport=clamp(p.rapport+choice.rapport,0,100);
     adjust(s,choice.effect);if(c.kind==='affair'&&c.partnerId==='nina')r.betrayedNina=true;
     const separated=choice.leave||p.rapport<8;
-    if(separated){r.partner=null;p.married=false;p.last=`Вы расстались. ${choice.reply}`;}
+    if(separated){dropPartner(r,c.partnerId);p.married=false;p.last=`Вы расстались. ${choice.reply}`;changeSocial(s,c.partnerId,c.kind==='affair'?-65:-25);}
     else p.last=choice.reply;
     r.history.unshift({day:s.day,id:c.partnerId,action:c.kind,text:p.last});r.history=r.history.slice(0,20);
     r.conflict=null;addLog(s,`${byId(romancePeople,c.partnerId).name}: ${p.last} Доверие ${p.rapport}/100.`,separated?'bad':'story');
@@ -393,7 +444,7 @@ export class GameEngine {
     const blocked=this.guard(); if (blocked) return this.emit(blocked);
     const s=this.state,p=byId(people,id);
     if (!p||s.district!==p.district && !(p.id==='valera' && s.district==='market') && !(p.id==='azamat' && s.district==='industrial') && !(p.id==='lida' && s.district==='center') && !(p.id==='vera' && s.district==='glass') && !(p.id==='artur' && s.district==='heights')) return this.emit(fail('Этого человека здесь нет.'));
-    if (s.stats.respect<p.threshold&&s.stats.contacts<Math.ceil(p.threshold/3)&&netWorth(s)<p.threshold*18000) return this.emit(fail('Нужно больше уважения, связей или денег, чтобы заинтересовать этого человека.'));
+    if (!socialMet(s,id)&&s.stats.respect<p.threshold&&s.stats.contacts<Math.ceil(p.threshold/3)&&netWorth(s)<p.threshold*18000) return this.emit(fail('Нужно больше уважения, связей или денег, чтобы заинтересовать этого человека.'));
     const rel=s.relations[id]||0;
     if (action==='talk') {
       const scene=nextDialogue(s,id),choice=scene?.choices[choiceIndex];
@@ -402,6 +453,7 @@ export class GameEngine {
       if(s.stats.energy<5)return this.emit(fail('На разговор нужны 5 энергии. Переведи дух (+22) или выспись.'));
       if(choice.cost&&!this.spend(choice.cost))return this.emit(fail('На этот ответ не хватает денег.'));
       const before=s.relations[id]||0;
+      changeSocial(s,id,choice.relation);
       adjust(s,choice.effect);
       adjust(s,{energy:-5});
       s.relations[id]=clamp(before+choice.relation,0,100);
@@ -411,8 +463,27 @@ export class GameEngine {
       addLog(s,`${p.name} — ${scene.topic}: ${choice.reply} Отношения +${s.relations[id]-before}.`,'story');
       return this.emit({...success(choice.reply),dialogueReply:choice.reply,dialogueTopic:scene.topic,relationGain:s.relations[id]-before,effects:choice.effect});
     }
-    if (action==='favor') { if(rel<2)return this.emit(fail('Сначала наладь отношения в разговоре.')); const price=Math.round(p.cost*(1-Math.min(.22,s.stats.contacts*.002+s.stats.appeal*.001))); if(!this.spend(price))return this.emit(fail('Не хватает денег.')); adjust(s,p.effect); s.relations[id]=clamp(rel+p.relation,0,100); this.tick(2); addLog(s,`${p.name}: ${p.favor}. Услуга обошлась в ${price.toLocaleString('ru-RU')} ₽.`,'good'); return this.emit(success(`${p.name} оценил помощь.`)); }
+    if (action==='favor') { if(rel<2||socialGroup(s,id)==='enemies')return this.emit(fail('Сначала наладь отношения в разговоре.')); const price=Math.round(p.cost*(1-Math.min(.22,s.stats.contacts*.002+s.stats.appeal*.001))); if(!this.spend(price))return this.emit(fail('Не хватает денег.')); adjust(s,p.effect);changeSocial(s,id,p.relation);s.relations[id]=clamp(rel+p.relation,0,100); this.tick(2); addLog(s,`${p.name}: ${p.favor}. Услуга обошлась в ${price.toLocaleString('ru-RU')} ₽.`,'good'); return this.emit(success(`${p.name} оценил помощь.`)); }
     return this.emit(fail('Неизвестный выбор.'));
+  }
+  socialAction(id,action){
+    const blocked=this.guard();if(blocked)return this.emit(blocked);
+    const s=this.state,person=[...people,...romancePeople].find(p=>p.id===id);
+    if(!person||!socialMet(s,id))return this.emit(fail('Сначала познакомьтесь.'));
+    const bond=s.social?.[id];if(bond?.lastDay===s.day)return this.emit(fail('Сегодня вы уже выяснили отношения. Продолжи завтра.'));
+    if(s.stats.energy<6)return this.emit(fail('На разговор не хватает сил. Передохни или выспись.'));
+    let delta=0,reply='',tone='good';
+    if(action==='help'){
+      delta=10;adjust(s,{energy:-8,contacts:1,stress:-1});reply=`Ты помог ${person.name}. Теперь вам легче доверять друг другу.`;
+    }else if(action==='boundary'){
+      delta=-17;adjust(s,{energy:-6,stress:-3,respect:1});reply=`Ты отказался выполнять просьбу ${person.name}. Тебе стало спокойнее, но связь испортилась.`;tone='neutral';
+    }else if(action==='reconcile'){
+      if(socialValue(s,id)>-1)return this.emit(fail('Ссориться вам сейчас не из-за чего.'));
+      const worked=this.rng()<Math.min(.85,.42+s.skills.charm*.05);delta=worked?21:-5;adjust(s,{energy:-6,stress:worked?-4:3});reply=worked?`Вы с ${person.name} смогли поговорить без взаимных обвинений.`:`${person.name} пока не готов мириться.`;tone=worked?'good':'bad';
+    }else return this.emit(fail('Неизвестное действие.'));
+    const score=changeSocial(s,id,delta);if(s.romance?.profiles?.[id])s.romance.profiles[id].rapport=clamp(s.romance.profiles[id].rapport+delta,0,100);s.social[id].lastDay=s.day;this.tick(1);
+    addLog(s,`${reply} Связь ${score>0?'+':''}${score}.`,tone);
+    return this.emit(success(reply,tone));
   }
   invest(id,amount) {
     const blocked=this.guard(); if (blocked) return this.emit(blocked);

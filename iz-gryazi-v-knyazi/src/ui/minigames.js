@@ -6,21 +6,21 @@ export class MiniGame {
   constructor(job,finish) {
     this.job=job; this.finish=finish; this.round=0; this.scores=[]; this.active=true;
     this.target=rand(23,77); this.marker=0; this.direction=1;
-    this.sequence=Array.from({length:4},()=>rand(0,5)); this.guess=0; this.revealed=false;
+    this.sequence=Array.from({length:4},()=>rand(0,5)); this.guess=0; this.revealed=false;this.memoryResults=[];this.finishing=false;
     this.route=[]; this.auditChoice=rand(0,2); this.auditCorrect=0;
     this.offer=95; this.bargainIdeal=rand(75,125);
     this.alert=0;this.loot=0;this.sortData=null;this.cipherData=null;
     this.clock=null; this.timeout=null;
   }
   title() { return {timing:'ПОЙМАЙ МОМЕНТ',memory:'ЗАПОМНИ ЗАКАЗ',route:'ПРОЛОЖИ МАРШРУТ',bargain:'ДОГОВОРИСЬ',audit:'НАЙДИ ОШИБКУ',sort:'СОБЕРИ ЗАКАЗ',cipher:'РАЗБЕРИ ШИФР',stealth:'ОЦЕНИ ОБСТАНОВКУ'}[this.job.game]; }
-  description() { return {timing:'Останови метку в освещённой зоне. Три попытки.',memory:'Запомни последовательность и повтори её.',route:'Выбери три участка по времени, усталости и риску.',bargain:'Назови цену. Чем ближе к ожиданию клиента, тем выше результат.',audit:'Проверь накладную и найди поле, которое не сходится.',sort:'Найди посылку по двум признакам. Три заказа подряд.',cipher:'Восстанови правило числового ряда. Три проверки.',stealth:'Выбирай темп и осторожность. Шум растёт от каждого шага.'}[this.job.game]; }
+  description() { return {timing:'Останови метку в освещённой зоне. Три попытки.',memory:'Запомни четыре слова по порядку. Перед первым будет время подготовиться.',route:'Выбери три участка по времени, усталости и риску.',bargain:'Назови цену. Чем ближе к ожиданию клиента, тем выше результат.',audit:'Проверь накладную и найди поле, которое не сходится.',sort:'Сверь адрес, вес и пломбу. Три заказа подряд.',cipher:'Восстанови правило числового ряда. Три проверки.',stealth:'Выбирай темп и осторожность. Шум растёт от каждого шага.'}[this.job.game]; }
   sortRound() {
     if(this.sortData)return this.sortData;
-    const colors=['КРАСНАЯ','СИНЯЯ','ЗЕЛЁНАЯ'],marks=['КРУГ','ТРЕУГОЛЬНИК','ЗВЕЗДА'];
-    const color=rand(0,2),mark=rand(0,2),correct=rand(0,2);
-    const cards=Array.from({length:3},(_,i)=>i===correct?{color,mark}:{color:i===0?(color+1)%3:color,mark:i===0?mark:(mark+1)%3});
-    if(cards.some((x,i)=>i!==correct&&x.color===color&&x.mark===mark))cards[(correct+1)%3]={color:(color+1)%3,mark};
-    this.sortData={colors,marks,color,mark,correct,cards};return this.sortData;
+    const places=['ДВОР','РЫНОК','ПРОМЗОНА','ЦЕНТР'],destination=rand(0,3),limit=rand(6,13),correct=rand(0,3);
+    const valid={destination,weight:limit-rand(1,4),seal:true};
+    const decoys=[{destination:(destination+1)%4,weight:valid.weight,seal:true},{destination,weight:limit+rand(1,4),seal:true},{destination,weight:valid.weight,seal:false}];
+    const cards=Array.from({length:4},(_,i)=>i===correct?valid:decoys[i<correct?i:i-1]);
+    this.sortData={places,destination,limit,correct,cards};return this.sortData;
   }
   cipherRound() {
     if(this.cipherData)return this.cipherData;
@@ -31,8 +31,8 @@ export class MiniGame {
   render() {
     let body='';
     if(this.job.game==='timing') body=`<div class="timing-track"><div class="timing-target" style="left:${this.target-8}%"></div><div class="timing-marker" id="timing-marker" style="left:${this.marker}%"></div></div><p class="mini-hint">Попытка ${this.round+1}/3 · Нажми кнопку или пробел</p><button class="primary big" data-mini="timing">СТОП</button>`;
-    if(this.job.game==='memory') body=`<div class="memory-display" id="memory-display">${this.revealed?'?':'СМОТРИ ВНИМАТЕЛЬНО'}</div><p class="mini-hint">${this.revealed?`Слово ${this.guess+1} из ${this.sequence.length}`:'Слова появятся одно за другим'}</p><div class="memory-options">${this.revealed?words.slice(0,6).map((w,i)=>`<button data-mini="memory" data-value="${i}">${w}</button>`).join(''):''}</div>`;
-    if(this.job.game==='sort') {const q=this.sortRound();body=`<div class="sort-order"><small>НАКЛАДНАЯ ${this.round+1}/3</small><strong>${q.colors[q.color]} · ${q.marks[q.mark]}</strong><p>Выбери посылку с обоими признаками.</p></div><div class="sort-cards">${q.cards.map((x,i)=>`<button data-mini="sort" data-value="${i}" class="parcel-color-${x.color}"><span class="parcel-mark">${['●','▲','★'][x.mark]}</span><strong>${q.colors[x.color]}</strong><small>${q.marks[x.mark]}</small></button>`).join('')}</div>`;}
+    if(this.job.game==='memory') body=`<div class="memory-checks" aria-label="Ответы">${this.sequence.map((_,i)=>`<span class="${this.memoryResults[i]===true?'correct':this.memoryResults[i]===false?'wrong':i===this.guess&&this.revealed?'current':'waiting'}">${i+1}</span>`).join('')}</div><div class="memory-display" id="memory-display">${this.revealed?'?':'ПРИГОТОВЬСЯ'}</div><p class="mini-hint">${this.revealed?this.finishing?'Проверка закончена':`Слово ${this.guess+1} из ${this.sequence.length}`:'Слова появятся одно за другим'}</p><div class="memory-options">${this.revealed&&!this.finishing?words.slice(0,6).map((w,i)=>`<button data-mini="memory" data-value="${i}">${w}</button>`).join(''):''}</div>`;
+    if(this.job.game==='sort') {const q=this.sortRound();body=`<div class="sort-order"><small>НАКЛАДНАЯ ${this.round+1}/3</small><strong>${q.places[q.destination]} · ДО ${q.limit} КГ</strong><p>Адрес верный, вес не выше лимита, пломба целая.</p></div><div class="sort-cards">${q.cards.map((x,i)=>`<button data-mini="sort" data-value="${i}"><span class="parcel-mark">0${i+1}</span><strong>${q.places[x.destination]}</strong><small>${x.weight} кг · пломба ${x.seal?'целая':'сорвана'}</small></button>`).join('')}</div>`;}
     if(this.job.game==='cipher'){const q=this.cipherRound();body=`<div class="cipher-paper"><small>ЗАПИСЬ ${this.round+1}/3</small><strong>${q.start} · ${q.start+q.step} · ${q.start+q.step*2} · ?</strong><p>Какое число продолжит правило?</p></div><div class="cipher-options">${q.options.map((x,i)=>`<button data-mini="cipher" data-value="${i}">${x}</button>`).join('')}</div>`;}
     if(this.job.game==='stealth') {const stage=['НАБЛЮДЕНИЕ','ДЕЙСТВИЕ','ВЫХОД'][this.round];const options=[{name:'Подождать удобный момент',gain:12,noise:5,detail:'Медленно · тихо'},{name:'Действовать по плану',gain:27,noise:18,detail:'Средний темп · средний шум'},{name:'Пойти напролом',gain:44,noise:38,detail:'Быстро · громко'}];body=`<div class="stealth-status"><span>ЭТАП ${this.round+1}/3 · ${stage}</span><strong>ВНИМАНИЕ ${this.alert}%</strong><div><i style="width:${this.alert}%"></i></div><small>Потенциальная добыча ${this.loot}%</small></div><div class="stealth-options">${options.map((x,i)=>`<button data-mini="stealth" data-value="${i}"><strong>${x.name}</strong><span>ДОБЫЧА +${x.gain} · ШУМ +${x.noise}</span><small>${x.detail}</small></button>`).join('')}</div>`;}
     if(this.job.game==='route') {
@@ -44,7 +44,7 @@ export class MiniGame {
       const rows=this.auditRows();
       body=`<div class="audit-docs"><div><h4>ЗАКАЗ</h4>${rows.map((r,i)=>`<p>${r.label}<strong>${r.left}</strong></p>`).join('')}</div><div><h4>НАКЛАДНАЯ</h4>${rows.map((r,i)=>`<button data-mini="audit" data-value="${i}">${r.label}<strong>${r.right}</strong></button>`).join('')}</div></div><p class="mini-hint">Проверка ${this.round+1}/3 · нажми на неверную строку справа</p>`;
     }
-    return `<div class="mini-shell"><div class="mini-heading"><span class="eyebrow">СМЕНА / ${esc(this.job.name.toUpperCase())}</span><h2>${this.title()}</h2><p>${this.description()}</p></div><div class="mini-progress">${[0,1,2].map(i=>`<span class="${i<this.round?'done':i===this.round?'active':''}"></span>`).join('')}</div>${body}<button class="text-button mini-exit" data-mini="exit">Прервать смену</button></div>`;
+    return `<div class="mini-shell"><div class="mini-heading"><span class="eyebrow">${'arrest' in this.job?'ЗАКАЗ':'СМЕНА'} / ${esc(this.job.name.toUpperCase())}</span><h2>${this.title()}</h2><p>${this.description()}</p></div>${this.job.game==='memory'?'':`<div class="mini-progress">${[0,1,2].map(i=>`<span class="${i<this.round?'done':i===this.round?'active':''}"></span>`).join('')}</div>`}${body}<button class="text-button mini-exit" data-mini="exit">Прервать ${'arrest' in this.job?'заказ':'смену'}</button></div>`;
   }
   routeOptions() {
     if(!this.currentRoute) {
@@ -78,13 +78,13 @@ export class MiniGame {
     const show=()=>{
       if(!this.active)return;
       const el=document.getElementById('memory-display');
-      if(index<this.sequence.length){if(el)el.textContent=words[this.sequence[index]]; index++; this.timeout=setTimeout(show,1050);}
+      if(index<this.sequence.length){if(el)el.textContent=words[this.sequence[index]]; index++; this.timeout=setTimeout(show,1400);}
       else {this.revealed=true;this.onRender();}
     };
-    this.timeout=setTimeout(show,700);
+    this.timeout=setTimeout(show,1800);
   }
   input(type,value) {
-    if(!this.active)return;
+    if(!this.active||this.finishing)return;
     if(type==='exit') {this.destroy();this.finish(null);return;}
     if(type!==this.job.game)return;
     if(type==='timing') {
@@ -95,9 +95,9 @@ export class MiniGame {
     }
     if(type==='memory') {
       if(!this.revealed)return;
-      this.scores.push(Number(value)===this.sequence[this.guess]?1:0);
+      const correct=Number(value)===this.sequence[this.guess];this.scores.push(correct?1:0);this.memoryResults.push(correct);
       this.guess++;
-      if(this.guess>=this.sequence.length)return this.complete();
+      if(this.guess>=this.sequence.length){this.finishing=true;this.onRender();this.timeout=setTimeout(()=>this.complete(),850);return;}
     }
     if(type==='route') {
       const options=this.routeOptions(),best=Math.min(...options.map(o=>o.time*5+o.effort*9+o.risk*3));
@@ -126,4 +126,3 @@ export class MiniGame {
   complete() { let score=this.scores.reduce((a,b)=>a+b,0)/this.scores.length;if(this.job.game==='stealth')score=this.alert>=100?.05:Math.max(.1,Math.min(1,score*.5+this.loot/140-this.alert/260));this.destroy();this.finish(score); }
   destroy() {this.active=false;clearInterval(this.clock);clearTimeout(this.timeout);}
 }
-

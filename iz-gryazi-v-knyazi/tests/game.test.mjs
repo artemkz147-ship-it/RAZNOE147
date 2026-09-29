@@ -13,15 +13,41 @@ import { casinoOutcome,casinoRemaining } from '../src/data/casino.js';
 import { shell,modal } from '../src/ui/views.js';
 import { dialogues } from '../src/data/dialogues.js';
 import { MiniGame } from '../src/ui/minigames.js';
+import { activePartners,socialGroup,socialValue } from '../src/systems/social.js';
+import { ageOf } from '../src/systems/lifestyle.js';
 
 globalThis.localStorage={data:new Map(),setItem(k,v){this.data.set(k,v)},getItem(k){return this.data.get(k)||null},removeItem(k){this.data.delete(k)}};
+
+test('age, diet and month long career use real game days and living costs',()=>{
+  const s=freshState(),game=new GameEngine(s,()=>.99);
+  assert.equal(ageOf(s),30);
+  assert.equal(game.setDiet('expired').ok,true);
+  assert.equal(dailySettlement(s,{rng:()=>.99}).expenses,55);
+  game.setDiet('basic');
+  const before=s.money;
+  const result=game.workCareer('janitor',1);
+  assert.equal(result.ok,true);
+  assert.equal(s.day,31);
+  assert.equal(s.careerMonths,1);
+  assert.ok(s.money>before);
+  assert.match(s.lastWorkResult.detail,/еда, жильё/);
+  s.day=361;assert.equal(ageOf(s),31);
+});
+
+test('casino entrance requires status and clean clothing',()=>{
+  const s=freshState(),game=new GameEngine(s,()=>.9);
+  assert.equal(game.startCasino('roulette',100).ok,false);
+  s.stats.respect=8;s.upgrades.push('clean-shirt');
+  assert.equal(game.startCasino('roulette',100).ok,true);
+});
 
 test('first shifts consume time and energy and pay earned money',()=>{
   const game=new GameEngine(freshState(),()=>.9);
   const result=game.completeJob('scrap',.95);
   assert.equal(result.ok,true);
   assert.ok(game.state.money>870);
-  assert.equal(game.state.hour,10);
+  assert.equal(game.state.hour,7);
+  assert.equal(game.state.day,2);
   assert.ok(game.state.stats.energy<73);
   assert.equal(game.state.jobsDone,1);
 });
@@ -143,8 +169,8 @@ test('damaged shoes slow walking and suits prevent asking for handouts',()=>{
 test('free sofa has no housing charge and formal work checks appearance',()=>{
   const s=freshState();const before=s.money;
   const settlement=dailySettlement(s,{rng:()=>.99});
-  assert.equal(settlement.expenses,110);
-  assert.equal(s.money,before-110);
+  assert.equal(settlement.expenses,180);
+  assert.equal(s.money,before-180);
   s.district='center';const game=new GameEngine(s,()=>.99);
   assert.match(game.jobReady('barista').message,/рубашка/);
   s.upgrades.push('clean-shirt');assert.equal(game.jobReady('barista').ok,true);
@@ -246,7 +272,7 @@ test('older saves acquire casino state without losing progress',()=>{
 });
 
 test('three casino tables preserve a real stake and use player decisions',()=>{
-  const state=freshState();state.money=10000;
+  const state=freshState();state.money=10000;state.stats.respect=8;state.upgrades.push('clean-shirt');
   const game=new GameEngine(state,()=>0);
   assert.equal(game.startCasino('roulette',100).ok,true);
   assert.equal(state.money,9900);
@@ -284,7 +310,7 @@ test('romance trust unlocks commitment and daily consequences',()=>{
   assert.match(shell(s,'people','home',null,'legal',null,null,null,'romance'),/romance-card/);
 });
 
-test('relationship tab shows only started relationships, while dating stays with contacts',()=>{
+test('relationship tab shows current couples only and moves exes into social groups',()=>{
   const s=freshState(),game=new GameEngine(s,()=>.99);
   const relationshipView=()=>shell(s,'people','home',null,'legal',null,null,null,'romance');
   const contactView=()=>shell(s,'people','home',null,'legal',null,null,null,'contacts');
@@ -300,7 +326,57 @@ test('relationship tab shows only started relationships, while dating stays with
   assert.match(relationshipView(),/class="romance-card/);
   assert.doesNotMatch(contactView(),/data-romance-action="talk" data-id="marina"/);
   assert.equal(game.romanceAction('marina','separate').ok,true);
-  assert.match(relationshipView(),/БЫЛИ ВМЕСТЕ/);
+  assert.doesNotMatch(relationshipView(),/class="romance-card/);
+  assert.match(contactView(),/data-romance-action="talk" data-id="marina"/);
+});
+
+test('several romances can coexist and separating one preserves the other',()=>{
+  const s=freshState(),game=new GameEngine(s,()=>.99);
+  s.romance.profiles.marina={met:true,rapport:50,meetings:3,lastDay:0,days:0};
+  s.romance.profiles.alisa={met:true,rapport:50,meetings:3,lastDay:0,days:0};
+  assert.equal(game.romanceAction('marina','commit').ok,true);
+  assert.equal(game.romanceAction('alisa','commit').ok,true);
+  assert.deepEqual(activePartners(s),['marina','alisa']);
+  assert.equal((shell(s,'people','home',null,'legal',null,null,null,'romance').match(/class="romance-card/g)||[]).length,2);
+  assert.equal(game.romanceAction('marina','separate').ok,true);
+  assert.deepEqual(activePartners(s),['alisa']);
+  assert.equal(socialGroup(s,'marina'),'contacts');
+});
+
+test('contacts can become friends, enemies and acquaintances again',()=>{
+  const s=freshState(),game=new GameEngine(s,()=>0);
+  assert.equal(game.person('valera','talk',0).ok,true);
+  for(let i=0;i<3;i++){s.day++;s.stats.energy=80;assert.equal(game.socialAction('valera','help').ok,true);}
+  assert.equal(socialGroup(s,'valera'),'friends');
+  assert.match(shell(s,'people','home',null,'legal',null,null,null,'friends'),/Валера «Ключ»/i);
+  for(let i=0;i<4;i++){s.day++;s.stats.energy=80;assert.equal(game.socialAction('valera','boundary').ok,true);}
+  assert.equal(socialGroup(s,'valera'),'enemies');
+  assert.match(shell(s,'people','home',null,'legal',null,null,null,'enemies'),/Валера «Ключ»/i);
+  s.day++;s.stats.energy=80;assert.equal(game.socialAction('valera','reconcile').ok,true);
+  assert.equal(socialGroup(s,'valera'),'contacts');
+});
+
+test('parcel decisions have one valid answer and memory shows four coloured results',()=>{
+  const sort=new MiniGame({game:'sort',name:'Склад',district:'yard'},()=>{}),round=sort.sortRound();
+  assert.equal(round.cards.length,4);
+  assert.deepEqual(round.cards.map((x,i)=>x.destination===round.destination&&x.weight<=round.limit&&x.seal?i:null).filter(x=>x!==null),[round.correct]);
+  const memory=new MiniGame({game:'memory',name:'Заказ',district:'yard'},()=>{});memory.onRender=()=>{};memory.revealed=true;
+  for(let i=0;i<3;i++)memory.input('memory',String(i===1?(memory.sequence[i]+1)%6:memory.sequence[i]));
+  const html=memory.render();
+  assert.match(html,/class="memory-checks"/);
+  assert.equal((html.match(/class="correct"/g)||[]).length,2);
+  assert.equal((html.match(/class="wrong"/g)||[]).length,1);
+  memory.destroy();
+});
+
+test('more mini-game mistakes increase criminal consequences and work shows its payout',()=>{
+  const poor=new GameEngine(freshState(),()=>.17),good=new GameEngine(freshState(),()=>.17);
+  assert.equal(poor.completeCrime('parcel',0).ok,true);
+  assert.equal(good.completeCrime('parcel',1).ok,true);
+  assert.equal(poor.state.lastWorkResult.earned,0);
+  assert.ok(good.state.lastWorkResult.earned>0);
+  assert.match(shell(good.state,'work','home',null,'crime'),/ИТОГ ПОСЛЕДНЕГО ДЕЛА/);
+  assert.match(shell(good.state,'work','home',null,'crime'),/Получено/);
 });
 
 test('card tables contain three distinct rivals and settle the shared pot',()=>{

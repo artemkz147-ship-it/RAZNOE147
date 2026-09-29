@@ -7,6 +7,7 @@ import { GameEngine } from './systems/engine.js';
 import { artScene } from './scene/artscene.js';
 import { shell,modal,menuModal } from './ui/views.js';
 import { MiniGame } from './ui/minigames.js';
+import { socialGroup } from './systems/social.js';
 
 const app=document.getElementById('app');
 const loaded=loadGame();
@@ -50,7 +51,7 @@ function toast(message,tone='good') {
   if(!message)return;
   const zone=document.getElementById('toast-zone');if(!zone)return;
   const node=document.createElement('div');node.className=`toast ${tone}`;node.textContent=message;
-  zone.append(node);setTimeout(()=>node.remove(),4400);
+  zone.append(node);setTimeout(()=>node.remove(),6500);
   const scene=document.querySelector('.scene-wrap');
   if(scene&&tone!=='neutral'){
     scene.classList.add(tone==='bad'?'scene-shake':'scene-glow');
@@ -75,7 +76,7 @@ function startCrime(id) {
   mini=new MiniGame(gig,score=>{mini=null;if(score===null){render();toast('Заказ сорвался. Пока без последствий.','bad');return;}game.completeCrime(id,score);});
   renderModal();mini.start(renderModal);
 }
-function perform(action,id) {
+function perform(action,id,months) {
   if(action==='menu'){menuOpen=true;renderModal();return;}
   if(action==='close-menu'){menuOpen=false;renderModal();return;}
   if(action==='tab-story'){tab='story';render();window.scrollTo(0,0);return;}
@@ -87,6 +88,9 @@ function perform(action,id) {
   if(action==='job'){startJob(id);return;}
   if(action==='crime'){startCrime(id);return;}
   if(action==='casino'){game.startCasino(id,document.getElementById('casino-stake')?.value);return;}
+  if(action==='career'){game.workCareer(id,months);return;}
+  if(action==='diet'){game.setDiet(id);return;}
+  if(action==='restart-after-death'){menuOpen=false;tab='city';game.replaceState(freshState());return;}
   if(action==='serve'){game.serveSentence();return;}
   if(action==='activity'){game.activity(id);return;}
   if(action.startsWith('buy-')){game.buy(action.slice(4),id);return;}
@@ -117,7 +121,9 @@ document.addEventListener('click',event=>{
   const romanceChoice=event.target.closest('[data-romance-choice]');
   if(romanceChoice){game.resolveRomanceConflict(Number(romanceChoice.dataset.romanceChoice));return;}
   const romanceAction=event.target.closest('[data-romance-action]');
-  if(romanceAction){const result=game.romanceAction(romanceAction.dataset.id,romanceAction.dataset.romanceAction);if(result.ok&&romanceAction.dataset.romanceAction==='commit'){peopleMode='romance';railPositions.delete('people:0');render();}return;}
+  if(romanceAction){const id=romanceAction.dataset.id,action=romanceAction.dataset.romanceAction,result=game.romanceAction(id,action);if(result.ok&&(action==='commit'||action==='separate')){peopleMode=action==='commit'?'romance':socialGroup(game.state,id);railPositions.delete('people:0');render();}return;}
+  const socialAction=event.target.closest('[data-social-action]');
+  if(socialAction){const result=game.socialAction(socialAction.dataset.id,socialAction.dataset.socialAction);if(result.ok){peopleMode=socialGroup(game.state,socialAction.dataset.id);railPositions.delete('people:0');render();}return;}
   const peopleTab=event.target.closest('[data-people-mode]');
   if(peopleTab){peopleMode=peopleTab.dataset.peopleMode;railPositions.delete('people:0');render();return;}
   const casinoAction=event.target.closest('[data-casino-action]');
@@ -143,7 +149,7 @@ document.addEventListener('click',event=>{
   const chip=event.target.closest('[data-bet]');
   if(chip){const field=document.getElementById('casino-stake');if(field)field.value=chip.dataset.bet;return;}
   const button=event.target.closest('[data-action]');
-  if(button)perform(button.dataset.action,button.dataset.id);
+  if(button)perform(button.dataset.action,button.dataset.id,button.dataset.months);
   else if(event.target.classList.contains('dismissable')){menuOpen=false;renderModal();}
 });
 document.addEventListener('input',event=>{

@@ -1,6 +1,8 @@
 import { homes, vehicles, businesses, districts } from '../data/world.js';
 import { investments } from '../data/investments.js';
 import { clamp, adjust, addLog } from './state.js';
+import { diets } from '../data/lifestyle.js';
+import { dailyVitals } from './lifestyle.js';
 
 export const byId = (items,id) => items.find(item => item.id === id);
 export function netWorth(state) {
@@ -85,15 +87,18 @@ export function dailySettlement(state,{offline=false,rng=Math.random}={}) {
   const vehicle = byId(vehicles,state.vehicle);
   state.market = Math.floor(rng()*4);
   const business = dailyBusiness(state,offline,rng);
-  const expenses = home.daily + vehicle.upkeep + 110 + Math.floor(state.debt*.018);
+  const food=(byId(diets,state.diet)||diets[1]).daily;
+  const expenses = home.daily + vehicle.upkeep + food + Math.floor(state.debt*.018);
   state.money += business-expenses;
   state.debt += Math.ceil(state.debt*.012);
   state.heat = Math.max(0,(state.heat||0)-4);
   if(state.conditions) {state.conditions.back=Math.max(0,state.conditions.back-1);state.conditions.hangover=Math.max(0,state.conditions.hangover-1);}
   state.stats.life = clamp(Math.round(8+home.prestige*.55+vehicle.prestige*.16+state.stats.mood*.1-state.stats.stress*.06),0,100);
   adjust(state,{energy:Math.round(home.restore*.43),health:state.money<0?-4:1,mood:state.money<0?-3:state.stats.life>55?1:0,stress:state.money<0?5:state.stats.life>55?0:1});
+  dailyVitals(state,rng);
+  state.lastSettlement={day:state.day,food,rent:home.daily,transport:vehicle.upkeep,business,expenses};
   if (business) addLog(state,`День ${state.day}: дела принесли ${business.toLocaleString('ru-RU')} ₽; быт и обязательства забрали ${expenses.toLocaleString('ru-RU')} ₽.`,business>=expenses?'good':'bad');
-  else addLog(state,`День ${state.day}: питание и быт 110 ₽, жильё ${home.daily} ₽, транспорт ${vehicle.upkeep} ₽${state.debt?', долг и проценты учтены':''}. Всего ${expenses.toLocaleString('ru-RU')} ₽.`,'neutral');
+  else addLog(state,`День ${state.day}: еда ${food} ₽, жильё ${home.daily} ₽, транспорт ${vehicle.upkeep} ₽${state.debt?', долг и проценты учтены':''}. Всего ${expenses.toLocaleString('ru-RU')} ₽.`,'neutral');
   if (state.money < -12000) {
     state.debt += Math.abs(state.money)+12000; state.money = -12000;
     addLog(state,'Банк молча превратил минус на счёте в долг. Уведомление было удивительно вежливым.','bad');
@@ -112,4 +117,3 @@ export function settleMatureInvestments(state,rng=Math.random) {
   }
   state.investments=state.investments.filter(x=>x.maturity>state.day);
 }
-

@@ -34,7 +34,7 @@ export const jobs = [
   {id:'eventsetup',name:'Собрать мероприятие',district:'center',hours:5,energy:33,pay:5900,skill:'grit',game:'timing',risk:.04,description:'Главный спикер опоздал, баннер — нет.'},
   {id:'prcrisis',name:'Погасить скандал',district:'glass',hours:4,energy:27,pay:12500,skill:'charm',game:'bargain',risk:.02,description:'Слово «недоразумение» оплачивается отдельно.'},
   {id:'datacheck',name:'Проверить аналитику',district:'glass',hours:5,energy:24,pay:14200,skill:'focus',game:'audit',risk:.01,description:'График растёт, если повернуть экран.'},
-  {id:'gala',name:'Вести приём',district:'heights',hours:5,energy:31,pay:28000,skill:'charm',game:'sort',risk:.02,description:'Запомни имена тех, кто помнит твою фамилию.'},
+  {id:'gala',name:'Вести приём',district:'heights',hours:5,energy:31,pay:28000,skill:'charm',game:'memory',risk:.02,description:'Запомни имена тех, кто помнит твою фамилию.'},
   {id:'foundation',name:'Сверить фонд',district:'heights',hours:5,energy:27,pay:32000,skill:'focus',game:'audit',risk:.01,description:'Благотворительность начинается с бухгалтерии.'},
   {id:'snow',name:'Расчистить двор',district:'yard',hours:3,energy:24,pay:430,skill:'grit',game:'timing',risk:.03,description:'Снег убран. Машины заняли место быстрее.'},
   {id:'notice',name:'Разнести квитанции',district:'yard',hours:2,energy:14,pay:370,skill:'focus',game:'route',risk:.01,description:'Каждая дверь уверена, что платёж придумал ты.'},
@@ -42,7 +42,7 @@ export const jobs = [
   {id:'bake',name:'Ночная выпечка',district:'market',hours:5,energy:30,pay:1780,skill:'grit',game:'timing',risk:.03,description:'Самая свежая булка досталась начальнику.'},
   {id:'quality',name:'Проверить партию',district:'industrial',hours:5,energy:25,pay:3650,skill:'focus',game:'audit',risk:.02,description:'Брак считается допустимым, пока не твой.'},
   {id:'welding',name:'Сварить каркас',district:'industrial',hours:5,energy:34,pay:4100,skill:'grit',game:'timing',risk:.06,description:'Красиво получилось там, где не видно.'},
-  {id:'archive',name:'Разобрать архив',district:'center',hours:4,energy:22,pay:6200,skill:'focus',game:'sort',risk:.01,description:'Пыль знает историю мэрии лучше учебника.'},
+  {id:'archive',name:'Разобрать архив',district:'center',hours:4,energy:22,pay:6200,skill:'focus',game:'memory',risk:.01,description:'Пыль знает историю мэрии лучше учебника.'},
   {id:'host',name:'Встретить делегацию',district:'center',hours:4,energy:21,pay:7100,skill:'charm',game:'route',risk:.01,description:'Улыбка держится дольше согласованной речи.'},
   {id:'fundraise',name:'Найти спонсора',district:'glass',hours:4,energy:24,pay:17500,skill:'charm',game:'bargain',risk:.02,description:'Они хотят добра, желательно с логотипом.'},
   {id:'securityaudit',name:'Аудит доступа',district:'glass',hours:5,energy:27,pay:19200,skill:'focus',game:'audit',risk:.02,description:'Пароль сменили. Он всё ещё написан на стикере.'},
@@ -109,5 +109,4 @@ export const upgrades = [
 ];
 
 export const marketLabels = ['Затишье','Обычный день','Суета','Бум'];
-
 
