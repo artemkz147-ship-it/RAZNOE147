@@ -9,7 +9,7 @@ export function freshState() {
     conditions: {shoes:100,back:0,hangover:0,loaderShifts:0,walkTrips:0}, incidentHistory: [], recentIncident: null,
     heat: 0, jailDays: 0, crimesDone: 0, arrestCount: 0,
     casino: {rounds:0,wins:0,wagered:0,returned:0,history:[]}, casinoDaily: {day:1,wagered:0}, casinoTable:null,
-    romance:{partner:null,profiles:{},betrayedNina:false,history:[]},
+    romance:{partner:null,profiles:{},betrayedNina:false,history:[],conflict:null,affairs:0},
     relations: {}, dialogueProgress: {}, dialogueLast: {}, story: 0, flags: [], log: [{ day:1, hour:7, text:'Проснулся на чужом диване. Город пока не в курсе, что ты собираешься его купить.', type:'story' }],
     market: 1, pending: null, eventHistory: [], lastSaved: Date.now(), totalEarned: 0, jobsDone: 0, ending: false, achievedRoutes: []
   };

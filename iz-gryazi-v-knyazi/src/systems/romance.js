@@ -1,7 +1,23 @@
 import { netWorth } from './economy.js';
 import { adjust,addLog,clamp } from './state.js';
+import { romancePeople } from '../data/romance.js';
 
 const notice=(state,title,text,portrait,choices)=>{if(!state.recentIncident)state.recentIncident={title,text,portrait,art:portrait,choices};};
+export function romanceConflictChoices(state){
+  const c=state.romance?.conflict;if(!c)return [];
+  const person=romancePeople.find(x=>x.id===c.partnerId);
+  if(c.kind==='affair')return [
+    {text:'Признаться честно',cost:0,rapport:person.id==='nina'?-100:-18,effect:{stress:6,respect:person.id==='nina'?-2:0},leave:person.id==='nina',reply:person.id==='nina'?'Нина ушла. Предательство перечеркнуло доверие.':'Правда прозвучала больно, но разговор состоялся.'},
+    {text:'Скрыть встречу',cost:0,rapport:person.id==='nina'?-100:-30,effect:{stress:11,contacts:-2,respect:-4},leave:person.id==='nina',reply:'Ложь быстро стала ещё одной причиной не доверять тебе.'},
+    {text:'Разорвать отношения',cost:0,rapport:-35,effect:{mood:-7,stress:5},leave:true,reply:'Ты сам поставил точку в этих отношениях.'}
+  ];
+  const repair=Math.round(person.giftCost*2);
+  return [
+    {text:'Выслушать и признать свою часть',cost:0,rapport:8,effect:{energy:-4,stress:-3},reply:'Разговор был трудным, но вы услышали друг друга.'},
+    {text:'Уйти и остыть',cost:0,rapport:-6,effect:{stress:-2,mood:-2},reply:'Тишина помогла тебе, но другой стороне стало обиднее.'},
+    {text:`Загладить подарком · ${repair.toLocaleString('ru-RU')} ₽`,cost:repair,rapport:person.id==='nina'?-4:person.id==='viktoria'?9:5,effect:{mood:2,stress:1},reply:person.id==='nina'?'Нина хотела разговора, а не покупки прощения.':'Подарок смягчил вечер, но причину ссоры не стёр.'}
+  ];
+}
 export function romanceDay(state,rng){
   const r=state.romance;if(!r)return;
   const id=r.partner;
@@ -14,6 +30,12 @@ export function romanceDay(state,rng){
   }
   const p=r.profiles[id];if(!p){r.partner=null;return;}
   p.days++;p.appearance=Math.min(2,Math.floor(p.days/8));
+  const apart=state.day-(p.lastDay||state.day),conflictChance=.07+(apart>=3?.15:0)+(p.rapport<25?.1:0)+(state.stats.stress>70?.1:0);
+  if(p.days>=2&&!r.conflict&&rng()<conflictChance){
+    const cause=apart>=3?'Ты давно не находил времени на встречу.':state.stats.stress>70?'Напряжение после тяжёлого дня перешло в разговор на повышенных тонах.':'Неосторожная фраза испортила общий вечер.';
+    r.conflict={kind:'quarrel',partnerId:id,title:`Ссора с ${romancePeople.find(x=>x.id===id)?.name}`,text:cause,day:state.day};
+    p.quarrels=(p.quarrels||0)+1;addLog(state,`${r.conflict.title}: ${cause}`,'bad');
+  }
   if(id==='marina'){
     if(rng()<.38){const cost=Math.min(state.money,120+Math.floor(rng()*220));state.money-=cost;adjust(state,{mood:2,stress:3,energy:-2});p.last=`Марина предложила спонтанный вечер. Ушло ${cost} ₽.`;addLog(state,p.last,'neutral');}
     if(p.days>=10&&state.money<300&&rng()<.22){adjust(state,{stress:7,mood:-4});p.last='Очередная ссора из-за планов, которых никто не строил.';}

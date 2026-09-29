@@ -22,3 +22,15 @@ export function romanceAccess(state,person){
 }
 
 export const romancePortraitAtlas=new URL('../assets/people/romance-atlas.jpg',import.meta.url).href;
+export const romanceGifts=[
+  {id:'flowers',name:'Цветы и записка',factor:.5},
+  {id:'useful',name:'Полезная вещь',factor:1},
+  {id:'luxury',name:'Дорогой сюрприз',factor:3}
+];
+export const giftTaste={
+  marina:{flowers:9,useful:3,luxury:4},
+  nina:{flowers:5,useful:11,luxury:-3},
+  alisa:{flowers:4,useful:2,luxury:12},
+  viktoria:{flowers:-2,useful:1,luxury:13},
+  irina:{flowers:8,useful:4,luxury:7}
+};

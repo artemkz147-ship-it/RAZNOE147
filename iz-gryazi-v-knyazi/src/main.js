@@ -114,6 +114,8 @@ function perform(action,id) {
   }
 }
 document.addEventListener('click',event=>{
+  const romanceChoice=event.target.closest('[data-romance-choice]');
+  if(romanceChoice){game.resolveRomanceConflict(Number(romanceChoice.dataset.romanceChoice));return;}
   const romanceAction=event.target.closest('[data-romance-action]');
   if(romanceAction){game.romanceAction(romanceAction.dataset.id,romanceAction.dataset.romanceAction);return;}
   const peopleTab=event.target.closest('[data-people-mode]');

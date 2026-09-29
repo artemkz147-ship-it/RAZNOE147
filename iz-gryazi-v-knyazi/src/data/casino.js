@@ -1,8 +1,21 @@
 export const casinoGames = [
   {id:'roulette',name:'Рулетка',chance:'Красное 18/37 · число 1/37',payout:'×2 или ×36',description:'Выбери цвет, чётность или конкретное число. Зеро забирает обычные ставки.',asset:'roulette'},
-  {id:'blackjack',name:'21 · Блэкджек',chance:'Решения меняют исход',payout:'×2 · натуральное 21 ×2,5',description:'Бери карту или остановись. Крупье добирает до 17. Можно удвоить.',asset:'cards'},
-  {id:'poker',name:'Покер · пять карт',chance:'Против Артура «Тихого»',payout:'Банк ×2 или ×4',description:'Замени до трёх карт. Откройся, повысь или сбрось. Артур может блефовать.',asset:'cards'}
+  {id:'blackjack',name:'21 · Блэкджек',chance:'Три игрока и крупье',payout:'×2 · натуральное 21 ×2,5',description:'Вадим, Лера и Артур сидят рядом с тобой. Крупье играет против каждого. Бери карту, стой или удваивай.',asset:'cards'},
+  {id:'poker',name:'Покер · пять карт',chance:'Три соперника за столом',payout:'Банк до ×8',description:'Артур, Лера и Вадим разыгрывают общий банк. Обмени карты, откройся, повысь или сбрось.',asset:'cards'}
 ];
+
+export const casinoOpponents={
+  blackjack:[
+    {id:'vadim',name:'Вадим',portrait:'valera',style:'Осторожный · стоит на 16',hold:16},
+    {id:'lera',name:'Лера',portrait:'lida',style:'Рисковая · добирает до 18',hold:18},
+    {id:'artur',name:'Артур',portrait:'artur',style:'Хладнокровный · стоит на 17',hold:17}
+  ],
+  poker:[
+    {id:'artur',name:'Артур',portrait:'artur',style:'Осторожный · ценит пару',call:0.12},
+    {id:'lera',name:'Лера',portrait:'lida',style:'Смелая · часто отвечает',call:0.68},
+    {id:'vadim',name:'Вадим',portrait:'valera',style:'Читает стол · иногда блефует',call:0.34}
+  ]
+};
 
 export function casinoLimit(state) {
   const assets=Math.max(0,state.money)+Object.values(state.businesses||{}).length*150000;

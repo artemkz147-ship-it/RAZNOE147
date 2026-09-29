@@ -284,6 +284,51 @@ test('romance trust unlocks commitment and daily consequences',()=>{
   assert.match(shell(s,'people','home',null,'legal',null,null,null,'romance'),/romance-card/);
 });
 
+test('card tables contain three distinct rivals and settle the shared pot',()=>{
+  const blackjack=createCasinoTable('blackjack',200,()=>.43);
+  assert.equal(blackjack.opponents.length,3);
+  assert.equal(new Set(blackjack.opponents.map(x=>x.id)).size,3);
+  assert.equal(actCasinoTable(blackjack,'stand',null,()=>.43).done,true);
+  assert.ok(blackjack.opponents.every(x=>x.status!=='Ждёт хода'));
+  const poker=createCasinoTable('poker',200,()=>.31);
+  assert.equal(poker.opponents.length,3);
+  assert.equal(poker.pot,800);
+  assert.equal(actCasinoTable(poker,'draw',null,()=>.31).error,undefined);
+  assert.equal(actCasinoTable(poker,'raise',null,()=>.31).done,true);
+  assert.ok(poker.pot>=1000);
+  assert.ok(poker.returned>=0&&poker.returned<=poker.pot);
+  assert.match(modal({...freshState(),casinoTable:poker},null),/casino-seat/g);
+});
+
+test('gift tastes, arguments and infidelity produce different outcomes',()=>{
+  const s=freshState();s.money=10000;s.jobsDone=8;s.home='room';s.district='industrial';s.visitedDistricts.push('industrial');
+  const game=new GameEngine(s,()=>.99);
+  assert.equal(game.romanceAction('nina','meet').ok,true);
+  const before=s.romance.profiles.nina.rapport;s.day++;
+  assert.equal(game.romanceAction('nina','gift-luxury').ok,true);
+  assert.ok(s.romance.profiles.nina.rapport<before);
+  s.day++;
+  assert.equal(game.romanceAction('nina','gift-useful').ok,true);
+  assert.ok(s.romance.profiles.nina.rapport>before);
+  s.romance.profiles.nina.rapport=90;assert.equal(game.romanceAction('nina','commit').ok,true);
+  s.romance.conflict={kind:'quarrel',partnerId:'nina',title:'Разговор',text:'Ссора'};
+  assert.match(modal(s,null),/data-romance-choice="0"/);
+  assert.equal(game.resolveRomanceConflict(0).ok,true);
+  assert.equal(s.romance.partner,'nina');
+  s.romance.conflict={kind:'affair',partnerId:'nina',targetId:'alisa',title:'Измена',text:'Встреча раскрыта'};
+  assert.equal(game.resolveRomanceConflict(0).ok,true);
+  assert.equal(s.romance.partner,null);
+  assert.equal(s.romance.betrayedNina,true);
+});
+
+test('old unfinished card rounds refund their stake during migration',()=>{
+  const old=freshState();old.money=600;old.casinoTable={id:'poker',wager:200,stake:200,phase:'play'};
+  const loaded=validate(old);
+  assert.equal(loaded.money,800);
+  assert.equal(loaded.casinoTable,null);
+  assert.match(loaded.log[0].text,/возвращена/);
+});
+
 test('all home cards have an actual raster image reference',()=>{
   const html=shell(freshState(),'assets','home',null);
   assert.equal((html.match(/class="asset-raster"/g)||[]).length,8);

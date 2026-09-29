@@ -9,8 +9,8 @@ import { crimes } from '../data/crime.js';
 import { activities } from '../data/activities.js';
 import { casinoGames,casinoOutcome,casinoRemaining } from '../data/casino.js';
 import { createCasinoTable,actCasinoTable } from './casinoTable.js';
-import { romancePeople,romanceAccess } from '../data/romance.js';
-import { romanceDay } from './romance.js';
+import { romancePeople,romanceAccess,romanceGifts,giftTaste } from '../data/romance.js';
+import { romanceDay,romanceConflictChoices } from './romance.js';
 import { freshState,adjust,addLog,clamp } from './state.js';
 import { byId,districtUnlocked,travelOptions,gainSkill,dailySettlement,settleMatureInvestments,netWorth,businessStrategies } from './economy.js';
 import { saveGame } from './save.js';
@@ -29,6 +29,7 @@ export class GameEngine {
     if (this.state.jailDays>0) return fail(`Ты под арестом. Осталось ${this.state.jailDays} дн.`);
     if (this.state.pending) return fail('Сначала прими решение в открытой истории.');
     if (this.state.recentIncident) return fail('Сначала разберись с неожиданным событием.');
+    if (this.state.romance?.conflict) return fail('Сначала закончи личный разговор.');
     if (this.state.casinoTable) return fail('Сначала закончи партию за игровым столом.');
     return null;
   }
@@ -338,7 +339,7 @@ export class GameEngine {
     const r=s.romance,p=r.profiles[id]||{rapport:0,meetings:0,lastDay:0,days:0,spent:0,appearance:0,last:person.description,met:false};
     if(action==='separate'){
       if(r.partner!==id)return this.emit(fail('Вы не вместе.'));
-      r.partner=null;p.last='Вы решили разойтись.';r.profiles[id]=p;adjust(s,{stress:5,mood:-4});addLog(s,`${person.name}: вы расстались.`,'bad');return this.emit(success(p.last,'bad'));
+      r.partner=null;p.married=false;p.last='Вы решили разойтись.';r.profiles[id]=p;adjust(s,{stress:5,mood:-4});addLog(s,`${person.name}: вы расстались.`,'bad');return this.emit(success(p.last,'bad'));
     }
     if(action==='commit'){
       if(r.partner)return this.emit(fail('Сначала реши отношения с нынешним партнёром.'));
@@ -351,29 +352,42 @@ export class GameEngine {
       if(id==='nina'&&r.betrayedNina)return this.emit(fail('Нина не готова после измены.'));
       p.married=true;p.last=`Вы с ${person.name} поженились.`;r.profiles[id]=p;adjust(s,{mood:10,respect:3});addLog(s,p.last,'good');return this.emit(success(p.last));
     }
-    if(!['meet','date','gift'].includes(action))return this.emit(fail('Неизвестное действие.'));
+    const gift=action.startsWith('gift-')?romanceGifts.find(x=>x.id===action.slice(5)):null;
+    if(!['meet','talk','date'].includes(action)&&!gift)return this.emit(fail('Неизвестное действие.'));
     if(!p.met){
       const reason=romanceAccess(s,person);if(reason)return this.emit(fail(reason));
       if(person.district&&s.district!==person.district)return this.emit(fail('Сначала доберись в её район для знакомства.'));
       if(action!=='meet')return this.emit(fail('Сначала познакомьтесь.'));
     }
     if(p.lastDay===s.day)return this.emit(fail('Сегодня вы уже провели время вместе. Продолжи завтра.'));
-    const cost=action==='date'?person.dateCost:action==='gift'?person.giftCost:0;
+    const cost=action==='date'?person.dateCost:gift?Math.round(person.giftCost*gift.factor):0;
     if(s.money<cost)return this.emit(fail(`Нужно ${cost.toLocaleString('ru-RU')} ₽.`));
     if(s.stats.energy<6)return this.emit(fail('Нужны силы на встречу. Переведи дух или выспись.'));
-    if(r.partner&&r.partner!==id&&action!=='meet'){
-      const old=r.profiles[r.partner];if(old)old.rapport=clamp(old.rapport-25,0,100);
-      if(r.partner==='nina'){r.betrayedNina=true;r.partner=null;addLog(s,'Нина узнала о тайной встрече и ушла.','bad');}
-      else addLog(s,'Встреча за спиной партнёра ударила по доверию.','bad');
-    }
+    const affair=!!(r.partner&&r.partner!==id&&action!=='meet');
     s.money-=cost;p.spent+=cost;p.met=true;p.meetings++;p.lastDay=s.day;
-    const gain=action==='meet'?6:action==='date'?(id==='nina'?9:11):(id==='nina'?2:id==='viktoria'?10:5);
+    const gain=gift?giftTaste[id][gift.id]:action==='meet'?6:action==='talk'?5:action==='date'?(id==='nina'?9:11):0;
     p.rapport=clamp(p.rapport+gain,0,100);
-    const line=person.lines[(p.meetings-1)%person.lines.length];p.last=`${line} ${action==='gift'?'Подарок принят.':action==='date'?'Вы провели вечер вместе.':'Вы познакомились.'}`;
+    const line=person.lines[(p.meetings-1)%person.lines.length];p.last=`${line} ${gift?`${gift.name}: ${gain>=0?'понравилось':'не попало в характер'}.`:action==='date'?'Вы провели вечер вместе.':action==='talk'||p.meetings>1?'Вы поговорили.':'Вы познакомились.'}`;
+    if(gift){p.gifts=(p.gifts||0)+1;p.lastGift=gift.id;}
     r.profiles[id]=p;r.history.unshift({day:s.day,id,action,text:p.last});r.history=r.history.slice(0,20);
-    adjust(s,{energy:action==='date'?-9:-6,mood:action==='gift'?2:4,stress:action==='date'?-2:0});
+    adjust(s,{energy:action==='date'?-9:-6,mood:gift?2:4,stress:action==='date'?-2:0});
+    if(affair){r.affairs=(r.affairs||0)+1;const partner=byId(romancePeople,r.partner);r.conflict={kind:'affair',partnerId:r.partner,targetId:id,title:`Тайная встреча раскрыта`,text:`${partner.name} узнала о твоей встрече с ${person.name}. Реши, что сказать.`,day:s.day};addLog(s,r.conflict.text,'bad');}
     this.tick(action==='date'?3:1);addLog(s,`${person.name}: ${p.last} Доверие ${p.rapport}/100.`,'story');
     return this.emit(success(`${person.name}: ${p.last} Доверие ${p.rapport}/100.`));
+  }
+  resolveRomanceConflict(index){
+    const s=this.state,r=s.romance,c=r?.conflict;if(!c)return this.emit(fail('Ссоры сейчас нет.'));
+    const choice=romanceConflictChoices(s)[index];if(!choice)return this.emit(fail('Выбери ответ.'));
+    if(s.money<choice.cost)return this.emit(fail('Не хватает денег на этот ответ.'));
+    const p=r.profiles[c.partnerId];if(!p){r.conflict=null;return this.emit(fail('Разговор уже закончился.'));}
+    s.money-=choice.cost;p.spent=(p.spent||0)+choice.cost;p.rapport=clamp(p.rapport+choice.rapport,0,100);
+    adjust(s,choice.effect);if(c.kind==='affair'&&c.partnerId==='nina')r.betrayedNina=true;
+    const separated=choice.leave||p.rapport<8;
+    if(separated){r.partner=null;p.married=false;p.last=`Вы расстались. ${choice.reply}`;}
+    else p.last=choice.reply;
+    r.history.unshift({day:s.day,id:c.partnerId,action:c.kind,text:p.last});r.history=r.history.slice(0,20);
+    r.conflict=null;addLog(s,`${byId(romancePeople,c.partnerId).name}: ${p.last} Доверие ${p.rapport}/100.`,separated?'bad':'story');
+    return this.emit(success(p.last,separated?'bad':'good'));
   }
   person(id,action,choiceIndex) {
     const blocked=this.guard(); if (blocked) return this.emit(blocked);
