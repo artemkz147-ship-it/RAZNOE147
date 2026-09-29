@@ -59,7 +59,7 @@ test('everyone ages with game time and new generations enter the city',()=>{
   assert.ok(livingPeople(s).some(p=>p.id==='resident-1'));
   s.day=361;populationDay(s,()=>.99);
   assert.equal(personAge(s,valera),49);
-  assert.equal(personAge(s,s.population.residents[0]),24);
+  assert.equal(personAge(s,s.population.residents[0]),25);
   assert.ok(livingRomancePeople(s).some(p=>p.id==='resident-2'));
   assert.match(nextDialogue(s,'resident-1').prompt,/Данил/);
   const migrated=validate({...freshState(),day:800});
@@ -87,6 +87,20 @@ test('a newly arrived partner can join relationships and ages with the hero',()=
   assert.ok(activePartners(s).includes(newcomer.id));
   assert.match(shell(s,'people','home',null,'legal',null,null,null,'romance'),/Оксана/);
   s.day=721;assert.equal(personAge(s,newcomer),38);
+});
+
+test('a known person has a birthday event that changes the bond',()=>{
+  const s=freshState(),valera=people.find(p=>p.id==='valera');
+  const birthday=Array.from({length:360},(_,i)=>i+2).find(day=>personAge({...s,day},valera)>personAge({...s,day:day-1},valera));
+  s.day=birthday;s.population.nextArrivalDay=1000;s.social.valera={score:35,met:true,lastDay:0};
+  populationDay(s,()=>.99);
+  assert.match(s.recentIncident.title,/День рождения/);
+  const game=new GameEngine(s,()=>.99);
+  assert.equal(game.resolveIncident(0).ok,true);
+  assert.equal(s.social.valera.score,40);
+  const working=freshState();working.day=birthday;working.social.valera={score:35,met:true,lastDay:0};working.population.nextArrivalDay=1000;
+  populationDay(working,()=>.99,true);
+  assert.equal(working.recentIncident,null);
 });
 
 test('first shifts consume time and energy and pay earned money',()=>{

@@ -11,7 +11,7 @@ export function loadGame() {
     const elapsed = Math.max(0,Date.now()-(state.lastSaved||Date.now()));
     const offlineDays = Math.min(7,Math.floor(elapsed/(6*60*60*1000)));
     if (offlineDays && !state.pending) {
-      for (let i=0;i<offlineDays;i++) { state.day++; dailySettlement(state,{offline:true}); populationDay(state); settleMatureInvestments(state); }
+      for (let i=0;i<offlineDays;i++) { state.day++; dailySettlement(state,{offline:true}); populationDay(state,Math.random,true); settleMatureInvestments(state); }
     }
     state.lastSaved = Date.now();
     return {state,offlineDays};

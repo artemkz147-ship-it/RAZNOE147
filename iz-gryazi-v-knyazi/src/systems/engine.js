@@ -43,7 +43,7 @@ export class GameEngine {
     while (s.hour>=24) {
       s.hour-=24; s.day++;
       dailySettlement(s,{rng:this.rng});
-      populationDay(s,this.rng);
+      populationDay(s,this.rng,quiet);
       romanceDay(s,this.rng);
       if(!quiet)socialDay(s,this.rng);
       settleMatureInvestments(s,this.rng);

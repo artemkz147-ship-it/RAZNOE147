@@ -16,7 +16,8 @@ const residents=[
 export const populationState=()=>({residents:[],departed:{},nextArrivalDay:181});
 export const personAge=(state,person)=>{
   const base=person.ageAtArrival??startingAges[person.id]??35;
-  return base+Math.floor((state.day-(person.arrivedDay||1))/360);
+  const birthday=person.birthdayOffset??[...person.id].reduce((sum,ch)=>(sum*31+ch.charCodeAt(0))%360,0);
+  return base+Math.floor((state.day-(person.arrivedDay||1)+birthday)/360);
 };
 export const isPresent=(state,id)=>!state.population?.departed?.[id];
 export const livingPeople=state=>[...people,...(state.population?.residents||[]).filter(p=>!p.romance)].filter(p=>isPresent(state,p.id));
@@ -48,11 +49,20 @@ function leave(state,person){
   if(!state.recentIncident&&!state.pending)state.recentIncident={title:`Память о ${person.name}`,text:`${person.name} ушёл из жизни в ${age} лет. Город продолжает шуметь, а вашей истории больше не будет нового разговора.`,portrait:person.portrait,image:person.portrait===undefined?`person:${person.id}`:undefined,art:0,choices:[{text:'Вспомнить хорошие моменты',effect:{mood:2,stress:-3},reply:'Ты сохранил тёплые воспоминания.'},{text:'Побыть одному',effect:{energy:3,stress:2},reply:'Ты дал себе время пережить новость.'}]};
 }
 
-export function populationDay(state,rng=Math.random){
+export function populationDay(state,rng=Math.random,quiet=false){
   state.population ||= populationState();
   let arrived=0;
   while(state.day>=state.population.nextArrivalDay){arrive(state,state.population.nextArrivalDay);arrived++;}
   if(arrived>1)addLog(state,`За прошедшие годы в городе появились новые жители: ${arrived}.`,'story');
+  if(!quiet&&!state.recentIncident&&!state.pending&&!state.jailDays){
+    const birthday=[...people,...romancePeople,...state.population.residents].find(person=>isPresent(state,person.id)&&(state.social?.[person.id]?.met||state.dialogueProgress?.[person.id]||state.romance?.profiles?.[person.id]?.met)&&personAge(state,person)>personAge({...state,day:state.day-1},person));
+    if(birthday){
+      const age=personAge(state,birthday),romance=birthday.romance||romancePeople.some(p=>p.id===birthday.id),gift=Math.round(birthday.giftCost||600);
+      const bond=romance?{rapport:{id:birthday.id,delta:5}}:{socialDelta:5};
+      state.recentIncident={title:`День рождения ${birthday.name}`,text:`${birthday.name} исполнилось ${age} лет. Можно уделить человеку время или выбрать подарок.`,portrait:birthday.portrait,image:birthday.portrait===undefined?`person:${birthday.id}`:undefined,art:0,socialId:birthday.id,choices:[{text:'Поздравить лично',effect:{energy:-3,mood:2},...bond,reply:'Вы провели немного времени вместе.'},{text:`Подарить полезную вещь · ${gift} ₽`,cost:gift,effect:{mood:3,contacts:1},...(romance?{rapport:{id:birthday.id,delta:9}}:{socialDelta:9}),reply:'Подарок пришёлся кстати.'}]};
+      addLog(state,`${birthday.name}: день рождения, ${age} лет.`,'story');
+    }
+  }
   if(state.day%30!==0)return;
   for(const person of [...people,...romancePeople,...state.population.residents]){
     if(!isPresent(state,person.id))continue;
