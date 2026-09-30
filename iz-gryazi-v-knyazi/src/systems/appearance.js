@@ -9,5 +9,5 @@ export const ageAppearance=age=>{
 };
 export const ageStyle=age=>{
   const intensity=Math.max(0,Math.min(1,(age-30)/60));
-  return `--age-gray:${intensity.toFixed(3)};--age-wrinkles:${Math.pow(intensity,1.35).toFixed(3)};--age-face:${Math.max(0,Math.min(1,(age-35)/40)).toFixed(3)}`;
+  return `--age-gray:${intensity.toFixed(3)};--age-wrinkles:${Math.pow(intensity,1.35).toFixed(3)};--age-sat:${(1-intensity*.35).toFixed(3)};--age-contrast:${(1+intensity*.12).toFixed(3)}`;
 };

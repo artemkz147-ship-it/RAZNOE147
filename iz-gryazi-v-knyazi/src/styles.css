@@ -324,8 +324,8 @@
 .age-decade-70{--age-gray:.7;--age-wrinkles:.65}
 .age-decade-80{--age-gray:.86;--age-wrinkles:.82}
 .age-decade-90{--age-gray:1;--age-wrinkles:1}
-.person-card .person-portrait-raster{filter:grayscale(var(--age-gray,0)) saturate(calc(1 - var(--age-gray,0)*.35)) contrast(calc(1 + var(--age-gray,0)*.12));transition:filter .8s ease}
-.romance-card .romance-portrait{filter:grayscale(var(--age-gray,0)) saturate(calc(1 - var(--age-gray,0)*.32)) contrast(calc(1 + var(--age-gray,0)*.1));transition:filter .8s ease}
+.person-card .person-portrait-raster,.dialogue-person img,.social-incident-portrait img{filter:grayscale(var(--age-gray,0)) saturate(var(--age-sat,1)) contrast(var(--age-contrast,1));transition:filter .8s ease}
+.romance-card .romance-portrait,.romance-incident-portrait,.romance-conflict-art{filter:grayscale(var(--age-gray,0)) saturate(var(--age-sat,1)) contrast(var(--age-contrast,1));transition:filter .8s ease}
 .person-head::after,.romance-portrait::before{content:"";position:absolute;z-index:1;pointer-events:none;opacity:var(--age-wrinkles,0);background:repeating-linear-gradient(174deg,transparent 0 11px,#261d1938 12px,#f8ddbb29 13px,transparent 15px);mask-image:radial-gradient(ellipse 32% 26% at 51% 24%,#000 18%,transparent 70%);inset:0}
 .person-head .person-number,.romance-portrait>span,.romance-portrait>small{z-index:2}
 @media(prefers-reduced-motion:reduce){.world-hero-age,.portrait-age,.person-card .person-portrait-raster,.romance-card .romance-portrait{transition:none}}
