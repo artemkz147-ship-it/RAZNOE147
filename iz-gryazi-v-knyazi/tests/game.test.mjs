@@ -66,6 +66,14 @@ test('paid housing is lost and time skip stops when living costs exceed cash',()
   assert.match(s.recentIncident.title,/Выселение/);
 });
 
+test('career skip counts parallel business income and hunger is visible from other tabs',()=>{
+  const s=freshState(),game=new GameEngine(s,()=>.99);s.money=50000;s.businesses.stall={level:1,staff:false,condition:100,strategy:'normal'};
+  assert.equal(game.workCareer('janitor',1,'basic').ok,true);
+  assert.ok(s.timeSkip.earned>12500);
+  s.vitals.nutrition=30;
+  assert.match(shell(s,'work','home',null),/НУЖНО ПОЕСТЬ/);
+});
+
 test('age, diet and month long career use real game days and living costs',()=>{
   const s=freshState(),game=new GameEngine(s,()=>.99);
   assert.equal(ageOf(s),30);

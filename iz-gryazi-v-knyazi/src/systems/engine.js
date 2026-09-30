@@ -249,14 +249,13 @@ export class GameEngine {
     const start=s.money,goal=count*30,startingDay=s.day;let earned=0,worked=0,stop='';
     for(let i=0;i<goal;i++){
       if(career){s.stats.energy=clamp(s.stats.energy-8,0,100);s.vitals.strain=clamp(s.vitals.strain+(career.id==='janitor'||career.id==='mechanic'?1:0),0,100);}
-      const before=s.money;
       this.tick(24,true,{skipDiet:true});worked++;
+      earned+=Math.max(0,s.lastSettlement?.business||0);
       if(s.death){stop='Жизнь закончилась.';break;}
       if(career&&worked%30===0){
         const salary=Math.round(career.salary*(.8+Math.min(.4,(s.skills[career.skill]-1)*.04))*(1+(s.careerRaises?.[career.id]||0)*.12));
         s.money+=salary;s.totalEarned+=salary;earned+=salary;s.careerMonths++;gainSkill(s,career.skill,3);addLedger(s,'Зарплата',salary,career.name);
       }
-      if(!career)earned+=Math.max(0,s.money-before);
       if(s.recentIncident||s.romance?.conflict){stop='Появилось событие, которое требует твоего решения.';break;}
       if(s.money<0&&byId(homes,s.home)?.daily>0){
         const formerId=s.home,former=byId(homes,formerId)?.name;s.home='sofa';s.ownedHomes=(s.ownedHomes||[]).filter(x=>x!==formerId);if(!s.ownedHomes.includes('sofa'))s.ownedHomes.push('sofa');

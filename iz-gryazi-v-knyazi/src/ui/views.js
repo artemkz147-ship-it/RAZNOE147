@@ -34,10 +34,11 @@ function currentGoal(s) {
 const routeDone=(s,route)=>(s.achievedRoutes||[]).includes(route.id)||goalReached(s,route);
 function goalRequirements(s,goal){const v=goalsSnapshot(s);return Object.entries(goal.need).map(([key,target])=>{const names={wealth:'Капитал',businesses:'Дела',respect:'Уважение',contacts:'Связи',crime:'Криминал',jobs:'Смены',homeRank:'Жильё',vehicleRank:'Транспорт',district:'Район'};return `<span class="${key==='district'?v.districts.includes(target)?'met':'':v[key]>=target?'met':''}">${names[key]}: ${key==='district'?(v.districts.includes(target)?'посещён':'впереди'):key==='wealth'?`${money(v[key])} / ${money(target)}`:`${v[key]} / ${target}`}</span>`}).join('')}
 function recoveryStrip(s) {
-  if(s.stats.energy>=35||s.jailDays)return '';
+  const hungry=s.vitals.nutrition<=35;
+  if((s.stats.energy>=35&&!hungry)||s.jailDays)return '';
   const target=Math.min(100,75+Math.round((byId(homes,s.home)?.restore||28)*.2)+Math.round(s.stats.life*.08));
   const rested=s.lastRestDay===s.day;
-  return `<div class="recovery-strip" role="region" aria-label="Восстановление энергии"><div class="recovery-copy"><strong>СИЛЫ НА ИСХОДЕ · ${s.stats.energy}/100</strong><span>${rested?'Передышка уже была':'Передышка +22 за 1 ч'} · сон до ${target} за 8 ч</span></div><div class="recovery-actions">${b(rested?'УЖЕ ОТДЫХАЛ':'ПЕРЕДЫШКА','activity','rest',rested,'rest-button')}${b('СПАТЬ','activity','sleep',false,'sleep-button')}</div></div>`;
+  return `<div class="recovery-strip" role="region" aria-label="Состояние"><div class="recovery-copy"><strong>${hungry?`НУЖНО ПОЕСТЬ · СЫТОСТЬ ${s.vitals.nutrition}/100`:`СИЛЫ НА ИСХОДЕ · ${s.stats.energy}/100`}</strong><span>${hungry?'Еду можно купить в городе.':`${rested?'Передышка уже была':'Передышка +22 за 1 ч'} · сон до ${target} за 8 ч`}</span></div><div class="recovery-actions">${hungry?'<button data-tab="city" class="rest-button">К ЕДЕ</button>':''}${s.stats.energy<35?`${b(rested?'УЖЕ ОТДЫХАЛ':'ПЕРЕДЫШКА','activity','rest',rested,'rest-button')}${b('СПАТЬ','activity','sleep',false,'sleep-button')}`:''}</div></div>`;
 }
 export function shell(s,tab,shopType,mini,earningMode='legal',dialogueId=null,dialogueResult=null,travelId=null,peopleMode='contacts') {
   const d=byId(districts,s.district),nw=netWorth(s),won=routesToSuccess.find(route=>routeDone(s,route));
