@@ -1,0 +1,160 @@
+ublic static final long SNOOZE_MS = 10L * 60L * 1000L;
++    public static final int DEFAULT_SLEEP_START_MIN = 23 * 60;
++    public static final int DEFAULT_SLEEP_END_MIN = 7 * 60;
+ 
+     private PlanStore() {}
+ 
+@@ -98,4 +106,96 @@
+     public static void clearSnooze(Context context) {
+         prefs(context).edit().putLong(K_SNOOZE_UNTIL_MS, 0L).apply();
+     }
++
++    public static boolean isManualSleepEnabled(Context context) {
++        return prefs(context).getBoolean(K_SLEEP_MANUAL, false);
++    }
++
++    public static void setManualSleepEnabled(Context context, boolean enabled) {
++        prefs(context).edit().putBoolean(K_SLEEP_MANUAL, enabled).apply();
++    }
++
++    public static boolean isScheduledSleepEnabled(Context context) {
++        return prefs(context).getBoolean(K_SLEEP_SCHEDULE, false);
++    }
++
++    public static void setScheduledSleepEnabled(Context context, boolean enabled) {
++        prefs(context).edit().putBoolean(K_SLEEP_SCHEDULE, enabled).apply();
++    }
++
++    public static int getSleepStartMin(Context context) {
++        return prefs(context).getInt(K_SLEEP_START_MIN, DEFAULT_SLEEP_START_MIN);
++    }
++
++    public static int getSleepEndMin(Context context) {
++        return prefs(context).getInt(K_SLEEP_END_MIN, DEFAULT_SLEEP_END_MIN);
++    }
++
++    public static void setSleepWindow(Context context, int startMin, int endMin) {
++        startMin = normalizeMinute(startMin);
++        endMin = normalizeMinute(endMin);
++        prefs(context).edit()
++                .putInt(K_SLEEP_START_MIN, startMin)
++                .putInt(K_SLEEP_END_MIN, endMin)
++                .apply();
++    }
++
++    public static boolean isSleepActive(Context context, long nowMs) {
++        if (isManualSleepEnabled(context)) return true;
++        if (!isScheduledSleepEnabled(context)) return false;
++        return isWithinWindow(minuteOfDay(nowMs), getSleepStartMin(context), getSleepEndMin(context));
++    }
++
++    public static long adjustNotificationTime(Context context, long triggerAtMs) {
++        if (isManualSleepEnabled(context)) return -1L;
++        if (!isScheduledSleepEnabled(context)) return triggerAtMs;
++        int start = getSleepStartMin(context);
++        int end = getSleepEndMin(context);
++        if (!isWithinWindow(minuteOfDay(triggerAtMs), start, end)) return triggerAtMs;
++        return nextSleepEndMs(context, triggerAtMs);
++    }
++
++    public static long nextSleepEndMs(Context context, long referenceMs) {
++        if (isManualSleepEnabled(context)) return Long.MAX_VALUE;
++        int start = getSleepStartMin(context);
++        int end = getSleepEndMin(context);
++        if (!isScheduledSleepEnabled(context) || !isWithinWindow(minuteOfDay(referenceMs), start, end)) {
++            return referenceMs;
++        }
++
++        Calendar cal = Calendar.getInstance();
++        cal.setTimeInMillis(referenceMs);
++        int currentMinute = minuteOfDay(referenceMs);
++        boolean overnight = start > end;
++
++        if (overnight && currentMinute >= start) {
++            cal.add(Calendar.DAY_OF_YEAR, 1);
++        }
++
++        cal.set(Calendar.HOUR_OF_DAY, end / 60);
++        cal.set(Calendar.MINUTE, end % 60);
++        cal.set(Calendar.SECOND, 0);
++        cal.set(Calendar.MILLISECOND, 0);
++        return cal.getTimeInMillis();
++    }
++
++    private static int normalizeMinute(int min) {
++        int day = 24 * 60;
++        int value = min % day;
++        return value < 0 ? value + day : value;
++    }
++
++    private static int minuteOfDay(long ms) {
++        Calendar cal = Calendar.getInstance();
++        cal.setTimeInMillis(ms);
++        return cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE);
++    }
++
++    private static boolean isWithinWindow(int minute, int start, int end) {
++        if (start == end) return false;
++        if (start < end) {
++            return minute >= start && minute < end;
++        }
++        return minute >= start || minute < end;
++    }
+ }
+diff -ruN orig_v12/SmokeInterval/app/src/main/java/com/example/smokeinterval/SettingsActivity.java work_v12/SmokeInterval/app/src/main/java/com/example/smokeinterval/SettingsActivity.java
+--- orig_v12/SmokeInterval/app/src/main/java/com/example/smokeinterval/SettingsActivity.java	2026-09-28 05:15:39.000000000 +0000
++++ work_v12/SmokeInterval/app/src/main/java/com/example/smokeinterval/SettingsActivity.java	2026-09-30 00:37:42.964966769 +0000
+@@ -3,10 +3,10 @@
+ import android.Manifest;
+ import android.app.Activity;
+ import android.app.NotificationManager;
++import android.app.TimePickerDialog;
+ import android.content.Context;
+ import android.content.Intent;
+ import android.content.pm.PackageManager;
+-import android.graphics.Color;
+ import android.graphics.Typeface;
+ import android.graphics.drawable.GradientDrawable;
+ import android.net.Uri;
+@@ -20,6 +20,8 @@
+ import android.widget.ScrollView;
+ import android.widget.TextView;
+ 
++import java.util.Locale;
++
+ public class SettingsActivity extends Activity {
+     private static final int REQ_NOTIFICATIONS = 45;
+     private static final int BG = 0xFF08110D;
+@@ -28,6 +30,7 @@
+     private static final int TEXT = 0xFFF4F8F5;
+     private static final int MUTED = 0xFF92A099;
+     private static final int GREEN = 0xFF54E68A;
++    private static final int ORANGE = 0xFFFFB35C;
+     private static final int LINE = 0xFF26352E;
+ 
+     private TextView notifState;
+@@ -37,6 +40,14 @@
+     private Button exactButton;
+     private Button dndButton;
+ 
++    private TextView manualSleepState;
++    private TextView scheduleSleepState;
++    private Button manualSleepButton;
++    private Button scheduleSleepButton;
++    private Button sleepStartButton;
++    private Button sleepEndButton;
++    private TextView sleepHint;
++
+     @Override protected void onCreate(Bundle savedInstanceState) {
+         super.onCreate(savedInstanceState);
+         getWindow().setStatusBarColor(BG);
+@@ -90,19 +101,58 @@
+         addInfoRow(plan, "Сигареты", "Не копятся");
+         root.addView(plan, matchWrap());
+ 
++        addSection(root, "Сон и тихие часы", "Можно отключить уведомления вручную или по постоянному диапазону");
++        LinearLayout sleep = card();
++        manualSleepState = addStatusRow(sleep, "Кнопка «Спать»", "Полностью отключает уведомления, пока ты сам не выключишь режим сна");
++        manualSleepButton = actionButton("Включить сон");
++        manualSleepButton.setOnClickListener(v -> {
++            PlanStore.setManualSleepEnabled(this, !PlanStore.isManualSleepEnabled(th
