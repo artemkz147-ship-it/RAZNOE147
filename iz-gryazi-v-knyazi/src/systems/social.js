@@ -30,7 +30,9 @@ export function socialDay(state,rng){
   if(state.recentIncident||state.pending||state.romance?.conflict||state.jailDays||state.day<3||state.day%3!==0)return;
   const pool=Object.keys(state.social||{}).filter(id=>isPresent(state,id)&&socialMet(state,id)&&!activePartners(state).includes(id)&&Math.abs(socialValue(state,id))>=20);
   if(!pool.length||rng()>=.28)return;
-  const id=pool[Math.floor(rng()*pool.length)],score=socialValue(state,id),person=[...livingPeople(state),...livingRomancePeople(state)].find(p=>p.id===id);
+  const responding=pool.filter(id=>state.citizens?.[id]?.retaliation&&socialValue(state,id)<0);
+  const candidates=responding.length?responding:pool;
+  const id=candidates[Math.floor(rng()*candidates.length)],score=socialValue(state,id),person=[...livingPeople(state),...livingRomancePeople(state)].find(p=>p.id===id);
   if(!person)return;
   const friend=score>=30,portrait=romancePeople.find(p=>p.id===id)?.portrait;
   const life=citizenLife(state,person),art={portrait,image:portrait===undefined?`person:${id}`:undefined,art:0,socialId:id};
@@ -50,7 +52,7 @@ export function socialDay(state,rng){
     addLog(state,`${person.name}: ответ на твой предыдущий ход.`,'bad');return;
   }
   state.recentIncident=friend?{
-    title:`Звонок от ${person.name}`,text:`${person.name} узнал о твоём тяжёлом дне и предлагает помощь. Можно принять её или справиться самому.`,portrait,image:portrait===undefined?`person:${id}`:undefined,art:0,socialId:id,
+    title:`Встреча с ${person.name}`,text:`${person.name} узнал о твоём тяжёлом дне и предлагает помощь. Можно принять её или справиться самому.`,portrait,image:portrait===undefined?`person:${id}`:undefined,art:0,socialId:id,
     choices:[{text:'Принять помощь',effect:{energy:9,stress:-3,contacts:1},socialDelta:3,reply:`${person.name} помог разобраться с делами. Сил стало больше.`},{text:'Поблагодарить и справиться самому',effect:{respect:1,mood:2},socialDelta:1,reply:'Ты поблагодарил за внимание и продолжил сам.'}]
   }:{
     title:`Неприятный слух`,text:`После вашей ссоры ${person.name} пересказал знакомым свою версию событий. История уже дошла до тебя.`,portrait,image:portrait===undefined?`person:${id}`:undefined,art:0,socialId:id,

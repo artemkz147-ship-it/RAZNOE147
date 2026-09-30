@@ -23,6 +23,7 @@ for(const firm of businesses){
  contextEvents.push({id:`staff-${firm.id}`,minDay:1,scope:'business',firmId:firm.id,art:11,test:s=>!!s.businesses[firm.id]?.staff&&!s.businesses[firm.id]?.audited,title:'Недостача у сотрудника',text:`При сверке денег «${firm.name}» обнаружилась недостача. Нужно проверить смену.`,choices:[{text:'Проверить кассу и установить учёт',cost,firmAction:'audit',log:'Ты усилил контроль и выяснил причину недостачи.'},{text:'Поверить на слово',effect:{money:-cost},log:'Недостачу пришлось закрыть собственными деньгами.'}]});
 }
 contextEvents.push(
+ {id:'work-street-warning',scope:'work',minDay:1,art:10,test:s=>homeTerms(s.home).kind==='street'&&!!s.employment&&['clerk','manager','director','shop'].includes(s.employment.id),title:'Рабочий день после вокзала',text:'После ночёвок без своей комнаты ты пришёл на смену невыспавшимся. Руководитель заметил состояние и жалобы клиентов.',choices:[{text:'Привести себя в порядок и обсудить график',cost:250,effect:{energy:-8,stress:3},log:'Ты оплатил душ и объяснил ситуацию. Сегодня договор удалось сохранить.'},{text:'Нагрубить в ответ',misconduct:true,effect:{respect:-5},log:'Конфликт закончился увольнением. Ночлег на вокзале усугубил проблему.'}]},
  {id:'street-mugging',scope:'housing',minDay:1,art:3,test:s=>homeTerms(s.home).kind==='street',title:'Ночлег оказался чужим',text:'Ночью тебя разбудили люди, считающие это место своим.',choices:[{text:'Уйти и искать другое место',effect:{energy:-12,stress:5},log:'Ты ушёл без драки, но почти не спал.'},{text:'Спорить',effect:{health:-14,stress:8},log:'Словами закончить не удалось. Ты получил травмы.'}]},
  {id:'street-cold',scope:'housing',minDay:1,art:3,test:s=>homeTerms(s.home).kind==='street',title:'Холодная ночь',text:'Укрытие промокло. К утру начался кашель.',choices:[{text:'Зайти в тёплую столовую',cost:120,effect:{health:3,energy:4},log:'Ты согрелся, но нужен нормальный ночлег.'},{text:'Остаться',effect:{health:-6,energy:-8},log:'Холод ухудшил самочувствие.'}]},
  {id:'hostel-theft',scope:'housing',minDay:2,art:3,test:s=>s.home==='hostel',title:'Открытый шкафчик',text:'После ночёвки обнаружил, что шкафчик не заперт.',choices:[{text:'Проверить вещи и поставить замок',cost:250,effect:{stress:-2},log:'Вещи на месте. Замок куплен.'},{text:'Махнуть рукой',effect:{money:-100,stress:3},log:'Не досчитался небольшой суммы.'}]}
@@ -34,6 +35,7 @@ export function eventEligible(s,e){
  if(['rent','renovation'].includes(e.id)&&kind!=='rent')return false;
  if(['leak','heating'].includes(e.id)&&!['rent','owned'].includes(kind))return false;
  if(['corporate-party'].includes(e.id)&&!s.employment)return false;
+ if(e.id==='date'&&(!['lada','sedan','suv','limousine'].includes(s.vehicle)||!s.social?.sergey?.met||s.population?.departed?.sergey))return false;
  if(e.id==='employee'&&!Object.values(s.businesses).some(x=>x.staff))return false;
  if(e.id==='oldfriend'&&(!s.social?.valera?.met||s.population?.departed?.valera))return false;
  if(e.id==='article'&&!s.social?.vera?.met)return false;

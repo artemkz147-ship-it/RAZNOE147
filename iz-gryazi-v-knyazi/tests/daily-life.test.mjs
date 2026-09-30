@@ -22,7 +22,7 @@ test('hostel bills daily and ownership cannot be removed by a temporary lack of 
  s.ownedHomes.push('penthouse');moveHome(s,'penthouse');s.money=0;s.day+=30;housingDay(s,()=>.99);assert.equal(s.home,'penthouse');assert.ok(s.ownedHomes.includes('penthouse'));
 });
 test('the free host can expel an enemy and rich housing relocates the scene',()=>{
- const s=freshState(),g=new GameEngine(s,()=>.99);s.social.valera.score=-25;g.tick(24,true);assert.equal(s.home,'station');s.recentIncident=null;s.money=9000000;
+ const s=freshState(),g=new GameEngine(s,()=>.99);s.social.sergey.score=-25;g.tick(24,true);assert.equal(s.home,'station');s.recentIncident=null;s.money=9000000;
  assert.equal(g.buy('home','penthouse').ok,true);assert.equal(s.district,'heights');assert.equal(s.housing.nextDue,s.day+30);
 });
 test('a daily employment shift consumes time and energy; payday is monthly',()=>{

@@ -7,12 +7,12 @@ export function freshState() {
     skills: { grit: 1, charm: 1, focus: 1 }, xp: { grit: 0, charm: 0, focus: 0 },
     employment:null,careerBans:{},housing:{id:'sofa',since:1,nextDue:2,multiplier:1},home: 'sofa', vehicle: 'feet', ownedHomes: ['sofa'], ownedVehicles: ['feet'], businesses: {}, upgrades: [], lastRestDay: 0,
     conditions: {shoes:100,back:0,hangover:0,loaderShifts:0,walkTrips:0}, incidentHistory: [], recentIncident: null,
-    diet:'basic', lastMealDay:0, vitals:{nutrition:60,immunity:70,fitness:35,exposure:0,strain:0,illness:0}, death:null, careerMonths:0, lastSettlement:null, timeSkip:null,
+    diet:'basic',skipDiet:'basic',activeSkip:null,criminalCases:[], lastMealDay:0, vitals:{nutrition:60,unfedDays:0,immunity:70,fitness:35,exposure:0,strain:0,illness:0}, death:null, careerMonths:0, lastSettlement:null, timeSkip:null,
     heat: 0, jailDays: 0, crimesDone: 0, arrestCount: 0,
     casino: {rounds:0,wins:0,wagered:0,returned:0,history:[]}, casinoDaily: {day:1,wagered:0}, casinoTable:null,
     romance:{partner:null,partners:[],profiles:{marina:{met:true,rapport:0,meetings:0,lastDay:0,days:0,spent:0}},betrayedNina:false,history:[],conflict:null,affairs:0},
     population:{residents:[],departed:{},nextArrivalDay:181},
-    citizens:{},social:{valera:{met:true,score:8},tamara:{met:true,score:0},marina:{met:true,score:0}},relations: {}, dialogueProgress: {}, dialogueLast: {}, lastWorkResult:null, story: 0, flags: [], log: [{ day:1, hour:7, text:'Проснулся на чужом диване. Город пока не в курсе, что ты собираешься его купить.', type:'story' }],
+    citizens:{},social:{sergey:{met:true,score:35},valera:{met:true,score:8},tamara:{met:true,score:0},marina:{met:true,score:0}},relations: {}, dialogueProgress: {}, dialogueLast: {}, lastWorkResult:null, story: 0, flags: [], log: [{ day:1, hour:7, text:'Проснулся на чужом диване. Город пока не в курсе, что ты собираешься его купить.', type:'story' }],
     market: 1, pending: null, eventHistory: [], lastSaved: Date.now(), totalEarned: 0, jobsDone: 0, ending: false, achievedRoutes: [], ledger:[]
   };
 }

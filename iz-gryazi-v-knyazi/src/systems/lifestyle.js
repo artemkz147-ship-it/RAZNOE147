@@ -6,6 +6,7 @@ export const calendarOf = state => ({month:Math.floor((state.day-1)/30)%12+1,yea
 
 export function dailyVitals(state,rng=Math.random,{fed=false}={}){
   const v=state.vitals ||= {nutrition:60,immunity:70,fitness:35,exposure:0,strain:0,illness:0};
+  v.unfedDays=fed||state.lastMealDay>0&&state.lastMealDay>=state.day-1?0:(v.unfedDays||0)+1;
   const diet=fed?(diets.find(x=>x.id===state.diet)||diets[1]):null;
   const shelter=['station','heating-main'].includes(state.home);
   v.nutrition=clamp(v.nutrition+(diet?(diet.id==='expired'?-5:diet.id==='basic'?0:2):-9),0,100);
@@ -14,11 +15,18 @@ export function dailyVitals(state,rng=Math.random,{fed=false}={}){
   v.strain=clamp(v.strain+(state.stats.stress>65?2:-2)+(state.conditions?.back?2:0),0,100);
   v.fitness=clamp(v.fitness-(state.day%5===0?1:0),0,100);
   adjust(state,diet?{health:diet.health,energy:diet.energy,mood:diet.mood}:{health:-2,energy:-5,mood:-4,stress:3});
+  if(!fed&&v.nutrition===0){
+    adjust(state,{health:-6,energy:-8,mood:-3});
+    if(v.unfedDays>=7&&rng()<Math.min(.75,.18+(v.unfedDays-7)*.07)){
+      state.death={day:state.day,age:ageOf(state),cause:'Истощение от голода'};addLog(state,'Без еды организм не выдержал.','bad');return;
+    }
+    if(v.unfedDays>=2&&!state.recentIncident&&rng()<Math.min(.8,.35+(v.unfedDays-2)*.08))state.recentIncident={title:'Потерял сознание',interruptSkip:true,text:'Несколько дней без еды закончились обмороком. Прохожий вызвал помощь.',art:16,choices:[{text:'Принять помощь',feed:true,effect:{health:5,energy:12},reply:'Тебя напоили и накормили. Силы понемногу возвращаются.'}]};
+  }
   const illnessChance=(v.immunity<25?.055:0)+(v.exposure>45?.035:0)+(v.nutrition<15?.04:0);
   if(state.stats.health<55&&rng()<illnessChance){
     v.illness=clamp(v.illness+1,0,10);adjust(state,{health:-6,energy:-6});
     addLog(state,'Ночью поднялась температура. Условия жизни и питание сказались на здоровье.','bad');
-    if(!state.recentIncident)state.recentIncident={title:'Ночная температура',text:'Ты проснулся с жаром. Впереди был рабочий день, но тело требует внимания.',art:0,choices:[{text:'Остаться дома и восстановиться',effect:{health:8,energy:12,stress:-3},reply:'Ты дал себе время отлежаться.'},{text:'Сходить к врачу · 1 700 ₽',cost:1700,effect:{health:18,energy:5,stress:-5},reply:'Врач помог быстрее прийти в себя.'}]};
+    if(!state.recentIncident)state.recentIncident={title:'Ночная температура',interruptSkip:true,text:'Ты проснулся с жаром. Впереди был рабочий день, но тело требует внимания.',art:16,choices:[{text:'Остаться дома и восстановиться',effect:{health:8,energy:12,stress:-3},reply:'Ты дал себе время отлежаться.'},{text:'Сходить к врачу · 1 700 ₽',cost:1700,effect:{health:18,energy:5,stress:-5},reply:'Врач помог быстрее прийти в себя.'}]};
   }
   else if(v.illness>0&&state.stats.health>65)v.illness--;
   const age=ageOf(state);

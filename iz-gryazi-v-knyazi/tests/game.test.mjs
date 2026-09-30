@@ -143,11 +143,11 @@ test('everyone ages with game time and new generations enter the city',()=>{
 });
 
 test('aging can remove old contacts and changes the free sofa',()=>{
-  const s=freshState();s.day=10830;s.population.nextArrivalDay=20000;
+  const s=freshState();s.day=19470;s.population.nextArrivalDay=25000;
   populationDay(s,()=>0);
-  assert.ok(!livingPeople(s).some(p=>p.id==='valera'));
+  assert.ok(!livingPeople(s).some(p=>p.id==='sergey'));
   assert.equal(s.home,'station');
-  assert.equal(knownDepartures(s)[0].person.name,'Валера «Ключ»');
+  assert.equal(knownDepartures(s).some(x=>x.person.id==='sergey'),true);
   assert.match(shell(s,'people','home',null,'legal',null,null,null,'contacts'),/ПАМЯТЬ ГОРОДА/);
 });
 
@@ -583,7 +583,7 @@ test('conversations have authored choices, persistent effects and no repeated to
   assert.equal(state.relations.valera,3);
   assert.equal(state.stats.respect,2);
   assert.equal(state.stats.energy,66);
-  assert.match(state.log[0].text,/Чужой диван/);
+  assert.match(state.log[0].text,/Гаражная смена/);
   assert.match(shell(state,'people','home',null),/Работа без вывески/);
   for(let i=1;i<dialogues.valera.length;i++)assert.equal(game.person('valera','talk',0).ok,true);
   const energy=state.stats.energy,relationship=state.relations.valera;

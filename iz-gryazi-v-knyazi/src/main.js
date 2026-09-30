@@ -6,6 +6,7 @@ import { loadGame,saveGame,exportGame,importGame } from './systems/save.js';
 import { GameEngine } from './systems/engine.js';
 import { artScene } from './scene/artscene.js';
 import { shell,modal,menuModal } from './ui/views.js';
+import {renderSkipTimer} from './ui/timeSkip.js';
 import { MiniGame } from './ui/minigames.js';
 import { socialGroup } from './systems/social.js';
 
@@ -43,6 +44,7 @@ function render() {
   addCarouselControls();
   focusCurrentDistrict=false;
   if(menuOpen||citizenId)renderModal();
+  renderSkipTimer(game.state);
 }
 function renderModal() {
   const root=document.getElementById('modal-root');
@@ -59,7 +61,7 @@ function toast(message,tone='good') {
     setTimeout(()=>scene.classList.remove('scene-shake','scene-glow'),520);
   }
 }
-game.subscribe((_,result)=>{render();if(result&&!result.dialogueReply)toast(result.message,result.tone);});
+game.subscribe((_,result)=>{if(result?.skipPreference)return;if(result?.timeSkipFrame){if(game.state.pending||game.state.recentIncident||game.state.romance?.conflict)render();else renderSkipTimer(game.state);return;}render();if(result&&!result.dialogueReply)toast(result.message,result.tone);});
 render();
 if(loaded.offlineDays)toast(`Пока тебя не было, прошло ${loaded.offlineDays} дн. Доходы и расходы учтены.`,'story');
 
@@ -123,6 +125,7 @@ function perform(action,id,months) {
   }
 }
 document.addEventListener('click',event=>{
+  if(event.target.closest('[data-cancel-skip]')){game.finishTimeSkip();return;}
   const citizenTab=event.target.closest('[data-citizen-pane]');
   if(citizenTab){citizenPane=citizenTab.dataset.citizenPane;renderModal();return;}
   const citizenAction=event.target.closest('[data-citizen-action]');
@@ -162,7 +165,7 @@ document.addEventListener('click',event=>{
   const button=event.target.closest('[data-action]');
   if(button?.dataset.action==='skip'){
     const panel=button.closest('.skip-controls');
-    game.skipTime(button.dataset.kind,button.dataset.id,Number(panel.querySelector('.skip-months').value),panel.querySelector('.skip-diet').value);
+    game.startTimeSkip(button.dataset.kind,button.dataset.id,Number(panel.querySelector('.skip-months').value),panel.querySelector('.skip-diet').value);
     return;
   }
   if(button)perform(button.dataset.action,button.dataset.id,button.dataset.months);
@@ -172,6 +175,7 @@ document.addEventListener('input',event=>{
   if(event.target.matches('[data-mini-input="offer"]'))mini?.setOffer(event.target.value);
 });
 document.addEventListener('change',async event=>{
+  if(event.target.matches('.skip-diet')){game.chooseSkipDiet(event.target.value);return;}
   if(event.target.id!=='import-file'||!event.target.files?.length)return;
   try {const state=await importGame(event.target.files[0]);menuOpen=false;dialogueId=null;dialogueResult=null;tab='city';game.replaceState(state);}
   catch(error){toast(`Не удалось загрузить: ${error.message}`,'bad');}
@@ -188,3 +192,4 @@ document.addEventListener('keydown',event=>{
 });
 window.addEventListener('beforeunload',()=>saveGame(game.state));
 setInterval(()=>saveGame(game.state),30000);
+setInterval(()=>{if(game.state.activeSkip)game.advanceTimeSkip();},1000/7);

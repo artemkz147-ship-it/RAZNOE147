@@ -8,6 +8,7 @@ export const districts = [
 ];
 
 export const jobs = [
+  {id:'garage-help',name:'Помочь в гараже Валеры',district:'yard',hours:4,energy:22,pay:780,skill:'focus',game:'timing',risk:0.02,referral:'valera-work',description:'Согласованная смена: инструменты, мелкий ремонт и оплата после работы.'},
   {id:'scrap',name:'Сдать металл',district:'yard',hours:3,energy:18,pay:310,skill:'grit',game:'timing',risk:0.02,description:'Магнит ищет железо, дед ищет справедливость.'},
   {id:'courier',name:'Развозить заказы',district:'yard',hours:4,energy:26,pay:520,skill:'grit',game:'route',risk:0.03,description:'Клиент пишет «я у подъезда». Это ложь.'},
   {id:'cleaner',name:'Убрать подъезд',district:'yard',hours:4,energy:29,pay:580,skill:'charm',game:'sort',risk:0.01,description:'Найди то, что было полом до ремонта.'},
@@ -51,7 +52,7 @@ export const jobs = [
 ];
 
 export const homes = [
-  {id:'sofa',name:'Диван у знакомого',price:0,daily:0,restore:28,prestige:0,description:'Валера пустил бесплатно. Еду и прочий быт ты оплачиваешь сам.'},
+  {id:'sofa',name:'Диван у знакомого',price:0,daily:0,restore:28,prestige:0,description:'Серёга пустил бесплатно. Еду и прочий быт ты оплачиваешь сам.'},
   {id:'hostel',name:'Койка в хостеле',price:155,daily:155,restore:32,prestige:1,description:'Шторка — первая собственная граница.'},
   {id:'room',name:'Комната с ковром',price:5700,daily:190,restore:38,prestige:3,description:'Ковёр глушит соседей. Иногда.'},
   {id:'flat',name:'Однушка у кольца',price:15600,daily:520,restore:51,prestige:11,description:'Свой чайник. Чужой ипотечный страх.'},

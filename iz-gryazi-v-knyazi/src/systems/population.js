@@ -3,7 +3,7 @@ import { people } from '../data/people.js';
 import { romancePeople } from '../data/romance.js';
 import { addLog,adjust } from './state.js';
 
-export const startingAges={valera:48,tamara:64,azamat:39,lida:43,vera:35,artur:55,minister:60,rosa:57,pasha:49,zoya:52,marina:30,nina:32,alisa:20,viktoria:25,irina:36};
+export const startingAges={sergey:34,valera:48,tamara:64,azamat:39,lida:43,vera:35,artur:55,minister:60,rosa:57,pasha:49,zoya:52,marina:30,nina:32,alisa:20,viktoria:25,irina:36};
 const surnames={male:['Орлов','Соколов','Миронов','Ким','Ахметов','Белов','Лазарев','Волков'],female:['Орлова','Соколова','Миронова','Ким','Ахметова','Белова','Лазарева','Волкова']};
 const residents=[
   {names:['Данил','Кирилл','Рустам'],role:'курьер новой волны',district:'yard',portraitId:'azamat',accent:'#b28762',age:24,threshold:0,favor:'Доставить посылку',cost:90,effect:{contacts:1,energy:-3},relation:2,lines:['«Вчера адреса здесь не было. Сегодня дом уже есть».','«Маршрут меняется, а подъезд без лифта остаётся».']},
@@ -42,9 +42,9 @@ function leave(state,person){
   if(partner){state.romance.partners=(state.romance.partners||[]).filter(id=>id!==person.id);state.romance.partner=state.romance.partners.at(-1)||null;state.romance.profiles[person.id].married=false;adjust(state,{mood:-16,stress:14});}
   else if(score>=30)adjust(state,{mood:-8,stress:5});
   if(state.romance?.conflict?.partnerId===person.id)state.romance.conflict=null;
-  if(person.id==='valera'&&state.home==='sofa'){
+  if(person.id==='sergey'&&state.home==='sofa'){
     moveHome(state,'station');if(!state.ownedHomes.includes('station'))state.ownedHomes.push('station');
-    addLog(state,'После ухода Валеры диван больше недоступен. Тебе пришлось искать бесплатный ночлег на вокзале.','bad');
+    addLog(state,'После ухода Серёги диван больше недоступен. Тебе пришлось искать бесплатный ночлег на вокзале.','bad');
   }
   addLog(state,`${person.name} ушёл из жизни в ${age} лет.${partner?' Вы были вместе.':''}`,'bad');
   if(!state.recentIncident&&!state.pending)state.recentIncident={title:`Память о ${person.name}`,text:`${person.name} ушёл из жизни в ${age} лет. Город продолжает шуметь, а вашей истории больше не будет нового разговора.`,portrait:person.portrait,image:person.portrait===undefined?`person:${person.id}`:undefined,art:0,choices:[{text:'Вспомнить хорошие моменты',effect:{mood:2,stress:-3},reply:'Ты сохранил тёплые воспоминания.'},{text:'Побыть одному',effect:{energy:3,stress:2},reply:'Ты дал себе время пережить новость.'}]};

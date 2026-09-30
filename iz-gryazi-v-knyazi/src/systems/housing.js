@@ -23,15 +23,15 @@ export function loseHousing(s,reason){
   if(!s.ownedHomes.includes('station'))s.ownedHomes.push('station');
   moveHome(s,'station');
   const text=`${former}: ${reason} Пришлось уйти на вокзал.`;
-  addLog(s,text,'bad');if(!s.recentIncident)s.recentIncident={title:'Нужно искать ночлег',text,art:3};
+  addLog(s,text,'bad');if(!s.recentIncident)s.recentIncident={title:'Нужно искать ночлег',text,art:3,interruptSkip:true};
 }
 export function housingDay(s,rng){
   const account=ensureHousing(s),terms=homeTerms(s.home);
   if(terms.kind==='friend'){
-    const score=s.social?.valera?.score||0,days=s.day-account.since;
-    if(s.population?.departed?.valera||score<=-20||days>45&&rng()<Math.min(.5,(days-45)*.008)){
-      loseHousing(s,score<=-20?'Валера больше не хочет тебя принимать.':'Валера попросил освободить диван: бесплатная помощь не была навсегда.');
-    }else if(days>=25&&days%10===0&&!s.recentIncident)s.recentIncident={title:'Разговор о диване',text:'Валера устал делить комнату. Нужно обсудить, сколько ты ещё останешься.',image:'person:valera',socialId:'valera',choices:[{text:'Помочь с бытом и договориться ещё на неделю',effect:{energy:-12},socialDelta:4,housingGrace:7,reply:'Ты убрал комнату и помог в гараже. Валера согласился подождать.'},{text:'Сказать, что тебе все должны',socialDelta:-25,evict:true,reply:'Валера предложил искать другой ночлег.'}]};
+    const score=s.social?.sergey?.score||0,days=s.day-account.since;
+    if(s.population?.departed?.sergey||score<=-20||days>45&&rng()<Math.min(.5,(days-45)*.008)){
+      loseHousing(s,score<=-20?'Серёга больше не хочет тебя принимать.':'Серёга попросил освободить диван: бесплатная помощь не была навсегда.');
+    }else if(days>=25&&days%10===0&&!s.recentIncident)s.recentIncident={title:'Разговор о диване',text:'Серёга устал делить комнату. Нужно обсудить, сколько ты ещё останешься.',image:'person:sergey',socialId:'sergey',choices:[{text:'Помочь с бытом и договориться ещё на неделю',effect:{energy:-12},socialDelta:4,housingGrace:7,reply:'Ты убрал комнату и закупил продукты. Серёга согласился подождать.'},{text:'Сказать, что тебе все должны',socialDelta:-25,evict:true,reply:'Серёга предложил искать другой ночлег.'}]};
     return 0;
   }
   if(!terms.amount||s.day<account.nextDue)return 0;
