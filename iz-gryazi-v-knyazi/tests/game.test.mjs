@@ -54,6 +54,16 @@ test('bicycle chain incident is never in the bus or car pool',()=>{
   const chain=incidents.find(x=>x.id==='chain');
   assert.equal(chain.context,'bike');
   assert.ok(!incidents.filter(x=>x.context==='bus'||x.context==='ride').includes(chain));
+  assert.ok(incidents.some(x=>x.context==='taxi'));
+  assert.ok(incidents.some(x=>x.context==='moped'));
+});
+
+test('paid housing is lost and time skip stops when living costs exceed cash',()=>{
+  const s=freshState(),game=new GameEngine(s,()=>.99);s.home='room';s.ownedHomes.push('room');s.money=100;
+  assert.equal(game.skipTime('career','janitor',12,'basic').ok,true);
+  assert.equal(s.timeSkip.worked,1);assert.equal(s.home,'sofa');
+  assert.ok(!s.ownedHomes.includes('room'));
+  assert.match(s.recentIncident.title,/Выселение/);
 });
 
 test('age, diet and month long career use real game days and living costs',()=>{

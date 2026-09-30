@@ -29,10 +29,11 @@ export function adjust(state,changes) {
 
 export function addLog(state,text,type='neutral') {
   state.log.unshift({day:state.day,hour:state.hour,text,type});
-  state.log = state.log.slice(0,300);
+  state.log = state.log.slice(0,10000);
 }
 export function addLedger(state,category,amount,text){
   state.ledger ||= [];
-  state.ledger.unshift({day:state.day,hour:state.hour,category,amount,text});
-  state.ledger=state.ledger.slice(0,1500);
+  state.ledgerSeq=(state.ledgerSeq||0)+1;
+  state.ledger.unshift({seq:state.ledgerSeq,day:state.day,hour:state.hour,category,amount,text});
+  state.ledger=state.ledger.slice(0,10000);
 }

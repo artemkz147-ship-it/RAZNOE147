@@ -23,10 +23,10 @@ const homeRank = id => homes.findIndex(h=>h.id===id);
 
 export class GameEngine {
   constructor(state=freshState(),rng=Math.random) {
-    this.state=state; this.rng=rng; this.listeners=new Set();
+    this.state=state; this.rng=rng; this.listeners=new Set();this.lastMoney=state.money;this.lastLedgerSeq=state.ledgerSeq||0;
   }
   subscribe(fn) { this.listeners.add(fn); return ()=>this.listeners.delete(fn); }
-  emit(result) { const s=this.state;s.ending=successRoutes(s).length>0;saveGame(s); for (const fn of this.listeners) fn(s,result); return result; }
+  emit(result) { const s=this.state;s.ending=successRoutes(s).length>0;const recorded=(s.ledger||[]).filter(x=>(x.seq||0)>this.lastLedgerSeq).reduce((n,x)=>n+x.amount,0),actual=s.money-this.lastMoney,difference=Math.round(actual-recorded);if(difference)addLedger(s,'Прочее',difference,'Изменение денег за последние действия');this.lastMoney=s.money;this.lastLedgerSeq=s.ledgerSeq||0;saveGame(s); for (const fn of this.listeners) fn(s,result); return result; }
   guard() {
     if (this.state.death) return fail('История этой жизни завершилась. Начни новую игру в меню.');
     if (this.state.jailDays>0) return fail(`Ты под арестом. Осталось ${this.state.jailDays} дн.`);
@@ -131,7 +131,7 @@ export class GameEngine {
     if(caught){
       if(s.money>=trip.fine){s.money-=trip.fine;addLog(s,`Контролёр поймал без билета: штраф ${trip.fine} ₽ (десять билетов).`,'bad');s.recentIncident={title:'Проверка билета',text:`Контролёр выписал штраф ${trip.fine} ₽. Поездка оказалась дороже десяти билетов.`,art:2};}
       else {s.jailDays+=1;addLog(s,'Контролёр поймал без билета. Штраф оплатить нечем — сутки ареста.','bad');s.recentIncident={title:'Билет оказался дорогим',text:'Денег на штраф не было. Тебя отправили под арест на сутки.',art:2};}
-    } else this.maybeIncident(mode==='walk'?'walk':mode==='bus'||mode==='fare-dodge'?'bus':mode==='own'?(s.vehicle==='bike'?'bike':'ride'):mode==='taxi'?'taxi':'bus',trip.risk);
+    } else this.maybeIncident(mode==='walk'?'walk':mode==='bus'||mode==='fare-dodge'?'bus':mode==='own'?(s.vehicle==='bike'?'bike':s.vehicle==='moped'?'moped':'ride'):mode==='taxi'?'taxi':'bus',trip.risk);
     addLog(s,`${trip.name}: ${d.name}, ${trip.hours} ч, ${trip.cost} ₽, энергия −${trip.energy}.`,'neutral');
     return this.emit(success(`Теперь ты в районе «${d.name}». ${trip.name}: ${trip.cost} ₽, ${trip.hours} ч.`,caught?'bad':'good'));
   }
@@ -259,7 +259,7 @@ export class GameEngine {
       if(!career)earned+=Math.max(0,s.money-before);
       if(s.recentIncident||s.romance?.conflict){stop='Появилось событие, которое требует твоего решения.';break;}
       if(s.money<0&&byId(homes,s.home)?.daily>0){
-        const former=byId(homes,s.home)?.name;s.home='sofa';s.ownedHomes ||= [];if(!s.ownedHomes.includes('sofa'))s.ownedHomes.push('sofa');
+        const formerId=s.home,former=byId(homes,formerId)?.name;s.home='sofa';s.ownedHomes=(s.ownedHomes||[]).filter(x=>x!==formerId);if(!s.ownedHomes.includes('sofa'))s.ownedHomes.push('sofa');
         s.recentIncident={title:'Выселение',text:`На оплату жилья «${former}» больше нет денег. Ты вернулся на знакомый диван. Перемотка остановлена.`,art:0};
         addLog(s,`Выселение из «${former}»: денег на содержание жилья не хватило.`,'bad');stop='Выселение.';break;
       }
@@ -550,6 +550,6 @@ export class GameEngine {
     this.state.money-=paid; this.state.debt-=paid; this.tick(1);
     return this.emit(success(`Погашено ${paid.toLocaleString('ru-RU')} ₽ долга.`));
   }
-  replaceState(state) { this.state=state; return this.emit(success('Сохранение загружено.')); }
+  replaceState(state) { this.state=state;this.lastMoney=state.money;this.lastLedgerSeq=state.ledgerSeq||0; return this.emit(success('Сохранение загружено.')); }
   summary() { return {netWorth:netWorth(this.state),success:successRoute(this.state)?.name||null}; }
 }
