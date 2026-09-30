@@ -311,6 +311,24 @@
 .prosperity-2 .world-hero,.prosperity-3 .world-hero{filter:saturate(1.22) brightness(1.07) drop-shadow(5px 9px 4px #050b0eaf)}
 .hero-age-1 .world-hero,.hero-age-1 .portrait-character{filter:saturate(.87)}
 .hero-age-2 .world-hero,.hero-age-2 .portrait-character{filter:saturate(.67) contrast(1.04)}
+
+/* The face layer uses the same raster as the selected outfit. Its cropped
+   grayscale pass therefore follows every wardrobe change without replacing
+   clothes with a different illustration. */
+.world-hero-age,.portrait-age{clip-path:ellipse(13% 9% at 52% 8%);filter:none!important;opacity:var(--age-opacity,0);pointer-events:none;transition:opacity .8s ease;animation:none!important}
+.portrait-mini .portrait-age{z-index:1}
+.age-decade-30{--age-gray:.02;--age-wrinkles:0}
+.age-decade-40{--age-gray:.15;--age-wrinkles:.1}
+.age-decade-50{--age-gray:.32;--age-wrinkles:.25}
+.age-decade-60{--age-gray:.52;--age-wrinkles:.42}
+.age-decade-70{--age-gray:.7;--age-wrinkles:.65}
+.age-decade-80{--age-gray:.86;--age-wrinkles:.82}
+.age-decade-90{--age-gray:1;--age-wrinkles:1}
+.person-card .person-portrait-raster{filter:grayscale(var(--age-gray,0)) saturate(calc(1 - var(--age-gray,0)*.35)) contrast(calc(1 + var(--age-gray,0)*.12));transition:filter .8s ease}
+.romance-card .romance-portrait{filter:grayscale(var(--age-gray,0)) saturate(calc(1 - var(--age-gray,0)*.32)) contrast(calc(1 + var(--age-gray,0)*.1));transition:filter .8s ease}
+.person-head::after,.romance-portrait::before{content:"";position:absolute;z-index:1;pointer-events:none;opacity:var(--age-wrinkles,0);background:repeating-linear-gradient(174deg,transparent 0 11px,#261d1938 12px,#f8ddbb29 13px,transparent 15px);mask-image:radial-gradient(ellipse 32% 26% at 51% 24%,#000 18%,transparent 70%);inset:0}
+.person-head .person-number,.romance-portrait>span,.romance-portrait>small{z-index:2}
+@media(prefers-reduced-motion:reduce){.world-hero-age,.portrait-age,.person-card .person-portrait-raster,.romance-card .romance-portrait{transition:none}}
 .skip-controls,.business-skip{display:grid;gap:9px;padding:12px;background:#263a32;border:1px solid #b2936c;margin-top:12px}
 .skip-controls label{display:grid;gap:4px;color:#f0cf99;font-size:11px;font-weight:900;letter-spacing:.6px}
 .skip-controls select{width:100%;min-height:48px;border:1px solid #bfa27d;background:#f2e6cc;color:#21342a;padding:7px 9px;font-size:15px;font-weight:700}

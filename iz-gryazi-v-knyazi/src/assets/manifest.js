@@ -1,3 +1,4 @@
+import { ageAppearance } from '../systems/appearance.js';
 const file=path=>new URL(path,import.meta.url).href;
 export const backgrounds={yard:file('./backgrounds/yard.webp'),market:file('./backgrounds/market.webp'),industrial:file('./backgrounds/industrial.webp'),center:file('./backgrounds/center.webp'),glass:file('./backgrounds/glass.webp'),heights:file('./backgrounds/heights.webp')};
 export const characters={poor:file('./characters/hero-poor.webp'),worker:file('./characters/hero-worker.webp'),jacket:file('./characters/hero-jacket.webp'),middle:file('./characters/hero-middle.webp'),suit:file('./characters/hero-suit.webp'),magnate:file('./characters/hero-magnate.webp'),rich:file('./characters/hero-rich.webp')};
@@ -12,10 +13,13 @@ export const heroStage=state=>{
   return heroStages[Math.min(heroStages.length-1,clothing||wealthStage)];
 };
 export const heroImage=state=>{
-  const stage=heroStage(state),age=30+Math.floor(((state.day||1)-1)/360);
-  if(age>=55&&stage==='worker')return olderCharacters.worker;
-  if(age>=60&&['suit','magnate','rich'].includes(stage))return olderCharacters.suit;
-  return characters[stage];
+  return characters[heroStage(state)];
+};
+export const heroAgePortraits={40:file('./characters/hero-age-40.png'),50:file('./characters/hero-age-50.png'),60:file('./characters/hero-age-60.png'),70:file('./characters/hero-age-70.png'),80:file('./characters/hero-age-80.png'),90:file('./characters/hero-age-90.png')};
+export const heroAgeLayers=state=>{
+  const age=30+Math.floor(((state.day||1)-1)/360);
+  const {decade,next,blend}=ageAppearance(age);
+  return [{image:heroAgePortraits[decade],opacity:1},{image:heroAgePortraits[next],opacity:blend}].filter(x=>x.image&&x.opacity>0);
 };
 export const transport={bike:file('./vehicles/bike.webp'),moped:file('./vehicles/moped.webp'),lada:file('./vehicles/lada.webp'),sedan:file('./vehicles/sedan.webp'),suv:file('./vehicles/suv.webp'),limousine:file('./vehicles/luxury.webp')};
 export const props={kiosk:file('./props/kiosk.webp'),streetlamp:file('./props/streetlamp.webp'),busStop:file('./props/bus-stop.png')};

@@ -17,8 +17,28 @@ import { MiniGame } from '../src/ui/minigames.js';
 import { activePartners,socialGroup,socialValue } from '../src/systems/social.js';
 import { ageOf } from '../src/systems/lifestyle.js';
 import { populationDay,personAge,livingPeople,livingRomancePeople,knownDepartures } from '../src/systems/population.js';
+import { ageAppearance,ageDecade,ageStyle } from '../src/systems/appearance.js';
+import { heroImage,heroStage,heroAgeLayers } from '../src/assets/manifest.js';
+import { artScene } from '../src/scene/artscene.js';
 
 globalThis.localStorage={data:new Map(),setItem(k,v){this.data.set(k,v)},getItem(k){return this.data.get(k)||null},removeItem(k){this.data.delete(k)}};
+
+test('every decade changes appearance while clothes survive birthdays',()=>{
+  const s=freshState();s.upgrades.push('office-suit');
+  const outfit=heroImage(s);
+  for(const age of [30,40,50,60,70,80,90]){
+    s.day=1+(age-30)*360;
+    assert.equal(ageOf(s),age);
+    assert.equal(ageDecade(age),age);
+    assert.equal(heroImage(s),outfit);
+    assert.equal(heroAgeLayers(s).length,age===30?0:1);
+    if(age>30)assert.match(heroAgeLayers(s)[0].image,new RegExp(`hero-age-${age}`));
+    if(age>30)assert.match(artScene(districts[0],s),new RegExp(`age-decade-${age}`));
+  }
+  assert.equal(heroStage(s),'suit');
+  assert.equal(ageAppearance(49).next,50);
+  assert.ok(Number(ageStyle(90).match(/--age-gray:([\d.]+)/)[1])>Number(ageStyle(40).match(/--age-gray:([\d.]+)/)[1]));
+});
 
 test('ordinary days charge no automatic food and manual meals enter the diary',()=>{
   const s=freshState(),game=new GameEngine(s,()=>.99);
