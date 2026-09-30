@@ -29,12 +29,16 @@ function rivalDraw(hand,cards,rng){
   const score=pokerScore(hand);if(score[0]>=4)return;const keep=score[0]>=1?hand.filter(c=>hand.filter(x=>x.rank===c.rank).length>1):hand.filter(c=>c.rank>=11);
   const replace=hand.filter(c=>!keep.includes(c)).slice(0,3);for(const c of replace)hand[hand.indexOf(c)]=draw(cards,rng);
 }
-export function createCasinoTable(id,stake,rng){
+function tableOpponents(id,state){
+  const replacements={artur:{id:'denis',name:'Денис',portrait:'pasha',ageAtArrival:36},vadim:{id:'mikhail',name:'Михаил',portrait:'azamat',ageAtArrival:41},lera:{id:'svetlana',name:'Светлана',portrait:'vera',ageAtArrival:38}};
+  return (casinoOpponents[id]||[]).map(opponent=>state?.population?.departed?.[opponent.id]?{...opponent,...replacements[opponent.id],arrivedDay:state.population.departed[opponent.id].day}:{...opponent});
+}
+export function createCasinoTable(id,stake,rng,state=null){
   const base={id,stake,wager:stake,phase:'play',result:null,returned:0,lastMove:'Карты на столе.'};
   if(id==='roulette')return {...base,selection:null,pocket:null};
   const cards=deck();
-  if(id==='blackjack')return {...base,deck:cards,player:[draw(cards,rng),draw(cards,rng)],rival:[draw(cards,rng),draw(cards,rng)],opponents:casinoOpponents.blackjack.map(o=>({...o,hand:[draw(cards,rng),draw(cards,rng)],status:'Ждёт хода'}))};
-  if(id==='poker')return {...base,deck:cards,player:Array.from({length:5},()=>draw(cards,rng)),opponents:casinoOpponents.poker.map(o=>({...o,hand:Array.from({length:5},()=>draw(cards,rng)),status:'В игре',folded:false})),selected:[],drawn:false,pot:stake*4};
+  if(id==='blackjack')return {...base,deck:cards,player:[draw(cards,rng),draw(cards,rng)],rival:[draw(cards,rng),draw(cards,rng)],opponents:tableOpponents(id,state).map(o=>({...o,hand:[draw(cards,rng),draw(cards,rng)],status:'Ждёт хода'}))};
+  if(id==='poker')return {...base,deck:cards,player:Array.from({length:5},()=>draw(cards,rng)),opponents:tableOpponents(id,state).map(o=>({...o,hand:Array.from({length:5},()=>draw(cards,rng)),status:'В игре',folded:false})),selected:[],drawn:false,pot:stake*4};
   return null;
 }
 function settleBlackjack(table,rng){
@@ -58,6 +62,7 @@ export function actCasinoTable(table,action,value,rng){
   if(table.id==='blackjack'){
     if(action==='hit'){table.player.push(draw(table.deck,rng));table.lastMove='Ты взял карту.';if(blackjackValue(table.player)>21){settleBlackjack(table,rng);return {done:true}}return {message:'Взята ещё карта.'};}
     if(action!=='stand'&&action!=='double')return {error:'Выбери карту или остановись.'};
+    if(action==='double'&&table.player.length!==2)return {error:'Удвоить можно только начальную руку из двух карт.'};
     if(action==='double'){table.wager+=table.stake;table.player.push(draw(table.deck,rng));}
     settleBlackjack(table,rng);return {done:true,extraStake:action==='double'?table.stake:0};
   }

@@ -1,4 +1,5 @@
 export const activities = [
+ {id:'vehicle-repair',name:'Мастерская: ремонт транспорта',hours:2,cost:650,effect:{stress:-3},description:'Мастер устранил поломку. Транспорт снова доступен для поездок.'},
  {id:'medicine',name:'Аптека: лекарства',hours:1,cost:650,effect:{health:12,energy:3},description:'Фармацевт подобрал средство. Если болезнь не проходит, нужен врач.'},
  {id:'vet',name:'Знакомый ветеринар',hours:2,cost:350,effect:{health:10,stress:3},description:'Осмотр на скорую руку. Он честно сказал, что людей обычно не лечит.'},
  {id:'private-doctor',name:'Частная клиника',hours:2,cost:6500,effect:{health:45,stress:-10},description:'Обследование и лечение назначены.'},

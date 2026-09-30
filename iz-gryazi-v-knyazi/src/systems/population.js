@@ -1,4 +1,4 @@
-import {moveHome} from './housing.js';
+import {loseHousing} from './housing.js';
 import { people } from '../data/people.js';
 import { romancePeople } from '../data/romance.js';
 import { addLog,adjust } from './state.js';
@@ -23,7 +23,8 @@ export const personAge=(state,person)=>{
 export const isPresent=(state,id)=>!state.population?.departed?.[id];
 export const livingPeople=state=>[...people,...(state.population?.residents||[]).filter(p=>!p.romance)].filter(p=>isPresent(state,p.id));
 export const livingRomancePeople=state=>[...romancePeople,...(state.population?.residents||[]).filter(p=>p.romance)].filter(p=>isPresent(state,p.id));
-export const knownDepartures=state=>Object.entries(state.population?.departed||{}).map(([id,record])=>({id,...record,person:[...people,...romancePeople,...(state.population?.residents||[])].find(p=>p.id===id)})).filter(x=>x.person);
+const personKnown=(state,id)=>!!(state.social?.[id]?.met||state.dialogueProgress?.[id]||state.romance?.profiles?.[id]?.met||(state.romance?.partners||[]).includes(id)||state.romance?.partner===id);
+export const knownDepartures=state=>Object.entries(state.population?.departed||{}).map(([id,record])=>({id,...record,person:[...people,...romancePeople,...(state.population?.residents||[])].find(p=>p.id===id)})).filter(x=>x.person&&personKnown(state,x.id));
 
 function arrive(state,arrivalDay=state.day){
   const population=state.population,number=population.residents.length,template=residents[number%residents.length];
@@ -37,15 +38,17 @@ function arrive(state,arrivalDay=state.day){
 
 function leave(state,person){
   const age=personAge(state,person),partner=(state.romance?.partners||[]).includes(person.id)||state.romance?.partner===person.id;
+  const known=personKnown(state,person.id);
   const score=state.social?.[person.id]?.score||0;
   state.population.departed[person.id]={day:state.day,age,cause:'Ушёл из жизни'};
-  if(partner){state.romance.partners=(state.romance.partners||[]).filter(id=>id!==person.id);state.romance.partner=state.romance.partners.at(-1)||null;state.romance.profiles[person.id].married=false;adjust(state,{mood:-16,stress:14});}
+  if(partner){state.romance.partners=(state.romance.partners||[]).filter(id=>id!==person.id);state.romance.partner=state.romance.partners.at(-1)||null;if(state.romance.profiles[person.id])state.romance.profiles[person.id].married=false;adjust(state,{mood:-16,stress:14});}
   else if(score>=30)adjust(state,{mood:-8,stress:5});
   if(state.romance?.conflict?.partnerId===person.id)state.romance.conflict=null;
+  if(state.recentIncident?.socialId===person.id)state.recentIncident=null;
   if(person.id==='sergey'&&state.home==='sofa'){
-    moveHome(state,'station');if(!state.ownedHomes.includes('station'))state.ownedHomes.push('station');
-    addLog(state,'После ухода Серёги диван больше недоступен. Тебе пришлось искать бесплатный ночлег на вокзале.','bad');
+    loseHousing(state,'После ухода Серёги диван больше недоступен.');
   }
+  if(!known)return;
   addLog(state,`${person.name} ушёл из жизни в ${age} лет.${partner?' Вы были вместе.':''}`,'bad');
   if(!state.recentIncident&&!state.pending)state.recentIncident={title:`Память о ${person.name}`,text:`${person.name} ушёл из жизни в ${age} лет. Город продолжает шуметь, а вашей истории больше не будет нового разговора.`,portrait:person.portrait,image:person.portrait===undefined?`person:${person.id}`:undefined,art:0,choices:[{text:'Вспомнить хорошие моменты',effect:{mood:2,stress:-3},reply:'Ты сохранил тёплые воспоминания.'},{text:'Побыть одному',effect:{energy:3,stress:2},reply:'Ты дал себе время пережить новость.'}]};
 }

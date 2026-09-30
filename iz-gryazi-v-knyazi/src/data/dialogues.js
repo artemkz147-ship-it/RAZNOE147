@@ -1,4 +1,8 @@
-// Each topic is played once. Choices change relationships and the city state.
+import { people } from './people.js';
+import { homes,businesses } from './world.js';
+import { careers } from './lifestyle.js';
+
+// Introductions are played once; later conversations follow the current life.
 export const dialogues = {
   sergey:[
     {topic:'Договориться о ночлеге',prompt:'«Оставайся пока на диване. Помогай по дому и постепенно ищи своё жильё — мне тоже нужно личное пространство».',choices:[{text:'Договориться и помочь с уборкой',reply:'Ты убрал комнату. Серёга рад, что бытовые дела не легли только на него.',relation:6,effect:{energy:-6,mood:3}},{text:'Попросить ещё немного времени',reply:'Серёга согласился подождать. Вы договорились вернуться к вопросу позже.',relation:2,effect:{stress:-2}}]},
@@ -158,7 +162,8 @@ export const dialogues = {
 export function nextDialogue(state,id) {
   const resident=state.population?.residents?.find(p=>p.id===id);
   const scenes=resident?residentDialogues(resident):dialogues[id];
-  return scenes?.[state.dialogueProgress?.[id]||0]||null;
+  if(!scenes)return null;
+  return scenes[state.dialogueProgress?.[id]||0]||continuingDialogue(state,resident||people.find(person=>person.id===id));
 }
 export function dialogueCount(state,id){
   return state.population?.residents?.some(p=>p.id===id)?3:dialogues[id]?.length||0;
@@ -179,4 +184,40 @@ function residentDialogues(person){
       {text:'Предложить проверить условия вместе',reply:'Вы нашли неприятный пункт до подписи. Теперь у вас есть общая история.',relation:5,effect:{business:2,energy:-3}}
     ]}
   ];
+}
+
+function continuingDialogue(state,person){
+  if(!person)return null;
+  const name=person.name,progress=state.dialogueProgress?.[person.id]||0,variant=progress%2;
+  let topic,prompt,positive,negative,good,bad;
+  if(state.stats.health<45||state.vitals?.illness>15||state.conditions?.back>20){
+    topic='Как ты себя чувствуешь';
+    prompt=variant?`${name} замечает, что тебе трудно сосредоточиться. «Давай спокойно. Как ты себя чувствуешь?»`:`${name} спрашивает о самочувствии: «Выглядишь измученным. Что случилось?»`;
+    positive='Рассказать о самочувствии и своих планах';negative='Отмахнуться и сорвать раздражение';
+    good='Ты рассказал, что тебя беспокоит. Человек выслушал; стало немного спокойнее.';bad='Ты ответил резко. Разговор о здоровье закончился обидой.';
+  }else if(['station','heating-main'].includes(state.home)){
+    const place=homes.find(home=>home.id===state.home)?.name||'ночлег на улице';
+    topic='Где пережить ночь';prompt=`${name} спрашивает, где ты сейчас ночуешь. Ты объясняешь: ${place.toLowerCase()}. «Как собираешься выбираться из этого?»`;
+    positive='Честно обсудить следующий шаг';negative='Обвинить собеседника в своих проблемах';
+    good='Вы обсудили, что нужно для тёплого ночлега. Тебе стало легче собраться и заняться поиском.';bad='Ты переложил свою злость на другого человека. Он закрыл разговор.';
+  }else if(state.home==='sofa'&&(person.id==='sergey'||!state.employment&&!Object.keys(state.businesses||{}).length)){
+    topic='Жизнь на чужом диване';prompt=person.id==='sergey'?'«Как у тебя с поиском своего места? Я рад помочь, но хочу понимать, какие у нас дальше планы».':`${name} спрашивает, как тебе живётся у Серёги. «Делиться комнатой непросто. Как вы ладите?»`;
+    positive='Поговорить о быте и своих планах';negative='Сказать, что тебе обязаны помогать';
+    good='Вы спокойно обсудили жизнь в тесной комнате. Ты услышал взгляд со стороны.';bad='Твои слова прозвучали так, будто чужая помощь тебе полагается. Собеседник отдалился.';
+  }else if(Object.keys(state.businesses||{}).length){
+    const [id,firm]=Object.entries(state.businesses)[progress%Object.keys(state.businesses).length],title=businesses.find(item=>item.id===id)?.name||'твоё дело';
+    topic=firm.paused?'Дело на паузе':'Как идут дела';prompt=firm.paused?`${name} спрашивает о «${title}»: «Ты пока остановил работу. Что собираешься делать дальше?»`:`${name} спрашивает о «${title}». «Сколько у тебя остаётся времени на себя?»`;
+    positive='Обсудить трудности без красивых обещаний';negative='Перевести разговор на чужие неудачи';
+    good='Ты рассказал о деле без бахвальства. Разговор помог выдохнуть и лучше понять друг друга.';bad='Сравнения с чужими неудачами испортили встречу. Собеседник перестал делиться своим.';
+  }else if(state.employment){
+    const title=careers.find(career=>career.id===state.employment.id)?.name||'постоянная работа';
+    topic='После смены';prompt=`${name} вспоминает твою работу: ${title.toLowerCase()}. «Как проходят смены? Есть силы на жизнь после них?»`;
+    positive='Рассказать о сменах и выслушать в ответ';negative='Сказать, что чужие заботы тебя не интересуют';
+    good='Вы поделились рабочими историями. После тяжёлой смены стало приятно просто побыть в хорошей компании.';bad='Встреча превратилась в монолог о тебе. Собеседник обиделся.';
+  }else{
+    topic=variant?'Время на разговор':'Что дальше';prompt=variant?`${name} предлагает немного посидеть и поговорить. «Что у тебя сейчас на уме?»`:`${name} спрашивает о дальнейших планах. «Как ты сам? Куда хочешь двигаться дальше?»`;
+    positive='Рассказать о планах и спросить о делах собеседника';negative='Высмеять то, чем живёт другой человек';
+    good='Вы поговорили о том, что происходит в вашей жизни. Так проще понимать друг друга.';bad='Шутка оказалась обидной. Вместо близости между вами стало больше напряжения.';
+  }
+  return {generic:true,topic,prompt,choices:[{text:positive,reply:good,relation:2,effect:{mood:2,stress:-2}},{text:negative,reply:bad,relation:-3,effect:{stress:2}}]};
 }

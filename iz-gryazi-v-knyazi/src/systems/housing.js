@@ -7,11 +7,23 @@ export const homeTerms=id=>{
 };
 export function ensureHousing(s){
   if(!s.housing||s.housing.id!==s.home)s.housing={id:s.home,since:s.day,nextDue:s.day+homeTerms(s.home).period,multiplier:1};
-  if(s.home==='sofa')s.sofaSince??=s.housing.since;
+  if(s.home==='sofa'){
+    s.sofaSince??=s.housing.since;
+    s.housing.since=Math.min(s.housing.since,s.sofaSince);
+    s.housing.grace=Math.min(14,Math.max(0,s.housing.grace||0));
+  }
   return s.housing;
+}
+export function grantSofaGrace(s,days=7){
+  if(s.home!=='sofa')return false;
+  const account=ensureHousing(s),remaining=14-(account.grace||0);
+  if(remaining<=0)return false;
+  account.grace=(account.grace||0)+Math.min(remaining,Math.max(0,days));return true;
 }
 export const housingBill=s=>Math.round(homeTerms(s.home).amount*(ensureHousing(s).multiplier||1));
 export function moveHome(s,id){
+  if(s.home===id){ensureHousing(s);return;}
+  if(id==='sofa'&&s.day>=(s.sofaBlockedUntil||0)&&s.home!=='sofa')s.sofaSince=s.day;
   if(s.home!==id&&['hostel','room','flat'].includes(s.home))s.ownedHomes=s.ownedHomes.filter(h=>h!==s.home);
   s.home=id;s.housing={id,since:id==='sofa'?(s.sofaSince||s.day):s.day,nextDue:s.day+homeTerms(id).period,multiplier:1};
   s.district=homeTerms(id).district;s.visitedDistricts||=['yard'];if(!s.visitedDistricts.includes(s.district))s.visitedDistricts.push(s.district);
@@ -19,20 +31,20 @@ export function moveHome(s,id){
 export function loseHousing(s,reason){
   if(s.activeSkip)s.activeSkip.interruption='Потерян ночлег: '+reason;
   if(s.home==='sofa'){s.sofaBlockedUntil=s.day+30;s.sofaSince=s.day;}
-  const former=homes.find(x=>x.id===s.home)?.name||s.home;
+  const wasSofa=s.home==='sofa',former=homes.find(x=>x.id===s.home)?.name||s.home;
   s.ownedHomes=s.ownedHomes.filter(x=>!['hostel','room','flat'].includes(x));
   if(!s.ownedHomes.includes('station'))s.ownedHomes.push('station');
   moveHome(s,'station');
   const text=`${former}: ${reason} Пришлось уйти на вокзал.`;
-  addLog(s,text,'bad');if(!s.recentIncident)s.recentIncident={title:'Нужно искать ночлег',text,art:3,interruptSkip:true};
+  addLog(s,text,'bad');if(!s.recentIncident)s.recentIncident={title:'Нужно искать ночлег',text,art:3,scene:wasSofa?'eviction':undefined,interruptSkip:true};
 }
 export function housingDay(s,rng){
   const account=ensureHousing(s),terms=homeTerms(s.home);
   if(terms.kind==='friend'){
-    const score=s.social?.sergey?.score||0,days=s.day-account.since;
-    if(s.population?.departed?.sergey||score<=-20||days>45&&rng()<Math.min(.5,(days-45)*.008)){
+    const score=s.social?.sergey?.score||0,days=s.day-account.since,limit=45+(account.grace||0);
+    if(s.population?.departed?.sergey||score<=-20||days>=limit){
       loseHousing(s,score<=-20?'Серёга больше не хочет тебя принимать.':'Серёга попросил освободить диван: бесплатная помощь не была навсегда.');
-    }else if(days>=25&&days%10===0&&!s.recentIncident)s.recentIncident={title:'Разговор о диване',text:'Серёга устал делить комнату. Нужно обсудить, сколько ты ещё останешься.',image:'person:sergey',socialId:'sergey',choices:[{text:'Помочь с бытом и договориться ещё на неделю',effect:{energy:-12},socialDelta:4,housingGrace:7,reply:'Ты убрал комнату и помог с домашними делами. Серёга согласился подождать.'},{text:'Сказать, что тебе все должны',socialDelta:-25,evict:true,reply:'Серёга предложил искать другой ночлег.'}]};
+    }else if(days>=25&&days%10===0&&(account.grace||0)<14&&!s.recentIncident)s.recentIncident={title:'Разговор о диване',text:'Серёга устал делить комнату. Нужно обсудить, сколько ты ещё останешься.',image:'person:sergey',socialId:'sergey',choices:[{text:'Помочь с бытом и договориться ещё на неделю',effect:{energy:-12},socialDelta:4,housingGrace:7,reply:'Ты помог с домашними делами. Серёга согласился дать ещё неделю, но попросил искать своё место.'},{text:'Сказать, что тебе все должны',socialDelta:-25,evict:true,reply:'Серёга предложил искать другой ночлег.'}]};
     return 0;
   }
   if(!terms.amount||s.day<account.nextDue)return 0;

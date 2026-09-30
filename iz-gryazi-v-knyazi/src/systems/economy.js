@@ -28,7 +28,7 @@ export function travelOptions(state,districtId) {
     {id:'fare-dodge',name:'Автобус · зайцем',cost:0,hours:Math.max(1,distance),energy:3,risk:Math.min(.42,.14+distance*.035),fine:fare*10,detail:'Если поймают — штраф ×10; нет денег — арест.'},
     {id:'taxi',name:'Такси',cost:fare*4,hours:1,energy:1,risk:.025,detail:'Дорого, зато до двери. Тариф известен заранее.'}
   ];
-  if(state.vehicle!=='feet') {
+  if(state.vehicle!=='feet'&&!state.vehicleFaults?.[state.vehicle]) {
     const vehicle=byId(vehicles,state.vehicle);
     options.push({id:'own',name:vehicle.name,cost:Math.max(10,Math.ceil(fare*vehicle.fareFactor)),hours:Math.max(1,Math.ceil(distance*vehicle.timeFactor)),energy:Math.max(2,Math.ceil(4*vehicle.timeFactor)),risk:Math.min(.16,.018+distance*.008),detail:'Топливо и износ за поездку.'});
   }
@@ -82,7 +82,7 @@ export function dailySettlement(state,{offline=false,rng=Math.random,skipDiet=fa
   const vehicle = byId(vehicles,state.vehicle);
   if(prison){
     ensureHousing(state).nextDue++;if(state.employment){state.employment.nextPay++;state.employment.reviewDay++;}
-    const savedDiet=state.diet;state.diet='expired';dailyVitals(state,rng,{fed:true});state.diet=savedDiet;
+    const savedDiet=state.diet;state.diet='expired';dailyVitals(state,rng,{fed:true,prison:true});state.diet=savedDiet;
     state.lastSettlement={day:state.day,food:0,rent:0,transport:0,business:0,expenses:0,prison:true};
     return {business:0,expenses:0};
   }
@@ -103,8 +103,9 @@ export function dailySettlement(state,{offline=false,rng=Math.random,skipDiet=fa
   if(state.conditions) {state.conditions.back=Math.max(0,state.conditions.back-1);state.conditions.hangover=Math.max(0,state.conditions.hangover-1);}
   state.stats.life = clamp(Math.round(8+home.prestige*.55+vehicle.prestige*.16+state.stats.mood*.1-state.stats.stress*.06),0,100);
   adjust(state,{energy:Math.round(home.restore*.43),health:state.money<0?-4:1,mood:state.money<0?-3:state.stats.life>55?1:0,stress:state.money<0?5:state.stats.life>55?0:1});
-  dailyVitals(state,rng,{fed:skipDiet||state.lastMealDay===state.day-1});
   state.lastSettlement={day:state.day,food,rent,transport:vehicle.upkeep,business,expenses};
+  dailyVitals(state,rng,{fed:skipDiet||state.lastMealDay===state.day-1});
+  if(state.death)return {business,expenses};
   if (business) addLog(state,`День ${state.day}: дела принесли ${business.toLocaleString('ru-RU')} ₽; быт и обязательства забрали ${expenses.toLocaleString('ru-RU')} ₽.`,business>=expenses?'good':'bad');
   else if(expenses)addLog(state,`День ${state.day}: питание ${food} ₽, жильё ${rent} ₽, транспорт ${vehicle.upkeep} ₽${state.debt?', долг и проценты учтены':''}. Всего ${expenses.toLocaleString('ru-RU')} ₽.`,'neutral');
   if (state.money < -12000) {

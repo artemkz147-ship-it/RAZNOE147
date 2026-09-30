@@ -428,3 +428,28 @@ body.skipping{overflow:hidden}.shelter-preview{width:100%;height:115px;object-fi
 .diagnostic-readings{background:#142b24;padding:12px;border:1px solid #b79567}.diagnostic-readings>small{color:#e3b881;letter-spacing:2px;font-weight:700}.diagnostic-readings>div{display:grid;grid-template-columns:1.2fr 1fr 1fr;align-items:center;gap:5px;padding:10px 0;border-bottom:1px solid #a99c7150;font-size:12px}.diagnostic-readings strong{text-align:center;color:#f2d1a0}.diagnostic-readings div small{text-align:right;font-size:10px;color:#bbccbc}.diagnostic-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}.diagnostic-options button{padding:12px 8px;min-height:52px;background:#2d493b;border:1px solid #99a184;color:#f3e5c6;font:700 12px/1.3 var(--body)}.repair-feedback{padding:14px;border-left:4px solid #86ad72;background:#284034;margin:12px 0}.repair-feedback.bad{border-color:#d48566}.repair-feedback p{font-size:13px;margin:8px 0}.repair-feedback small{font-size:12px}.mini-shell h4{font-size:12px;color:#dcb586;letter-spacing:1px;margin:12px 0}
 
 .current-shelter{display:grid;grid-template-columns:80px minmax(0,1fr);column-gap:12px;padding:12px}.current-shelter .shelter-preview{grid-row:1/4;width:80px;height:94px;margin:0}.current-shelter h3{font-size:20px;margin:4px 0}.current-shelter p{margin:4px 0;font-size:13px}.current-shelter .eyebrow{font-size:10px}
+
+/* Rarely used controls sit below the playable cards. */
+.diary-dossier,.time-skip-panel{padding:0;border:1px solid #7a836e;background:#24342d;margin:18px 0}
+.diary-dossier>summary,.time-skip-panel>summary{list-style:none;min-height:62px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;cursor:pointer;color:#efd4ae;font:800 14px/1.25 var(--body)}
+.diary-dossier>summary::-webkit-details-marker,.time-skip-panel>summary::-webkit-details-marker{display:none}
+.diary-dossier>summary span,.time-skip-panel>summary span{display:grid;gap:5px}
+.diary-dossier>summary small,.time-skip-panel>summary small{font:400 12px/1.3 var(--body);color:#c5cbbc}
+.diary-dossier>summary i,.time-skip-panel>summary i{font-style:normal;font-size:25px;transition:transform .18s}
+.diary-dossier[open]>summary i,.time-skip-panel[open]>summary i{transform:rotate(180deg)}
+.diary-dossier[open]>summary,.time-skip-panel[open]>summary{border-bottom:1px solid #6e7763}
+.dossier-grid{padding:16px;gap:16px}.dossier-grid strong{color:#f0dbb8}.dossier-grid span{color:#c8cfbd;line-height:1.4}
+.time-skip-panel .skip-controls{margin:0;border:0;background:transparent;padding:16px}
+.skip-controls label{font-size:12px;gap:7px}.skip-controls select{font-family:var(--body);min-height:52px}.skip-controls button{margin-top:9px;min-height:54px;font-family:var(--body)}
+.condition-notes{padding:10px 12px;margin-bottom:14px;background:#48372c;border-left:3px solid #dca577}.condition-notes p{font:13px/1.5 var(--body);margin:4px 0;color:#f1dbc1}
+.death-modal{padding:0!important;overflow-y:auto}.death-art{margin:0!important;height:auto!important;aspect-ratio:16/9;background-size:contain;background-repeat:no-repeat;background-position:center;border:0}.death-art[data-status="2"]{filter:saturate(1.14)}
+.event-scene-art{display:block;width:calc(100% + 64px);max-width:none;aspect-ratio:16/9;height:auto;object-fit:contain;margin:-16px -32px 16px;border-bottom:2px solid #b28c62}
+html:has(.modal-scrim),body:has(.modal-scrim){overflow:hidden}
+.incident-modal h2,.decision-modal h2{font-family:var(--body);line-height:1.13}
+.incident-modal .decision-options strong,.decision-modal .decision-options strong{font-family:var(--body);font-size:14px;line-height:1.35}
+@media(max-width:760px){.event-scene-art{width:calc(100% + 32px);margin:-16px -16px 13px}}
+@media(max-width:760px){.incident-modal p,.decision-modal p{font-size:14px;line-height:1.5}.incident-modal h2,.decision-modal h2{font-size:25px}}
+.death-copy{padding:22px}.death-copy h2{font:800 30px/1.1 var(--body);text-transform:none;margin:10px 0 14px}.death-copy p{font:15px/1.55 var(--body);margin:12px 0}.death-cause{display:block;font:700 13px/1.5 var(--body);color:#dfb185}.death-detail{font-size:12px!important;color:#c6bfae!important;border-left:2px solid #a78361;padding-left:10px}
+.death-summary{display:grid;gap:6px;margin:18px 0;color:#dad7c9;font:13px/1.5 var(--body)}.death-summary strong{color:#f0d7ad}.death-copy button{font:800 14px/1.3 var(--body);min-height:52px}
+@media(max-width:760px){.death-art{height:clamp(170px,29vh,235px)}.death-copy{padding:18px}.death-copy h2{font-size:25px}.death-copy p{font-size:14px}.diary-dossier>summary,.time-skip-panel>summary{padding:13px 14px}.time-skip-panel .skip-controls{padding:14px}.planner-actions button{min-height:44px}.career-actions button{background:#c9ab83}.gift-picker summary{min-height:44px;display:flex;align-items:center}.person-actions button{min-height:46px}}
+@media(prefers-reduced-motion:reduce){.diary-dossier>summary i,.time-skip-panel>summary i{transition:none}}

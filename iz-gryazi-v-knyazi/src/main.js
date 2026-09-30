@@ -16,6 +16,7 @@ const loaded=loadGame();
 const game=new GameEngine(loaded.state);
 let tab='city',shopType='home',earningMode='legal',peopleMode='contacts',careMode='food',mini=null,menuOpen=false,dialogueId=null,dialogueResult=null,travelId=null,citizenId=null,citizenPane='life';
 const railPositions=new Map();
+const disclosureStates=new Map();let lastRenderedTab=tab;
 let focusCurrentDistrict=false;
 
 function addCarouselControls() {
@@ -37,8 +38,10 @@ function addCarouselControls() {
 }
 
 function render() {
+  document.querySelectorAll('details[data-remember]').forEach(el=>disclosureStates.set(lastRenderedTab+':'+el.id,el.open));
   document.body.className=`tab-${tab}`;
   app.innerHTML=shell(game.state,tab,shopType,mini,earningMode,dialogueId,dialogueResult,travelId,peopleMode,careMode);
+  document.querySelectorAll('details[data-remember]').forEach(el=>{el.open=disclosureStates.get(tab+':'+el.id)||false;});lastRenderedTab=tab;
   const district=byId(districts,game.state.district);
   document.getElementById('scene').innerHTML=artScene(district,game.state);
   addCarouselControls();
