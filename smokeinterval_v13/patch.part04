@@ -1,0 +1,58 @@
+
+     }
+ 
+     private void setState(TextView view, boolean ok) {
+         view.setText(ok ? "✓ Готово" : "Нужно включить");
+-        view.setTextColor(ok ? GREEN : 0xFFFFB35C);
++        view.setTextColor(ok ? GREEN : ORANGE);
++    }
++
++    private void setCustomState(TextView view, String text, int color) {
++        view.setText(text);
++        view.setTextColor(color);
+     }
+ 
+     public static boolean notificationsAllowed(Context context) {
+@@ -247,6 +327,30 @@
+         startActivity(i);
+     }
+ 
++    private void pickSleepTime(boolean start) {
++        int minute = start ? PlanStore.getSleepStartMin(this) : PlanStore.getSleepEndMin(this);
++        int hour = minute / 60;
++        int min = minute % 60;
++        new TimePickerDialog(this, (view, h, m) -> {
++            if (start) {
++                PlanStore.setSleepWindow(this, h * 60 + m, PlanStore.getSleepEndMin(this));
++            } else {
++                PlanStore.setSleepWindow(this, PlanStore.getSleepStartMin(this), h * 60 + m);
++            }
++            applySleepChanges();
++        }, hour, min, true).show();
++    }
++
++    private static String formatTime(int minuteOfDay) {
++        int h = minuteOfDay / 60;
++        int m = minuteOfDay % 60;
++        return String.format(Locale.getDefault(), "%02d:%02d", h, m);
++    }
++
++    private static String formatTimeRange(int startMin, int endMin) {
++        return formatTime(startMin) + "–" + formatTime(endMin);
++    }
++
+     private LinearLayout card() {
+         LinearLayout l = new LinearLayout(this);
+         l.setOrientation(LinearLayout.VERTICAL);
+diff -ruN orig_v12/SmokeInterval/app/src/main/java/com/example/smokeinterval/SystemEventReceiver.java work_v12/SmokeInterval/app/src/main/java/com/example/smokeinterval/SystemEventReceiver.java
+--- orig_v12/SmokeInterval/app/src/main/java/com/example/smokeinterval/SystemEventReceiver.java	2026-09-25 23:44:45.000000000 +0000
++++ work_v12/SmokeInterval/app/src/main/java/com/example/smokeinterval/SystemEventReceiver.java	2026-09-30 00:36:58.463162885 +0000
+@@ -13,7 +13,7 @@
+         long now = System.currentTimeMillis();
+         long nextAllowed = PlanStore.getNextAllowedMs(context);
+ 
+-        if (now >= nextAllowed) {
++        if (now >= nextAllowed && !PlanStore.isSleepActive(context, now)) {
+             NotificationHelper.showAllowed(context);
+         } else {
+             AlarmScheduler.scheduleNext(context);
