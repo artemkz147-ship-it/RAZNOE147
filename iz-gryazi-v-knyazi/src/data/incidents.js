@@ -1,3 +1,4 @@
+import {jobEncounters} from './jobEncounters.js';
 // Small, contextual encounters. They are drawn only after the action that can cause them.
 export const incidents=[
   {id:'sole',context:'walk',art:0,title:'Подошва просит свободы',text:'На мокром переходе ботинок раскрылся, как дешёвая книга. До дома ещё далеко.',test:s=>s.conditions.shoes<82,choices:[{text:'Перевязать шнурком и дойти',effect:{energy:-5,stress:2},condition:{shoes:-24},reply:'Шнурок выдержал. Подошва — пока нет.'},{text:'Зайти к сапожнику · 280 ₽',cost:280,effect:{stress:-2},condition:{shoes:26},reply:'Мастер вернул обуви ещё несколько километров.'}]},
@@ -52,3 +53,13 @@ export const incidents=[
   {id:'taxi-detour',context:'taxi',art:3,title:'Таксист ищет объезд',text:'Впереди перекрыли улицу. Водитель предложил более длинный путь.',choices:[{text:'Согласиться · 120 ₽',cost:120,effect:{stress:-1},reply:'Доехали без пробки, поездка вышла дороже.'},{text:'Выйти и пройти квартал',effect:{energy:-3},condition:{shoes:-2},reply:'Последний квартал прошёл пешком.'}]},
   {id:'taxi-phone',context:'taxi',art:1,title:'Телефон на сиденье',text:'Пассажир до тебя забыл телефон. Водитель не заметил его.',choices:[{text:'Передать водителю',effect:{respect:1,mood:2},reply:'Водитель связался с владельцем.'},{text:'Попробовать вернуть лично',effect:{energy:-3,contacts:1},reply:'Владелец ответил и поблагодарил.'}]}
 ];
+
+const taskScopes={box:['courier','packing'],tip:['courier','dogwalk','barista','showing','sales'],shortchange:['reseller','sales','barista','stocktake'], 'late-client':['courier','showing'], 'address':['courier','notice'], 'shift-swap':['barista','bake','driver','warehouse','eventsetup'], 'broken-tool':['scrap','garage-help','mechanic','snow','eventsetup'], 'meeting':['consultant','manager','board','datacheck','foundation'], 'stain':['consultant','showing','sales','gala'], 'old-contact':['pitch','board','summit','prcrisis'], 'interview':['consultant','manager','pitch','board','summit'], 'unexpected-audit':['consultant','datacheck','foundation','contract','stocktake']};
+export function incidentEligible(s,item){
+ if(!item)return false;if(item.test&&!item.test(s))return false;
+ if(item.jobs||taskScopes[item.id]){const job=s.lastJob;return !!job&&job.day===s.day&&(item.jobs||taskScopes[item.id]).includes(job.id);}
+ if(item.id==='bus-late'&&s.lastTrip?.mode==='fare-dodge')return false;
+ if(item.id==='stranger'&&s.money<100||item.id==='bus-pickpocket'&&s.money<90)return false;
+ return true;
+}
+incidents.push(...jobEncounters);

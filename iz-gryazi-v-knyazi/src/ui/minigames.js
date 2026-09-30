@@ -1,3 +1,4 @@
+import {diagnosticRound} from '../data/diagnostics.js';
 const words=['ЛАРЁК','ПОДЪЕЗД','ЧЕК','СКЛАД','ЧАЙ','ШИНОМОНТАЖ','ДОГОВОР','МАРШРУТ'];
 const rand=(min,max)=>Math.floor(Math.random()*(max-min+1))+min;
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;');
@@ -12,8 +13,8 @@ export class MiniGame {
     this.alert=0;this.loot=0;this.sortData=null;this.cipherData=null;
     this.clock=null; this.timeout=null;
   }
-  title() { return {timing:'ПОЙМАЙ МОМЕНТ',memory:'ЗАПОМНИ ЗАКАЗ',route:'ПРОЛОЖИ МАРШРУТ',bargain:'ДОГОВОРИСЬ',audit:'НАЙДИ ОШИБКУ',sort:'СОБЕРИ ЗАКАЗ',cipher:'РАЗБЕРИ ШИФР',stealth:'ОЦЕНИ ОБСТАНОВКУ'}[this.job.game]; }
-  description() { return {timing:'Останови метку в освещённой зоне. Три попытки.',memory:'Запомни четыре слова по порядку. Перед первым будет время подготовиться.',route:'Выбери три участка по времени, усталости и риску.',bargain:'Назови цену. Чем ближе к ожиданию клиента, тем выше результат.',audit:'Проверь накладную и найди поле, которое не сходится.',sort:'Сверь адрес, вес и пломбу. Три заказа подряд.',cipher:'Восстанови правило числового ряда. Три проверки.',stealth:'Выбирай темп и осторожность. Шум растёт от каждого шага.'}[this.job.game]; }
+  title() { return {repair:'НАЙДИ И УСТРАНИ СБОЙ',timing:'ПОЙМАЙ МОМЕНТ',memory:'ЗАПОМНИ ЗАКАЗ',route:'ПРОЛОЖИ МАРШРУТ',bargain:'ДОГОВОРИСЬ',audit:'НАЙДИ ОШИБКУ',sort:'СОБЕРИ ЗАКАЗ',cipher:'РАЗБЕРИ ШИФР',stealth:'ОЦЕНИ ОБСТАНОВКУ'}[this.job.game]; }
+  description() { return {repair:'Сверь показания с нормой. Найди причину, затем выбери ремонт.',timing:'Останови метку в освещённой зоне. Три попытки.',memory:'Запомни четыре слова по порядку. Перед первым будет время подготовиться.',route:'Выбери три участка по времени, усталости и риску.',bargain:'Назови цену. Чем ближе к ожиданию клиента, тем выше результат.',audit:'Проверь накладную и найди поле, которое не сходится.',sort:'Сверь адрес, вес и пломбу. Три заказа подряд.',cipher:'Восстанови правило числового ряда. Три проверки.',stealth:'Выбирай темп и осторожность. Шум растёт от каждого шага.'}[this.job.game]; }
   sortRound() {
     if(this.sortData)return this.sortData;
     const places=['ДВОР','РЫНОК','ПРОМЗОНА','ЦЕНТР'],destination=rand(0,3),limit=rand(6,13),correct=rand(0,3);
@@ -28,8 +29,16 @@ export class MiniGame {
     const options=[answer-step,answer+step,answer+2,answer-2];options[correct]=answer;
     this.cipherData={start,step,answer,correct,options};return this.cipherData;
   }
+  repairRound(){return this.diagnostic||=(diagnosticRound(this.job,this.round));}
+  renderRepair(){
+    const q=this.repairRound(),stage=this.repairStage||'diagnose';
+    const readings='<div class="diagnostic-readings"><small>ПОКАЗАНИЯ · УЗЕЛ '+(this.round+1)+'/3</small>'+q.readings.map(r=>'<div><span>'+r.name+'</span><strong>'+r.value+' '+r.unit+'</strong><small>Норма '+r.min+'–'+r.max+'</small></div>').join('')+'</div>';
+    if(stage==='feedback')return readings+'<div class="repair-feedback '+(this.repairCorrect?'good':'bad')+'"><strong>'+(this.repairCorrect?'Узел восстановлен':'Сбой остался')+'</strong><p>'+q.reply+'</p><small>Диагностика: '+(this.chosenFault===q.fault?'верная':'ошибочная')+'</small></div><button data-mini="repair-next" class="primary big">'+(this.round===2?'ЗАКОНЧИТЬ РЕМОНТ':'СЛЕДУЮЩИЙ УЗЕЛ')+'</button>';
+    return readings+'<h4>'+(stage==='diagnose'?'ГДЕ ПРИЧИНА':'ЧТО ДЕЛАТЬ')+'</h4><div class="diagnostic-options">'+(stage==='diagnose'?q.readings.map(r=>'<button data-mini="diagnose" data-value="'+r.id+'">'+r.name+'</button>'):q.repairs.map(r=>'<button data-mini="repair" data-value="'+r.id+'">'+r.name+'</button>')).join('')+'</div>';
+  }
   render() {
     let body='';
+    if(this.job.game==='repair')body=this.renderRepair();
     if(this.job.game==='timing') body=`<div class="timing-track"><div class="timing-target" style="left:${this.target-8}%"></div><div class="timing-marker" id="timing-marker" style="left:${this.marker}%"></div></div><p class="mini-hint">Попытка ${this.round+1}/3 · Нажми кнопку или пробел</p><button class="primary big" data-mini="timing">СТОП</button>`;
     if(this.job.game==='memory') body=`<div class="memory-checks" aria-label="Ответы">${this.sequence.map((_,i)=>`<span class="${this.memoryResults[i]===true?'correct':this.memoryResults[i]===false?'wrong':i===this.guess&&this.revealed?'current':'waiting'}">${i+1}</span>`).join('')}</div><div class="memory-display" id="memory-display">${this.revealed?'?':'ПРИГОТОВЬСЯ'}</div><p class="mini-hint">${this.revealed?this.finishing?'Проверка закончена':`Слово ${this.guess+1} из ${this.sequence.length}`:'Слова появятся одно за другим'}</p><div class="memory-options">${this.revealed&&!this.finishing?words.slice(0,6).map((w,i)=>`<button data-mini="memory" data-value="${i}">${w}</button>`).join(''):''}</div>`;
     if(this.job.game==='sort') {const q=this.sortRound();body=`<div class="sort-order"><small>НАКЛАДНАЯ ${this.round+1}/3</small><strong>${q.places[q.destination]} · ДО ${q.limit} КГ</strong><p>Адрес верный, вес не выше лимита, пломба целая.</p></div><div class="sort-cards">${q.cards.map((x,i)=>`<button data-mini="sort" data-value="${i}"><span class="parcel-mark">0${i+1}</span><strong>${q.places[x.destination]}</strong><small>${x.weight} кг · пломба ${x.seal?'целая':'сорвана'}</small></button>`).join('')}</div>`;}
@@ -86,7 +95,7 @@ export class MiniGame {
   input(type,value) {
     if(!this.active||this.finishing)return;
     if(type==='exit') {this.destroy();this.finish(null);return;}
-    if(type!==this.job.game)return;
+    if(type!==this.job.game&&!(this.job.game==='repair'&&['diagnose','repair-next'].includes(type)))return;
     if(type==='timing') {
       const diff=Math.abs(this.marker-this.target);
       this.scores.push(Math.max(0,1-diff/46));this.round++;
@@ -98,6 +107,17 @@ export class MiniGame {
       const correct=Number(value)===this.sequence[this.guess];this.scores.push(correct?1:0);this.memoryResults.push(correct);
       this.guess++;
       if(this.guess>=this.sequence.length){this.finishing=true;this.onRender();this.timeout=setTimeout(()=>this.complete(),850);return;}
+    }
+    if(type==='diagnose'&&this.job.game==='repair'){
+      const q=this.repairRound();if(this.repairStage&&this.repairStage!=='diagnose'||!q.readings.some(r=>r.id===value))return;
+      this.chosenFault=value;this.repairStage='repair';this.onRender();return;
+    }
+    if(type==='repair'&&this.job.game==='repair'){
+      if(this.repairStage!=='repair')return;const q=this.repairRound(),choice=q.repairs.find(r=>r.id===value);if(!choice)return;
+      this.repairCorrect=choice.fault===q.fault;this.scores.push((this.chosenFault===q.fault?.35:0)+(this.repairCorrect?.65:0));this.repairStage='feedback';this.onRender();return;
+    }
+    if(type==='repair-next'&&this.job.game==='repair'){
+      if(this.repairStage!=='feedback')return;this.round++;this.diagnostic=null;this.repairStage='diagnose';if(this.round>=3)return this.complete();this.onRender();return;
     }
     if(type==='route') {
       const options=this.routeOptions(),best=Math.min(...options.map(o=>o.time*5+o.effort*9+o.risk*3));

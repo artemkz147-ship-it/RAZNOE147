@@ -40,7 +40,7 @@ export function eventEligible(s,e){
  if(e.id==='oldfriend'&&(!s.social?.valera?.met||s.population?.departed?.valera))return false;
  if(e.id==='article'&&!s.social?.vera?.met)return false;
  if(['paparazzi','luxury-shoot','charity'].includes(e.id)&&s.stats.fame<15)return false;
- if(e.id==='dating-app'&&s.home!=='sofa')return false;
+ if(e.id==='dating-app'&&(!s.upgrades.includes('phone')||s.home!=='sofa'))return false;
  if(e.id==='pothole'&&(!['lada','sedan','suv','limousine'].includes(s.vehicle)||s.lastTrip?.mode!=='own'||s.lastTrip.day<s.day-1))return false;
  return true;
 }

@@ -94,6 +94,7 @@ function perform(action,id,months) {
   if(action==='crime'){startCrime(id);return;}
   if(action==='casino'){game.startCasino(id,document.getElementById('casino-stake')?.value);return;}
   if(action==='hire'){game.hire(id);return;}
+  if(action==='leave'){game.requestLeave();return;}
   if(action==='quit-career'){game.quitCareer();return;}
   if(action==='career'){game.workCareer(id,months);return;}
   if(action==='diet'){game.setDiet(id);return;}
@@ -157,7 +158,7 @@ document.addEventListener('click',event=>{
   const shop=event.target.closest('[data-shop]');
   if(shop){shopType=shop.dataset.shop;render();return;}
   const care=event.target.closest('[data-care-mode]');
-  if(care){careMode=care.dataset.careMode;render();return;}
+  if(care){careMode=care.dataset.careMode;tab='life';render();return;}
   const earn=event.target.closest('[data-earn]');
   if(earn){earningMode=earn.dataset.earn;render();return;}
   const chip=event.target.closest('[data-bet]');

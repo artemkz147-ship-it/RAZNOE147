@@ -5,7 +5,7 @@ import { districts,jobs,homes,vehicles,businesses,upgrades } from '../data/world
 import { nextDialogue } from '../data/dialogues.js';
 import { successRoute,successRoutes } from '../data/goals.js';
 import { events } from '../data/events.js';
-import { incidents } from '../data/incidents.js';
+import { incidents,incidentEligible } from '../data/incidents.js';
 import { investments } from '../data/investments.js';
 import { crimes } from '../data/crime.js';
 import { activities } from '../data/activities.js';
@@ -29,7 +29,7 @@ export class GameEngine {
   constructor(state=freshState(),rng=Math.random) {
     seedCitizens(state);if(state.homeRelocationPending){delete state.homeRelocationPending;state.district=homeTerms(state.home).district;state.visitedDistricts||=['yard'];if(!state.visitedDistricts.includes(state.district))state.visitedDistricts.push(state.district);}ensureHousing(state);
     if(state.pending?.type==='event'){const event=[...events,...contextEvents].find(e=>e.id===state.pending.id);if(!event||!eventEligible(state,event))state.pending=null;}
-    if(state.recentIncident?.id){const incident=incidents.find(i=>i.id===state.recentIncident.id);if(!incident||incident.test&&!incident.test(state))state.recentIncident=null;}
+    if(state.recentIncident?.id){const incident=incidents.find(i=>i.id===state.recentIncident.id);if(!incident||!incidentEligible(state,incident))state.recentIncident=null;}
     this.state=state; this.rng=rng; this.listeners=new Set();this.lastMoney=state.money;this.lastLedgerSeq=state.ledgerSeq||0;
   }
   subscribe(fn) { this.listeners.add(fn); return ()=>this.listeners.delete(fn); }
@@ -78,7 +78,7 @@ export class GameEngine {
   maybeIncident(context,chance) {
     const s=this.state;
     if(s.recentIncident||this.rng()>=chance)return null;
-    const pool=incidents.filter(item=>item.context===context&&(!item.test||item.test(s))&&!s.incidentHistory.slice(-3).includes(item.id));
+    const pool=incidents.filter(item=>(item.context===context||(item.jobs&&['job','office','loader'].includes(context)))&&incidentEligible(s,item)&&!s.incidentHistory.slice(-3).includes(item.id));
     if(!pool.length)return null;
     const item=pool[Math.floor(this.rng()*pool.length)];
     s.recentIncident={id:item.id};s.incidentHistory.push(item.id);
@@ -104,7 +104,7 @@ export class GameEngine {
     const choice=item.choices[index];
     if(!choice)return this.emit(fail('Выбери решение.'));
     if(choice.cost&&!this.spend(choice.cost))return this.emit(fail('На это не хватает денег.'));
-    adjust(s,choice.effect);
+    adjust(s,choice.effect);if(choice.feed){s.lastMealDay=s.day;s.vitals.unfedDays=0;s.vitals.nutrition=clamp(s.vitals.nutrition+30,0,100);}
     for(const [key,delta] of Object.entries(choice.condition||{}))s.conditions[key]=clamp((s.conditions[key]||0)+delta,0,100);
     s.recentIncident=null;
     addLog(s,`${item.title}: ${choice.reply}`,(choice.effect?.health||0)<0?'bad':'neutral');
@@ -158,6 +158,8 @@ export class GameEngine {
   }
   jobReady(id) {
     const j=byId(jobs,id),s=this.state;
+    if(s.activeSkip)return fail('Сначала останови перемотку времени.');
+    if(s.death)return fail('Эта жизнь закончилась.');
     if(s.recentIncident)return fail('Сначала реши, что делать в неожиданной ситуации.');
     if (!j) return fail('Работа не найдена.');
     if(j.referral&&!s.flags.includes(j.referral))return fail('Сначала договорись с Валерой.');
@@ -194,6 +196,7 @@ export class GameEngine {
     this.tick(Math.max(j.hours,31-s.hour));
     addLog(s,`${j.name}: заработано ${(reward+tip).toLocaleString('ru-RU')} ₽${accident?', но досталось здоровью':''}.`,accident?'bad':'good');
     if(j.id==='loader')s.conditions.loaderShifts++;
+    s.lastJob={id:j.id,day:s.day};
     this.maybeIncident(j.id==='loader'?'loader':['center','glass','heights'].includes(j.district)?'office':'job',j.id==='loader'?Math.min(.42,.08+s.conditions.loaderShifts*.045):.13);
     s.lastWorkResult={kind:'job',title:j.name,earned:reward+tip,day:s.day,detail:`Заработано ${(reward+tip).toLocaleString('ru-RU')} ₽.${accident?' Получена травма.':''}${allies?' Помогли связи.':''}${rivals?' Помешала старая ссора.':''}`};
     return this.emit(success(s.lastWorkResult.detail,accident?'bad':'good'));
@@ -265,6 +268,12 @@ export class GameEngine {
     const ready=this.careerReady(id);if(!ready.ok)return this.emit(ready);
     if(this.state.employment)return this.emit(fail('Сначала уволься с текущей работы.'));
     hireCareer(this.state,id);addLog(this.state,'Трудоустройство: '+byId(careers,id).name+'. Первая смена завтра, зарплата через 30 дней.','good');return this.emit(success('Договор подписан.'));
+  }
+  requestLeave(){
+    const blocked=this.guard();if(blocked)return this.emit(blocked);const s=this.state,e=s.employment;
+    if(!e)return this.emit(fail('Сначала устройся на работу.'));
+    if(s.day-(e.lastLeave??-100)<14)return this.emit(fail('Новый выходной пока не согласуют.'));
+    e.lastLeave=s.day;e.leaveUntil=s.day+1;addLog(s,'Работодатель согласовал выходной без оплаты на день '+e.leaveUntil+'.','neutral');return this.emit(success('Завтра свободный день. Оплата за эту смену не начисляется.'));
   }
   quitCareer(){const blocked=this.guard();if(blocked)return this.emit(blocked);const id=this.state.employment?.id;dismissCareer(this.state,'Ты ушёл по собственному желанию.');if(id)delete this.state.careerBans[id];return this.emit(success('Договор завершён.'));}
   workCareer(id,months=1,dietId='basic'){
@@ -415,7 +424,7 @@ export class GameEngine {
     if(id==='rest')s.lastRestDay=s.day;
     if(id==='drink'){s.conditions.hangover=1;s.vitals.immunity=clamp(s.vitals.immunity-3,0,100);s.vitals.strain=clamp(s.vitals.strain+4,0,100);}
     if(id==='sleep')s.conditions.hangover=0;
-    if(['clinic','private-doctor','elite-doctor'].includes(id)){s.conditions.back=0;s.vitals.illness=0;s.vitals.immunity=clamp(s.vitals.immunity+18,0,100);}
+    if(['clinic','private-doctor','elite-doctor'].includes(id)){if(s.employment&&(s.vitals.illness||s.conditions.back||s.stats.health<45)){s.employment.medicalUntil=s.day+2;addLog(s,'Врач оформил освобождение от работы до дня '+s.employment.medicalUntil+'.','good');}s.conditions.back=0;s.vitals.illness=0;s.vitals.immunity=clamp(s.vitals.immunity+18,0,100);}
     if(id==='gym'){s.vitals.fitness=clamp(s.vitals.fitness+8,0,100);s.vitals.strain=clamp(s.vitals.strain-2,0,100);}
     if(['food','marketmeal'].includes(id)){s.lastMealDay=s.day;s.vitals.unfedDays=0;s.vitals.nutrition=clamp(s.vitals.nutrition+18,0,100);}
     if(id==='yardrepair')s.conditions.shoes=100;
