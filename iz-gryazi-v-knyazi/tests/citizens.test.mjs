@@ -39,7 +39,7 @@ test('residents start at their individual ages and portrait selection follows th
   s.day=361;assert.equal(personAge(s,person('valera')),49);assert.equal(personAge(s,person('alisa')),21);
 });
 test('gifted clothing is charged once and survives every decade in a saved life',()=>{
-  const {s,game,life}=setup('alisa');
+  const {s,game,life}=setup('alisa');s.romance.partners=['alisa'];
   assert.equal(game.citizenAction('alisa','gift-business').ok,true);
   assert.equal(s.money,982000);assert.equal(life.outfit,'business');
   assert.ok(s.ledger.some(x=>x.category==='Социальные связи'&&x.amount===-18000));

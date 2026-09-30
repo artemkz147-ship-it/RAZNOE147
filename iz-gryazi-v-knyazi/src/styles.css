@@ -393,3 +393,23 @@
 
 .incident-object{position:absolute!important;right:8%;bottom:8%;width:25%!important;height:45%!important;object-fit:contain}.shelter-event{background-position:center 55%;background-size:cover}
 @media(max-width:760px){.people-grid>.romance-card .romance-portrait{height:120px}.people-grid>.romance-card .romance-body{padding:10px}.people-grid>.romance-card .citizen-summary button{min-height:28px;padding:5px;font-size:10px}.people-grid>.romance-card .romance-body p{max-height:44px;overflow:auto;font-size:12px}.people-grid>.romance-card h3{font:800 23px/1.1 var(--body)}.people-grid>.romance-card .romance-actions button{min-height:42px}}
+
+/* One portrait and one interface for every social contact. */
+.people-grid>.person-card{display:flex;flex-direction:column;min-height:0;overflow:hidden;background:#25312d}
+.people-grid>.person-card .person-head{height:160px;min-height:160px;border-right:0;border-bottom:1px solid #68705e;background:#26302b}
+.people-grid>.person-card .person-info{padding:12px;min-width:0}
+.people-grid>.person-card .person-info p{min-height:0;margin:10px 0;font-style:normal;line-height:1.4;font-family:var(--body)}
+.people-grid>.person-card .person-actions{display:grid;gap:7px;grid-template-columns:1fr}
+.people-grid>.person-card .person-actions button{min-height:44px;font:700 12px/1.2 var(--body);white-space:normal;padding:9px}
+.contact-status{font:12px/1.4 var(--body);color:#bdc7b7;margin:8px 0}
+.citizen-summary button{white-space:normal;font-family:var(--body)}
+.care-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-bottom:14px}
+.care-tabs button{min-height:48px;padding:8px 4px;background:#293832;color:#e8d8bc;border:1px solid #86765e;font:700 12px/1.2 var(--body)}
+.care-tabs button.active{background:#d7aa78;color:#19231e}
+.care-panel[hidden]{display:none!important}
+.career-profile{padding:10px 0;color:#cad1bd;font:13px/1.5 var(--body)}
+.pay-calendar{display:grid;gap:6px;padding:12px;margin-bottom:12px;background:#2b3d31;border-left:3px solid #d5a672;font:14px/1.4 var(--body)}
+.pay-calendar span{font-size:13px;color:#ddd1bb}
+.job-metrics span{display:block;color:#d6d8c5;font:12px/1.4 var(--body);margin-top:4px}
+.job-metrics small{white-space:normal;line-height:1.35}
+@media(max-width:760px){.people-grid>.person-card{flex:0 0 min(85vw,340px);grid-template-columns:none}.people-grid>.person-card .person-head{height:150px;min-height:150px}.people-grid>.person-card .person-info h3{font:800 22px/1.15 var(--body)}.people-grid>.person-card .person-info p{font-size:13px}.people-grid>.person-card .citizen-summary button{min-height:32px;font-size:10px;padding:6px}.life-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.life-meals{display:grid;grid-template-columns:1fr}.life-meals button{min-height:54px;display:flex;justify-content:space-between;align-items:center;padding:10px;gap:8px}.life-meals button strong{font-size:14px}.job-metrics{gap:8px}.job-metrics small{font-size:9px}.career-profile{font-size:12px}}

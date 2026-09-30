@@ -52,6 +52,7 @@ export function citizenEligibility(state,person,action){
   const life=citizenLife(state,person),score=state.social?.[person.id]?.score??state.romance?.profiles?.[person.id]?.rapport??state.relations?.[person.id]??0;
   const partner=(state.romance?.partners||[]).includes(person.id)||state.romance?.partner===person.id;
   const info=citizenActionInfo(state,person,action);if(!info)return 'Неизвестное действие';
+  if((action.startsWith('wear-')||action.startsWith('gift-'))&&!partner)return 'Человек сам выбирает свою одежду';
   if(action.startsWith('wear-'))return score<=-20?'Сначала помиритесь':life.wardrobe.includes(action.slice(5))?'':'Этого комплекта нет в гардеробе';
   if(action.startsWith('gift-'))return score<=-20?'Сначала помиритесь':life.wardrobe.includes(action.slice(5))?'Такой комплект уже есть в гардеробе':'';
   if(['competition','audit'].includes(action)){

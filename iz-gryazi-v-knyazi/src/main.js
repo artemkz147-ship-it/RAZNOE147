@@ -13,7 +13,7 @@ if(window.AndroidGame)document.documentElement.classList.add('android-host');
 const app=document.getElementById('app');
 const loaded=loadGame();
 const game=new GameEngine(loaded.state);
-let tab='city',shopType='home',earningMode='legal',peopleMode='contacts',mini=null,menuOpen=false,dialogueId=null,dialogueResult=null,travelId=null,citizenId=null,citizenPane='life';
+let tab='city',shopType='home',earningMode='legal',peopleMode='contacts',careMode='food',mini=null,menuOpen=false,dialogueId=null,dialogueResult=null,travelId=null,citizenId=null,citizenPane='life';
 const railPositions=new Map();
 let focusCurrentDistrict=false;
 
@@ -37,7 +37,7 @@ function addCarouselControls() {
 
 function render() {
   document.body.className=`tab-${tab}`;
-  app.innerHTML=shell(game.state,tab,shopType,mini,earningMode,dialogueId,dialogueResult,travelId,peopleMode);
+  app.innerHTML=shell(game.state,tab,shopType,mini,earningMode,dialogueId,dialogueResult,travelId,peopleMode,careMode);
   const district=byId(districts,game.state.district);
   document.getElementById('scene').innerHTML=artScene(district,game.state);
   addCarouselControls();
@@ -153,6 +153,8 @@ document.addEventListener('click',event=>{
   if(tabButton){tab=tabButton.dataset.tab;render();if(tabButton.classList.contains('scene-map'))document.getElementById('view')?.scrollIntoView({behavior:'smooth',block:'start'});else window.scrollTo(0,0);return;}
   const shop=event.target.closest('[data-shop]');
   if(shop){shopType=shop.dataset.shop;render();return;}
+  const care=event.target.closest('[data-care-mode]');
+  if(care){careMode=care.dataset.careMode;render();return;}
   const earn=event.target.closest('[data-earn]');
   if(earn){earningMode=earn.dataset.earn;render();return;}
   const chip=event.target.closest('[data-bet]');

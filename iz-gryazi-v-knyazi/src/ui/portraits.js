@@ -9,10 +9,15 @@ export function citizenFrames(state,person,age=personAge(state,person)){
   return {atlas,row,column,next:Math.min(atlas.columns-1,column+1),blend,outfit:life.outfit,age};
 }
 export function citizenPortrait(state,person,cls='',labels='',age){
-  const f=citizenFrames(state,person,age),h=f.atlas.cellHeight||1;
-  // SVG selects exactly one atlas cell and keeps the face's proportions in
-  // both narrow people cards and wide event illustrations.
-  const layer=(column,opacity=1)=>`<svg class="citizen-skin" viewBox="0 0 1 ${h}" preserveAspectRatio="xMidYMin meet" style="opacity:${opacity}" aria-hidden="true"><svg width="1" height="${h}" viewBox="${column} ${f.row*h} 1 ${h}" overflow="hidden"><image href="${f.atlas.image}" width="${f.atlas.columns}" height="${f.atlas.rows*h}" preserveAspectRatio="none"/></svg></svg>`;
+  const f=citizenFrames(state,person,age),[xs,ys]=f.atlas.bounds;
+  const x=xs[f.column]+5,y=ys[f.row]+2,width=xs[f.column+1]-x-5;
+  const h=(ys[f.row+1]-y-2)/width;
+  // Different ages are separately drawn faces: blending them creates a second
+  // face. Crop one decade with explicit coordinates and keep its proportions.
+  const clip=`portrait-${++portraitSequence}`;
+  const crop=cls.includes('person-portrait-raster')?Math.min(h,1.5):h;
+  const layer=`<svg class="citizen-skin" viewBox="0 0 1 ${crop}" preserveAspectRatio="xMidYMin meet" aria-hidden="true"><defs><clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><rect width="1" height="${crop}"/></clipPath></defs><g clip-path="url(#${clip})"><image href="${f.atlas.image}" x="${-x/width}" y="${-y/width}" width="${xs.at(-1)/width}" height="${ys.at(-1)/width}" preserveAspectRatio="none"/></g></svg>`;
   const name=String(person.name).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;');
-  return `<div class="citizen-portrait ${cls}" style="--citizen-aspect:1 / ${h}" data-person="${person.id}" data-age="${f.age}" data-outfit="${f.outfit}" role="img" aria-label="${name}, ${f.age} лет">${layer(f.column)}${f.blend?layer(f.next,Number(f.blend.toFixed(3))):''}${labels}</div>`;
+  return `<div class="citizen-portrait ${cls}" style="--citizen-aspect:1 / ${h}" data-person="${person.id}" data-age="${f.age}" data-outfit="${f.outfit}" role="img" aria-label="${name}, ${f.age} лет">${layer}${labels}</div>`;
 }
+let portraitSequence=0;

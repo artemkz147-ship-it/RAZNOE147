@@ -1,5 +1,5 @@
 import {homeTerms,ensureHousing,moveHome,loseHousing} from './housing.js';
-import {hireCareer,dismissCareer,routineDay} from './routine.js';
+import {hireCareer,dismissCareer,routineDay,careerShift} from './routine.js';
 import {contextEvents,eventEligible,applyEventAction} from '../data/contextEvents.js';
 import { districts,jobs,homes,vehicles,businesses,upgrades } from '../data/world.js';
 import { nextDialogue } from '../data/dialogues.js';
@@ -29,6 +29,7 @@ export class GameEngine {
   constructor(state=freshState(),rng=Math.random) {
     seedCitizens(state);if(state.homeRelocationPending){delete state.homeRelocationPending;state.district=homeTerms(state.home).district;state.visitedDistricts||=['yard'];if(!state.visitedDistricts.includes(state.district))state.visitedDistricts.push(state.district);}ensureHousing(state);
     if(state.pending?.type==='event'){const event=[...events,...contextEvents].find(e=>e.id===state.pending.id);if(!event||!eventEligible(state,event))state.pending=null;}
+    if(state.recentIncident?.id){const incident=incidents.find(i=>i.id===state.recentIncident.id);if(!incident||incident.test&&!incident.test(state))state.recentIncident=null;}
     this.state=state; this.rng=rng; this.listeners=new Set();this.lastMoney=state.money;this.lastLedgerSeq=state.ledgerSeq||0;
   }
   subscribe(fn) { this.listeners.add(fn); return ()=>this.listeners.delete(fn); }
@@ -272,7 +273,7 @@ export class GameEngine {
       if(kind==='business'&&!Object.keys(s.businesses).length){stop='Бизнес закрыт.';break;}
     }
     const earned=(s.ledger||[]).filter(x=>x.seq>startSeq&&x.amount>0).reduce((sum,x)=>sum+x.amount,0),net=s.money-start;
-    const detail=name+': прошло '+worked+' из '+goal+' дней. Получено '+earned.toLocaleString('ru-RU')+' ₽, баланс '+(net>=0?'+':'')+net.toLocaleString('ru-RU')+' ₽. '+stop;
+    const detail=name+': прошло '+worked+' из '+goal+' дней. Получено '+earned.toLocaleString('ru-RU')+' ₽, баланс '+(net>=0?'+':'')+net.toLocaleString('ru-RU')+' ₽. '+(s.employment?'Начислено к выплате '+Math.round(s.employment.accrued).toLocaleString('ru-RU')+' ₽, зарплата в день '+s.employment.nextPay+'. ':'')+stop;
     s.timeSkip={kind,name,from:startingDay,to:s.day,planned:goal,worked,diet:diet.id,earned,net,stop};s.lastWorkResult={kind,title:name,earned,day:s.day,detail};addLog(s,detail,net>=0?'good':'bad');return this.emit(success(detail,net>=0?'good':'bad'));
   }
   startCasino(id,amount){
@@ -368,7 +369,14 @@ export class GameEngine {
     if(id==='yardrepair')s.conditions.shoes=100;
     let outcome=a.description;
     if(id==='beg'){const coins=20+Math.floor(this.rng()*100);s.money+=coins;s.totalEarned+=coins;outcome=`За два часа собрал ${coins} ₽. Никакой гарантии на завтра.`;}
-    adjust(s,effect); this.tick(a.hours);
+    adjust(s,effect); this.tick(id==='sleep'?31-s.hour:a.hours);
+    if(id==='sleep'){
+      const routine=s.lastRoutine,career=s.employment&&byId(careers,s.employment.id);
+      outcome=`Наступил день ${s.day}. Проснулся утром.`;
+      if(career&&s.employment.lastWorkedDay===s.day)outcome+=` ${career.name}: отработал до ${careerShift(career.id).end}:00, энергия −${routine.energy}. Зарплата — день ${s.employment.nextPay}.`;
+      else if(routine?.energy)outcome+=` Занялся своими делами до ${s.hour}:00, энергия −${routine.energy}.`;
+      else if(career)outcome+=' Сегодня без рабочей смены.';
+    }
     if(['walk','network','yardtea','centerdate'].includes(id)&&!s.recentIncident&&this.rng()<.25){const unknown=livingRomancePeople(s).filter(p=>!socialMet(s,p.id)&&p.district===s.district&&!romanceAccess(s,p));if(unknown.length){const person=unknown[Math.floor(this.rng()*unknown.length)];s.recentIncident={title:'Новая встреча',text:person.name+' завела разговор. Можно познакомиться.',image:'person:'+person.id,choices:[{text:'Представиться и поговорить',meetId:person.id,reply:'Вы познакомились и обменялись контактами.'},{text:'Пройти мимо',reply:'Вы разошлись, не познакомившись.'}]};}}if(a.cost)addLedger(s,'Занятие',-a.cost,a.name);addLog(s,outcome,a.cost?'neutral':'good');
     if(id==='walk'){s.conditions.walkTrips++;s.conditions.shoes=clamp(s.conditions.shoes-(s.upgrades.includes('boots')?3:7),0,100);this.maybeIncident('walk',.08+(100-s.conditions.shoes)*.0012);}
     if(id==='sleep')this.maybeIncident('daily',.09);
