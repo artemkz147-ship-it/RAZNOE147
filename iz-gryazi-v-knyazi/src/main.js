@@ -12,7 +12,7 @@ import { socialGroup } from './systems/social.js';
 const app=document.getElementById('app');
 const loaded=loadGame();
 const game=new GameEngine(loaded.state);
-let tab='city',shopType='home',earningMode='legal',peopleMode='contacts',mini=null,menuOpen=false,dialogueId=null,dialogueResult=null,travelId=null;
+let tab='city',shopType='home',earningMode='legal',peopleMode='contacts',mini=null,menuOpen=false,dialogueId=null,dialogueResult=null,travelId=null,citizenId=null,citizenPane='life';
 const railPositions=new Map();
 let focusCurrentDistrict=false;
 
@@ -41,11 +41,11 @@ function render() {
   document.getElementById('scene').innerHTML=artScene(district,game.state);
   addCarouselControls();
   focusCurrentDistrict=false;
-  if(menuOpen)document.getElementById('modal-root').innerHTML=menuModal(game.state);
+  if(menuOpen||citizenId)renderModal();
 }
 function renderModal() {
   const root=document.getElementById('modal-root');
-  if(root)root.innerHTML=menuOpen?menuModal(game.state):modal(game.state,mini,dialogueId,dialogueResult,travelId);
+  if(root)root.innerHTML=menuOpen?menuModal(game.state):modal(game.state,mini,dialogueId,dialogueResult,travelId,citizenId,citizenPane);
 }
 function toast(message,tone='good') {
   if(!message)return;
@@ -77,6 +77,8 @@ function startCrime(id) {
   renderModal();mini.start(renderModal);
 }
 function perform(action,id,months) {
+  if(action==='open-citizen'){citizenId=id;citizenPane='life';renderModal();return;}
+  if(action==='close-citizen'){citizenId=null;renderModal();return;}
   if(action==='menu'){menuOpen=true;renderModal();return;}
   if(action==='close-menu'){menuOpen=false;renderModal();return;}
   if(action==='tab-story'){tab='story';render();window.scrollTo(0,0);return;}
@@ -90,7 +92,7 @@ function perform(action,id,months) {
   if(action==='casino'){game.startCasino(id,document.getElementById('casino-stake')?.value);return;}
   if(action==='career'){game.workCareer(id,months);return;}
   if(action==='diet'){game.setDiet(id);return;}
-  if(action==='restart-after-death'){menuOpen=false;tab='city';game.replaceState(freshState());return;}
+  if(action==='restart-after-death'){menuOpen=false;citizenId=null;tab='city';game.replaceState(freshState());return;}
   if(action==='serve'){game.serveSentence();return;}
   if(action==='activity'){game.activity(id);return;}
   if(action.startsWith('buy-')){game.buy(action.slice(4),id);return;}
@@ -114,10 +116,14 @@ function perform(action,id,months) {
   if(action==='import'){document.getElementById('import-file')?.click();return;}
   if(action==='reset'){
     if(!window.confirm('Начать новую игру? Текущий прогресс в браузере будет перезаписан.'))return;
-    menuOpen=false;dialogueId=null;dialogueResult=null;tab='city';game.replaceState(freshState());return;
+    menuOpen=false;citizenId=null;dialogueId=null;dialogueResult=null;tab='city';game.replaceState(freshState());return;
   }
 }
 document.addEventListener('click',event=>{
+  const citizenTab=event.target.closest('[data-citizen-pane]');
+  if(citizenTab){citizenPane=citizenTab.dataset.citizenPane;renderModal();return;}
+  const citizenAction=event.target.closest('[data-citizen-action]');
+  if(citizenAction){game.citizenAction(citizenAction.dataset.id,citizenAction.dataset.citizenAction);return;}
   const romanceChoice=event.target.closest('[data-romance-choice]');
   if(romanceChoice){game.resolveRomanceConflict(Number(romanceChoice.dataset.romanceChoice));return;}
   const romanceAction=event.target.closest('[data-romance-action]');
@@ -170,7 +176,8 @@ document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){
     if(menuOpen){menuOpen=false;renderModal();}
     else if(mini)mini.input('exit');
-    else if(travelId){travelId=null;renderModal();}
+      else if(citizenId){citizenId=null;renderModal();}
+      else if(travelId){travelId=null;renderModal();}
     else if(dialogueId){dialogueId=null;dialogueResult=null;renderModal();}
   }
 });

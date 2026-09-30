@@ -16,6 +16,7 @@ import { byId,districtUnlocked,travelOptions,gainSkill,dailySettlement,settleMat
 import { saveGame } from './save.js';
 import { diets,careers } from '../data/lifestyle.js';
 import { livingPeople,livingRomancePeople,populationDay } from './population.js';
+import { seedCitizens,citizensDay,applyCitizenAction,citizenActionInfo,ensureCitizen } from './citizens.js';
 
 const success = (message,tone='good') => ({ok:true,message,tone});
 const fail = message => ({ok:false,message,tone:'bad'});
@@ -23,6 +24,7 @@ const homeRank = id => homes.findIndex(h=>h.id===id);
 
 export class GameEngine {
   constructor(state=freshState(),rng=Math.random) {
+    seedCitizens(state);
     this.state=state; this.rng=rng; this.listeners=new Set();this.lastMoney=state.money;this.lastLedgerSeq=state.ledgerSeq||0;
   }
   subscribe(fn) { this.listeners.add(fn); return ()=>this.listeners.delete(fn); }
@@ -44,6 +46,7 @@ export class GameEngine {
       s.hour-=24; s.day++;
       dailySettlement(s,{rng:this.rng,skipDiet,prison});
       populationDay(s,this.rng,quiet);
+      citizensDay(s,this.rng);
       if(!prison)romanceDay(s,this.rng);
       if(!quiet)socialDay(s,this.rng);
       if(!prison)settleMatureInvestments(s,this.rng);
@@ -67,6 +70,8 @@ export class GameEngine {
     if(s.recentIncident&&!s.recentIncident.id){
       const custom=s.recentIncident,choice=custom.choices?.[index];
       if(choice?.cost&&!this.spend(choice.cost))return this.emit(fail('На это не хватает денег.'));
+      if(choice?.npcEffect&&custom.socialId){const person=[...livingPeople(s),...livingRomancePeople(s)].find(p=>p.id===custom.socialId);if(person){const life=ensureCitizen(s,person);for(const [key,value] of Object.entries(choice.npcEffect))life[key]=Math.max(0,(life[key]||0)+value);}}
+      if(custom.socialId&&(choice?.cost||choice?.effect?.money))addLedger(s,'Социальные связи',(choice?.effect?.money||0)-(choice?.cost||0),`${custom.title}: ${choice.reply}`);
       if(choice){adjust(s,choice.effect);if(choice.rapport){const profile=s.romance?.profiles[choice.rapport.id];if(profile)profile.rapport=clamp(profile.rapport+choice.rapport.delta,0,100);changeSocial(s,choice.rapport.id,choice.rapport.delta);}if(choice.socialDelta&&custom.socialId)changeSocial(s,custom.socialId,choice.socialDelta);addLog(s,`${custom.title}: ${choice.reply}`,'story');}
       s.recentIncident=null;return this.emit(success(choice?.reply||'Продолжить.'));
     }
@@ -530,6 +535,18 @@ export class GameEngine {
     addLog(s,`${reply} Связь ${score>0?'+':''}${score}.`,tone);
     return this.emit(success(reply,tone));
   }
+  citizenAction(id,action){
+    const blocked=this.guard();if(blocked)return this.emit(blocked);
+    const s=this.state,person=[...livingPeople(s),...livingRomancePeople(s)].find(p=>p.id===id);
+    if(!person||!socialMet(s,id))return this.emit(fail('Сначала познакомьтесь.'));
+    const info=citizenActionInfo(s,person,action);if(!info)return this.emit(fail('Неизвестное действие.'));
+    if(info.hours&&s.stats.energy<8)return this.emit(fail('Нужно передохнуть перед этим делом.'));
+    const result=applyCitizenAction(s,person,action,this.rng);if(!result.ok)return this.emit(fail(result.message));
+    if(result.delta){changeSocial(s,id,result.delta);const profile=s.romance?.profiles?.[id];if(profile)profile.rapport=clamp(profile.rapport+result.delta,0,100);}
+    if(result.cost)addLedger(s,'Социальные связи',-result.cost,`${person.name}: ${info.name}`);
+    if(result.hours)adjust(s,{energy:-Math.min(14,result.hours*4),stress:result.tone==='bad'?4:0});
+    this.tick(result.hours);addLog(s,result.message,result.tone);return this.emit(success(result.message,result.tone));
+  }
   invest(id,amount) {
     const blocked=this.guard(); if (blocked) return this.emit(blocked);
     const s=this.state,item=byId(investments,id),value=Math.floor(Number(amount));
@@ -549,6 +566,6 @@ export class GameEngine {
     this.state.money-=paid; this.state.debt-=paid; this.tick(1);
     return this.emit(success(`Погашено ${paid.toLocaleString('ru-RU')} ₽ долга.`));
   }
-  replaceState(state) { this.state=state;this.lastMoney=state.money;this.lastLedgerSeq=state.ledgerSeq||0; return this.emit(success('Сохранение загружено.')); }
+  replaceState(state) { seedCitizens(state);this.state=state;this.lastMoney=state.money;this.lastLedgerSeq=state.ledgerSeq||0; return this.emit(success('Сохранение загружено.')); }
   summary() { return {netWorth:netWorth(this.state),success:successRoute(this.state)?.name||null}; }
 }

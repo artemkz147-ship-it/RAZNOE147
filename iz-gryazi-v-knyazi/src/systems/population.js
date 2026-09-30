@@ -2,7 +2,7 @@ import { people } from '../data/people.js';
 import { romancePeople } from '../data/romance.js';
 import { addLog,adjust } from './state.js';
 
-const startingAges={valera:48,tamara:64,azamat:39,lida:43,vera:35,artur:55,minister:60,rosa:57,pasha:49,zoya:52,marina:31,nina:34,alisa:28,viktoria:38,irina:36};
+export const startingAges={valera:48,tamara:64,azamat:39,lida:43,vera:35,artur:55,minister:60,rosa:57,pasha:49,zoya:52,marina:30,nina:32,alisa:20,viktoria:25,irina:36};
 const surnames={male:['Орлов','Соколов','Миронов','Ким','Ахметов','Белов','Лазарев','Волков'],female:['Орлова','Соколова','Миронова','Ким','Ахметова','Белова','Лазарева','Волкова']};
 const residents=[
   {names:['Данил','Кирилл','Рустам'],role:'курьер новой волны',district:'yard',portraitId:'azamat',accent:'#b28762',age:24,threshold:0,favor:'Доставить посылку',cost:90,effect:{contacts:1,energy:-3},relation:2,lines:['«Вчера адреса здесь не было. Сегодня дом уже есть».','«Маршрут меняется, а подъезд без лифта остаётся».']},

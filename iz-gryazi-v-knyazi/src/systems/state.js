@@ -12,7 +12,7 @@ export function freshState() {
     casino: {rounds:0,wins:0,wagered:0,returned:0,history:[]}, casinoDaily: {day:1,wagered:0}, casinoTable:null,
     romance:{partner:null,partners:[],profiles:{},betrayedNina:false,history:[],conflict:null,affairs:0},
     population:{residents:[],departed:{},nextArrivalDay:181},
-    social:{},relations: {}, dialogueProgress: {}, dialogueLast: {}, lastWorkResult:null, story: 0, flags: [], log: [{ day:1, hour:7, text:'Проснулся на чужом диване. Город пока не в курсе, что ты собираешься его купить.', type:'story' }],
+    citizens:{},social:{},relations: {}, dialogueProgress: {}, dialogueLast: {}, lastWorkResult:null, story: 0, flags: [], log: [{ day:1, hour:7, text:'Проснулся на чужом диване. Город пока не в курсе, что ты собираешься его купить.', type:'story' }],
     market: 1, pending: null, eventHistory: [], lastSaved: Date.now(), totalEarned: 0, jobsDone: 0, ending: false, achievedRoutes: [], ledger:[]
   };
 }
