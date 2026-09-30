@@ -7,7 +7,7 @@ export const calendarOf = state => ({month:Math.floor((state.day-1)/30)%12+1,yea
 export function dailyVitals(state,rng=Math.random,{fed=false}={}){
   const v=state.vitals ||= {nutrition:60,immunity:70,fitness:35,exposure:0,strain:0,illness:0};
   const diet=fed?(diets.find(x=>x.id===state.diet)||diets[1]):null;
-  const shelter=state.home==='sofa'||state.home==='hostel';
+  const shelter=['station','heating-main'].includes(state.home);
   v.nutrition=clamp(v.nutrition+(diet?(diet.id==='expired'?-5:diet.id==='basic'?0:2):-9),0,100);
   v.immunity=clamp(v.immunity+(shelter?-2:1)+(diet?.id==='expired'?-2:diet?1:-3)+(state.conditions?.hangover? -2:0),0,100);
   v.exposure=clamp(v.exposure+(shelter?3:-3),0,100);

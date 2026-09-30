@@ -12,7 +12,7 @@ export const romancePeople=[
 export function romanceAccess(state,person){
   if(person.id==='nina'){
     if(state.jobsDone<5)return 'Нужны пять рабочих смен';
-    if(homes.findIndex(x=>x.id===state.home)<1)return 'Нужно отдельное жильё, хотя бы койка';
+    if((['station','heating-main'].includes(state.home)?0:Math.min(7,homes.findIndex(x=>x.id===state.home)))<1)return 'Нужно отдельное жильё, хотя бы койка';
     if(state.stats.stress>=75)return 'Сначала справься со стрессом';
   }
   if(person.id==='viktoria'&&netWorth(state)<2000000)return 'Нужен капитал от 2 млн ₽';

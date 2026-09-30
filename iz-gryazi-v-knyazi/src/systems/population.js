@@ -1,3 +1,4 @@
+import {moveHome} from './housing.js';
 import { people } from '../data/people.js';
 import { romancePeople } from '../data/romance.js';
 import { addLog,adjust } from './state.js';
@@ -42,8 +43,8 @@ function leave(state,person){
   else if(score>=30)adjust(state,{mood:-8,stress:5});
   if(state.romance?.conflict?.partnerId===person.id)state.romance.conflict=null;
   if(person.id==='valera'&&state.home==='sofa'){
-    state.home='hostel';if(!state.ownedHomes.includes('hostel'))state.ownedHomes.push('hostel');
-    addLog(state,'После ухода Валеры диван больше недоступен. Ты перебрался в койку с ежедневной оплатой.','bad');
+    moveHome(state,'station');if(!state.ownedHomes.includes('station'))state.ownedHomes.push('station');
+    addLog(state,'После ухода Валеры диван больше недоступен. Тебе пришлось искать бесплатный ночлег на вокзале.','bad');
   }
   addLog(state,`${person.name} ушёл из жизни в ${age} лет.${partner?' Вы были вместе.':''}`,'bad');
   if(!state.recentIncident&&!state.pending)state.recentIncident={title:`Память о ${person.name}`,text:`${person.name} ушёл из жизни в ${age} лет. Город продолжает шуметь, а вашей истории больше не будет нового разговора.`,portrait:person.portrait,image:person.portrait===undefined?`person:${person.id}`:undefined,art:0,choices:[{text:'Вспомнить хорошие моменты',effect:{mood:2,stress:-3},reply:'Ты сохранил тёплые воспоминания.'},{text:'Побыть одному',effect:{energy:3,stress:2},reply:'Ты дал себе время пережить новость.'}]};

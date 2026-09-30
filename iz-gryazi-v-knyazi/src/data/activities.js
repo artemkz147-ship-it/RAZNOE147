@@ -1,4 +1,8 @@
 export const activities = [
+ {id:'medicine',name:'Аптека: лекарства',hours:1,cost:650,effect:{health:12,energy:3},description:'Фармацевт подобрал средство. Если болезнь не проходит, нужен врач.'},
+ {id:'vet',name:'Знакомый ветеринар',hours:2,cost:350,effect:{health:10,stress:3},description:'Осмотр на скорую руку. Он честно сказал, что людей обычно не лечит.'},
+ {id:'private-doctor',name:'Частная клиника',hours:2,cost:6500,effect:{health:45,stress:-10},description:'Обследование и лечение назначены.'},
+ {id:'elite-doctor',name:'Персональный врач',hours:3,cost:28000,effect:{health:65,stress:-15},description:'Полное обследование и курс восстановления.'},
   {id:'rest',name:'Перевести дух',hours:1,cost:0,effect:{energy:22,stress:-3,mood:1},description:'Час передышки: силы возвращаются, город подождёт.'},
   {id:'sleep',name:'Выспаться',hours:8,cost:0,effect:{health:9,stress:-10,mood:4},restoreSleep:true,description:'Сон восстановил силы. Письма от банка подождут.'},
   {id:'food',name:'Поесть горячего',hours:1,cost:260,effect:{energy:12,health:5,mood:3},description:'Горячая еда победила холодный день.'},
@@ -22,4 +26,3 @@ export const activities = [
   {id:'heightswellness',name:'Тихий выходной',district:'heights',hours:4,cost:65000,effect:{health:18,mood:12,stress:-16},description:'Тишина оплачивается отдельно и заранее.'},
   {id:'heightsauction',name:'Вечер благотворителей',district:'heights',hours:3,cost:120000,effect:{fame:5,respect:4,contacts:3,stress:3},description:'Пожертвование объявили громче цели сбора.'}
 ];
-

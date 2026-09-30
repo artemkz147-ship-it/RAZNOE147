@@ -84,12 +84,16 @@ public class MainActivity extends Activity {
             }
         }, "AndroidGame");
         FrameLayout container = new FrameLayout(this);
+        container.setBackgroundColor(0xff111416);
+        if (Build.VERSION.SDK_INT >= 29) getWindow().setNavigationBarContrastEnforced(false);
+        getWindow().setStatusBarColor(0xff111416);
+        getWindow().setNavigationBarColor(0xff111416);
         container.addView(webView, new FrameLayout.LayoutParams(-1, -1));
         if (Build.VERSION.SDK_INT >= 35) {
             container.setOnApplyWindowInsetsListener((view, windowInsets) -> {
                 Insets safe = windowInsets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
                 container.setPadding(safe.left, safe.top, safe.right, safe.bottom);
-                return windowInsets;
+                return WindowInsets.CONSUMED;
             });
         }
         setContentView(container);
@@ -115,4 +119,3 @@ public class MainActivity extends Activity {
         webView.evaluateJavascript("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))", null);
     }
 }
-

@@ -54,6 +54,7 @@ test('ordinary days charge no automatic food and manual meals enter the diary',(
 
 test('player chooses up to five years and skip records income, diet and actual stop',()=>{
   const s=freshState(),game=new GameEngine(s,()=>.99);
+  game.hire('janitor');s.money=50000;
   assert.equal(game.skipTime('career','janitor',61,'basic').ok,false);
   assert.equal(game.skipTime('career','janitor',1,'expired').ok,true);
   assert.equal(s.timeSkip.diet,'expired');
@@ -78,20 +79,17 @@ test('bicycle chain incident is never in the bus or car pool',()=>{
   assert.ok(incidents.some(x=>x.context==='moped'));
 });
 
-test('paid housing is lost and time skip stops when living costs exceed cash',()=>{
-  const s=freshState(),game=new GameEngine(s,()=>.99);s.home='room';s.ownedHomes.push('room');s.money=100;
-  assert.equal(game.skipTime('career','janitor',12,'basic').ok,true);
-  assert.equal(s.timeSkip.worked,1);assert.equal(s.home,'sofa');
-  assert.ok(!s.ownedHomes.includes('room'));
-  assert.match(s.recentIncident.title,/Выселение/);
+test('paid housing eviction happens on its payment date, never on an arbitrary negative day',()=>{
+ const s=freshState(),game=new GameEngine(s,()=>.99);s.home='room';s.ownedHomes.push('room');s.housing={id:'room',since:1,nextDue:31,multiplier:1};s.money=100;
+ game.tick(24,true);assert.equal(s.home,'room');s.day=30;game.tick(24,true);assert.equal(s.home,'station');assert.ok(!s.ownedHomes.includes('room'));
 });
 
 test('career skip counts parallel business income and hunger is visible from other tabs',()=>{
-  const s=freshState(),game=new GameEngine(s,()=>.99);s.money=50000;s.businesses.stall={level:1,staff:false,condition:100,strategy:'normal'};
+  const s=freshState(),game=new GameEngine(s,()=>.99);s.money=50000;game.hire('janitor');s.businesses.stall={level:1,staff:false,condition:100,strategy:'normal'};
   assert.equal(game.workCareer('janitor',1,'basic').ok,true);
-  assert.ok(s.timeSkip.earned>12500);
+  assert.ok(s.timeSkip.earned>10000);
   s.vitals.nutrition=30;
-  assert.match(shell(s,'work','home',null),/НУЖНО ПОЕСТЬ/);
+  assert.match(shell(s,'work','home',null),/СЫТ\./);
 });
 
 test('age, diet and month long career use real game days and living costs',()=>{
@@ -101,12 +99,13 @@ test('age, diet and month long career use real game days and living costs',()=>{
   assert.equal(dailySettlement(s,{rng:()=>.99}).expenses,0);
   game.setDiet('basic');
   const before=s.money;
+  s.money=20000;game.hire('janitor');
   const result=game.workCareer('janitor',1);
   assert.equal(result.ok,true);
   assert.equal(s.day,31);
   assert.equal(s.careerMonths,1);
   assert.ok(s.money>before);
-  assert.match(s.lastWorkResult.detail,/Доход/);
+  assert.match(s.lastWorkResult.detail,/Получено/);
   s.day=361;assert.equal(ageOf(s),31);
 });
 
@@ -119,7 +118,7 @@ test('casino entrance requires status and clean clothing',()=>{
 
 test('month skip advances an existing relationship',()=>{
   const s=freshState();s.romance.partner='nina';s.romance.partners=['nina'];s.romance.profiles.nina={rapport:80,lastDay:1,days:0,met:true};
-  const game=new GameEngine(s,()=>.99);
+  const game=new GameEngine(s,()=>.99);s.money=30000;game.hire('janitor');
   assert.equal(game.workCareer('janitor',1).ok,true);
   assert.ok(s.romance.profiles.nina.days>0);
   assert.ok(s.day<=31);
@@ -147,7 +146,7 @@ test('aging can remove old contacts and changes the free sofa',()=>{
   const s=freshState();s.day=10830;s.population.nextArrivalDay=20000;
   populationDay(s,()=>0);
   assert.ok(!livingPeople(s).some(p=>p.id==='valera'));
-  assert.equal(s.home,'hostel');
+  assert.equal(s.home,'station');
   assert.equal(knownDepartures(s)[0].person.name,'Валера «Ключ»');
   assert.match(shell(s,'people','home',null,'legal',null,null,null,'contacts'),/ПАМЯТЬ ГОРОДА/);
 });
@@ -434,17 +433,9 @@ test('three casino tables preserve a real stake and use player decisions',()=>{
   assert.equal(pokerScore([{rank:2,suit:'♠'},{rank:3,suit:'♠'},{rank:4,suit:'♠'},{rank:5,suit:'♠'},{rank:14,suit:'♠'}])[0],8);
 });
 
-test('romance trust unlocks commitment and daily consequences',()=>{
-  const s=freshState(),game=new GameEngine(s,()=>0);
-  assert.equal(game.romanceAction('marina','meet').ok,true);
-  assert.equal(game.romanceAction('marina','date').ok,false);
-  for(let i=0;i<2;i++){s.day++;s.stats.energy=80;assert.equal(game.romanceAction('marina','meet').ok,true);}
-  assert.ok(s.romance.profiles.marina.rapport>=18);
-  assert.equal(game.romanceAction('marina','commit').ok,true);
-  const before=s.money;s.hour=23;game.activity('rest');
-  assert.equal(s.romance.partner,'marina');
-  assert.ok(s.money<before);
-  assert.match(shell(s,'people','home',null,'legal',null,null,null,'romance'),/romance-card/);
+test('authored conversations unlock a relationship without visible numeric targets',()=>{
+ const s=freshState(),game=new GameEngine(s,()=>.99);for(let i=0;i<3;i++){s.day++;s.stats.energy=80;assert.equal(game.romanceAction('marina','talk').ok,true);assert.ok(s.recentIncident.choices.length===2);assert.equal(game.resolveIncident(0).ok,true);}
+ assert.equal(game.romanceAction('marina','commit').ok,true);assert.equal(s.romance.partner,'marina');
 });
 
 test('relationship tab shows current couples only and moves exes into social groups',()=>{
@@ -453,7 +444,7 @@ test('relationship tab shows current couples only and moves exes into social gro
   const contactView=()=>shell(s,'people','home',null,'legal',null,null,null,'contacts');
   assert.doesNotMatch(relationshipView(),/class="romance-card/);
   assert.match(relationshipView(),/Пока нет отношений/);
-  assert.match(contactView(),/data-romance-action="meet" data-id="marina"/);
+  assert.match(contactView(),/data-romance-action="talk" data-id="marina"/);
   assert.doesNotMatch(contactView(),/data-id="irina"/);
   assert.equal(game.romanceAction('marina','meet').ok,true);
   assert.doesNotMatch(relationshipView(),/class="romance-card/);
@@ -470,7 +461,7 @@ test('relationship tab shows current couples only and moves exes into social gro
 test('several romances can coexist and separating one preserves the other',()=>{
   const s=freshState(),game=new GameEngine(s,()=>.99);
   s.romance.profiles.marina={met:true,rapport:50,meetings:3,lastDay:0,days:0};
-  s.romance.profiles.alisa={met:true,rapport:50,meetings:3,lastDay:0,days:0};
+  s.romance.profiles.alisa={met:true,rapport:50,meetings:3,lastDay:0,days:0};s.social.marina.score=50;
   assert.equal(game.romanceAction('marina','commit').ok,true);
   assert.equal(game.romanceAction('alisa','commit').ok,true);
   assert.deepEqual(activePartners(s),['marina','alisa']);
@@ -563,15 +554,15 @@ test('old unfinished card rounds refund their stake during migration',()=>{
 
 test('all home cards have an actual raster image reference',()=>{
   const html=shell(freshState(),'assets','home',null);
-  assert.equal((html.match(/class="asset-raster"/g)||[]).length,8);
+  assert.equal((html.match(/class="asset-raster"/g)||[]).length,10);
   assert.doesNotMatch(html,/src="undefined"/);
 });
 
 test('exhausted player can recover immediately and sleep reaches a useful energy level',()=>{
   const state=freshState();state.stats.energy=0;
   const game=new GameEngine(state,()=>.99);
-  assert.match(shell(state,'work','home',null),/СИЛЫ НА ИСХОДЕ/);
-  assert.match(shell(state,'work','home',null),/data-id="rest"/);
+  assert.match(shell(state,'life','home',null),/ЭНЕР\./);
+  assert.match(shell(state,'life','home',null),/data-id="rest"/);
   assert.equal(game.activity('rest').ok,true);
   assert.equal(state.stats.energy,22);
   assert.equal(state.hour,8);

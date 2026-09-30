@@ -1,6 +1,7 @@
 import { ageAppearance } from '../systems/appearance.js';
 const file=path=>new URL(path,import.meta.url).href;
 export const backgrounds={yard:file('./backgrounds/yard.webp'),market:file('./backgrounds/market.webp'),industrial:file('./backgrounds/industrial.webp'),center:file('./backgrounds/center.webp'),glass:file('./backgrounds/glass.webp'),heights:file('./backgrounds/heights.webp')};
+export const shelterArt={station:file('./backgrounds/station-shelter.png'),heating:file('./backgrounds/heating-shelter.png')};
 export const characters={poor:file('./characters/hero-poor.webp'),worker:file('./characters/hero-worker.webp'),jacket:file('./characters/hero-jacket.webp'),middle:file('./characters/hero-middle.webp'),suit:file('./characters/hero-suit.webp'),magnate:file('./characters/hero-magnate.webp'),rich:file('./characters/hero-rich.webp')};
 export const olderCharacters={worker:file('./characters/hero-worker-aged.png'),suit:file('./characters/hero-suit-aged.png')};
 export const heroStages=['poor','worker','jacket','middle','suit','magnate','rich'];

@@ -52,13 +52,15 @@ export const jobs = [
 
 export const homes = [
   {id:'sofa',name:'Диван у знакомого',price:0,daily:0,restore:28,prestige:0,description:'Валера пустил бесплатно. Еду и прочий быт ты оплачиваешь сам.'},
-  {id:'hostel',name:'Койка без соседского дивана',price:2500,daily:155,restore:32,prestige:1,description:'Шторка — первая собственная граница.'},
-  {id:'room',name:'Комната с ковром',price:7500,daily:190,restore:38,prestige:3,description:'Ковёр глушит соседей. Иногда.'},
-  {id:'flat',name:'Однушка у кольца',price:90000,daily:520,restore:51,prestige:11,description:'Свой чайник. Чужой ипотечный страх.'},
+  {id:'hostel',name:'Койка в хостеле',price:155,daily:155,restore:32,prestige:1,description:'Шторка — первая собственная граница.'},
+  {id:'room',name:'Комната с ковром',price:5700,daily:190,restore:38,prestige:3,description:'Ковёр глушит соседей. Иногда.'},
+  {id:'flat',name:'Однушка у кольца',price:15600,daily:520,restore:51,prestige:11,description:'Свой чайник. Чужой ипотечный страх.'},
   {id:'loft',name:'Лофт с кирпичом',price:680000,daily:2200,restore:65,prestige:26,description:'Кирпич старый, цена новая.'},
   {id:'duplex',name:'Двухуровневая квартира',price:3100000,daily:5900,restore:72,prestige:41,description:'Лестница внутри жилья звучит как повышение.'},
   {id:'penthouse',name:'Пентхаус с видом',price:8900000,daily:11500,restore:78,prestige:58,description:'Видно даже район, где всё начиналось.'},
-  {id:'estate',name:'Усадьба на берегу',price:42000000,daily:38000,restore:90,prestige:100,description:'Свои ворота, чужие проблемы.'}
+  {id:'estate',name:'Усадьба на берегу',price:42000000,daily:38000,restore:90,prestige:100,description:'Свои ворота, чужие проблемы.'},
+  {id:'station',name:'Ночлег на вокзале',price:0,daily:0,restore:12,prestige:0,description:'Тепло не везде. Сон прерывают охрана и другие ночующие.'},
+  {id:'heating-main',name:'Теплотрасса',price:0,daily:0,restore:9,prestige:0,description:'Бесплатное укрытие возле труб. Сырость и чужая территория.'}
 ];
 
 export const vehicles = [

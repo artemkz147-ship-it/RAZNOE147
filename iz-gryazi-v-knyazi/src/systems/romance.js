@@ -42,7 +42,7 @@ function romancePartnerDay(state,rng,id){
     p.quarrels=(p.quarrels||0)+1;addLog(state,`${r.conflict.title}: ${cause}`,'bad');
   }
   if(id==='marina'){
-    if(rng()<.38){const cost=Math.min(state.money,120+Math.floor(rng()*220));state.money-=cost;adjust(state,{mood:2,stress:3,energy:-2});p.last=`Марина предложила спонтанный вечер. Ушло ${cost} ₽.`;addLog(state,p.last,'neutral');}
+    if(rng()<.38){const cost=Math.min(Math.max(0,state.money),120+Math.floor(rng()*220));state.money-=cost;adjust(state,{mood:2,stress:3,energy:-2});p.last=`Марина предложила спонтанный вечер. Ушло ${cost} ₽.`;addLog(state,p.last,'neutral');}
     if(p.days>=10&&state.money<300&&rng()<.22){adjust(state,{stress:7,mood:-4});p.last='Очередная ссора из-за планов, которых никто не строил.';}
   }
   if(id==='nina'){
@@ -50,13 +50,13 @@ function romancePartnerDay(state,rng,id){
     else{adjust(state,{mood:p.married?4:2,stress:p.married?-4:-2,health:p.married?1:0});if(p.days%5===0){p.rapport=clamp(p.rapport+2,0,100);p.last='Нина помогла пережить тяжёлую неделю. Вы стали ближе.';addLog(state,p.last,'good');}}
   }
   if(id==='alisa'&&p.days>=7){
-    if(rng()<.35){const cost=Math.min(state.money,250+Math.floor(rng()*850));state.money-=cost;adjust(state,{stress:4,mood:-2});p.last=`Алиса снова передумала насчёт общих планов. На спонтанный выход ушло ${cost} ₽.`;addLog(state,p.last,'bad');}
+    if(rng()<.35){const cost=Math.min(Math.max(0,state.money),250+Math.floor(rng()*850));state.money-=cost;adjust(state,{stress:4,mood:-2});p.last=`Алиса снова передумала насчёт общих планов. На спонтанный выход ушло ${cost} ₽.`;addLog(state,p.last,'bad');}
     if(p.days>=17&&rng()<.13){adjust(state,{stress:8,appeal:-2});p.last='Быт сделал разговоры колючими. Вам обоим стало тесно.';notice(state,'Остывший вечер',p.last,2,[{text:'Поговорить честно',effect:{stress:-3,contacts:1},rapport:{id:'alisa',delta:3},reply:'Удалось услышать друг друга.'},{text:'Отложить разговор',effect:{stress:5},reply:'Молчание стало громче.'}]);}
   }
   if(id==='viktoria'){
     if(netWorth(state)<500000){dropPartner(r,id);changeSocial(state,id,-35);p.last='Доходы упали. Виктория сказала, что у вас теперь разные планы.';notice(state,'Разные планы',p.last,3,[{text:'Отпустить',effect:{stress:4},reply:'Она уехала без долгого разговора.'},{text:'Попытаться удержать',effect:{stress:9,mood:-4},reply:'Решение она уже приняла.'}]);addLog(state,p.last,'bad');}
     else if(p.spent>=250000&&rng()<.12){const loss=Math.floor(Math.max(0,state.money)*.5);state.money-=loss;dropPartner(r,id);changeSocial(state,id,-65);p.last=`Виктория исчезла вместе с ${loss.toLocaleString('ru-RU')} ₽. Общий счёт оказался не таким уж общим.`;notice(state,'Пустой счёт',p.last,3,[{text:'Сохранить документы',effect:{stress:5,business:1},reply:'Остались выписки и тяжёлый урок.'},{text:'Закрыть эту историю',effect:{stress:8,mood:-5},reply:'Деньги не вернулись.'}]);addLog(state,p.last,'bad');}
-    else if(rng()<.28){const cost=Math.min(state.money,1500+Math.floor(rng()*4500));state.money-=cost;p.spent+=cost;adjust(state,{mood:1,stress:2});p.last=`Очередной дорогой вечер: ${cost} ₽.`;addLog(state,p.last,'neutral');}
+    else if(rng()<.28){const cost=Math.min(Math.max(0,state.money),1500+Math.floor(rng()*4500));state.money-=cost;p.spent+=cost;adjust(state,{mood:1,stress:2});p.last=`Очередной дорогой вечер: ${cost} ₽.`;addLog(state,p.last,'neutral');}
   }
   if(id==='irina'){
     if(p.days>=6&&rng()<.14){dropPartner(r,id);changeSocial(state,id,-80);adjust(state,{health:-32,respect:-14,stress:16});p.last='После тяжёлой ссоры ты попал в больницу. Ирина разнесла по знакомым выдуманные истории.';notice(state,'После ссоры',p.last,4,[{text:'Лечиться и собирать доказательства',effect:{health:8,stress:-3},reply:'Здоровье медленно возвращается.'},{text:'Сразу опровергать слухи',effect:{respect:4,energy:-8},reply:'Часть знакомых поверила тебе.'}]);addLog(state,p.last,'bad');}

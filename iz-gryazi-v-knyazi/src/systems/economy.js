@@ -1,3 +1,4 @@
+import {housingDay,ensureHousing} from './housing.js';
 import { homes, vehicles, businesses, districts } from '../data/world.js';
 import { investments } from '../data/investments.js';
 import { clamp, adjust, addLog, addLedger } from './state.js';
@@ -56,37 +57,31 @@ export const businessStrategies={
   normal:{label:'Обычно',income:1,expense:1,risk:1,wear:1},
   growth:{label:'На износ',income:1.28,expense:1.1,risk:1.9,wear:3}
 };
-export function dailyBusiness(state,offline=false,rng=Math.random) {
-  let result = 0;
-  const marketMultiplier = [.75,1,1.16,1.38][state.market];
-  for (const [id,firm] of Object.entries(state.businesses)) {
-    const config = byId(businesses,id);
-    if (!config) continue;
-    const relationBoost = 1 + state.stats.business*.003 + state.stats.fame*.0008 + state.stats.contacts*.001;
-    const condition = Math.max(.38,firm.condition/100);
-    const leadership = state.flags.includes('fairboss')?1.08:state.flags.includes('hardboss')?1.05:1;
-    const strategy=businessStrategies[firm.strategy]||businessStrategies.normal;
-    const gross = Math.round(config.base*firm.level*(firm.staff ? 1.32 : 1)*marketMultiplier*relationBoost*condition*leadership*strategy.income*(.55+rng()*.9));
-    const supplierDiscount = state.flags.includes('supplier')?.95:1;
-    const expense = Math.round((config.upkeep*(1+.38*(firm.level-1)) + (firm.staff ? config.staff : 0))*supplierDiscount*strategy.expense);
-    let net = gross-expense;
-    const riskFactor = state.flags.includes('openbooks')?.7:state.flags.includes('closedbooks')?1.45:1;
-    const crimeFactor = 1+state.stats.crime*.006;
-    if (!offline && rng() < config.risk*.15*riskFactor*crimeFactor*strategy.risk) {
-      const repair = Math.round(config.upkeep*(1+firm.level*.6));
-      net -= repair; firm.condition = clamp(firm.condition-12,20,100);
-      addLog(state,`${config.name}: внеплановый ремонт обошёлся в ${repair.toLocaleString('ru-RU')} ₽.`,'bad');
-    } else firm.condition = clamp(firm.condition-strategy.wear,20,100);
-    result += net;
-    addLedger(state,`Бизнес: ${config.name}`,net,`Выручка ${gross.toLocaleString('ru-RU')} ₽, расходы ${expense.toLocaleString('ru-RU')} ₽`);
-  }
-  if (offline) result = Math.floor(result*.62);
-  return result;
+export function businessForecast(state,config,firm={level:1,condition:100,staff:false}){
+ const strategy=businessStrategies[firm.strategy]||businessStrategies.normal;
+ const boost=1+state.stats.business*.003+state.stats.fame*.0008+state.stats.contacts*.001;
+ const leadership=state.flags.includes('fairboss')?1.08:state.flags.includes('hardboss')?1.05:1;
+ const base=config.base*firm.level*(firm.staff?1.32:1)*[.75,1,1.16,1.38][state.market]*boost*Math.max(.38,firm.condition/100)*leadership*strategy.income*(firm.capacity??1)*(firm.orderUntil>=state.day?1.2:1);
+ const expense=Math.round((config.upkeep*(1+.38*(firm.level-1))+(firm.staff?config.staff:0))*(state.flags.includes('supplier')?.95:1)*strategy.expense*(firm.expenseFactor||1));
+ const low=firm.paused?0:Math.round(base*.55),high=firm.paused?0:Math.round(base*1.45);
+ return {low,high,expense,netLow:low-expense,netHigh:high-expense};
+}
+export function dailyBusiness(state,offline=false,rng=Math.random){
+ let result=0;
+ for(const [id,firm] of Object.entries(state.businesses)){
+  const config=byId(businesses,id);if(!config)continue;
+  const f=businessForecast(state,config,firm),gross=Math.round(f.low+rng()*(f.high-f.low)),net=gross-f.expense;
+  if(state.money+result+gross<f.expense){delete state.businesses[id];addLedger(state,'Ликвидация бизнеса',0,config.name+': не хватает средств на обязательства');if(!state.recentIncident)state.recentIncident={title:'Дело закрыто',text:config.name+': не хватило денег на оплату обязательств. Выручка возвращена покупателям.',art:11};addLog(state,config.name+': закрытие из-за неплатёжеспособности.','bad');continue;}
+  result+=net;firm.condition=clamp(firm.condition-(businessStrategies[firm.strategy]||businessStrategies.normal).wear,20,100);
+  firm.lastResult={day:state.day,gross,expense:f.expense,net};addLedger(state,'Бизнес: '+config.name,net,'Выручка '+gross+' ₽, расходы '+f.expense+' ₽');
+ }
+ return result;
 }
 export function dailySettlement(state,{offline=false,rng=Math.random,skipDiet=false,prison=false}={}) {
   const home = byId(homes,state.home);
   const vehicle = byId(vehicles,state.vehicle);
   if(prison){
+    ensureHousing(state).nextDue++;if(state.employment){state.employment.nextPay++;state.employment.reviewDay++;}
     const savedDiet=state.diet;state.diet='expired';dailyVitals(state,rng,{fed:true});state.diet=savedDiet;
     state.lastSettlement={day:state.day,food:0,rent:0,transport:0,business:0,expenses:0,prison:true};
     return {business:0,expenses:0};
@@ -94,10 +89,13 @@ export function dailySettlement(state,{offline=false,rng=Math.random,skipDiet=fa
   state.market = Math.floor(rng()*4);
   const business = dailyBusiness(state,offline,rng);
   const food=skipDiet?(byId(diets,state.diet)||diets[1]).daily:0;
-  const expenses = home.daily + vehicle.upkeep + food + Math.floor(state.debt*.018);
-  state.money += business-expenses;
+  state.money+=business;
+  const rent=housingDay(state,rng);
+  const otherExpenses = vehicle.upkeep + food + Math.floor(state.debt*.018);
+  const expenses=rent+otherExpenses;
+  state.money -= otherExpenses;
   if(food)addLedger(state,'Питание',-food,(byId(diets,state.diet)||diets[1]).name);
-  if(home.daily)addLedger(state,'Жильё',-home.daily,home.name);
+
   if(vehicle.upkeep)addLedger(state,'Транспорт',-vehicle.upkeep,vehicle.name);
   if(state.debt)addLedger(state,'Долг',-Math.floor(state.debt*.018),'Проценты');
   state.debt += Math.ceil(state.debt*.012);
@@ -106,9 +104,9 @@ export function dailySettlement(state,{offline=false,rng=Math.random,skipDiet=fa
   state.stats.life = clamp(Math.round(8+home.prestige*.55+vehicle.prestige*.16+state.stats.mood*.1-state.stats.stress*.06),0,100);
   adjust(state,{energy:Math.round(home.restore*.43),health:state.money<0?-4:1,mood:state.money<0?-3:state.stats.life>55?1:0,stress:state.money<0?5:state.stats.life>55?0:1});
   dailyVitals(state,rng,{fed:skipDiet||state.lastMealDay===state.day-1});
-  state.lastSettlement={day:state.day,food,rent:home.daily,transport:vehicle.upkeep,business,expenses};
+  state.lastSettlement={day:state.day,food,rent,transport:vehicle.upkeep,business,expenses};
   if (business) addLog(state,`День ${state.day}: дела принесли ${business.toLocaleString('ru-RU')} ₽; быт и обязательства забрали ${expenses.toLocaleString('ru-RU')} ₽.`,business>=expenses?'good':'bad');
-  else if(expenses)addLog(state,`День ${state.day}: питание ${food} ₽, жильё ${home.daily} ₽, транспорт ${vehicle.upkeep} ₽${state.debt?', долг и проценты учтены':''}. Всего ${expenses.toLocaleString('ru-RU')} ₽.`,'neutral');
+  else if(expenses)addLog(state,`День ${state.day}: питание ${food} ₽, жильё ${rent} ₽, транспорт ${vehicle.upkeep} ₽${state.debt?', долг и проценты учтены':''}. Всего ${expenses.toLocaleString('ru-RU')} ₽.`,'neutral');
   if (state.money < -12000) {
     state.debt += Math.abs(state.money)+12000; state.money = -12000;
     addLog(state,'Банк молча превратил минус на счёте в долг. Уведомление было удивительно вежливым.','bad');

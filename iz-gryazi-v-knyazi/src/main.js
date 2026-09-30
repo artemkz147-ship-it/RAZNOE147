@@ -9,6 +9,7 @@ import { shell,modal,menuModal } from './ui/views.js';
 import { MiniGame } from './ui/minigames.js';
 import { socialGroup } from './systems/social.js';
 
+if(window.AndroidGame)document.documentElement.classList.add('android-host');
 const app=document.getElementById('app');
 const loaded=loadGame();
 const game=new GameEngine(loaded.state);
@@ -90,6 +91,8 @@ function perform(action,id,months) {
   if(action==='job'){startJob(id);return;}
   if(action==='crime'){startCrime(id);return;}
   if(action==='casino'){game.startCasino(id,document.getElementById('casino-stake')?.value);return;}
+  if(action==='hire'){game.hire(id);return;}
+  if(action==='quit-career'){game.quitCareer();return;}
   if(action==='career'){game.workCareer(id,months);return;}
   if(action==='diet'){game.setDiet(id);return;}
   if(action==='restart-after-death'){menuOpen=false;citizenId=null;tab='city';game.replaceState(freshState());return;}
