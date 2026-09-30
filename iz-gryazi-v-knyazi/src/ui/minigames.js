@@ -33,7 +33,7 @@ export class MiniGame {
   renderRepair(){
     const q=this.repairRound(),stage=this.repairStage||'diagnose';
     const readings='<div class="diagnostic-readings"><small>ПОКАЗАНИЯ · УЗЕЛ '+(this.round+1)+'/3</small>'+q.readings.map(r=>'<div><span>'+r.name+'</span><strong>'+r.value+' '+r.unit+'</strong><small>Норма '+r.min+'–'+r.max+'</small></div>').join('')+'</div>';
-    if(stage==='feedback')return readings+'<div class="repair-feedback '+(this.repairCorrect?'good':'bad')+'"><strong>'+(this.repairCorrect?'Узел восстановлен':'Сбой остался')+'</strong><p>'+q.reply+'</p><small>Диагностика: '+(this.chosenFault===q.fault?'верная':'ошибочная')+'</small></div><button data-mini="repair-next" class="primary big">'+(this.round===2?'ЗАКОНЧИТЬ РЕМОНТ':'СЛЕДУЮЩИЙ УЗЕЛ')+'</button>';
+    if(stage==='feedback')return readings+'<div class="repair-feedback '+(this.repairCorrect?'good':'bad')+'"><strong>'+(this.repairCorrect?'Узел восстановлен':'Сбой остался')+'</strong><p>'+(this.repairCorrect?q.reply:'Причина — '+q.readings.find(r=>r.id===q.fault).name.toLowerCase()+'. Выбранный ремонт её не устранил.')+'</p><small>Диагностика: '+(this.chosenFault===q.fault?'верная':'ошибочная')+'</small></div><button data-mini="repair-next" class="primary big">'+(this.round===2?'ЗАКОНЧИТЬ РЕМОНТ':'СЛЕДУЮЩИЙ УЗЕЛ')+'</button>';
     return readings+'<h4>'+(stage==='diagnose'?'ГДЕ ПРИЧИНА':'ЧТО ДЕЛАТЬ')+'</h4><div class="diagnostic-options">'+(stage==='diagnose'?q.readings.map(r=>'<button data-mini="diagnose" data-value="'+r.id+'">'+r.name+'</button>'):q.repairs.map(r=>'<button data-mini="repair" data-value="'+r.id+'">'+r.name+'</button>')).join('')+'</div>';
   }
   render() {

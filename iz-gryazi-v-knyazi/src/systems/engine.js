@@ -20,6 +20,7 @@ import { saveGame } from './save.js';
 import { diets,careers } from '../data/lifestyle.js';
 import { livingPeople,livingRomancePeople,populationDay } from './population.js';
 import { seedCitizens,citizensDay,applyCitizenAction,citizenActionInfo,ensureCitizen } from './citizens.js';
+import { receiveMedicalCare } from './lifestyle.js';
 
 const success = (message,tone='good') => ({ok:true,message,tone});
 const fail = message => ({ok:false,message,tone:'bad'});
@@ -27,6 +28,7 @@ const homeRank = id => ['station','heating-main'].includes(id)?0:Math.min(7,home
 
 export class GameEngine {
   constructor(state=freshState(),rng=Math.random) {
+    if(state.romance?.conflict&&!activePartners(state).includes(state.romance.conflict.partnerId))dropPartner(state.romance,state.romance.conflict.partnerId);
     seedCitizens(state);if(state.homeRelocationPending){delete state.homeRelocationPending;state.district=homeTerms(state.home).district;state.visitedDistricts||=['yard'];if(!state.visitedDistricts.includes(state.district))state.visitedDistricts.push(state.district);}ensureHousing(state);
     if(state.pending?.type==='event'){const event=[...events,...contextEvents].find(e=>e.id===state.pending.id);if(!event||!eventEligible(state,event))state.pending=null;}
     if(state.recentIncident?.id){const incident=incidents.find(i=>i.id===state.recentIncident.id);if(!incident||!incidentEligible(state,incident))state.recentIncident=null;}
@@ -97,6 +99,7 @@ export class GameEngine {
       if(choice?.meetId){const p=s.romance.profiles[choice.meetId]||{rapport:0,meetings:0,lastDay:0,days:0,spent:0};p.met=true;s.romance.profiles[choice.meetId]=p;changeSocial(s,choice.meetId,2);}
       if(choice?.housingGrace)ensureHousing(s).since+=choice.housingGrace;
       if(choice?.evict)loseHousing(s,'Серёга попросил уйти.');
+      if(choice?.medical)receiveMedicalCare(s);
       if(choice){if(choice.sentence)s.jailDays+=choice.sentence;adjust(s,choice.effect);if(choice.feed){s.vitals.nutrition=Math.max(30,s.vitals.nutrition);s.vitals.unfedDays=0;s.lastMealDay=s.day;}if(choice.rapport){const profile=s.romance?.profiles[choice.rapport.id];if(profile)profile.rapport=clamp(profile.rapport+choice.rapport.delta,0,100);changeSocial(s,choice.rapport.id,choice.rapport.delta);}if(choice.socialDelta&&custom.socialId)changeSocial(s,custom.socialId,choice.socialDelta);addLog(s,`${custom.title}: ${choice.reply}`,'story');}
       s.recentIncident=null;return this.emit(success(choice?.reply||'Продолжить.'));
     }
@@ -104,6 +107,7 @@ export class GameEngine {
     const choice=item.choices[index];
     if(!choice)return this.emit(fail('Выбери решение.'));
     if(choice.cost&&!this.spend(choice.cost))return this.emit(fail('На это не хватает денег.'));
+    if(choice.medical)receiveMedicalCare(s);
     adjust(s,choice.effect);if(choice.feed){s.lastMealDay=s.day;s.vitals.unfedDays=0;s.vitals.nutrition=clamp(s.vitals.nutrition+30,0,100);}
     for(const [key,delta] of Object.entries(choice.condition||{}))s.conditions[key]=clamp((s.conditions[key]||0)+delta,0,100);
     s.recentIncident=null;
@@ -297,6 +301,7 @@ export class GameEngine {
   }
   skipObstacle(){
     const s=this.state,p=s.activeSkip;if(!p)return '';
+    if(p.interruption)return p.interruption;
     if(s.death)return 'Жизнь закончилась.';
     if(s.jailDays)return 'Заключение прервало занятие.';
     if(p.kind==='career'&&s.employment?.id!==p.id)return 'Работа закончилась.';
@@ -424,7 +429,7 @@ export class GameEngine {
     if(id==='rest')s.lastRestDay=s.day;
     if(id==='drink'){s.conditions.hangover=1;s.vitals.immunity=clamp(s.vitals.immunity-3,0,100);s.vitals.strain=clamp(s.vitals.strain+4,0,100);}
     if(id==='sleep')s.conditions.hangover=0;
-    if(['clinic','private-doctor','elite-doctor'].includes(id)){if(s.employment&&(s.vitals.illness||s.conditions.back||s.stats.health<45)){s.employment.medicalUntil=s.day+2;addLog(s,'Врач оформил освобождение от работы до дня '+s.employment.medicalUntil+'.','good');}s.conditions.back=0;s.vitals.illness=0;s.vitals.immunity=clamp(s.vitals.immunity+18,0,100);}
+    if(['clinic','private-doctor','elite-doctor'].includes(id))receiveMedicalCare(s);
     if(id==='gym'){s.vitals.fitness=clamp(s.vitals.fitness+8,0,100);s.vitals.strain=clamp(s.vitals.strain-2,0,100);}
     if(['food','marketmeal'].includes(id)){s.lastMealDay=s.day;s.vitals.unfedDays=0;s.vitals.nutrition=clamp(s.vitals.nutrition+18,0,100);}
     if(id==='yardrepair')s.conditions.shoes=100;

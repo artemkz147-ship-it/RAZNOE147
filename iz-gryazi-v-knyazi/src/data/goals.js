@@ -21,7 +21,7 @@ export const milestones=[
 ];
 
 export function goalsSnapshot(state){
-  return {wealth:netWorth(state),businesses:Object.keys(state.businesses).length,respect:state.stats.respect,contacts:state.stats.contacts,crime:state.stats.crime,jobs:state.jobsDone,homeRank:Math.max(...state.ownedHomes.map(id=>Math.min(7,homes.findIndex(x=>x.id===id)))),vehicleRank:Math.max(...state.ownedVehicles.map(id=>vehicles.findIndex(x=>x.id===id))),districts:state.visitedDistricts||[state.district]};
+  return {wealth:netWorth(state),businesses:Object.keys(state.businesses).length,respect:state.stats.respect,contacts:state.stats.contacts,crime:state.stats.crime,jobs:state.jobsDone,homeRank:Math.max(0,...state.ownedHomes.map(id=>Math.max(0,['sofa','hostel','room','flat','loft','duplex','penthouse','estate'].indexOf(id)))),vehicleRank:Math.max(...state.ownedVehicles.map(id=>vehicles.findIndex(x=>x.id===id))),districts:state.visitedDistricts||[state.district]};
 }
 export function goalReached(state,goal){
   const data=goalsSnapshot(state);

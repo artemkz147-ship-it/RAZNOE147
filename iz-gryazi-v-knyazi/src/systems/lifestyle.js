@@ -4,6 +4,16 @@ import { clamp,adjust,addLog } from './state.js';
 export const ageOf = state => 30 + Math.floor((state.day-1)/360);
 export const calendarOf = state => ({month:Math.floor((state.day-1)/30)%12+1,year:Math.floor((state.day-1)/360)+1,day:(state.day-1)%30+1});
 
+export function receiveMedicalCare(state){
+  if(state.employment&&(state.vitals.illness||state.conditions.back||state.stats.health<45)){
+    state.employment.medicalUntil=Math.max(state.employment.medicalUntil||0,state.day+2);
+    addLog(state,'Врач оформил освобождение от работы до дня '+state.employment.medicalUntil+'.','good');
+  }
+  state.conditions.back=0;
+  state.vitals.illness=0;
+  state.vitals.immunity=clamp(state.vitals.immunity+18,0,100);
+}
+
 export function dailyVitals(state,rng=Math.random,{fed=false}={}){
   const v=state.vitals ||= {nutrition:60,immunity:70,fitness:35,exposure:0,strain:0,illness:0};
   v.unfedDays=fed||state.lastMealDay>0&&state.lastMealDay>=state.day-1?0:(v.unfedDays||0)+1;
@@ -26,7 +36,7 @@ export function dailyVitals(state,rng=Math.random,{fed=false}={}){
   if(state.stats.health<55&&rng()<illnessChance){
     v.illness=clamp(v.illness+1,0,10);adjust(state,{health:-6,energy:-6});
     addLog(state,'Ночью поднялась температура. Условия жизни и питание сказались на здоровье.','bad');
-    if(!state.recentIncident)state.recentIncident={title:'Ночная температура',interruptSkip:true,text:'Ты проснулся с жаром. Впереди был рабочий день, но тело требует внимания.',art:16,choices:[{text:'Остаться дома и восстановиться',effect:{health:8,energy:12,stress:-3},reply:'Ты дал себе время отлежаться.'},{text:'Сходить к врачу · 1 700 ₽',cost:1700,effect:{health:18,energy:5,stress:-5},reply:'Врач помог быстрее прийти в себя.'}]};
+    if(!state.recentIncident)state.recentIncident={title:'Ночная температура',interruptSkip:true,text:'Ты проснулся с жаром. Впереди был рабочий день, но тело требует внимания.',art:16,choices:[{text:'Остаться дома и восстановиться',effect:{health:8,energy:12,stress:-3},reply:'Ты дал себе время отлежаться.'},{text:'Сходить к врачу · 1 700 ₽',cost:1700,medical:true,effect:{health:18,energy:5,stress:-5},reply:'Врач назначил лечение и время на восстановление.'}]};
   }
   else if(v.illness>0&&state.stats.health>65)v.illness--;
   const age=ageOf(state);

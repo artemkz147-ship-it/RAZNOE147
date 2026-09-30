@@ -17,6 +17,7 @@ export function moveHome(s,id){
   s.district=homeTerms(id).district;s.visitedDistricts||=['yard'];if(!s.visitedDistricts.includes(s.district))s.visitedDistricts.push(s.district);
 }
 export function loseHousing(s,reason){
+  if(s.activeSkip)s.activeSkip.interruption='Потерян ночлег: '+reason;
   if(s.home==='sofa'){s.sofaBlockedUntil=s.day+30;s.sofaSince=s.day;}
   const former=homes.find(x=>x.id===s.home)?.name||s.home;
   s.ownedHomes=s.ownedHomes.filter(x=>!['hostel','room','flat'].includes(x));
@@ -31,7 +32,7 @@ export function housingDay(s,rng){
     const score=s.social?.sergey?.score||0,days=s.day-account.since;
     if(s.population?.departed?.sergey||score<=-20||days>45&&rng()<Math.min(.5,(days-45)*.008)){
       loseHousing(s,score<=-20?'Серёга больше не хочет тебя принимать.':'Серёга попросил освободить диван: бесплатная помощь не была навсегда.');
-    }else if(days>=25&&days%10===0&&!s.recentIncident)s.recentIncident={title:'Разговор о диване',text:'Серёга устал делить комнату. Нужно обсудить, сколько ты ещё останешься.',image:'person:sergey',socialId:'sergey',choices:[{text:'Помочь с бытом и договориться ещё на неделю',effect:{energy:-12},socialDelta:4,housingGrace:7,reply:'Ты убрал комнату и закупил продукты. Серёга согласился подождать.'},{text:'Сказать, что тебе все должны',socialDelta:-25,evict:true,reply:'Серёга предложил искать другой ночлег.'}]};
+    }else if(days>=25&&days%10===0&&!s.recentIncident)s.recentIncident={title:'Разговор о диване',text:'Серёга устал делить комнату. Нужно обсудить, сколько ты ещё останешься.',image:'person:sergey',socialId:'sergey',choices:[{text:'Помочь с бытом и договориться ещё на неделю',effect:{energy:-12},socialDelta:4,housingGrace:7,reply:'Ты убрал комнату и помог с домашними делами. Серёга согласился подождать.'},{text:'Сказать, что тебе все должны',socialDelta:-25,evict:true,reply:'Серёга предложил искать другой ночлег.'}]};
     return 0;
   }
   if(!terms.amount||s.day<account.nextDue)return 0;
@@ -42,3 +43,4 @@ export function housingDay(s,rng){
   addLog(s,`Оплачено жильё: ${bill} ₽. Следующий платёж — день ${account.nextDue}.`,'neutral');
   return bill;
 }
+

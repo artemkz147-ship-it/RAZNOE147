@@ -5,7 +5,7 @@ import { citizenLife,citizenWorth } from './citizens.js';
 
 export const activePartners=state=>[...new Set([...(state.romance?.partners||[]),state.romance?.partner].filter(Boolean))];
 export function addPartner(romance,id){romance.partners=[...new Set([...(romance.partners||[]),romance.partner,id].filter(Boolean))];romance.partner=id;}
-export function dropPartner(romance,id){romance.partners=[...new Set([...(romance.partners||[]),romance.partner].filter(Boolean))].filter(other=>other!==id);romance.partner=romance.partners.at(-1)||null;}
+export function dropPartner(romance,id){romance.partners=[...new Set([...(romance.partners||[]),romance.partner].filter(Boolean))].filter(other=>other!==id);romance.partner=romance.partners.at(-1)||null;if(romance.conflict?.partnerId===id)romance.conflict=null;if(romance.profiles?.[id])romance.profiles[id].married=false;}
 export function socialValue(state,id){
   if(Number.isFinite(state.social?.[id]?.score))return state.social[id].score;
   if(romancePeople.some(person=>person.id===id)||state.population?.residents?.some(person=>person.id===id&&person.romance))return state.romance?.profiles?.[id]?.rapport||0;
@@ -28,7 +28,7 @@ export function changeSocial(state,id,delta){
 }
 export function socialDay(state,rng){
   if(state.recentIncident||state.pending||state.romance?.conflict||state.jailDays||state.day<3||state.day%3!==0)return;
-  const pool=Object.keys(state.social||{}).filter(id=>isPresent(state,id)&&socialMet(state,id)&&!activePartners(state).includes(id)&&Math.abs(socialValue(state,id))>=20);
+  const pool=Object.keys(state.social||{}).filter(id=>isPresent(state,id)&&socialMet(state,id)&&!activePartners(state).includes(id)&&(socialValue(state,id)>=30||socialValue(state,id)<=-20));
   if(!pool.length||rng()>=.28)return;
   const responding=pool.filter(id=>state.citizens?.[id]?.retaliation&&socialValue(state,id)<0);
   const candidates=responding.length?responding:pool;

@@ -1,4 +1,4 @@
-import {housingDay,ensureHousing} from './housing.js';
+import {housingDay,ensureHousing,homeTerms} from './housing.js';
 import { homes, vehicles, businesses, districts } from '../data/world.js';
 import { investments } from '../data/investments.js';
 import { clamp, adjust, addLog, addLedger } from './state.js';
@@ -7,7 +7,7 @@ import { dailyVitals } from './lifestyle.js';
 
 export const byId = (items,id) => items.find(item => item.id === id);
 export function netWorth(state) {
-  const home = state.ownedHomes.reduce((sum,id)=>sum+(byId(homes,id)?.price||0),0);
+  const home = state.ownedHomes.reduce((sum,id)=>sum+(homeTerms(id).kind==='owned'?(byId(homes,id)?.price||0):0),0);
   const fleet = state.ownedVehicles.reduce((sum,id)=>sum+(byId(vehicles,id)?.price||0),0);
   const firms = Object.entries(state.businesses).reduce((sum,[id,b])=>sum+(byId(businesses,id)?.price||0)*(1+.45*(b.level-1)),0);
   return Math.round(state.money + home + fleet + firms - state.debt);

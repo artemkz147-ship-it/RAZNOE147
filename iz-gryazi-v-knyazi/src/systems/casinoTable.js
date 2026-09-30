@@ -26,7 +26,7 @@ export function pokerScore(cards){
 const scoreNames=['Старшая карта','Пара','Две пары','Тройка','Стрит','Флеш','Фул-хаус','Каре','Стрит-флеш'];
 function compare(a,b){for(let i=0;i<Math.max(a.length,b.length);i++){if((a[i]||0)!==(b[i]||0))return (a[i]||0)-(b[i]||0)}return 0;}
 function rivalDraw(hand,cards,rng){
-  const score=pokerScore(hand),keep=score[0]>=1?hand.filter(c=>hand.filter(x=>x.rank===c.rank).length>1):hand.filter(c=>c.rank>=11);
+  const score=pokerScore(hand);if(score[0]>=4)return;const keep=score[0]>=1?hand.filter(c=>hand.filter(x=>x.rank===c.rank).length>1):hand.filter(c=>c.rank>=11);
   const replace=hand.filter(c=>!keep.includes(c)).slice(0,3);for(const c of replace)hand[hand.indexOf(c)]=draw(cards,rng);
 }
 export function createCasinoTable(id,stake,rng){
@@ -41,7 +41,8 @@ function settleBlackjack(table,rng){
   for(const opponent of table.opponents){while(blackjackValue(opponent.hand)<opponent.hold)opponent.hand.push(draw(table.deck,rng));const points=blackjackValue(opponent.hand);opponent.status=points>21?'Перебор':`Стоит на ${points}`;}
   while(blackjackValue(table.rival)<17)table.rival.push(draw(table.deck,rng));
   const p=blackjackValue(table.player),d=blackjackValue(table.rival),natural=p===21&&table.player.length===2;
-  table.returned=p>21?0:d>21||p>d?Math.round(table.wager*(natural?2.5:2)):p===d?table.wager:0;
+  const dealerNatural=d===21&&table.rival.length===2;
+  table.returned=p>21?0:natural?(dealerNatural?table.wager:Math.round(table.wager*2.5)):dealerNatural?0:d>21||p>d?table.wager*2:p===d?table.wager:0;
   const rivals=table.opponents.map(o=>`${o.name} ${blackjackValue(o.hand)>21?'перебор':blackjackValue(o.hand)}`).join(' · ');
   table.result=`Ты ${p}, крупье ${d}. ${table.returned>table.wager?'Победа!':table.returned?'Ничья.':'Ставка проиграна.'} ${rivals}.`;
   table.phase='done';table.lastMove='Крупье открыл карты.';

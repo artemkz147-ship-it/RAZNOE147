@@ -9,7 +9,7 @@ export function dayPlan(s){
 export function budgetPlan(s){
  const h=homeTerms(s.home),housing=s.housing,nextDue=h.amount?(housing?.nextDue||s.day+h.period):null;
  const diet=diets.find(d=>d.id===(s.skipDiet||'basic')),transport=vehicles.find(v=>v.id===s.vehicle)?.upkeep||0;
- const recurring=transport+Math.floor(s.debt*.018)+(h.kind==='daily'?housingBill(s):h.amount/Math.max(1,h.period));
+ const recurring=transport+Math.floor(s.debt*.018)+(housingBill(s)/Math.max(1,h.period));
  const c=s.employment&&careers.find(c=>c.id===s.employment.id),forecast=Object.entries(s.businesses).reduce((n,[id,f])=>{const b=businesses.find(b=>b.id===id);if(!b)return n;const result=businessForecast(s,b,f);return n+(result.netLow+result.netHigh)/2},0);
  return {nextDue,rent:h.amount?housingBill(s):0,food: diet.daily,recurring:Math.round(recurring),daily:Math.round(recurring+diet.daily),nextPay:s.employment?.nextPay||null,accrued:Math.round(s.employment?.accrued||0),salary:c?salaryFor(s,c):0,business:Math.round(forecast)};
 }
