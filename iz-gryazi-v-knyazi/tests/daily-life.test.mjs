@@ -10,6 +10,7 @@ import {dailyBusiness,businessForecast} from '../src/systems/economy.js';
 import {businesses} from '../src/data/world.js';
 import {careers} from '../src/data/lifestyle.js';
 import {shell,modal} from '../src/ui/views.js';
+Object.defineProperty(globalThis,'localStorage',{value:{setItem(){}},configurable:true});
 
 test('rent events require a lease and permanently change the next bill',()=>{
  const s=freshState(),g=new GameEngine(s,()=>.99),rent=events.find(e=>e.id==='rent');s.day=10;

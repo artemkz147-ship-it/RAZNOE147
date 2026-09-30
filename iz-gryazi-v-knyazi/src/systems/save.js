@@ -31,16 +31,18 @@ function validateSchema(input,fresh){
   if(input.vehicleFaults!==undefined){if(!record(input.vehicleFaults))invalid();for(const [id,fault] of Object.entries(input.vehicleFaults))if(!sets.vehicle.has(id)||id==='feet'||typeof fault!=='string')invalid();}
   for(const key of ['stats','skills','xp','vitals','conditions'])if(input[key]!==undefined)numericFields(input[key],fresh[key]);
   optionalNumbers(input,['debt','heat','jailDays','lastRestDay','lastMealDay','crimesDone','arrestCount','careerMonths','jobsDone','totalEarned','market','ledgerSeq','lastSaved','story']);
+  if(input.market!==undefined&&(!Number.isInteger(input.market)||input.market<0||input.market>3))invalid();
+  if(input.jailDays!==undefined&&(!Number.isSafeInteger(input.jailDays)||input.jailDays<0))invalid();
   for(const key of ['ownedHomes','ownedVehicles','upgrades','visitedDistricts'])if(input[key]!==undefined){const allowed=sets[{ownedHomes:'home',ownedVehicles:'vehicle',upgrades:'upgrade',visitedDistricts:'district'}[key]];arrayField(input[key],id=>allowed.has(id));}
   for(const key of ['flags','eventHistory','incidentHistory','achievedRoutes'])if(input[key]!==undefined)arrayField(input[key],id=>typeof id==='string');
   arrayField(input.log,item=>record(item)&&day(item.day)&&hour(item.hour)&&typeof item.text==='string');
   if(input.ledger!==undefined)arrayField(input.ledger,item=>record(item)&&day(item.day)&&hour(item.hour)&&finite(item.amount)&&typeof item.text==='string'&&typeof item.category==='string'&&(item.seq===undefined||Number.isSafeInteger(item.seq)&&item.seq>=0));
   if(input.businesses!==undefined){
     if(!record(input.businesses))invalid();
-    for(const [id,firm] of Object.entries(input.businesses)){if(!sets.business.has(id)||!record(firm))invalid();optionalNumbers(firm,['level','condition','expenseFactor','boostUntil','capacity']);if(firm.level!==undefined&&(!Number.isInteger(firm.level)||firm.level<1||firm.level>5))invalid();if(firm.staff!==undefined&&typeof firm.staff!=='boolean')invalid();}
+    for(const [id,firm] of Object.entries(input.businesses)){if(!sets.business.has(id)||!record(firm)||!Number.isInteger(firm.level)||firm.level<1||firm.level>5||!finite(firm.condition)||firm.condition<0||firm.condition>100)invalid();optionalNumbers(firm,['level','condition','expenseFactor','boostUntil','capacity','lastDuty','orderUntil']);if(firm.staff!==undefined&&typeof firm.staff!=='boolean')invalid();if(firm.strategy!==undefined&&!['safe','normal','growth'].includes(firm.strategy))invalid();}
   }
   if(input.housing!==undefined&&input.housing!==null){if(!record(input.housing))invalid();optionalId(input.housing.id,sets.home);for(const key of ['since','nextDue'])if(input.housing[key]!==undefined&&!day(input.housing[key]))invalid();if(input.housing.multiplier!==undefined&&(!finite(input.housing.multiplier)||input.housing.multiplier<=0))invalid();}
-  if(input.employment!==undefined&&input.employment!==null){const e=input.employment;if(!record(e)||!sets.career.has(e.id))invalid();optionalNumbers(e,['since','nextPay','worked','accrued','lastShift','reviewDay','leaveUntil','medicalUntil','lastLeave','lastWorkedDay','absences','promotions','performance']);for(const key of ['since','nextPay','reviewDay'])if(e[key]!==undefined&&!day(e[key]))invalid();}
+  if(input.employment!==undefined&&input.employment!==null){const e=input.employment;if(!record(e)||!sets.career.has(e.id)||!finite(e.accrued)||e.accrued<0||!Number.isSafeInteger(e.lastShift)||e.lastShift<0)invalid();optionalNumbers(e,['since','nextPay','worked','accrued','lastShift','reviewDay','leaveUntil','medicalUntil','lastLeave','lastWorkedDay','absences','promotions','performance']);for(const key of ['since','nextPay','reviewDay'])if(!day(e[key]))invalid();}
   if(input.investments!==undefined)arrayField(input.investments,item=>record(item)&&sets.investment.has(item.id)&&finite(item.amount)&&item.amount>=0&&day(item.maturity));
   if(input.criminalCases!==undefined)arrayField(input.criminalCases,item=>record(item)&&typeof item.name==='string'&&day(item.day)&&day(item.due)&&day(item.expires)&&finite(item.fine)&&finite(item.jail)&&finite(item.risk));
   if(input.population!==undefined){
@@ -63,13 +65,15 @@ function validateSchema(input,fresh){
   if(input.casino?.history!==undefined)arrayField(input.casino.history);
   if(input.casinoTable!==undefined&&input.casinoTable!==null){
     const t=input.casinoTable;if(!record(t)||!sets.casino.has(t.id)||!['play','done'].includes(t.phase))invalid();optionalNumbers(t,['stake','wager','returned','pot']);
+    const legacy=['blackjack','poker'].includes(t.id)&&!Array.isArray(t.opponents);
+    if(!legacy&&(!Number.isSafeInteger(t.stake)||t.stake<50||!Number.isSafeInteger(t.wager)||t.wager<t.stake||!finite(t.returned)||t.returned<0))invalid();
     if(['blackjack','poker'].includes(t.id)&&Array.isArray(t.opponents)){
       arrayField(t.deck,card);arrayField(t.player,card);if(t.player.length<(t.id==='poker'?5:2))invalid();
       arrayField(t.opponents,o=>record(o)&&typeof o.id==='string'&&typeof o.name==='string'&&Array.isArray(o.hand)&&o.hand.every(card)&&o.hand.length>=(t.id==='poker'?5:2));if(t.opponents.length!==3)invalid();
       if(t.id==='blackjack')arrayField(t.rival,card);else arrayField(t.selected,n=>Number.isInteger(n)&&n>=0&&n<5);
     }
   }
-  if(input.activeSkip!==undefined&&input.activeSkip!==null){const p=input.activeSkip;if(!record(p)||!['career','business'].includes(p.kind))invalid();if(p.kind==='career'&&!sets.career.has(p.id))invalid();optionalId(p.diet,sets.diet);optionalNumbers(p,['from','planned','worked','startMoney','startSeq']);}
+  if(input.activeSkip!==undefined&&input.activeSkip!==null){const p=input.activeSkip;if(!record(p)||!['career','business'].includes(p.kind))invalid();if(p.kind==='career'&&!sets.career.has(p.id))invalid();if(!sets.diet.has(p.diet)||!day(p.from)||!Number.isSafeInteger(p.planned)||p.planned<30||p.planned>1800||!Number.isSafeInteger(p.worked)||p.worked<0||p.worked>p.planned||!finite(p.startMoney)||!Number.isSafeInteger(p.startSeq)||p.startSeq<0)invalid();}
   if(input.death!==undefined&&input.death!==null&&(!record(input.death)||!day(input.death.day)||!finite(input.death.age)||typeof input.death.cause!=='string'))invalid();
   for(const key of ['pending','recentIncident'])if(input[key]!==undefined&&input[key]!==null&&!record(input[key]))invalid();
 }

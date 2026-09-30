@@ -13,7 +13,7 @@ const stories={
  age:{cause:'Естественное угасание в старости',art:'home',titles:['Долгая дорога закончилась','Последняя страница дневника','Тихое прощание'],texts:['За плечами осталась долгая жизнь со своими удачами и потерями. В глубокой старости она завершилась естественным угасанием.','Старость завершила долгую жизнь. Её удачи, потери и решения остались в дневнике.','Долгая жизнь и накопленное состояние стали итогом этой истории. Глубокая старость завершила её естественным угасанием.']}
 };
 export const endingCount=Object.keys(stories).length*3;
-function worth(s){return Math.round(s.money-s.debt+s.ownedHomes.filter(id=>!['sofa','station','heating-main','hostel','room','flat'].includes(id)).reduce((n,id)=>n+(homes.find(h=>h.id===id)?.price||0),0)+s.ownedVehicles.reduce((n,id)=>n+(vehicles.find(v=>v.id===id)?.price||0),0)+Object.entries(s.businesses).reduce((n,[id,b])=>n+(businesses.find(x=>x.id===id)?.price||0)*(1+.45*(b.level-1)),0));}
+function worth(s){return Math.round(s.money-s.debt+(s.investments||[]).reduce((n,item)=>n+item.amount,0)+s.ownedHomes.filter(id=>!['sofa','station','heating-main','hostel','room','flat'].includes(id)).reduce((n,id)=>n+(homes.find(h=>h.id===id)?.price||0),0)+s.ownedVehicles.reduce((n,id)=>n+(vehicles.find(v=>v.id===id)?.price||0),0)+Object.entries(s.businesses).reduce((n,[id,b])=>n+(businesses.find(x=>x.id===id)?.price||0)*(1+.45*(b.level-1)),0));}
 export function recordHarm(s,reason,detail){s.lastHarm={reason,detail,day:s.day};}
 export function fatalReason(s){
  if(s.vitals.unfedDays>=7&&s.vitals.nutrition===0)return 'hunger';

@@ -58,9 +58,9 @@ export class GameEngine {
     if(s.stats.health<=0){endLife(s,prison?'prison':undefined);return;}
     if(!skipDiet&&!prison)this.state.vitals.nutrition=clamp(this.state.vitals.nutrition-Math.floor(hours*.65),0,100);
     let advanced=false;
-    s.hour += hours;
-    while (s.hour>=24&&!s.death) {
-      s.hour-=24; s.day++;advanced=true;
+    let remaining=s.hour+hours;
+    while (remaining>=24&&!s.death) {
+      remaining-=24;s.hour=0; s.day++;advanced=true;
       if(skipDiet)s.vitals.nutrition=75;
       if(skipDiet)s.stats.energy=Math.min(100,55+(byId(homes,s.home)?.restore||0)*.5);
       if(!prison)routineDay(s,this.rng,{skip:quiet});
@@ -70,13 +70,13 @@ export class GameEngine {
       citizensDay(s,this.rng);
       if(!prison)romanceDay(s,this.rng);
       if(s.stats.health<=0){endLife(s,prison?'prison':undefined);break;}
-      if(!quiet)socialDay(s,this.rng);
+      if(!prison)socialDay(s,this.rng);
       this.pastConsequences();
       if(!prison)settleMatureInvestments(s,this.rng);
       
       if (!prison&&!s.pending&&!s.recentIncident && !s.jailDays && this.rng()<.12) this.queueEvent();
     }
-    if(advanced&&!prison&&!s.death)s.hour=Math.max(s.hour,s.lastRoutine?.hours||0);
+    if(!s.death)s.hour=advanced&&!prison?Math.max(remaining,s.lastRoutine?.hours||0):remaining;
   }
   pastConsequences(){
     const s=this.state;if(s.death||s.pending||s.recentIncident||s.jailDays)return;
@@ -226,6 +226,7 @@ export class GameEngine {
   }
   crimeReady(id) {
     const gig=byId(crimes,id),s=this.state;
+    const blocked=this.guard();if(blocked)return blocked;
     if(s.recentIncident)return fail('Сначала реши, что делать в неожиданной ситуации.');
     if (!gig) return fail('Такого заказа нет.');
     if (s.jailDays) return fail('Сначала выйди на свободу.');
@@ -442,6 +443,7 @@ export class GameEngine {
     if (a.district && a.district!==s.district) return this.emit(fail('Это занятие доступно в другом районе.'));
     if (id==='rest' && s.lastRestDay===s.day) return this.emit(fail('Передышка сегодня уже была. Выспись, чтобы вернуть силы.'));
     if(id==='vehicle-repair'&&(!s.vehicleFaults?.[s.vehicle]||s.vehicle==='feet'))return this.emit(fail('Текущий транспорт не требует ремонта.'));
+    if(id==='yardrepair'&&s.conditions.shoes>=100)return this.emit(fail('Ботинки целы. Ремонт пока не нужен.'));
     if(id==='beg'&&['office-suit','tailored-suit','cashmere-coat'].some(x=>s.upgrades.includes(x)))return this.emit(fail('В дорогом костюме прохожие не верят, что тебе нужна мелочь.'));
     if (!this.spend(a.cost)) return this.emit(fail('Не хватает денег.'));
     const effect={...a.effect};
@@ -661,6 +663,7 @@ export class GameEngine {
     if (!this.spend(value)) return this.emit(fail('Не хватает денег для вложения.'));
     s.investments ||= [];
     s.investments.push({id,amount:value,maturity:s.day+item.days});
+    addLedger(s,'Вложения',-value,item.name+': размещение капитала');
     this.tick(1);if(this.state.death)return this.emit(success(this.state.death.cause,'bad')); addLog(s,`Вложено ${value.toLocaleString('ru-RU')} ₽: ${item.name}.`,'neutral');
     return this.emit(success('Вложение принято. Результат придёт позже.'));
   }

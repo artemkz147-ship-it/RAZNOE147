@@ -21,7 +21,7 @@ export function dailyVitals(state,rng=Math.random,{fed=false,prison=false}={}){
   const v=state.vitals ||= {nutrition:60,immunity:70,fitness:35,exposure:0,strain:0,illness:0};
   v.unfedDays=fed||state.lastMealDay>0&&state.lastMealDay>=state.day-1?0:(v.unfedDays||0)+1;
   const diet=fed?(diets.find(x=>x.id===state.diet)||diets[1]):null;
-  const shelter=['station','heating-main'].includes(state.home);
+  const shelter=!prison&&['station','heating-main'].includes(state.home);
   v.nutrition=clamp(v.nutrition+(diet?(diet.id==='expired'?-5:diet.id==='basic'?0:2):-9),0,100);
   v.immunity=clamp(v.immunity+(shelter?-2:1)+(diet?.id==='expired'?-2:diet?1:-3)+(state.conditions?.hangover? -2:0),0,100);
   v.exposure=clamp(v.exposure+(shelter?3:-3),0,100);

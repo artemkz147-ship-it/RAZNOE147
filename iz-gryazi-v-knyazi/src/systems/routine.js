@@ -17,6 +17,7 @@ export function dismissCareer(s,reason,misconduct=false){
 }
 export function routineDay(s,rng,{skip=false}={}){
   const e=s.employment,c=e&&careers.find(x=>x.id===e.id);let hours=7,energy=0;
+  s.hour=7;
   if(c&&e.lastShift!==s.day){
     e.lastShift=s.day;const shift=careerShift(c.id),weekday=(s.day-e.since)%7;
     if(weekday<shift.days){
@@ -25,7 +26,7 @@ export function routineDay(s,rng,{skip=false}={}){
       const exhausted=s.stats.health<25||s.vitals.illness>=4||s.conditions.hangover>0||s.conditions.back>0&&['janitor','mechanic'].includes(c.id);
       if(excused){addLog(s,c.name+': согласованный выходной, начисление за смену отсутствует.','neutral');}
       else if(exhausted){e.absences=(e.absences||0)+1;addLog(s,`${c.name}: пропустил смену из-за травмы или самочувствия.`,'bad');}
-      else{e.worked++;e.lastWorkedDay=s.day;e.accrued+=salaryFor(s,c)/scheduled;hours=shift.end;energy+=shift.energy;s.jobsDone++;s.vitals.strain=Math.min(100,s.vitals.strain+(c.id==='mechanic'||c.id==='janitor'?4:1));addLog(s,`Проснулся, отработал: ${c.name}. Закончил в ${shift.end}:00, энергия −${shift.energy}.`,'neutral');}
+      else{e.worked++;e.lastWorkedDay=s.day;e.accrued+=salaryFor(s,c)/scheduled;hours=shift.end;s.hour=hours;energy+=shift.energy;s.jobsDone++;s.vitals.strain=Math.min(100,s.vitals.strain+(c.id==='mechanic'||c.id==='janitor'?4:1));addLog(s,`Проснулся, отработал: ${c.name}. Закончил в ${shift.end}:00, энергия −${shift.energy}.`,'neutral');}
     }
     if(s.day>=e.nextPay){const pay=Math.round(e.accrued);s.money+=pay;s.totalEarned+=pay;addLedger(s,'Зарплата',pay,c.name);addLog(s,`${c.name}: зарплата ${pay} ₽.`,'good');e.accrued=0;e.nextPay+=30;s.careerMonths++;}
     if(s.day>=e.reviewDay){
@@ -39,6 +40,7 @@ export function routineDay(s,rng,{skip=false}={}){
     if(firm.lastDuty===s.day||firm.paused)continue;
     firm.lastDuty=s.day;const config=businesses.find(x=>x.id===id);if(!config)continue;
     const duty=businessDuty(config,firm);hours+=duty.hours;energy+=duty.energy;
+    s.hour=Math.min(23,hours);
     if(hours>22){firm.capacity=.45;addLog(s,`${config.name}: не хватило времени, часть заказов потеряна.`,'bad');}
     else firm.capacity=1;
     addLog(s,`${config.name}: ${firm.staff?'проверка работы команды':'личная работа'}, ${duty.hours} ч, энергия −${duty.energy}.`,'neutral');

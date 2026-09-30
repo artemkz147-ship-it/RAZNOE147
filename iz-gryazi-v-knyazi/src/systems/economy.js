@@ -10,7 +10,8 @@ export function netWorth(state) {
   const home = state.ownedHomes.reduce((sum,id)=>sum+(homeTerms(id).kind==='owned'?(byId(homes,id)?.price||0):0),0);
   const fleet = state.ownedVehicles.reduce((sum,id)=>sum+(byId(vehicles,id)?.price||0),0);
   const firms = Object.entries(state.businesses).reduce((sum,[id,b])=>sum+(byId(businesses,id)?.price||0)*(1+.45*(b.level-1)),0);
-  return Math.round(state.money + home + fleet + firms - state.debt);
+  const invested=(state.investments||[]).reduce((sum,item)=>sum+item.amount,0);
+  return Math.round(state.money + home + fleet + firms + invested - state.debt);
 }
 export function travelPrice(state,districtId) {
   return travelOptions(state,districtId).find(option=>option.id==='bus')?.cost||0;
@@ -109,7 +110,9 @@ export function dailySettlement(state,{offline=false,rng=Math.random,skipDiet=fa
   if (business) addLog(state,`День ${state.day}: дела принесли ${business.toLocaleString('ru-RU')} ₽; быт и обязательства забрали ${expenses.toLocaleString('ru-RU')} ₽.`,business>=expenses?'good':'bad');
   else if(expenses)addLog(state,`День ${state.day}: питание ${food} ₽, жильё ${rent} ₽, транспорт ${vehicle.upkeep} ₽${state.debt?', долг и проценты учтены':''}. Всего ${expenses.toLocaleString('ru-RU')} ₽.`,'neutral');
   if (state.money < -12000) {
-    state.debt += Math.abs(state.money)+12000; state.money = -12000;
+    const transferred=-12000-state.money;
+    state.debt += transferred; state.money = -12000;
+    addLedger(state,'Перенос в долг',transferred,'Часть минуса переведена в отдельный долг');
     addLog(state,'Банк молча превратил минус на счёте в долг. Уведомление было удивительно вежливым.','bad');
   }
   return {business,expenses};
@@ -121,7 +124,7 @@ export function settleMatureInvestments(state,rng=Math.random) {
     if (!config) continue;
     const payout=Math.round(item.amount*(config.low+rng()*(config.high-config.low)));
     state.money+=payout;
-    addLedger(state,'Вложения',payout-item.amount,config.name);
+    addLedger(state,'Вложения',payout,config.name+': возврат капитала и результат');
     if(payout>item.amount)state.totalEarned+=payout-item.amount;
     addLog(state,`${config.name}: вернулось ${payout.toLocaleString('ru-RU')} ₽ (${payout>=item.amount?'+':''}${(payout-item.amount).toLocaleString('ru-RU')} ₽).`,payout>=item.amount?'good':'bad');
   }
