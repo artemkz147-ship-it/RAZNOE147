@@ -7,13 +7,13 @@ export function freshState() {
     skills: { grit: 1, charm: 1, focus: 1 }, xp: { grit: 0, charm: 0, focus: 0 },
     home: 'sofa', vehicle: 'feet', ownedHomes: ['sofa'], ownedVehicles: ['feet'], businesses: {}, upgrades: [], lastRestDay: 0,
     conditions: {shoes:100,back:0,hangover:0,loaderShifts:0,walkTrips:0}, incidentHistory: [], recentIncident: null,
-    diet:'basic', vitals:{nutrition:60,immunity:70,fitness:35,exposure:0,strain:0,illness:0}, death:null, careerMonths:0, lastSettlement:null,
+    diet:'basic', lastMealDay:0, vitals:{nutrition:60,immunity:70,fitness:35,exposure:0,strain:0,illness:0}, death:null, careerMonths:0, lastSettlement:null, timeSkip:null,
     heat: 0, jailDays: 0, crimesDone: 0, arrestCount: 0,
     casino: {rounds:0,wins:0,wagered:0,returned:0,history:[]}, casinoDaily: {day:1,wagered:0}, casinoTable:null,
     romance:{partner:null,partners:[],profiles:{},betrayedNina:false,history:[],conflict:null,affairs:0},
     population:{residents:[],departed:{},nextArrivalDay:181},
     social:{},relations: {}, dialogueProgress: {}, dialogueLast: {}, lastWorkResult:null, story: 0, flags: [], log: [{ day:1, hour:7, text:'Проснулся на чужом диване. Город пока не в курсе, что ты собираешься его купить.', type:'story' }],
-    market: 1, pending: null, eventHistory: [], lastSaved: Date.now(), totalEarned: 0, jobsDone: 0, ending: false, achievedRoutes: []
+    market: 1, pending: null, eventHistory: [], lastSaved: Date.now(), totalEarned: 0, jobsDone: 0, ending: false, achievedRoutes: [], ledger:[]
   };
 }
 
@@ -29,5 +29,10 @@ export function adjust(state,changes) {
 
 export function addLog(state,text,type='neutral') {
   state.log.unshift({day:state.day,hour:state.hour,text,type});
-  state.log = state.log.slice(0,70);
+  state.log = state.log.slice(0,300);
+}
+export function addLedger(state,category,amount,text){
+  state.ledger ||= [];
+  state.ledger.unshift({day:state.day,hour:state.hour,category,amount,text});
+  state.ledger=state.ledger.slice(0,1500);
 }

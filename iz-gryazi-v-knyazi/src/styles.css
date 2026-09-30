@@ -300,3 +300,22 @@
 .death-art{height:190px;margin:-24px -24px 18px;background-size:cover;background-position:center;border-bottom:3px solid #ba936c}@media(max-width:760px){.main-nav button{font-size:10px}.death-art{height:150px;margin:-16px -16px 14px}}
 .person-age{font:800 11px var(--body);letter-spacing:.5px;color:#e5b984;margin:1px 0 5px}.departure-panel{margin:0 0 16px;border:1px solid #806f58;background:#25302b}.departure-panel summary{cursor:pointer;padding:11px 13px;color:#e4c094;font-size:11px;font-weight:900;letter-spacing:.5px}.departure-panel>div{display:flex;gap:8px;overflow-x:auto;padding:0 10px 10px}.departure-panel article{flex:0 0 190px;display:flex;gap:8px;align-items:center;padding:5px;background:#344039;color:#f0e3cf}.departure-panel img,.departure-romance{display:block;width:42px;height:47px;flex:none;object-fit:cover;background-size:500% 100%;background-repeat:no-repeat}.departure-panel strong,.departure-panel small{display:block;font-size:11px}.departure-panel small{font-size:9px;color:#cfbea8;margin-top:4px}
 .person-card.elder .person-portrait-raster,.romance-card.elder .romance-portrait{filter:saturate(.68) contrast(1.07)}.person-card.elder .person-age,.romance-card.elder .person-age{color:#d4c5aa}
+.world-bus-stop{position:absolute;z-index:1;width:min(30%,260px);height:auto;left:2%;bottom:4%;filter:drop-shadow(7px 8px 5px #12191aad)}
+/* Clear portrait UI and a warmer city as the household becomes prosperous. */
+.app-shell:before,.portrait-mini:before,.scene-wrap:before{display:none!important}
+.scene-tier-4 .world-bg,.scene-tier-5 .world-bg{filter:saturate(1.12) brightness(1.08)}
+.prosperity-1 .world-bg{filter:saturate(1.05) brightness(1.06)}
+.prosperity-2 .world-bg{filter:saturate(1.17) brightness(1.13)}
+.prosperity-3 .world-bg{filter:saturate(1.27) brightness(1.18)}
+.prosperity-1 .world-hero{filter:saturate(1.1) drop-shadow(5px 9px 4px #050b0eaf)}
+.prosperity-2 .world-hero,.prosperity-3 .world-hero{filter:saturate(1.22) brightness(1.07) drop-shadow(5px 9px 4px #050b0eaf)}
+.hero-age-1 .world-hero,.hero-age-1 .portrait-character{filter:saturate(.87)}
+.hero-age-2 .world-hero,.hero-age-2 .portrait-character{filter:saturate(.67) contrast(1.04)}
+.skip-controls,.business-skip{display:grid;gap:9px;padding:12px;background:#263a32;border:1px solid #b2936c;margin-top:12px}
+.skip-controls label{display:grid;gap:4px;color:#f0cf99;font-size:11px;font-weight:900;letter-spacing:.6px}
+.skip-controls select{width:100%;min-height:48px;border:1px solid #bfa27d;background:#f2e6cc;color:#21342a;padding:7px 9px;font-size:15px;font-weight:700}
+.skip-controls button{min-height:48px;border:1px solid #f5d3a7;background:#d3a173;color:#1b2b24;font-size:14px;font-weight:900}
+.skip-controls>small{font-size:11px;line-height:1.35;color:#dfd5c2}
+.business-skip{margin:0 0 16px}.business-skip h3{margin:0;font-size:20px}.business-skip p{margin:0;font-size:13px;color:#e1d7c7}
+.diary-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 14px}.diary-summary>div,.skip-result{padding:13px;background:#2b3c34;border:1px solid #a38b67}.diary-summary span,.diary-summary strong{display:block}.diary-summary span{font-size:10px;color:#e1bf8d;font-weight:800}.diary-summary strong{font-size:19px;margin-top:3px}.skip-result{margin-bottom:14px}.skip-result p{margin:5px 0 0;font-size:13px;line-height:1.4}.diary-list{display:grid;gap:7px}.diary-entry{position:relative;background:#27332e;border:1px solid #566a5b;padding:10px 112px 10px 13px;min-height:62px}.diary-entry.expense{border-left:3px solid #c67d67}.diary-entry.money:not(.expense){border-left:3px solid #9bc491}.diary-entry small{color:#dbba8a;font-size:10px;font-weight:800}.diary-entry p{margin:4px 0 0;font-size:13px;line-height:1.32}.diary-entry strong{position:absolute;right:10px;top:19px;color:#bce3ab;font-size:14px}.diary-entry.expense strong{color:#e7a58e}
+@media(max-width:760px){.diary-summary{grid-template-columns:repeat(2,1fr)}.diary-summary strong{font-size:16px}.diary-entry{padding-right:96px}.diary-entry strong{font-size:12px}.skip-controls{padding:10px}.diet-options button{min-height:58px}.scene-wrap:after{background:linear-gradient(0deg,#111719b0 0,transparent 48%,transparent 82%,#11171933 100%)}}

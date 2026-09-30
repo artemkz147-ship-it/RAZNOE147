@@ -11,7 +11,7 @@ import { createCasinoTable,actCasinoTable } from './casinoTable.js';
 import { romanceAccess,romanceGifts,giftTaste } from '../data/romance.js';
 import { romanceDay,romanceConflictChoices } from './romance.js';
 import { activePartners,addPartner,dropPartner,changeSocial,socialDay,socialGroup,socialMet,socialValue } from './social.js';
-import { freshState,adjust,addLog,clamp } from './state.js';
+import { freshState,adjust,addLog,addLedger,clamp } from './state.js';
 import { byId,districtUnlocked,travelOptions,gainSkill,dailySettlement,settleMatureInvestments,netWorth,businessStrategies } from './economy.js';
 import { saveGame } from './save.js';
 import { diets,careers } from '../data/lifestyle.js';
@@ -26,7 +26,7 @@ export class GameEngine {
     this.state=state; this.rng=rng; this.listeners=new Set();
   }
   subscribe(fn) { this.listeners.add(fn); return ()=>this.listeners.delete(fn); }
-  emit(result) { const s=this.state;s.achievedRoutes ||= [];for(const route of successRoutes(s)){if(!s.achievedRoutes.includes(route.id)){s.achievedRoutes.push(route.id);addLog(s,`Достигнут путь: ${route.name}. Другие направления можно развивать одновременно.`,'story');}}s.ending=s.achievedRoutes.length>0;saveGame(s); for (const fn of this.listeners) fn(s,result); return result; }
+  emit(result) { const s=this.state;s.ending=successRoutes(s).length>0;saveGame(s); for (const fn of this.listeners) fn(s,result); return result; }
   guard() {
     if (this.state.death) return fail('История этой жизни завершилась. Начни новую игру в меню.');
     if (this.state.jailDays>0) return fail(`Ты под арестом. Осталось ${this.state.jailDays} дн.`);
@@ -37,18 +37,18 @@ export class GameEngine {
     return null;
   }
   spend(cost) { if (this.state.money<cost) return false; this.state.money-=cost; return true; }
-  tick(hours,quiet=false) {
+  tick(hours,quiet=false,{skipDiet=false,prison=false}={}) {
     const s=this.state;
     s.hour += hours;
     while (s.hour>=24) {
       s.hour-=24; s.day++;
-      dailySettlement(s,{rng:this.rng});
+      dailySettlement(s,{rng:this.rng,skipDiet,prison});
       populationDay(s,this.rng,quiet);
-      romanceDay(s,this.rng);
+      if(!prison)romanceDay(s,this.rng);
       if(!quiet)socialDay(s,this.rng);
-      settleMatureInvestments(s,this.rng);
+      if(!prison)settleMatureInvestments(s,this.rng);
       if (!quiet&&s.day%6===0) this.crisis();
-      if (!quiet&&!s.pending && !s.jailDays && this.rng()<.42) this.queueEvent();
+      if (!quiet&&!prison&&!s.pending && !s.jailDays && this.rng()<.42) this.queueEvent();
     }
   }
   maybeIncident(context,chance) {
@@ -131,7 +131,7 @@ export class GameEngine {
     if(caught){
       if(s.money>=trip.fine){s.money-=trip.fine;addLog(s,`Контролёр поймал без билета: штраф ${trip.fine} ₽ (десять билетов).`,'bad');s.recentIncident={title:'Проверка билета',text:`Контролёр выписал штраф ${trip.fine} ₽. Поездка оказалась дороже десяти билетов.`,art:2};}
       else {s.jailDays+=1;addLog(s,'Контролёр поймал без билета. Штраф оплатить нечем — сутки ареста.','bad');s.recentIncident={title:'Билет оказался дорогим',text:'Денег на штраф не было. Тебя отправили под арест на сутки.',art:2};}
-    } else this.maybeIncident(mode==='walk'?'walk':mode==='bus'?'bus':'ride',trip.risk);
+    } else this.maybeIncident(mode==='walk'?'walk':mode==='bus'||mode==='fare-dodge'?'bus':mode==='own'?(s.vehicle==='bike'?'bike':'ride'):mode==='taxi'?'taxi':'bus',trip.risk);
     addLog(s,`${trip.name}: ${d.name}, ${trip.hours} ч, ${trip.cost} ₽, энергия −${trip.energy}.`,'neutral');
     return this.emit(success(`Теперь ты в районе «${d.name}». ${trip.name}: ${trip.cost} ₽, ${trip.hours} ч.`,caught?'bad':'good'));
   }
@@ -166,7 +166,7 @@ export class GameEngine {
     const reward=Math.round(j.pay*(.48+performance*.85)*skill*mood*resilience*social*notoriety*network);
     const tip=performance>.83?Math.round(j.pay*.13):0;
     const accident=this.rng()<j.risk*(1+(1-performance)*1.2)*(1+s.stats.stress*.004+s.stats.crime*.003+(j.id==='loader'?s.conditions.loaderShifts*.08:0));
-    s.money+=reward+tip; s.totalEarned+=reward+tip; s.jobsDone++;
+    s.money+=reward+tip; s.totalEarned+=reward+tip; s.jobsDone++;addLedger(s,'Подработка',reward+tip,j.name);
     adjust(s,{energy:-j.energy,stress:Math.round(2+j.hours*.6-performance*3),mood:performance>.65?2:-2,respect:performance>.74?2:0,health:accident?-Math.ceil(j.energy*.25):0});
     gainSkill(s,j.skill,performance>.75?2:1);
     this.tick(Math.max(j.hours,31-s.hour));
@@ -202,11 +202,11 @@ export class GameEngine {
     this.tick(gig.hours);
     if(arrested){
       s.arrestCount++;const penalty=this.rng();
-      if(penalty<.36){s.jailDays+=gig.jail;s.money-=gig.fine;s.lastWorkResult={kind:'crime',title:gig.name,earned:0,day:s.day,detail:`Заказ сорвался. Заработано 0 ₽. Штраф ${gig.fine.toLocaleString('ru-RU')} ₽ и ${gig.jail} дн. ареста.`};addLog(s,s.lastWorkResult.detail,'bad');return this.emit(success(s.lastWorkResult.detail,'bad'));}
-      if(penalty<.78){s.money-=gig.fine;s.lastWorkResult={kind:'crime',title:gig.name,earned:0,day:s.day,detail:`Заказ сорвался. Заработано 0 ₽. Штраф ${gig.fine.toLocaleString('ru-RU')} ₽.`};addLog(s,s.lastWorkResult.detail,'bad');return this.emit(success(s.lastWorkResult.detail,'bad'));}
+      if(penalty<.36){s.jailDays+=gig.jail;s.money-=gig.fine;addLedger(s,'Штраф',-gig.fine,gig.name);s.lastWorkResult={kind:'crime',title:gig.name,earned:0,day:s.day,detail:`Заказ сорвался. Заработано 0 ₽. Штраф ${gig.fine.toLocaleString('ru-RU')} ₽ и ${gig.jail} дн. ареста.`};addLog(s,s.lastWorkResult.detail,'bad');return this.emit(success(s.lastWorkResult.detail,'bad'));}
+      if(penalty<.78){s.money-=gig.fine;addLedger(s,'Штраф',-gig.fine,gig.name);s.lastWorkResult={kind:'crime',title:gig.name,earned:0,day:s.day,detail:`Заказ сорвался. Заработано 0 ₽. Штраф ${gig.fine.toLocaleString('ru-RU')} ₽.`};addLog(s,s.lastWorkResult.detail,'bad');return this.emit(success(s.lastWorkResult.detail,'bad'));}
       adjust(s,{health:-Math.max(8,Math.round(gig.energy*.55)),stress:8});s.lastWorkResult={kind:'crime',title:gig.name,earned:0,day:s.day,detail:'Заказ сорвался. Заработано 0 ₽. Получены травмы.'};addLog(s,s.lastWorkResult.detail,'bad');return this.emit(success(s.lastWorkResult.detail,'bad'));
     }
-    s.money+=payout;s.totalEarned+=payout;
+    s.money+=payout;s.totalEarned+=payout;addLedger(s,'Криминал',payout,gig.name);
     addLog(s,`${gig.name}: получено ${payout.toLocaleString('ru-RU')} ₽.${injured?' Пришлось лечить травму.':''}`,injured?'bad':'good');
     this.maybeIncident('crime',.14);
     s.lastWorkResult={kind:'crime',title:gig.name,earned:payout,day:s.day,detail:`Получено ${payout.toLocaleString('ru-RU')} ₽.${injured?' Получена травма.':''}${allies?' Помогли связи.':''}${rivals?' Старая ссора повысила риск.':''}`};
@@ -215,8 +215,10 @@ export class GameEngine {
   setDiet(id){
     const blocked=this.guard();if(blocked)return this.emit(blocked);
     const diet=byId(diets,id);if(!diet)return this.emit(fail('Такого режима питания нет.'));
-    this.state.diet=id;addLog(this.state,`Теперь питание: ${diet.name}, ${diet.daily.toLocaleString('ru-RU')} ₽ в день.`,'neutral');
-    return this.emit(success(`Питание изменено: ${diet.name}. Расход ${diet.daily.toLocaleString('ru-RU')} ₽ в день.`));
+    if(!this.spend(diet.daily))return this.emit(fail('На эту еду не хватает денег.'));
+    this.state.diet=id;this.state.lastMealDay=this.state.day;this.state.vitals.nutrition=clamp(this.state.vitals.nutrition+(diet.id==='expired'?9:18),0,100);adjust(this.state,{energy:Math.max(5,diet.energy+9),health:diet.health,mood:diet.mood});
+    addLedger(this.state,'Питание',-diet.daily,diet.name);addLog(this.state,`Поел: ${diet.name}, −${diet.daily.toLocaleString('ru-RU')} ₽.`,'neutral');
+    return this.emit(success(`Поел: ${diet.name}. Потрачено ${diet.daily.toLocaleString('ru-RU')} ₽.`));
   }
   careerReady(id){
     const s=this.state,career=byId(careers,id);
@@ -229,25 +231,61 @@ export class GameEngine {
     if(s.stats.health<30)return fail('Сначала восстанови здоровье.');
     return success('Можно работать.');
   }
-  workCareer(id,months=1){
+  skipTime(kind,id,months=1,dietId='basic'){
+    if(kind==='career')return this.workCareer(id,months,dietId);
+    const blocked=this.guard();if(blocked)return this.emit(blocked);
+    if(kind!=='business'||!Object.keys(this.state.businesses).length)return this.emit(fail('Для автоматического управления нужен свой бизнес.'));
+    return this.runSkip({kind:'business',name:'Свои дела',months,dietId});
+  }
+  workCareer(id,months=1,dietId='basic'){
     const ready=this.careerReady(id);if(!ready.ok)return this.emit(ready);
-    const s=this.state,c=byId(careers,id),count=Math.floor(Number(months));
-    if(![1,3,6].includes(count))return this.emit(fail('Выбери срок работы: 1, 3 или 6 месяцев.'));
-    const start=s.money;let paid=0,worked=0;
-    for(let i=0;i<count*30;i++){
-      s.stats.energy=clamp(s.stats.energy-8,0,100);
-      s.vitals.strain=clamp(s.vitals.strain+(c.id==='janitor'||c.id==='mechanic'?1:0),0,100);
-      this.tick(24,true);worked++;
-      if(worked%30===0){const salary=Math.round(c.salary*(.8+Math.min(.3,(s.skills[c.skill]-1)*.04)));s.money+=salary;s.totalEarned+=salary;paid+=salary;s.careerMonths++;gainSkill(s,c.skill,3);}
-      if(s.death||s.recentIncident||s.romance?.conflict)break;
+    return this.runSkip({kind:'career',id,name:byId(careers,id).name,months,dietId});
+  }
+  runSkip({kind,id,name,months,dietId}){
+    const s=this.state,count=Math.floor(Number(months)),diet=byId(diets,dietId),career=kind==='career'?byId(careers,id):null;
+    if(!Number.isInteger(count)||count<1||count>60)return this.emit(fail('Выбери срок от 1 месяца до 5 лет.'));
+    if(!diet)return this.emit(fail('Выбери питание на период перемотки.'));
+    s.diet=diet.id;
+    const start=s.money,goal=count*30,startingDay=s.day;let earned=0,worked=0,stop='';
+    for(let i=0;i<goal;i++){
+      if(career){s.stats.energy=clamp(s.stats.energy-8,0,100);s.vitals.strain=clamp(s.vitals.strain+(career.id==='janitor'||career.id==='mechanic'?1:0),0,100);}
+      const before=s.money;
+      this.tick(24,true,{skipDiet:true});worked++;
+      if(s.death){stop='Жизнь закончилась.';break;}
+      if(career&&worked%30===0){
+        const salary=Math.round(career.salary*(.8+Math.min(.4,(s.skills[career.skill]-1)*.04))*(1+(s.careerRaises?.[career.id]||0)*.12));
+        s.money+=salary;s.totalEarned+=salary;earned+=salary;s.careerMonths++;gainSkill(s,career.skill,3);addLedger(s,'Зарплата',salary,career.name);
+      }
+      if(!career)earned+=Math.max(0,s.money-before);
+      if(s.recentIncident||s.romance?.conflict){stop='Появилось событие, которое требует твоего решения.';break;}
+      if(s.money<0&&byId(homes,s.home)?.daily>0){
+        const former=byId(homes,s.home)?.name;s.home='sofa';s.ownedHomes ||= [];if(!s.ownedHomes.includes('sofa'))s.ownedHomes.push('sofa');
+        s.recentIncident={title:'Выселение',text:`На оплату жилья «${former}» больше нет денег. Ты вернулся на знакомый диван. Перемотка остановлена.`,art:0};
+        addLog(s,`Выселение из «${former}»: денег на содержание жилья не хватило.`,'bad');stop='Выселение.';break;
+      }
+      if(!career&&s.money<=-10000){stop='Долги вынудили остановиться.';s.recentIncident={title:'Деньги закончились',text:'Расходы бизнеса и быта превышают доход. Нужно изменить план.',art:1};break;}
+      if(worked%30===0){
+        if(career){
+          const quality=(s.stats.health+s.stats.mood+s.stats.appeal+s.stats.respect)/4-s.stats.stress*.3-(s.conditions.hangover?15:0);
+          const fired=.015+(quality<35?.08:0)+(s.vitals.illness>2?.06:0)+count*.0005;
+          if(this.rng()<fired){stop='Тебя уволили.';s.recentIncident={title:'Увольнение',text:`После ${worked} дней начальник расторг договор. Самочувствие, привычки и репутация повлияли на решение.`,art:10};addLog(s,`${career.name}: увольнение после ${worked} дней.`,'bad');break;}
+          if(quality>60&&this.rng()<.035+Math.min(.06,s.skills[career.skill]*.005)){
+            s.careerRaises ||= {};s.careerRaises[career.id]=(s.careerRaises[career.id]||0)+1;
+            stop='Повышение оклада.';s.recentIncident={title:'Повышение',text:`За ${worked} дней ты доказал, что справляешься. Теперь оклад выше на 12%.`,art:10};addLog(s,`${career.name}: повышение оклада на 12%.`,'good');break;
+          }
+        }else{
+          const firms=Object.entries(s.businesses);
+          const failing=firms.find(([key,firm])=>firm.condition<35&&this.rng()<.09+count*.002+(byId(businesses,key)?.risk||0)*.3);
+          if(failing){const [key]=failing,name=byId(businesses,key)?.name||key;delete s.businesses[key];stop='Бизнес обанкротился.';s.recentIncident={title:'Банкротство',text:`Дело «${name}» не выдержало расходов и износа. Перемотка остановлена, актив потерян.`,art:11};addLog(s,`Банкротство: ${name}.`,'bad');break;}
+          if(this.rng()<.025+count*.0008){stop='Дело требует твоего решения.';s.recentIncident={title:'Срочное решение',text:'Поставщик меняет условия. Твои дела требуют личного участия: проверь состояние и стратегию.',art:11};break;}
+        }
+      }
     }
-    const remaining=worked%30;
-    if(remaining&&!s.death){const partial=Math.round(c.salary*remaining/30*(.8+Math.min(.3,(s.skills[c.skill]-1)*.04)));s.money+=partial;s.totalEarned+=partial;paid+=partial;}
+    if(career&&worked%30&&!s.death){const partial=Math.round(career.salary*(worked%30)/30*(.8+Math.min(.4,(s.skills[career.skill]-1)*.04))*(1+(s.careerRaises?.[career.id]||0)*.12));s.money+=partial;earned+=partial;s.totalEarned+=partial;addLedger(s,'Зарплата',partial,`${career.name}: неполный месяц`);}
     const net=s.money-start;
-    const detail=`${c.name}: прошло ${worked} дн.${worked<count*30?' Контракт прерван событием.':''} Зарплата +${paid.toLocaleString('ru-RU')} ₽; еда, жильё и прочие расходы учтены. Баланс ${net>=0?'+':''}${net.toLocaleString('ru-RU')} ₽.`;
-    s.lastWorkResult={kind:'career',title:c.name,earned:paid,day:s.day,detail};
-    addLog(s,detail,net>=0?'good':'bad');
-    if(!s.death&&!s.recentIncident&&!s.romance?.conflict)this.maybeIncident(c.respect>=18?'office':'job',.32);
+    const detail=`${name}: прошло ${worked} из ${goal} дней. Доход ${earned.toLocaleString('ru-RU')} ₽, итог баланса ${net>=0?'+':''}${net.toLocaleString('ru-RU')} ₽.${stop?` ${stop}`:''}`;
+    s.timeSkip={kind,name,from:startingDay,to:s.day,planned:goal,worked,diet:diet.id,earned,net,stop};
+    s.lastWorkResult={kind,title:name,earned,day:s.day,detail};addLog(s,detail,net>=0?'good':'bad');
     return this.emit(success(detail,net>=0?'good':'bad'));
   }
   startCasino(id,amount){
@@ -314,9 +352,11 @@ export class GameEngine {
   }
   serveSentence() {
     const s=this.state;if(!s.jailDays)return this.emit(fail('Ты уже на свободе.'));
-    s.jailDays--;adjust(s,{health:-3,mood:-5,stress:3,energy:12});
-    this.tick(24);addLog(s,s.jailDays?`День в изоляторе. Осталось ${s.jailDays} дн.`:'Вышел на свободу. Город делает вид, что ничего не было.','bad');
-    return this.emit(success(s.jailDays?`Осталось ${s.jailDays} дн. ареста.`:'Ты снова на свободе.',s.jailDays?'bad':'good'));
+    const start=s.day,money=s.money;
+    while(s.jailDays>0&&!s.death){s.jailDays--;adjust(s,{health:-2,mood:-3,stress:2,energy:3});s.vitals.immunity=clamp(s.vitals.immunity-1,0,100);this.tick(24,true,{prison:true});}
+    const detail=`Срок ${s.day-start} дн. завершён. Доход 0 ₽, расходы 0 ₽, здоровье и настроение пострадали.`;
+    s.timeSkip={kind:'prison',from:start,to:s.day,worked:s.day-start,earned:0,net:s.money-money,stop:s.death?'Жизнь закончилась.':''};
+    addLog(s,detail,'bad');return this.emit(success(detail,s.death?'bad':'neutral'));
   }
   activity(id) {
     const blocked=this.guard(); if (blocked) return this.emit(blocked);
@@ -337,10 +377,11 @@ export class GameEngine {
     if(id==='sleep')s.conditions.hangover=0;
     if(id==='clinic'){s.conditions.back=0;s.vitals.illness=0;s.vitals.immunity=clamp(s.vitals.immunity+18,0,100);}
     if(id==='gym'){s.vitals.fitness=clamp(s.vitals.fitness+8,0,100);s.vitals.strain=clamp(s.vitals.strain-2,0,100);}
+    if(['food','marketmeal'].includes(id)){s.lastMealDay=s.day;s.vitals.nutrition=clamp(s.vitals.nutrition+18,0,100);}
     if(id==='yardrepair')s.conditions.shoes=100;
     let outcome=a.description;
     if(id==='beg'){const coins=20+Math.floor(this.rng()*100);s.money+=coins;s.totalEarned+=coins;outcome=`За два часа собрал ${coins} ₽. Никакой гарантии на завтра.`;}
-    adjust(s,effect); this.tick(a.hours); addLog(s,outcome,a.cost?'neutral':'good');
+    adjust(s,effect); this.tick(a.hours);if(a.cost)addLedger(s,'Занятие',-a.cost,a.name);addLog(s,outcome,a.cost?'neutral':'good');
     if(id==='walk'){s.conditions.walkTrips++;s.conditions.shoes=clamp(s.conditions.shoes-(s.upgrades.includes('boots')?3:7),0,100);this.maybeIncident('walk',.08+(100-s.conditions.shoes)*.0012);}
     if(id==='sleep')this.maybeIncident('daily',.09);
     return this.emit(success(outcome));
@@ -356,7 +397,7 @@ export class GameEngine {
     if (kind==='vehicle') { s.ownedVehicles.push(id); s.vehicle=id; adjust(s,{respect:Math.ceil(item.prestige*.2),appeal:Math.ceil(item.prestige*.12)}); }
     if (kind==='upgrade') { s.upgrades.push(id); s.skills[item.stat]+=item.amount; adjust(s,{respect:2}); }
     if (kind==='business') { s.businesses[id]={level:1,staff:false,condition:100,strategy:'normal'}; adjust(s,{respect:6,business:3,stress:4}); }
-    this.tick(1); addLog(s,`Куплено: ${item.name} за ${item.price.toLocaleString('ru-RU')} ₽.`,'good');
+    this.tick(1);addLedger(s,'Покупка',-item.price,item.name);addLog(s,`Куплено: ${item.name} за ${item.price.toLocaleString('ru-RU')} ₽.`,'good');
     return this.emit(success(`Куплено: ${item.name}.`));
   }
   equip(kind,id) {
@@ -467,7 +508,7 @@ export class GameEngine {
       addLog(s,`${p.name} — ${scene.topic}: ${choice.reply} Отношения +${s.relations[id]-before}.`,'story');
       return this.emit({...success(choice.reply),dialogueReply:choice.reply,dialogueTopic:scene.topic,relationGain:s.relations[id]-before,effects:choice.effect});
     }
-    if (action==='favor') { if(rel<2||socialGroup(s,id)==='enemies')return this.emit(fail('Сначала наладь отношения в разговоре.')); const price=Math.round(p.cost*(1-Math.min(.22,s.stats.contacts*.002+s.stats.appeal*.001))); if(!this.spend(price))return this.emit(fail('Не хватает денег.')); adjust(s,p.effect);changeSocial(s,id,p.relation);s.relations[id]=clamp(rel+p.relation,0,100); this.tick(2); addLog(s,`${p.name}: ${p.favor}. Услуга обошлась в ${price.toLocaleString('ru-RU')} ₽.`,'good'); return this.emit(success(`${p.name} оценил помощь.`)); }
+    if (action==='favor') { if(rel<2||socialGroup(s,id)==='enemies')return this.emit(fail('Сначала наладь отношения в разговоре.'));s.favorDays ||= {};if(s.day-(s.favorDays[id]??-100)<20)return this.emit(fail(`${p.name} пока не нуждается в новой помощи.`)); const price=Math.round(p.cost*(1-Math.min(.22,s.stats.contacts*.002+s.stats.appeal*.001))); if(!this.spend(price))return this.emit(fail('Не хватает денег.')); adjust(s,p.effect);changeSocial(s,id,p.relation);s.relations[id]=clamp(rel+p.relation,0,100);s.favorDays[id]=s.day;this.tick(2);if(price)addLedger(s,'Услуга',-price,`${p.name}: ${p.favor}`);addLog(s,`${p.name}: ${p.favor}. ${price?`Потрачено ${price.toLocaleString('ru-RU')} ₽.`:'Бесплатно.'}`,'good'); return this.emit(success(`${p.name}: ${p.favor}.`)); }
     return this.emit(fail('Неизвестный выбор.'));
   }
   socialAction(id,action){
@@ -478,14 +519,15 @@ export class GameEngine {
     if(s.stats.energy<6)return this.emit(fail('На разговор не хватает сил. Передохни или выспись.'));
     let delta=0,reply='',tone='good';
     if(action==='help'){
-      delta=10;adjust(s,{energy:-8,contacts:1,stress:-1});reply=`Ты помог ${person.name}. Теперь вам легче доверять друг другу.`;
+      if(bond?.helpDay!==undefined&&s.day-bond.helpDay<14)return this.emit(fail(`${person.name} пока не просил новой помощи.`));
+      delta=5;adjust(s,{energy:-8,stress:-1});reply=`Ты помог ${person.name} с конкретной просьбой. Теперь вам легче доверять друг другу.`;
     }else if(action==='boundary'){
       delta=-17;adjust(s,{energy:-6,stress:-3,respect:1});reply=`Ты отказался выполнять просьбу ${person.name}. Тебе стало спокойнее, но связь испортилась.`;tone='neutral';
     }else if(action==='reconcile'){
       if(socialValue(s,id)>-1)return this.emit(fail('Ссориться вам сейчас не из-за чего.'));
       const worked=this.rng()<Math.min(.85,.42+s.skills.charm*.05);delta=worked?21:-5;adjust(s,{energy:-6,stress:worked?-4:3});reply=worked?`Вы с ${person.name} смогли поговорить без взаимных обвинений.`:`${person.name} пока не готов мириться.`;tone=worked?'good':'bad';
     }else return this.emit(fail('Неизвестное действие.'));
-    const score=changeSocial(s,id,delta);if(s.romance?.profiles?.[id])s.romance.profiles[id].rapport=clamp(s.romance.profiles[id].rapport+delta,0,100);s.social[id].lastDay=s.day;this.tick(1);
+    const score=changeSocial(s,id,delta);if(s.romance?.profiles?.[id])s.romance.profiles[id].rapport=clamp(s.romance.profiles[id].rapport+delta,0,100);s.social[id].lastDay=s.day;if(action==='help')s.social[id].helpDay=s.day;this.tick(1);
     addLog(s,`${reply} Связь ${score>0?'+':''}${score}.`,tone);
     return this.emit(success(reply,tone));
   }

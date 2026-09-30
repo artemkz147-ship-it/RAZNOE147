@@ -149,6 +149,11 @@ document.addEventListener('click',event=>{
   const chip=event.target.closest('[data-bet]');
   if(chip){const field=document.getElementById('casino-stake');if(field)field.value=chip.dataset.bet;return;}
   const button=event.target.closest('[data-action]');
+  if(button?.dataset.action==='skip'){
+    const panel=button.closest('.skip-controls');
+    game.skipTime(button.dataset.kind,button.dataset.id,Number(panel.querySelector('.skip-months').value),panel.querySelector('.skip-diet').value);
+    return;
+  }
   if(button)perform(button.dataset.action,button.dataset.id,button.dataset.months);
   else if(event.target.classList.contains('dismissable')){menuOpen=false;renderModal();}
 });

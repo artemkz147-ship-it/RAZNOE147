@@ -4,16 +4,16 @@ import { clamp,adjust,addLog } from './state.js';
 export const ageOf = state => 30 + Math.floor((state.day-1)/360);
 export const calendarOf = state => ({month:Math.floor((state.day-1)/30)%12+1,year:Math.floor((state.day-1)/360)+1,day:(state.day-1)%30+1});
 
-export function dailyVitals(state,rng=Math.random){
+export function dailyVitals(state,rng=Math.random,{fed=false}={}){
   const v=state.vitals ||= {nutrition:60,immunity:70,fitness:35,exposure:0,strain:0,illness:0};
-  const diet=diets.find(x=>x.id===state.diet)||diets[1];
+  const diet=fed?(diets.find(x=>x.id===state.diet)||diets[1]):null;
   const shelter=state.home==='sofa'||state.home==='hostel';
-  v.nutrition=clamp(v.nutrition+(diet.id==='expired'?-5:diet.id==='basic'?0:2),0,100);
-  v.immunity=clamp(v.immunity+(shelter?-2:1)+(diet.id==='expired'?-2:1)+(state.conditions?.hangover? -2:0),0,100);
+  v.nutrition=clamp(v.nutrition+(diet?(diet.id==='expired'?-5:diet.id==='basic'?0:2):-9),0,100);
+  v.immunity=clamp(v.immunity+(shelter?-2:1)+(diet?.id==='expired'?-2:diet?1:-3)+(state.conditions?.hangover? -2:0),0,100);
   v.exposure=clamp(v.exposure+(shelter?3:-3),0,100);
   v.strain=clamp(v.strain+(state.stats.stress>65?2:-2)+(state.conditions?.back?2:0),0,100);
   v.fitness=clamp(v.fitness-(state.day%5===0?1:0),0,100);
-  adjust(state,{health:diet.health,energy:diet.energy,mood:diet.mood});
+  adjust(state,diet?{health:diet.health,energy:diet.energy,mood:diet.mood}:{health:-2,energy:-5,mood:-4,stress:3});
   const illnessChance=(v.immunity<25?.055:0)+(v.exposure>45?.035:0)+(v.nutrition<15?.04:0);
   if(state.stats.health<55&&rng()<illnessChance){
     v.illness=clamp(v.illness+1,0,10);adjust(state,{health:-6,energy:-6});
