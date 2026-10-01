@@ -98,6 +98,8 @@ jobs:
           base64 --decode smokeinterval_v19/YandexBannerStripView.java.gz.b64 > smokeinterval_v19/banner_java.gz
           gzip -t smokeinterval_v19/banner_java.gz
           gzip -dc smokeinterval_v19/banner_java.gz > SmokeInterval/app/src/main/java/com/example/smokeinterval/YandexBannerStripView.java
+          sed -i '/import androidx.annotation.NonNull;/d' SmokeInterval/app/src/main/java/com/example/smokeinterval/YandexBannerStripView.java
+          sed -i 's/@NonNull //g' SmokeInterval/app/src/main/java/com/example/smokeinterval/YandexBannerStripView.java
           sed -i -E "s/versionCode [0-9]+/versionCode 10/" SmokeInterval/app/build.gradle
           sed -i -E "s/versionName '[^']+'/versionName '1.9.0'/" SmokeInterval/app/build.gradle
           grep -q "versionName '1.9.0'" SmokeInterval/app/build.gradle
