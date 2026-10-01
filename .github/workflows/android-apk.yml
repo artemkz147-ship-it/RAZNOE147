@@ -81,6 +81,19 @@ jobs:
           name: iz-gryazi-v-knyazi-release-build
           path: release-output/
           if-no-files-found: error
+      - name: Publish unsigned signing input for local release signing
+        if: steps.release.outputs.signed != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=iz-gryazi-v-knyazi-signing-input-${{ github.run_number }}
+          gh release create "$tag" \
+            release-output/iz-gryazi-v-knyazi-release-unsigned.apk \
+            release-output/apksigner.jar \
+            release-output/apk-metadata.txt \
+            --prerelease --target "$GITHUB_SHA" \
+            --title "Release signing input ${{ github.run_number }} — not an installable APK" \
+            --notes "Production release compilation with debugging disabled. This input requires the permanent local release key before installation or store upload. No signing credentials are included."
       - name: Publish signed release APK
         if: steps.release.outputs.signed == 'true'
         env:
