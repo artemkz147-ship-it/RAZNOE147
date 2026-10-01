@@ -41,7 +41,7 @@ export class GameEngine {
   }
   prepareState(state){
     if(state.romance?.conflict&&!activePartners(state).includes(state.romance.conflict.partnerId))dropPartner(state.romance,state.romance.conflict.partnerId);
-    seedCitizens(state);if(state.homeRelocationPending){delete state.homeRelocationPending;state.district=homeTerms(state.home).district;state.visitedDistricts||=['yard'];if(!state.visitedDistricts.includes(state.district))state.visitedDistricts.push(state.district);}ensureHousing(state);
+    state.ledgerReceipts??=(state.ledger||[]).filter(x=>x.amount>0&&x.category!=='Перенос в долг').reduce((n,x)=>n+x.amount,0);seedCitizens(state);if(state.homeRelocationPending){delete state.homeRelocationPending;state.district=homeTerms(state.home).district;state.visitedDistricts||=['yard'];if(!state.visitedDistricts.includes(state.district))state.visitedDistricts.push(state.district);}ensureHousing(state);
     if(state.pending?.type==='event'){const event=[...events,...contextEvents,...activityEvents].find(e=>e.id===state.pending.id);if(!event||!state.pending.occurred&&!eventEligible(state,event))state.pending=null;}
     if(state.recentIncident?.id){const incident=incidents.find(i=>i.id===state.recentIncident.id);if(!incident||!incidentEligible(state,incident))state.recentIncident=null;}
   }
@@ -348,7 +348,7 @@ export class GameEngine {
     if(kind==='career'&&s.employment?.id!==id)return this.emit(fail('Сначала устройся на работу.'));
     if(kind!=='career'&&(kind!=='business'||(id?!s.businesses[id]||s.businesses[id].paused:!Object.values(s.businesses).some(f=>!f.paused))))return this.emit(fail('Нужен работающий бизнес.'));
     s.skipDiet=diet.id;s.diet=diet.id;
-    s.activeSkip={kind,id,name:kind==='career'?byId(careers,id).name:id?byId(businesses,id).name:'Свои дела',from:s.day,planned:count*30,worked:0,diet:diet.id,startMoney:s.money,startSeq:s.ledgerSeq||0,status:'running'};
+    s.activeSkip={kind,id,name:kind==='career'?byId(careers,id).name:id?byId(businesses,id).name:'Свои дела',from:s.day,planned:count*30,worked:0,diet:diet.id,startMoney:s.money,startSeq:s.ledgerSeq||0,startReceipts:s.ledgerReceipts,status:'running'};
     return this.emit({ok:true,timeSkipFrame:true,message:''});
   }
   skipObstacle(){
@@ -375,14 +375,14 @@ export class GameEngine {
   }
   finishTimeSkip(stop='Перемотка отменена.'){
     const s=this.state,p=s.activeSkip;if(!p)return;
-    const earned=(s.ledger||[]).filter(x=>x.seq>p.startSeq&&x.amount>0).reduce((n,x)=>n+x.amount,0),net=s.money-p.startMoney;
-    const detail=p.name+': прошло '+p.worked+' из '+p.planned+' дней. Выплачено '+earned.toLocaleString('ru-RU')+' ₽; баланс '+(net>=0?'+':'')+net.toLocaleString('ru-RU')+' ₽. '+(s.employment?'Начислено '+Math.round(s.employment.accrued)+' ₽, выплата в день '+s.employment.nextPay+'. ':'')+stop;
+    const earned=p.startReceipts!==undefined?s.ledgerReceipts-p.startReceipts:(s.ledger||[]).filter(x=>x.seq>p.startSeq&&x.amount>0&&x.category!=='Перенос в долг').reduce((n,x)=>n+x.amount,0),net=s.money-p.startMoney;
+    const detail=p.name+': прошло '+p.worked+' из '+p.planned+' дней. Поступило '+earned.toLocaleString('ru-RU')+' ₽; баланс '+(net>=0?'+':'')+net.toLocaleString('ru-RU')+' ₽. '+(s.employment?'Начислено '+Math.round(s.employment.accrued)+' ₽, выплата в день '+s.employment.nextPay+'. ':'')+stop;
     s.timeSkip={...p,to:s.day,earned,net,stop};s.lastWorkResult={kind:p.kind,title:p.name,earned,day:s.day,detail};s.activeSkip=null;addLog(s,detail,net>=0?'good':'bad');return this.emit(success(detail,net>=0?'good':'bad'));
   }
   runSkip({kind,id,name,months,dietId}){
     const s=this.state,count=Math.floor(Number(months)),diet=byId(diets,dietId);
     if(!Number.isInteger(count)||count<1||count>60||!diet)return this.emit(fail('Выбери срок и питание.'));
-    s.diet=diet.id;const start=s.money,startingDay=s.day,startSeq=s.ledgerSeq||0,goal=count*30;let worked=0,stop='';
+    s.diet=diet.id;const start=s.money,startingDay=s.day,startReceipts=s.ledgerReceipts,goal=count*30;let worked=0,stop='';
     for(let i=0;i<goal;i++){
       if(s.money<diet.daily){stop='Не хватает денег на ежедневное питание.';break;}
       s.hour=0;this.tick(24,true,{skipDiet:true});worked++;
@@ -391,7 +391,7 @@ export class GameEngine {
       if(kind==='career'&&s.employment?.id!==id){stop='Работа закончилась.';break;}
       if(kind==='business'&&!Object.keys(s.businesses).length){stop='Бизнес закрыт.';break;}
     }
-    const earned=(s.ledger||[]).filter(x=>x.seq>startSeq&&x.amount>0).reduce((sum,x)=>sum+x.amount,0),net=s.money-start;
+    const earned=s.ledgerReceipts-startReceipts,net=s.money-start;
     const detail=name+': прошло '+worked+' из '+goal+' дней. Получено '+earned.toLocaleString('ru-RU')+' ₽, баланс '+(net>=0?'+':'')+net.toLocaleString('ru-RU')+' ₽. '+(s.employment?'Начислено к выплате '+Math.round(s.employment.accrued).toLocaleString('ru-RU')+' ₽, зарплата в день '+s.employment.nextPay+'. ':'')+stop;
     s.timeSkip={kind,name,from:startingDay,to:s.day,planned:goal,worked,diet:diet.id,earned,net,stop};s.lastWorkResult={kind,title:name,earned,day:s.day,detail};addLog(s,detail,net>=0?'good':'bad');return this.emit(success(detail,net>=0?'good':'bad'));
   }
@@ -500,7 +500,7 @@ export class GameEngine {
       else if(routine?.energy)outcome+=` Занялся своими делами до ${s.hour}:00, энергия −${routine.energy}.`;
       else if(career)outcome+=' Сегодня без рабочей смены.';
     }
-    if(['walk','network','yardtea','centerdate'].includes(id)&&!s.recentIncident&&this.rng()<.25){const unknown=livingRomancePeople(s).filter(p=>!socialMet(s,p.id)&&p.district===s.district&&!romanceAccess(s,p));if(unknown.length){const person=unknown[Math.floor(this.rng()*unknown.length)];s.recentIncident={title:'Новая встреча',text:person.name+' завела разговор. Можно познакомиться.',image:'person:'+person.id,choices:[{text:'Представиться и поговорить',meetId:person.id,reply:'Вы познакомились и обменялись контактами.'},{text:'Пройти мимо',reply:'Вы разошлись, не познакомившись.'}]};}}if(a.cost)addLedger(s,'Занятие',-a.cost,a.name);addLog(s,outcome,a.cost?'neutral':'good');
+    if(['walk','network','yardtea','centerdate'].includes(id)&&encounterAllowed(s,'new-meeting',14)&&this.rng()<.25){const unknown=livingRomancePeople(s).filter(p=>!socialMet(s,p.id)&&p.district===s.district&&!romanceAccess(s,p));if(unknown.length){const person=unknown[Math.floor(this.rng()*unknown.length)];recordEncounter(s,'new-meeting');s.recentIncident={title:'Новая встреча',text:person.name+' завела разговор. Можно познакомиться.',image:'person:'+person.id,choices:[{text:'Представиться и поговорить',meetId:person.id,reply:'Вы познакомились и обменялись контактами.'},{text:'Пройти мимо',reply:'Вы разошлись, не познакомившись.'}]};}}if(a.cost)addLedger(s,'Занятие',-a.cost,a.name);addLog(s,outcome,a.cost?'neutral':'good');
     if(id==='walk'){s.conditions.walkTrips++;s.conditions.shoes=clamp(s.conditions.shoes-(s.upgrades.includes('boots')?3:7),0,100);this.maybeIncident('walk',.08+(100-s.conditions.shoes)*.0012);}
     if(id==='sleep')this.maybeIncident('daily',.09);
     return this.emit(success(outcome));

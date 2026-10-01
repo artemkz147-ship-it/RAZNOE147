@@ -8,6 +8,7 @@ export const homeTerms=id=>{
 export function ensureHousing(s){
   s.propertyAccounts||={};
   if(!s.housing||s.housing.id!==s.home)s.housing={id:s.home,since:s.day,nextDue:s.day+homeTerms(s.home).period,multiplier:1};
+  if(s.home!=='sofa')s.sofaAbsentSince??=s.housing.since;
   if(homeTerms(s.home).kind==='owned'){
     s.propertyAccounts[s.home]||=s.housing;
     s.housing=s.propertyAccounts[s.home];
@@ -43,7 +44,8 @@ export function housingBudget(s){
 export function moveHome(s,id){
   if(s.home===id){ensureHousing(s);return;}
   housingAccounts(s);
-  if(id==='sofa'&&s.day>=(s.sofaBlockedUntil||0)&&s.home!=='sofa')s.sofaSince=s.day;
+  if(s.home==='sofa')s.sofaAbsentSince=s.day;
+  if(id==='sofa'&&s.day>=(s.sofaBlockedUntil||0)&&s.day-(s.sofaAbsentSince??s.day)>=30)s.sofaSince=s.day;
   if(s.home!==id&&['hostel','room','flat'].includes(s.home))s.ownedHomes=s.ownedHomes.filter(h=>h!==s.home);
   s.home=id;s.housing={id,since:id==='sofa'?(s.sofaSince||s.day):s.day,nextDue:s.day+homeTerms(id).period,multiplier:1};
   ensureHousing(s);

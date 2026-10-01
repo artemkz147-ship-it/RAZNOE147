@@ -2,7 +2,7 @@ export const VERSION = 1;
 
 export function freshState() {
   return {
-    version: VERSION, day: 1, hour: 7, district: 'yard', visitedDistricts:['yard'], money: 870, debt: 0,
+    version: VERSION, ledgerReceipts:0, day: 1, hour: 7, district: 'yard', visitedDistricts:['yard'], money: 870, debt: 0,
     stats: { health: 82, energy: 73, mood: 48, respect: 0, fame: 0, stress: 19, appeal: 5, contacts: 0, crime: 0, business: 0, life: 8 },
     skills: { grit: 1, charm: 1, focus: 1 }, xp: { grit: 0, charm: 0, focus: 0 },
     employment:null,careerBans:{},propertyAccounts:{},housing:{id:'sofa',since:1,nextDue:2,multiplier:1},home: 'sofa', vehicle: 'feet', ownedHomes: ['sofa'], ownedVehicles: ['feet'], businesses: {}, upgrades: [], lastRestDay: 0,
@@ -33,6 +33,8 @@ export function addLog(state,text,type='neutral') {
 }
 export function addLedger(state,category,amount,text){
   state.ledger ||= [];
+  state.ledgerReceipts??=state.ledger.filter(x=>x.amount>0&&x.category!=='Перенос в долг').reduce((n,x)=>n+x.amount,0);
+  if(amount>0&&category!=='Перенос в долг')state.ledgerReceipts+=amount;
   state.ledgerSeq=(state.ledgerSeq||0)+1;
   state.ledger.unshift({seq:state.ledgerSeq,day:state.day,hour:state.hour,category,amount,text});
   state.ledger=state.ledger.slice(0,10000);

@@ -49,7 +49,7 @@ export function socialDay(state,rng){
     addLog(state,`${person.name} предложил финансовую поддержку.`,'story');return;
   }
   if(!friend&&life.retaliation&&rng()<.6){
-    const loss=Math.min(state.money,Math.round(1000+Math.max(0,citizenWorth(life))*.003));
+    const loss=Math.min(Math.max(0,state.money),Math.round(1000+Math.max(0,citizenWorth(life))*.003));
     state.recentIncident={...art,title:`Ответный ход ${person.name}`,text:life.bankrupt?`${person.name} винит тебя в разорении. Старая вражда дошла до твоих знакомых.`:`${person.name} ответил на давление и переманил часть твоих контактов.`,choices:[{text:'Искать компромисс',cost:Math.min(5000,loss),npcEffect:{retaliation:-1},effect:{energy:-6,stress:-2},socialDelta:9,reply:'Через общих знакомых удалось немного снизить напряжение.'},{text:'Продолжить конфликт',effect:{money:-loss,contacts:-2,stress:8},socialDelta:-6,reply:`Конфликт обошёлся в ${loss.toLocaleString('ru-RU')} ₽ и часть связей. История ещё не закончилась.`}]};
     addLog(state,`${person.name}: ответ на твой предыдущий ход.`,'bad');return;
   }

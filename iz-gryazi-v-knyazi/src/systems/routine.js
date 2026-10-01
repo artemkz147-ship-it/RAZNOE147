@@ -4,6 +4,7 @@ import { adjust,addLog,addLedger } from './state.js';
 import {encounterAllowed,recordEncounter} from './encounters.js';
 export const careerShift=id=>({janitor:{start:6,end:15,energy:25,days:6},shop:{start:9,end:18,energy:22,days:6},mechanic:{start:8,end:17,energy:28,days:5},clerk:{start:9,end:18,energy:15,days:5},manager:{start:9,end:19,energy:21,days:5},director:{start:10,end:19,energy:19,days:5}}[id]);
 export const salaryFor=(s,c)=>Math.round(c.salary*(.8+Math.min(.4,(s.skills[c.skill]-1)*.04))*(1+(s.careerRaises?.[c.id]||0)*.12));
+export const shiftBlocked=(s,id)=>s.stats.health<25||s.vitals.illness>=4||s.conditions.hangover>0||s.conditions.back>0&&['janitor','mechanic'].includes(id);
 export const businessDuty=(config,firm)=>firm.staff?{hours:1,energy:3}:{hours:['stall','canteen','cafe','pickup','laundry'].includes(config.id)?8:config.district==='yard'||config.district==='market'?6:4,energy:config.district==='industrial'?18:14};
 export function hireCareer(s,id){
   s.employment={id,since:s.day,nextPay:s.day+30,worked:0,accrued:0,lastShift:0,reviewDay:s.day+30};
@@ -24,7 +25,7 @@ export function routineDay(s,rng,{skip=false}={}){
     if(weekday<shift.days){
       const excused=Math.max(e.leaveUntil||0,e.medicalUntil||0)>=s.day;
       const scheduled=Array.from({length:30},(_,i)=>e.nextPay-29+i).filter(day=>((day-e.since)%7+7)%7<shift.days).length;
-      const exhausted=s.stats.health<25||s.vitals.illness>=4||s.conditions.hangover>0||s.conditions.back>0&&['janitor','mechanic'].includes(c.id);
+      const exhausted=shiftBlocked(s,c.id);
       if(excused){addLog(s,c.name+': согласованный выходной, начисление за смену отсутствует.','neutral');}
       else if(exhausted){e.absences=(e.absences||0)+1;addLog(s,`${c.name}: пропустил смену из-за травмы или самочувствия.`,'bad');}
       else{e.worked++;e.lastWorkedDay=s.day;e.accrued+=salaryFor(s,c)/scheduled;hours=shift.end;s.hour=hours;energy+=shift.energy;s.jobsDone++;s.vitals.strain=Math.min(100,s.vitals.strain+(c.id==='mechanic'||c.id==='janitor'?4:1));addLog(s,`Проснулся, отработал: ${c.name}. Закончил в ${shift.end}:00, энергия −${shift.energy}.`,'neutral');}

@@ -1,10 +1,10 @@
-import {careers,diets} from '../data/lifestyle.js';import {vehicles,businesses} from '../data/world.js';import {careerShift,businessDuty,salaryFor} from './routine.js';import {housingBudget} from './housing.js';import {businessForecast} from './economy.js';
+import {careers,diets} from '../data/lifestyle.js';import {vehicles,businesses} from '../data/world.js';import {careerShift,businessDuty,salaryFor,shiftBlocked} from './routine.js';import {housingBudget} from './housing.js';import {businessForecast} from './economy.js';
 export function dayPlan(s){
  const next=s.day+1,e=s.employment,c=e&&careers.find(c=>c.id===e.id),shift=c&&careerShift(c.id),weekday=e?(next-e.since)%7:0;
  const leave=c&&Math.max(e.leaveUntil||0,e.medicalUntil||0)>=next;
- const working=!!(c&&!leave&&weekday<shift.days),duties=Object.entries(s.businesses).filter(([,f])=>!f.paused).map(([id,f])=>({name:businesses.find(b=>b.id===id)?.name,...businessDuty(businesses.find(b=>b.id===id),f)}));
+ const blocked=!!(c&&!leave&&weekday<shift.days&&shiftBlocked(s,c.id)),working=!!(c&&!leave&&!blocked&&weekday<shift.days),duties=Object.entries(s.businesses).filter(([,f])=>!f.paused).map(([id,f])=>({name:businesses.find(b=>b.id===id)?.name,...businessDuty(businesses.find(b=>b.id===id),f)}));
  const end=Math.min(23,(working?shift.end:7)+duties.reduce((n,d)=>n+d.hours,0));
- return {working,leave,career:c?.name,end,energy:(working?shift.energy:0)+duties.reduce((n,d)=>n+d.energy,0),duties,free:Math.max(0,23-end)};
+ return {working,leave,blocked,career:c?.name,end,energy:(working?shift.energy:0)+duties.reduce((n,d)=>n+d.energy,0),duties,free:Math.max(0,23-end)};
 }
 export function budgetPlan(s){
  const housing=housingBudget(s),nextDue=housing.nextDue;
