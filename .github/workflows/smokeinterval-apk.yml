@@ -9,6 +9,7 @@ on:
       - 'smokeinterval_v14c/**'
       - 'smokeinterval_v15/**'
       - 'smokeinterval_v17/**'
+      - 'smokeinterval_v18/**'
       - '.github/workflows/smokeinterval-apk.yml'
   workflow_dispatch:
 
@@ -77,6 +78,18 @@ jobs:
           grep -q 'YandexAds.initialize' SmokeInterval/app/src/main/java/com/example/smokeinterval/YandexBannerStripView.java
           echo 'android.useAndroidX=true' >> SmokeInterval/gradle.properties
 
+      - name: Apply v1.8 clean placeholder
+        run: |
+          base64 --decode smokeinterval_v18/YandexBannerStripView.java.gz.b64 > smokeinterval_v18/banner.gz
+          gzip -t smokeinterval_v18/banner.gz
+          gzip -dc smokeinterval_v18/banner.gz > SmokeInterval/app/src/main/java/com/example/smokeinterval/YandexBannerStripView.java
+          sed -i -E "s/versionCode [0-9]+/versionCode 9/" SmokeInterval/app/build.gradle
+          sed -i -E "s/versionName '[^']+'/versionName '1.8.0'/" SmokeInterval/app/build.gradle
+          grep -q "versionName '1.8.0'" SmokeInterval/app/build.gradle
+          ! grep -q 'Партнёрский блок' SmokeInterval/app/src/main/java/com/example/smokeinterval/YandexBannerStripView.java
+          ! grep -q 'Подбираем баннер' SmokeInterval/app/src/main/java/com/example/smokeinterval/YandexBannerStripView.java
+          grep -q 'YandexAds.initialize' SmokeInterval/app/src/main/java/com/example/smokeinterval/YandexBannerStripView.java
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -102,12 +115,12 @@ jobs:
         run: |
           APK=$(find SmokeInterval/app/build/outputs/apk/debug -name '*.apk' | head -1)
           test -n "$APK"
-          cp "$APK" Shag-bez-sigaret-v1.7.apk
-          sha256sum Shag-bez-sigaret-v1.7.apk
+          cp "$APK" Shag-bez-sigaret-v1.8.apk
+          sha256sum Shag-bez-sigaret-v1.8.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Shag-bez-sigaret-v1.7-APK
-          path: Shag-bez-sigaret-v1.7.apk
+          name: Shag-bez-sigaret-v1.8-APK
+          path: Shag-bez-sigaret-v1.8.apk
           if-no-files-found: error
