@@ -8,16 +8,24 @@ import { artScene } from './scene/artscene.js';
 import { shell,modal,menuModal } from './ui/views.js';
 import {renderSkipTimer} from './ui/timeSkip.js';
 import { MiniGame } from './ui/minigames.js';
+import {GameAds} from './systems/ads.js';
 import { socialGroup } from './systems/social.js';
 
 if(window.AndroidGame)document.documentElement.classList.add('android-host');
 const app=document.getElementById('app');
 const loaded=loadGame();
-const game=new GameEngine(loaded.state);
+const game=new GameEngine(loaded.state,Math.random,{rewardedSkips:true});
 let tab='city',shopType='home',earningMode='legal',peopleMode='contacts',careMode='food',mini=null,menuOpen=false,dialogueId=null,dialogueResult=null,travelId=null,citizenId=null,citizenPane='life';
 const railPositions=new Map();
 const disclosureStates=new Map();let lastRenderedTab=tab;
-let focusCurrentDistrict=false;
+let focusCurrentDistrict=false,nativeVisible=true;
+const ads=new GameAds({bridge:window.AndroidGame,storage:localStorage,onMessage:m=>toast(m,'neutral'),onChange:()=>updateAdStatus(),onGrant:context=>{game.grantSkipReward();return game.startTimeSkip(context.kind,context.id,1,context.diet);}});
+function requestMonth(kind,id,diet=game.state.skipDiet){const ready=game.timeSkipReady(kind,id,1,diet);if(!ready.ok){toast(ready.message,'bad');return;}ads.requestMonth({kind,id,diet});}
+function adSafe(){const s=game.state;return !document.hidden&&nativeVisible&&!mini&&!menuOpen&&!dialogueId&&!travelId&&!citizenId&&!s.death&&!s.jailDays&&!s.activeSkip&&!s.pending&&!s.recentIncident&&!s.outcome&&!s.romance?.conflict&&!s.casinoTable;}
+function updateAdStatus(){let root=document.getElementById('ad-status');if(!root){root=document.createElement('div');root.id='ad-status';document.body.append(root);}root.innerHTML=ads.busy?'<div class="ad-status-card" role="status"><span class="ad-spinner" aria-hidden="true"></span><strong>'+(ads.request.status==='loading'?'Загружаем рекламу…':'Рекламная пауза')+'</strong>'+(ads.request.status==='loading'&&ads.request.type==='rewarded'?'<button data-cancel-ad>ОТМЕНА</button>':'')+'</div>':'';root.hidden=!ads.busy;document.querySelectorAll('[data-action="skip"]').forEach(b=>{b.disabled=ads.busy;b.textContent=ads.credits?'ПЕРЕМОТАТЬ 1 МЕСЯЦ':'1 МЕСЯЦ · ЗА РЕКЛАМУ';});}
+window.addEventListener('game-ad',e=>ads.handle(e.detail||{}));
+window.addEventListener('game-visibility',e=>{nativeVisible=!!e.detail;if(!nativeVisible)saveGame(game.state);});
+document.addEventListener('click',e=>{if(ads.busy){if(e.target.closest('[data-cancel-ad]'))ads.cancel();e.preventDefault();e.stopImmediatePropagation();}},true);
 
 function addCarouselControls() {
   if(window.innerWidth>760)return;
@@ -47,7 +55,7 @@ function render() {
   addCarouselControls();
   focusCurrentDistrict=false;
   if(menuOpen||citizenId)renderModal();
-  renderSkipTimer(game.state);
+  renderSkipTimer(game.state);updateAdStatus();
 }
 function renderModal() {
   const root=document.getElementById('modal-root');
@@ -73,13 +81,13 @@ function startJob(id) {
   if(game.state.pending){toast('Сначала прими решение в истории.','bad');return;}
   const ready=game.jobReady(id);if(!ready.ok){toast(ready.message,ready.tone);return;}
   const job=byId(jobs,id);
-  mini=new MiniGame(job,score=>{mini=null;if(score===null){render();toast('Смена прервана. Деньги за попытку не платят.','bad');return;}game.completeJob(id,score);});
+  mini=new MiniGame(job,score=>{mini=null;if(score===null){render();toast('Смена прервана. Деньги за попытку не платят.','bad');return;}const result=game.completeJob(id,score);if(result.ok)ads.noteAction();});
   renderModal();mini.start(renderModal);
 }
 function startCrime(id) {
   const ready=game.crimeReady(id);if(!ready.ok){toast(ready.message,ready.tone);return;}
   const gig=byId(crimes,id);
-  mini=new MiniGame(gig,score=>{mini=null;if(score===null){render();toast('Заказ сорвался. Пока без последствий.','bad');return;}game.completeCrime(id,score);});
+  mini=new MiniGame(gig,score=>{mini=null;if(score===null){render();toast('Заказ сорвался. Пока без последствий.','bad');return;}const result=game.completeCrime(id,score);if(result.ok)ads.noteAction();});
   renderModal();mini.start(renderModal);
 }
 function perform(action,id,months) {
@@ -100,11 +108,11 @@ function perform(action,id,months) {
   if(action==='hire'){game.hire(id);return;}
   if(action==='leave'){game.requestLeave();return;}
   if(action==='quit-career'){game.quitCareer();return;}
-  if(action==='career'){game.workCareer(id,months);return;}
+  if(action==='career'){requestMonth('career',id);return;}
   if(action==='diet'){game.setDiet(id);return;}
   if(action==='restart-after-death'){menuOpen=false;citizenId=null;tab='city';game.replaceState(freshState());return;}
   if(action==='serve'){game.serveSentence();return;}
-  if(action==='activity'){game.activity(id);return;}
+  if(action==='activity'){const result=game.activity(id);if(result.ok&&id==='sleep')ads.noteAction();return;}
   if(action.startsWith('buy-')){game.buy(action.slice(4),id);return;}
   if(action.startsWith('equip-')){game.equip(action.slice(6),id);return;}
   if(action.startsWith('manage-')){game.manageBusiness(id,action.slice(7));return;}
@@ -144,7 +152,7 @@ document.addEventListener('click',event=>{
   const peopleTab=event.target.closest('[data-people-mode]');
   if(peopleTab){peopleMode=peopleTab.dataset.peopleMode;railPositions.delete('people:0');render();return;}
   const casinoAction=event.target.closest('[data-casino-action]');
-  if(casinoAction){if(casinoAction.dataset.casinoAction==='close')game.closeCasino();else game.casinoAct(casinoAction.dataset.casinoAction,casinoAction.dataset.casinoValue);return;}
+  if(casinoAction){if(casinoAction.dataset.casinoAction==='close'){const result=game.closeCasino();if(result.ok)ads.noteAction();}else game.casinoAct(casinoAction.dataset.casinoAction,casinoAction.dataset.casinoValue);return;}
   const carousel=event.target.closest('[data-carousel]');
   if(carousel){const rail=document.getElementById(carousel.dataset.rail);if(rail)rail.scrollBy({left:Number(carousel.dataset.carousel)*(rail.firstElementChild?.getBoundingClientRect().width||rail.clientWidth)+Number(carousel.dataset.carousel)*10,behavior:'smooth'});return;}
   const travelMode=event.target.closest('[data-travel-mode]');
@@ -158,7 +166,7 @@ document.addEventListener('click',event=>{
   const miniButton=event.target.closest('[data-mini]');
   if(miniButton){mini?.input(miniButton.dataset.mini,miniButton.dataset.value);return;}
   const tabButton=event.target.closest('[data-tab]');
-  if(tabButton){tab=tabButton.dataset.tab;render();if(tabButton.classList.contains('scene-map'))document.getElementById('view')?.scrollIntoView({behavior:'smooth',block:'start'});else window.scrollTo(0,0);return;}
+  if(tabButton){tab=tabButton.dataset.tab;render();if(tabButton.classList.contains('scene-map'))document.getElementById('view')?.scrollIntoView({behavior:'smooth',block:'start'});else window.scrollTo(0,0);ads.tryInterstitial(adSafe());return;}
   const shop=event.target.closest('[data-shop]');
   if(shop){shopType=shop.dataset.shop;render();return;}
   const care=event.target.closest('[data-care-mode]');
@@ -171,7 +179,7 @@ document.addEventListener('click',event=>{
   if(button?.dataset.action==='book-hostel'){game.bookHostel(Number(button.closest('.hostel-booking').querySelector('.hostel-days').value));return;}
   if(button?.dataset.action==='skip'){
     const panel=button.closest('.skip-controls');
-    game.startTimeSkip(button.dataset.kind,button.dataset.id,Number(panel.querySelector('.skip-months').value),panel.querySelector('.skip-diet').value);
+    requestMonth(button.dataset.kind,button.dataset.id,panel.querySelector('.skip-diet').value);
     return;
   }
   if(button)perform(button.dataset.action,button.dataset.id,button.dataset.months);
@@ -187,6 +195,7 @@ document.addEventListener('change',async event=>{
   catch(error){toast(`Не удалось загрузить: ${error.message}`,'bad');}
 });
 document.addEventListener('keydown',event=>{
+  if(ads.busy){if(event.key==='Escape')ads.cancel();event.preventDefault();return;}
   if(event.code==='Space'&&mini?.job.game==='timing'){event.preventDefault();mini.input('timing');}
   if(event.key==='Escape'){
     if(menuOpen){menuOpen=false;renderModal();}
@@ -198,4 +207,4 @@ document.addEventListener('keydown',event=>{
 });
 window.addEventListener('beforeunload',()=>saveGame(game.state));
 setInterval(()=>saveGame(game.state),30000);
-setInterval(()=>{if(game.state.activeSkip)game.advanceTimeSkip();},1000/7);
+setInterval(()=>{if(game.state.activeSkip&&!ads.busy&&!document.hidden&&nativeVisible)game.advanceTimeSkip();},1000/7);

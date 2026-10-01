@@ -21,7 +21,7 @@ test('a late walk does not overlay a new meeting on a pending daily event',()=>{
  const [s,g]=setup();s.money=50000;s.day=3;s.hour=23;s.social.sergey.score=0;s.district='market';s.visitedDistricts.push('market');g.rng=()=>0;g.activity('walk');assert.equal(s.day,4);assert.ok(s.pending);assert.equal(s.recentIncident,null);
 });
 test('full time-skip receipts survive journal truncation and reload',()=>{
- const [s,g]=setup();hireCareer(s,'janitor');g.startTimeSkip('career','janitor',60,'basic');
+ const [s,g]=setup();hireCareer(s,'janitor');g.startTimeSkip('career','janitor',1,'basic');
  for(let i=0;i<10001;i++){s.money++;addLedger(s,'Зарплата',1,'Начисление');}
  const loaded=validate(JSON.parse(JSON.stringify(s))),resumed=new GameEngine(loaded,()=>.99);resumed.finishTimeSkip('');assert.equal(loaded.timeSkip.earned,10001);assert.equal(loaded.timeSkip.net,10001);
 });

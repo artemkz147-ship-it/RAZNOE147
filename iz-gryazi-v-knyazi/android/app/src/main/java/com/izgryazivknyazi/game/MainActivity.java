@@ -25,6 +25,7 @@ public class MainActivity extends Activity {
     private static final int EXPORT_REQUEST = 8;
     private static final String HOST = "appassets.androidplatform.net";
     private WebView webView;
+    private GameAdManager ads;
     private ValueCallback<Uri[]> importCallback;
     private String exportContent;
 
@@ -72,6 +73,9 @@ public class MainActivity extends Activity {
             }
         });
         webView.addJavascriptInterface(new Object() {
+            @JavascriptInterface public void showRewarded(String id) {runOnUiThread(() -> {if(trustedPage())ads.showRewarded(id);});}
+            @JavascriptInterface public void showInterstitial(String id) {runOnUiThread(() -> {if(trustedPage())ads.showInterstitial(id);});}
+            @JavascriptInterface public void cancelAd(String id) {runOnUiThread(() -> {if(trustedPage())ads.cancel(id);});}
             @JavascriptInterface public void saveJson(String json, String filename) {
                 runOnUiThread(() -> {
                     exportContent = json;
@@ -97,6 +101,7 @@ public class MainActivity extends Activity {
             });
         }
         setContentView(container);
+        ads=new GameAdManager(this,webView);
         webView.loadUrl("https://" + HOST + "/assets/game/index.html");
     }
 
@@ -116,6 +121,11 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
+        if(ads!=null&&ads.isShowing())return;
         webView.evaluateJavascript("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))", null);
     }
+    private boolean trustedPage(){return webView!=null&&webView.getUrl()!=null&&webView.getUrl().startsWith("https://"+HOST+"/assets/game/");}
+    @Override protected void onPause(){if(webView!=null)webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('game-visibility',{detail:false}))",null);super.onPause();}
+    @Override protected void onResume(){super.onResume();if(webView!=null)webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('game-visibility',{detail:true}))",null);}
+    @Override protected void onDestroy(){if(ads!=null)ads.destroy();if(webView!=null){webView.removeJavascriptInterface("AndroidGame");webView.destroy();}super.onDestroy();}
 }

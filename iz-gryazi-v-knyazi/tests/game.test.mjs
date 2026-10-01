@@ -52,10 +52,11 @@ test('ordinary days charge no automatic food and manual meals enter the diary',(
   assert.ok(s.ledger.some(x=>x.category==='Питание'&&x.amount===-180));
 });
 
-test('player chooses up to five years and skip records income, diet and actual stop',()=>{
+test('one month skip records income, diet and actual stop',()=>{
   const s=freshState(),game=new GameEngine(s,()=>.99);
   game.hire('janitor');s.money=50000;
-  assert.equal(game.skipTime('career','janitor',61,'basic').ok,false);
+  assert.equal(game.skipTime('career','janitor',3,'basic').ok,false);
+  assert.equal(game.skipTime('career','janitor',1.9,'basic').ok,false);
   assert.equal(game.skipTime('career','janitor',1,'expired').ok,true);
   assert.equal(s.timeSkip.diet,'expired');
   assert.equal(s.timeSkip.planned,30);

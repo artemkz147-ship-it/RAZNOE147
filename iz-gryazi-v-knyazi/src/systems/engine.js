@@ -35,9 +35,11 @@ const fail = message => ({ok:false,message,tone:'bad'});
 const homeRank = id => ['station','heating-main'].includes(id)?0:Math.min(7,homes.findIndex(h=>h.id===id));
 
 export class GameEngine {
-  constructor(state=freshState(),rng=Math.random) {
+  constructor(state=freshState(),rng=Math.random,{rewardedSkips=false}={}) {
+    this.rewardedSkips=rewardedSkips;this.skipRewards=0;
     this.prepareState(state);
     this.state=state; this.rng=rng; this.listeners=new Set();this.lastMoney=state.money;this.lastLedgerSeq=state.ledgerSeq||0;
+    if(rewardedSkips&&state.activeSkip&&!state.activeSkip.adRewarded)this.finishTimeSkip('Теперь перемотка доступна на месяц за рекламу.');
   }
   prepareState(state){
     if(state.romance?.conflict&&!activePartners(state).includes(state.romance.conflict.partnerId))dropPartner(state.romance,state.romance.conflict.partnerId);
@@ -341,14 +343,24 @@ export class GameEngine {
     if(!byId(diets,id))return this.emit(fail('Рацион не найден.'));
     this.state.skipDiet=id;return this.emit({ok:true,skipPreference:true,message:''});
   }
+  grantSkipReward(){this.skipRewards=1;}
+  timeSkipReady(kind,id,months=1,dietId=this.state.skipDiet||'basic'){
+    const blocked=this.guard();if(blocked)return blocked;
+    if(Number(months)!==1||!byId(diets,dietId))return fail('Перемотка доступна на один месяц.');
+    if(kind==='career'&&this.state.employment?.id!==id)return fail('Сначала устройся на работу.');
+    if(kind!=='career'&&(kind!=='business'||(id?!this.state.businesses[id]||this.state.businesses[id].paused:!Object.values(this.state.businesses).some(f=>!f.paused))))return fail('Нужен работающий бизнес.');
+    if(this.state.money<byId(diets,dietId).daily)return fail('Не хватает денег на выбранное питание.');
+    return success('Можно перемотать месяц.');
+  }
   startTimeSkip(kind,id,months=1,dietId=this.state.skipDiet||'basic'){
-    const blocked=this.guard();if(blocked)return this.emit(blocked);
+    const ready=this.timeSkipReady(kind,id,months,dietId);if(!ready.ok)return this.emit(ready);
+    if(this.rewardedSkips&&!this.skipRewards)return this.emit(fail('Для перемотки посмотри рекламу.'));
     const count=Number(months),diet=byId(diets,dietId),s=this.state;
-    if(!Number.isInteger(count)||count<1||count>60||!diet)return this.emit(fail('Выбери срок и питание.'));
+    if(!Number.isInteger(count)||count!==1||!diet)return this.emit(fail('Выбери срок и питание.'));
     if(kind==='career'&&s.employment?.id!==id)return this.emit(fail('Сначала устройся на работу.'));
     if(kind!=='career'&&(kind!=='business'||(id?!s.businesses[id]||s.businesses[id].paused:!Object.values(s.businesses).some(f=>!f.paused))))return this.emit(fail('Нужен работающий бизнес.'));
-    s.skipDiet=diet.id;s.diet=diet.id;
-    s.activeSkip={kind,id,name:kind==='career'?byId(careers,id).name:id?byId(businesses,id).name:'Свои дела',from:s.day,planned:count*30,worked:0,diet:diet.id,startMoney:s.money,startSeq:s.ledgerSeq||0,startReceipts:s.ledgerReceipts,status:'running'};
+    if(this.rewardedSkips)this.skipRewards--;s.skipDiet=diet.id;s.diet=diet.id;
+    s.activeSkip={kind,id,adRewarded:this.rewardedSkips,name:kind==='career'?byId(careers,id).name:id?byId(businesses,id).name:'Свои дела',from:s.day,planned:count*30,worked:0,diet:diet.id,startMoney:s.money,startSeq:s.ledgerSeq||0,startReceipts:s.ledgerReceipts,status:'running'};
     return this.emit({ok:true,timeSkipFrame:true,message:''});
   }
   skipObstacle(){
@@ -380,8 +392,9 @@ export class GameEngine {
     s.timeSkip={...p,to:s.day,earned,net,stop};s.lastWorkResult={kind:p.kind,title:p.name,earned,day:s.day,detail};s.activeSkip=null;addLog(s,detail,net>=0?'good':'bad');return this.emit(success(detail,net>=0?'good':'bad'));
   }
   runSkip({kind,id,name,months,dietId}){
-    const s=this.state,count=Math.floor(Number(months)),diet=byId(diets,dietId);
-    if(!Number.isInteger(count)||count<1||count>60||!diet)return this.emit(fail('Выбери срок и питание.'));
+    if(this.rewardedSkips)return this.emit(fail('Для перемотки используй кнопку месяца за рекламу.'));
+    const s=this.state,count=Number(months),diet=byId(diets,dietId);
+    if(!Number.isInteger(count)||count!==1||!diet)return this.emit(fail('Выбери срок и питание.'));
     s.diet=diet.id;const start=s.money,startingDay=s.day,startReceipts=s.ledgerReceipts,goal=count*30;let worked=0,stop='';
     for(let i=0;i<goal;i++){
       if(s.money<diet.daily){stop='Не хватает денег на ежедневное питание.';break;}
