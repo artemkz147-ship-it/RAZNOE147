@@ -62,7 +62,7 @@ jobs:
           base64 --decode smokeinterval_v15/patch.gz.b64 > smokeinterval_v15/patch.gz
           gzip -t smokeinterval_v15/patch.gz
           gzip -dc smokeinterval_v15/patch.gz > smokeinterval_v15/v1.5.patch
-          patch -p3 < smokeinterval_v15/v1.5.patch
+          patch -p4 < smokeinterval_v15/v1.5.patch
           grep -q "versionName '1.5.0'" SmokeInterval/app/build.gradle
           grep -q 'getBaseIntervalMin' SmokeInterval/app/src/main/java/com/example/smokeinterval/PlanStore.java
           grep -q 'Нажми на параметр' SmokeInterval/app/src/main/java/com/example/smokeinterval/SettingsActivity.java
