@@ -1,4 +1,4 @@
-name: Android APK
+name: Android release APK
 on:
   push:
     branches: [main, iz-gryazi-v-knyazi-apk]
@@ -35,21 +35,60 @@ jobs:
           mkdir -p iz-gryazi-v-knyazi/android/app/src/main/assets/game
           cp iz-gryazi-v-knyazi/index.html iz-gryazi-v-knyazi/android/app/src/main/assets/game/
           cp -R iz-gryazi-v-knyazi/src iz-gryazi-v-knyazi/android/app/src/main/assets/game/
-      - name: Build debug APK
-        run: gradle assembleDebug --no-daemon
+      - name: Prepare release signing when configured
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/game-release.p12"
+            chmod 600 "$RUNNER_TEMP/game-release.p12"
+            echo "ANDROID_RELEASE_KEYSTORE=$RUNNER_TEMP/game-release.p12" >> "$GITHUB_ENV"
+          fi
+      - name: Build release APK
+        run: gradle assembleRelease --no-daemon
         working-directory: iz-gryazi-v-knyazi/android
+        env:
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+      - name: Verify release manifest and prepare artifacts
+        id: release
+        run: |
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          apkdir=iz-gryazi-v-knyazi/android/app/build/outputs/apk/release
+          mkdir -p release-output
+          if [ -s "$apkdir/app-release.apk" ]; then
+            apk="$apkdir/app-release.apk"
+            "$tools/apksigner" verify --verbose --print-certs "$apk" > release-output/signature-verification.txt
+            ! grep -q 'CN=Android Debug' release-output/signature-verification.txt
+            cp "$apk" release-output/iz-gryazi-v-knyazi-release.apk
+            echo 'signed=true' >> "$GITHUB_OUTPUT"
+          else
+            apk="$apkdir/app-release-unsigned.apk"
+            test -s "$apk"
+            cp "$apk" release-output/iz-gryazi-v-knyazi-release-unsigned.apk
+            echo 'signed=false' >> "$GITHUB_OUTPUT"
+          fi
+          "$tools/aapt" dump badging "$apk" > release-output/apk-metadata.txt
+          ! grep -q '^application-debuggable' release-output/apk-metadata.txt
+          "$tools/aapt" dump xmltree "$apk" AndroidManifest.xml > release-output/AndroidManifest.txt
+          ! grep -Eq 'android:debuggable.*0xffffffff' release-output/AndroidManifest.txt
+          cp "$tools/lib/apksigner.jar" release-output/apksigner.jar
+          cp "$apkdir/output-metadata.json" release-output/output-metadata.json
+          sha256sum release-output/*.apk > release-output/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: iz-gryazi-v-knyazi-apk
-          path: iz-gryazi-v-knyazi/android/app/build/outputs/apk/debug/app-debug.apk
+          name: iz-gryazi-v-knyazi-release-build
+          path: release-output/
           if-no-files-found: error
-      - name: Publish direct APK
+      - name: Publish signed release APK
+        if: steps.release.outputs.signed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          apk=iz-gryazi-v-knyazi/android/app/build/outputs/apk/debug/app-debug.apk
-          tag=iz-gryazi-v-knyazi-${{ github.run_number }}
-          gh release create "$tag" "$apk#iz-gryazi-v-knyazi.apk" \
+          apk=release-output/iz-gryazi-v-knyazi-release.apk
+          tag=iz-gryazi-v-knyazi-release-${{ github.run_number }}
+          gh release create "$tag" "$apk" \
             --target "$GITHUB_SHA" \
-            --title "Из грязи в князи — APK ${{ github.run_number }}" \
-            --notes "Портретная версия игры для Android. Установочный APK собран автоматически из этого коммита."
+            --title "Из грязи в князи — release APK ${{ github.run_number }}" \
+            --notes "Подписанная release-сборка для Android. Отладка отключена."

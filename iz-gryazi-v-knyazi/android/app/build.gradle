@@ -8,8 +8,33 @@ android {
         applicationId 'com.izgryazivknyazi.game'
         minSdk 26
         targetSdk 35
-        versionCode 74
-        versionName '1.2.0'
+        versionCode 75
+        versionName '1.2.1'
+    }
+
+    def releaseKeyFile = System.getenv('ANDROID_RELEASE_KEYSTORE')
+    def releaseStorePassword = System.getenv('ANDROID_RELEASE_STORE_PASSWORD')
+    def releaseKeyAlias = System.getenv('ANDROID_RELEASE_KEY_ALIAS')
+    def releaseKeyPassword = System.getenv('ANDROID_RELEASE_KEY_PASSWORD')
+    def hasReleaseSigning = releaseKeyFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseKeyFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            debuggable false
+            minifyEnabled false
+            if (hasReleaseSigning) signingConfig signingConfigs.release
+        }
     }
 }
 
