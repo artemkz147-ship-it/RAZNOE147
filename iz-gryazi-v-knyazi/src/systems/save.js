@@ -46,6 +46,10 @@ function validateSchema(input,fresh){
     for(const [id,firm] of Object.entries(input.businesses)){if(!sets.business.has(id)||!record(firm)||!Number.isInteger(firm.level)||firm.level<1||firm.level>5||!finite(firm.condition)||firm.condition<0||firm.condition>100)invalid();optionalNumbers(firm,['level','condition','expenseFactor','boostUntil','capacity','lastDuty','orderUntil']);if(firm.staff!==undefined&&typeof firm.staff!=='boolean')invalid();if(firm.strategy!==undefined&&!['safe','normal','growth'].includes(firm.strategy))invalid();}
   }
   if(input.housing!==undefined&&input.housing!==null){if(!record(input.housing))invalid();optionalId(input.housing.id,sets.home);for(const key of ['since','nextDue'])if(input.housing[key]!==undefined&&!day(input.housing[key]))invalid();if(input.housing.multiplier!==undefined&&(!finite(input.housing.multiplier)||input.housing.multiplier<=0))invalid();if(input.housing.prepaidCost!==undefined&&(!finite(input.housing.prepaidCost)||input.housing.prepaidCost<0))invalid();}
+  optionalObject(input,'propertyAccounts');
+  for(const [id,a] of Object.entries(input.propertyAccounts||{})){
+    if(!['loft','duplex','penthouse','estate'].includes(id)||!record(a)||a.id!==id||!day(a.since)||!day(a.nextDue)||!finite(a.multiplier)||a.multiplier<=0)invalid();
+  }
   if(input.employment!==undefined&&input.employment!==null){const e=input.employment;if(!record(e)||!sets.career.has(e.id)||!finite(e.accrued)||e.accrued<0||!Number.isSafeInteger(e.lastShift)||e.lastShift<0)invalid();optionalNumbers(e,['since','nextPay','worked','accrued','lastShift','reviewDay','leaveUntil','medicalUntil','lastLeave','lastWorkedDay','absences','promotions','performance']);for(const key of ['since','nextPay','reviewDay'])if(!day(e[key]))invalid();}
   if(input.investments!==undefined)arrayField(input.investments,item=>record(item)&&sets.investment.has(item.id)&&finite(item.amount)&&item.amount>=0&&day(item.maturity));
   if(input.criminalCases!==undefined)arrayField(input.criminalCases,item=>record(item)&&typeof item.name==='string'&&day(item.day)&&day(item.due)&&day(item.expires)&&finite(item.fine)&&finite(item.jail)&&finite(item.risk));

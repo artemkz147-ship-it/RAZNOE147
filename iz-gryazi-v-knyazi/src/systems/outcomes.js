@@ -9,6 +9,7 @@ export function choiceOutcome(s,event,choice,rng,before={money:s.money,health:s.
  const branch=choice.risk?(rng()<choice.risk.chance?choice.risk.bad:choice.good):null;
  const consequence=branch||choice;
  if(branch){adjust(s,branch.effect);if(branch.effect?.money)addLedger(s,'Последствия решения',branch.effect.money,event.title);}
+ if(consequence.loss){const loss=Math.min(Math.max(0,s.money),consequence.loss);s.money-=loss;if(loss)addLedger(s,'Происшествие',-loss,event.title);}
  if(consequence.effect?.health<0)recordHarm(s,consequence.cause||event.cause||'injury',event.title+': '+consequence.reply);
  if(consequence.neglect)recordLifeFactor(s,'neglect',event.title+': не обработал травму');
  for(const [key,value] of Object.entries(consequence.condition||{}))s.conditions[key]=Math.max(s.conditions[key]||0,value);

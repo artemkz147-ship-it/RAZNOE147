@@ -33,6 +33,7 @@ phone.scene='found-phone';phone.choices[1].risk={chance:.45,bad:{title:'Заяв
 export function eventEligible(s,e){
  if(s.day<e.minDay||e.test&&!e.test(s))return false;
  if(e.needBusiness&&!Object.keys(s.businesses).length||e.needVehicle&&s.vehicle==='feet')return false;
+ if(e.id.startsWith('staff-')&&s.businesses[e.firmId]?.paused)return false;
  const kind=homeTerms(s.home).kind;
  if(['rent','renovation'].includes(e.id)&&kind!=='rent')return false;
  if(['leak','heating'].includes(e.id)&&!['rent','owned'].includes(kind))return false;

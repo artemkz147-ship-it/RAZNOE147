@@ -1,4 +1,4 @@
-import {housingDay,ensureHousing,homeTerms} from './housing.js';
+import {housingDay,pauseHousingBills,homeTerms} from './housing.js';
 import { homes, vehicles, businesses, districts } from '../data/world.js';
 import { investments } from '../data/investments.js';
 import { clamp, adjust, addLog, addLedger } from './state.js';
@@ -79,10 +79,10 @@ export function dailyBusiness(state,offline=false,rng=Math.random){
  return result;
 }
 export function dailySettlement(state,{offline=false,rng=Math.random,skipDiet=false,prison=false}={}) {
-  const home = byId(homes,state.home);
+  let home = byId(homes,state.home);
   const vehicle = byId(vehicles,state.vehicle);
   if(prison){
-    ensureHousing(state).nextDue++;if(state.employment){state.employment.nextPay++;state.employment.reviewDay++;}
+    pauseHousingBills(state);if(state.employment){state.employment.nextPay++;state.employment.reviewDay++;}
     const savedDiet=state.diet;state.diet='expired';dailyVitals(state,rng,{fed:true,prison:true});state.diet=savedDiet;
     state.lastSettlement={day:state.day,food:0,rent:0,transport:0,business:0,expenses:0,prison:true};
     return {business:0,expenses:0};
@@ -92,6 +92,7 @@ export function dailySettlement(state,{offline=false,rng=Math.random,skipDiet=fa
   const food=skipDiet?(byId(diets,state.diet)||diets[1]).daily:0;
   state.money+=business;
   const rent=housingDay(state,rng);
+  home=byId(homes,state.home);
   const otherExpenses = vehicle.upkeep + food + Math.floor(state.debt*.018);
   const expenses=rent+otherExpenses;
   state.money -= otherExpenses;

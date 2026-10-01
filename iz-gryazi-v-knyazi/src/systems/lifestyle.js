@@ -48,7 +48,7 @@ export function dailyVitals(state,rng=Math.random,{fed=false,prison=false}={}){
   }
   if(state.stats.health<=0){endLife(state,prison?'prison':undefined);return;}
   const illnessChance=(v.immunity<25?.055:0)+(v.exposure>45?.035:0)+(v.nutrition<15?.04:0);
-  if(encounterAllowed(state,'night-fever',14)&&state.stats.health<55&&rng()<illnessChance){
+  if(!prison&&encounterAllowed(state,'night-fever',14)&&state.stats.health<55&&rng()<illnessChance){
     recordEncounter(state,'night-fever');
     v.illness=clamp(v.illness+1,0,10);adjust(state,{health:-6,energy:-6});
     if(state.stats.health<=0){endLife(state,prison?'prison':'illness');return;}
