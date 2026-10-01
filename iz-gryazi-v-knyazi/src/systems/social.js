@@ -2,6 +2,7 @@ import { romancePeople } from '../data/romance.js';
 import { addLog,clamp } from './state.js';
 import { livingPeople,livingRomancePeople,isPresent } from './population.js';
 import { citizenLife,citizenWorth } from './citizens.js';
+import {encounterAllowed,recordEncounter} from './encounters.js';
 
 export const activePartners=state=>[...new Set([...(state.romance?.partners||[]),state.romance?.partner].filter(Boolean))];
 export function addPartner(romance,id){romance.partners=[...new Set([...(romance.partners||[]),romance.partner,id].filter(Boolean))];romance.partner=id;}
@@ -28,12 +29,13 @@ export function changeSocial(state,id,delta){
 }
 export function socialDay(state,rng){
   if(state.recentIncident||state.pending||state.romance?.conflict||state.jailDays||state.day<3||state.day%3!==0)return;
-  const pool=Object.keys(state.social||{}).filter(id=>isPresent(state,id)&&socialMet(state,id)&&!activePartners(state).includes(id)&&(socialValue(state,id)>=30||socialValue(state,id)<=-20));
+  const pool=Object.keys(state.social||{}).filter(id=>isPresent(state,id)&&socialMet(state,id)&&!activePartners(state).includes(id)&&encounterAllowed(state,'social-'+id,45)&&!(id==='sergey'&&state.home==='sofa'&&state.day-(state.sofaSince||1)>=30)&&(socialValue(state,id)>=30||socialValue(state,id)<=-20));
   if(!pool.length||rng()>=.28)return;
   const responding=pool.filter(id=>state.citizens?.[id]?.retaliation&&socialValue(state,id)<0);
   const candidates=responding.length?responding:pool;
   const id=candidates[Math.floor(rng()*candidates.length)],score=socialValue(state,id),person=[...livingPeople(state),...livingRomancePeople(state)].find(p=>p.id===id);
   if(!person)return;
+  recordEncounter(state,'social-'+id);
   const friend=score>=30,portrait=romancePeople.find(p=>p.id===id)?.portrait;
   const life=citizenLife(state,person),art={portrait,image:portrait===undefined?`person:${id}`:undefined,art:0,socialId:id};
   if(friend&&(life.bankrupt||life.debt>life.cash+10000)&&rng()<.55){
@@ -52,8 +54,8 @@ export function socialDay(state,rng){
     addLog(state,`${person.name}: ответ на твой предыдущий ход.`,'bad');return;
   }
   state.recentIncident=friend?{
-    title:`Встреча с ${person.name}`,text:`${person.name} узнал о твоём тяжёлом дне и предлагает помощь. Можно принять её или справиться самому.`,portrait,image:portrait===undefined?`person:${id}`:undefined,art:0,socialId:id,
-    choices:[{text:'Принять помощь',effect:{energy:9,stress:-3,contacts:1},socialDelta:3,reply:`${person.name} помог разобраться с делами. Сил стало больше.`},{text:'Поблагодарить и справиться самому',effect:{respect:1,mood:2},socialDelta:1,reply:'Ты поблагодарил за внимание и продолжил сам.'}]
+    title:'Вечер с '+person.name,text:id==='sergey'?'Серёга зовёт поесть супа и вместе убрать кухню.':id==='valera'?'Валера показывает свой верстак и объясняет, как выбирать инструмент для мелкого ремонта.':id==='tamara'?'Тамара предлагает вместе сверить квитанции и показания счётчиков.':person.name+' приглашает прогуляться после рабочего дня и спокойно поговорить.',portrait,image:portrait===undefined?'person:'+id:undefined,art:0,socialId:id,
+    choices:[{text:id==='sergey'?'Поесть и помочь с посудой':id==='valera'?'Разобраться в инструменте':id==='tamara'?'Сверить квитанции':'Прогуляться вместе',feed:id==='sergey',effect:id==='valera'?{energy:-4,business:2}:id==='tamara'?{energy:-4,business:1}:{energy:4,stress:-3,mood:3},socialDelta:3,reply:id==='sergey'?'Ты поел супа и вымыл посуду.':id==='valera'?'Валера показал различия инструмента и дал попробовать его на верстаке.':id==='tamara'?'Вы нашли ошибку в показаниях и исправили квитанцию.':'Вы провели вечер вместе. Разговор помог отдохнуть.'},{text:'Поблагодарить: сегодня занят',effect:{mood:1},socialDelta:1,reply:'Ты поблагодарил и продолжил свои дела.'}]
   }:{
     title:`Неприятный слух`,text:`После вашей ссоры ${person.name} пересказал знакомым свою версию событий. История уже дошла до тебя.`,portrait,image:portrait===undefined?`person:${id}`:undefined,art:0,socialId:id,
     choices:[{text:'Спокойно поговорить лично',effect:{energy:-5,stress:-2},socialDelta:8,reply:'Разговор не был тёплым, но слух перестал расти.'},{text:'Ответить публично',effect:{respect:2,stress:5,contacts:-1},socialDelta:-7,reply:'Ты ответил жёстко. Люди услышали обе стороны.'}]

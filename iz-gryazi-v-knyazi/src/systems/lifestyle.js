@@ -1,11 +1,14 @@
 import {endLife} from './endings.js';
 import { diets } from '../data/lifestyle.js';
 import { clamp,adjust,addLog } from './state.js';
+import {recordLifeFactor} from './lifeHistory.js';
+import {encounterAllowed,recordEncounter} from './encounters.js';
 
 export const ageOf = state => 30 + Math.floor((state.day-1)/360);
 export const calendarOf = state => ({month:Math.floor((state.day-1)/30)%12+1,year:Math.floor((state.day-1)/360)+1,day:(state.day-1)%30+1});
 
 export function receiveMedicalCare(state){
+  recordLifeFactor(state,'care','Обратился к врачу: получил лечение и время на восстановление');
   if(state.employment&&(state.vitals.illness||state.conditions.back||state.stats.health<45)){
     state.employment.medicalUntil=Math.max(state.employment.medicalUntil||0,state.day+2);
     addLog(state,'Врач оформил освобождение от работы до дня '+state.employment.medicalUntil+'.','good');
@@ -22,6 +25,13 @@ export function dailyVitals(state,rng=Math.random,{fed=false,prison=false}={}){
   v.unfedDays=fed||state.lastMealDay>0&&state.lastMealDay>=state.day-1?0:(v.unfedDays||0)+1;
   const diet=fed?(diets.find(x=>x.id===state.diet)||diets[1]):null;
   const shelter=!prison&&['station','heating-main'].includes(state.home);
+  if(diet?.id==='expired')recordLifeFactor(state,'food','Питался уценёнными и просроченными продуктами',diet.health);
+  if(shelter)recordLifeFactor(state,'cold',state.home==='station'?'Ночевал на вокзале без своей комнаты':'Ночевал у теплотрассы');
+  if(!fed&&v.nutrition===0)recordLifeFactor(state,'hunger','Оставался без еды с нулевой сытостью');
+  if(v.illness>0)recordLifeFactor(state,'illness','Болезнь сохранялась без полного восстановления');
+  if(v.illness>0&&state.day%7===0)recordLifeFactor(state,'neglect','Прошла неделя болезни без лечения');
+  if(state.lastRoutine?.energy>35||v.strain>65)recordLifeFactor(state,'strain','Регулярная нагрузка оставляла мало времени на восстановление');
+  if(prison)recordLifeFactor(state,'prison','Здоровье ухудшалось во время заключения');
   v.nutrition=clamp(v.nutrition+(diet?(diet.id==='expired'?-5:diet.id==='basic'?0:2):-9),0,100);
   v.immunity=clamp(v.immunity+(shelter?-2:1)+(diet?.id==='expired'?-2:diet?1:-3)+(state.conditions?.hangover? -2:0),0,100);
   v.exposure=clamp(v.exposure+(shelter?3:-3),0,100);
@@ -38,7 +48,8 @@ export function dailyVitals(state,rng=Math.random,{fed=false,prison=false}={}){
   }
   if(state.stats.health<=0){endLife(state,prison?'prison':undefined);return;}
   const illnessChance=(v.immunity<25?.055:0)+(v.exposure>45?.035:0)+(v.nutrition<15?.04:0);
-  if(state.stats.health<55&&rng()<illnessChance){
+  if(encounterAllowed(state,'night-fever',14)&&state.stats.health<55&&rng()<illnessChance){
+    recordEncounter(state,'night-fever');
     v.illness=clamp(v.illness+1,0,10);adjust(state,{health:-6,energy:-6});
     if(state.stats.health<=0){endLife(state,prison?'prison':'illness');return;}
     addLog(state,'Ночью поднялась температура. Условия жизни и питание сказались на здоровье.','bad');

@@ -448,11 +448,12 @@ test('relationship tab shows current couples only and moves exes into social gro
   assert.doesNotMatch(contactView(),/data-id="irina"/);
   assert.equal(game.romanceAction('marina','meet').ok,true);
   assert.doesNotMatch(relationshipView(),/class="romance-card/);
-  assert.match(contactView(),/data-romance-action="talk" data-id="marina"/);
+  assert.doesNotMatch(contactView(),/data-romance-action="talk" data-id="marina"/);
   s.romance.profiles.marina.rapport=30;
   assert.equal(game.romanceAction('marina','commit').ok,true);
   assert.match(relationshipView(),/class="romance-card/);
   assert.doesNotMatch(contactView(),/data-romance-action="talk" data-id="marina"/);
+  s.day++;
   assert.equal(game.romanceAction('marina','separate').ok,true);
   assert.doesNotMatch(relationshipView(),/class="romance-card/);
   assert.match(contactView(),/data-romance-action="talk" data-id="marina"/);
@@ -584,8 +585,8 @@ test('conversations have authored choices, persistent effects and no repeated to
   assert.equal(state.stats.respect,2);
   assert.equal(state.stats.energy,66);
   assert.match(state.log[0].text,/Гаражная смена/);
-  assert.match(shell(state,'people','home',null),/Работа без вывески/);
-  for(let i=1;i<dialogues.valera.length;i++)assert.equal(game.person('valera','talk',0).ok,true);
+  assert.match(shell(state,'people','home',null),/ТЕПЛОТА/);
+  for(let i=1;i<dialogues.valera.length;i++){state.day++;assert.equal(game.person('valera','talk',0).ok,true);}
   const energy=state.stats.energy,relationship=state.relations.valera;
   assert.equal(game.person('valera','talk',0).ok,false);
   assert.equal(state.stats.energy,energy);

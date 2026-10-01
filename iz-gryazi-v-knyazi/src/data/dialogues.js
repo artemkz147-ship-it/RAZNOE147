@@ -1,4 +1,6 @@
 import { people } from './people.js';
+import {socialValue} from '../systems/social.js';
+import {helpTopics} from '../systems/socialActivities.js';
 import { homes,businesses } from './world.js';
 import { careers } from './lifestyle.js';
 
@@ -189,6 +191,13 @@ function residentDialogues(person){
 function continuingDialogue(state,person){
   if(!person)return null;
   const name=person.name,progress=state.dialogueProgress?.[person.id]||0,variant=progress%2;
+  const warmth=socialValue(state,person.id),help=helpTopics[person.id];
+  if(help&&warmth>=12&&progress%4===0&&state.day-(state.social?.[person.id]?.lastOfferDay??-100)>=20&&!(person.id==='sergey'&&state.home==='sofa'&&state.day-(state.sofaSince||1)>=30))return {generic:true,topic:help[0],prompt:help[1],choices:[{text:'Обсудить детали и договориться',reply:'Вы договорились. Предложение доступно в карточке человека ещё три дня.',relation:3,effect:{stress:-1},offer:true},{text:'Сказать, что сейчас не готов',reply:'Вы спокойно отложили это дело. Договорённости о помощи нет.',relation:0,effect:{mood:1}}]};
+  if(warmth>=30&&progress%3===1){
+    const topics={sergey:['Личные границы','Серёга рассказывает, почему ему важно личное пространство.'],valera:['Первый заработок','Валера вспоминает, как начинал работать в гараже и однажды остался без оплаты.'],tamara:['История подъезда','Тамара вспоминает соседей, которые раньше жили в этом доме.'],azamat:['Цена доверия','Азамат рассказывает о поставщике, которому доверил деньги.'],lida:['Ошибка в начале карьеры','Лида делится историей о своём первом отчёте.'],vera:['История без публикации','Вера рассказывает о статье, которую решила не выпускать.'],artur:['Провал первой сделки','Артур вспоминает свою первую неудачную инвестицию.'],rosa:['Работа без выходных','Роза говорит, как тяжело много лет держать прилавок одной.'],pasha:['Люди в цехе','Паша вспоминает коллегу, который научил его беречь людей.'],zoya:['Трудное решение','Зоя рассказывает о деле, в котором отказалась идти против совести.']};
+    const t=topics[person.id]||['Своя история',`${name} делится личной историей, которую не рассказывает первому встречному.`];
+    return {generic:true,topic:t[0],prompt:t[1]+(warmth>=60?' «Тебе могу рассказать всё как было».':''),choices:[{text:'Выслушать и поделиться своей историей',reply:'Вы поговорили о личном. Доверие стало крепче.',relation:4,effect:{mood:3,stress:-3}},{text:'Отмахнуться и пошутить над этим',reply:'Собеседник замолчал. Он не ожидал насмешки над важной для него историей.',relation:-8,effect:{stress:3}}]};
+  }
   let topic,prompt,positive,negative,good,bad;
   if(state.stats.health<45||state.vitals?.illness>15||state.conditions?.back>20){
     topic='Как ты себя чувствуешь';

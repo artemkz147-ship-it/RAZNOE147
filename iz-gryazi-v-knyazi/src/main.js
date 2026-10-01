@@ -64,7 +64,7 @@ function toast(message,tone='good') {
     setTimeout(()=>scene.classList.remove('scene-shake','scene-glow'),520);
   }
 }
-game.subscribe((_,result)=>{if(result?.skipPreference)return;if(result?.timeSkipFrame){if(game.state.pending||game.state.recentIncident||game.state.romance?.conflict)render();else renderSkipTimer(game.state);return;}render();if(result&&!result.dialogueReply)toast(result.message,result.tone);});
+game.subscribe((_,result)=>{if(result?.skipPreference)return;if(result?.timeSkipFrame){if(game.state.pending||game.state.recentIncident||game.state.outcome||game.state.romance?.conflict)render();else renderSkipTimer(game.state);return;}render();if(result&&!result.dialogueReply)toast(result.message,result.tone);});
 render();
 if(loaded.offlineDays)toast(`Пока тебя не было, прошло ${loaded.offlineDays} дн. Доходы и расходы учтены.`,'story');
 
@@ -96,6 +96,7 @@ function perform(action,id,months) {
   if(action==='job'){startJob(id);return;}
   if(action==='crime'){startCrime(id);return;}
   if(action==='casino'){game.startCasino(id,document.getElementById('casino-stake')?.value);return;}
+  if(action==='acknowledge-outcome'){game.acknowledgeOutcome();return;}
   if(action==='hire'){game.hire(id);return;}
   if(action==='leave'){game.requestLeave();return;}
   if(action==='quit-career'){game.quitCareer();return;}
@@ -167,6 +168,7 @@ document.addEventListener('click',event=>{
   const chip=event.target.closest('[data-bet]');
   if(chip){const field=document.getElementById('casino-stake');if(field)field.value=chip.dataset.bet;return;}
   const button=event.target.closest('[data-action]');
+  if(button?.dataset.action==='book-hostel'){game.bookHostel(Number(button.closest('.hostel-booking').querySelector('.hostel-days').value));return;}
   if(button?.dataset.action==='skip'){
     const panel=button.closest('.skip-controls');
     game.startTimeSkip(button.dataset.kind,button.dataset.id,Number(panel.querySelector('.skip-months').value),panel.querySelector('.skip-diet').value);

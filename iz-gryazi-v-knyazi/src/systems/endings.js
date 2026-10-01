@@ -1,5 +1,6 @@
 import {homes,vehicles,businesses} from '../data/world.js';
 import {addLog} from './state.js';
+import {recordLifeFactor,deathHistory} from './lifeHistory.js';
 
 // The ending describes the actual cause and snapshots the life when it ends.
 const stories={
@@ -14,7 +15,7 @@ const stories={
 };
 export const endingCount=Object.keys(stories).length*3;
 function worth(s){return Math.round(s.money-s.debt+(s.investments||[]).reduce((n,item)=>n+item.amount,0)+s.ownedHomes.filter(id=>!['sofa','station','heating-main','hostel','room','flat'].includes(id)).reduce((n,id)=>n+(homes.find(h=>h.id===id)?.price||0),0)+s.ownedVehicles.reduce((n,id)=>n+(vehicles.find(v=>v.id===id)?.price||0),0)+Object.entries(s.businesses).reduce((n,[id,b])=>n+(businesses.find(x=>x.id===id)?.price||0)*(1+.45*(b.level-1)),0));}
-export function recordHarm(s,reason,detail){s.lastHarm={reason,detail,day:s.day};}
+export function recordHarm(s,reason,detail){s.lastHarm={reason,detail,day:s.day};recordLifeFactor(s,reason,detail);}
 export function fatalReason(s){
  if(s.vitals.unfedDays>=7&&s.vitals.nutrition===0)return 'hunger';
  if(s.lastHarm&&s.day-s.lastHarm.day<=3)return s.lastHarm.reason;
@@ -33,9 +34,9 @@ export function endingFor(s,reason=fatalReason(s),snapshot=null){
 }
 export function endLife(s,reason=fatalReason(s)){
  if(s.death)return s.death;
- s.death={...endingFor(s,reason),day:s.day,age:30+Math.floor((s.day-1)/360),home:s.home};
+ s.death={...endingFor(s,reason),day:s.day,age:30+Math.floor((s.day-1)/360),home:s.home,history:deathHistory(s,reason)};
  if(s.activeSkip){const p=s.activeSkip;s.timeSkip={...p,to:s.day,worked:s.day-p.from,earned:(s.ledger||[]).filter(x=>x.seq>p.startSeq&&x.amount>0).reduce((n,x)=>n+x.amount,0),net:s.money-p.startMoney,stop:'Жизнь закончилась.'};}
- s.activeSkip=null;s.pending=null;s.recentIncident=null;s.casinoTable=null;if(s.romance)s.romance.conflict=null;
+ s.activeSkip=null;s.pending=null;s.recentIncident=null;s.outcome=null;s.casinoTable=null;if(s.romance)s.romance.conflict=null;
  addLog(s,`${s.death.cause}. ${s.death.title}. Жизнь закончилась в ${s.death.age} лет.`,'bad');return s.death;
 }
 export function deathEnding(s){

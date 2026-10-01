@@ -28,6 +28,8 @@ contextEvents.push(
  {id:'street-cold',scene:'cold',cause:'cold',occurrence:{effect:{health:-4},illness:1,log:'Промокшая одежда и холодная ночь уже сказались на здоровье.'},scope:'housing',minDay:1,art:3,test:s=>homeTerms(s.home).kind==='street',title:'Холодная ночь',text:'Укрытие промокло. К утру начался кашель.',choices:[{text:'Зайти в тёплую столовую',cost:120,effect:{health:3,energy:4},log:'Ты согрелся, но нужен нормальный ночлег.'},{text:'Остаться',effect:{health:-6,energy:-8},log:'Холод ухудшил самочувствие.'}]},
  {id:'hostel-theft',scope:'housing',minDay:2,art:3,test:s=>s.home==='hostel',title:'Открытый шкафчик',text:'После ночёвки обнаружил, что шкафчик не заперт.',choices:[{text:'Проверить вещи и поставить замок',cost:250,effect:{stress:-2},log:'Вещи на месте. Замок куплен.'},{text:'Махнуть рукой',effect:{money:-100,stress:3},log:'Не досчитался небольшой суммы.'}]}
 );
+const phone=contextEvents.find(e=>e.id==='work-janitor-0');
+phone.scene='found-phone';phone.choices[1].risk={chance:.45,bad:{title:'Заявление о пропаже',reply:'Телефон нашли после заявления владельца. За присвоение находки работодатель расторг договор.',effect:{respect:-7,stress:8},fire:true,scene:'complaint'}};
 export function eventEligible(s,e){
  if(s.day<e.minDay||e.test&&!e.test(s))return false;
  if(e.needBusiness&&!Object.keys(s.businesses).length||e.needVehicle&&s.vehicle==='feet')return false;
@@ -35,6 +37,7 @@ export function eventEligible(s,e){
  if(['rent','renovation'].includes(e.id)&&kind!=='rent')return false;
  if(['leak','heating'].includes(e.id)&&!['rent','owned'].includes(kind))return false;
  if(['corporate-party'].includes(e.id)&&!s.employment)return false;
+ if(e.id==='blogger'&&!Object.values(s.businesses).some(f=>!f.paused))return false;
  if(e.id==='date'&&(!['lada','sedan','suv','limousine'].includes(s.vehicle)||!s.social?.sergey?.met||s.population?.departed?.sergey))return false;
  if(e.id==='employee'&&!Object.values(s.businesses).some(x=>x.staff))return false;
  if(e.id==='oldfriend'&&(!s.social?.valera?.met||s.population?.departed?.valera))return false;

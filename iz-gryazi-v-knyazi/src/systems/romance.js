@@ -1,4 +1,5 @@
 import { netWorth } from './economy.js';
+import {encounterAllowed,recordEncounter} from './encounters.js';
 import {recordHarm,endLife} from './endings.js';
 import { adjust,addLog,clamp } from './state.js';
 import { livingRomancePeople,isPresent } from './population.js';
@@ -24,7 +25,8 @@ export function romanceDay(state,rng){
   const r=state.romance;if(!r)return;
   const partners=activePartners(state);
   if(!partners.length){
-    if(netWorth(state)>=100000&&isPresent(state,'irina')&&!r.profiles.irina?.met&&rng()<.035){
+    if(encounterAllowed(state,'romance-meeting',60)&&netWorth(state)>=100000&&isPresent(state,'irina')&&!r.profiles.irina?.met&&rng()<.035){
+      recordEncounter(state,'romance-meeting');
       r.profiles.irina={rapport:0,meetings:0,lastDay:0,days:0,spent:0,appearance:0,last:'Ирина будто знала, где тебя искать.',met:true};
       notice(state,'Неожиданное знакомство','Ирина встретила тебя у выхода. Говорит, что это совпадение.',4,[{text:'Поговорить спокойно',effect:{contacts:1,stress:1},rapport:{id:'irina',delta:4},reply:'Разговор закончился, вопросы — нет.'},{text:'Уйти',effect:{stress:3,energy:-2},reply:'Она проводила взглядом до поворота.'}]);
     }
@@ -35,12 +37,26 @@ export function romanceDay(state,rng){
 function romancePartnerDay(state,rng,id){
   const r=state.romance,p=r.profiles[id];if(!p){dropPartner(r,id);return;}
   p.days++;p.appearance=Math.min(2,Math.floor(p.days/8));
+  const allowed=encounterAllowed(state,'relationship-'+id,14);
+  if(!allowed){if(id==='nina'&&!r.betrayedNina)adjust(state,{mood:p.married?4:2,stress:p.married?-4:-2,health:p.married?1:0});return;}
+  const before={money:state.money,health:state.stats.health,stress:state.stats.stress,notice:state.recentIncident,conflict:r.conflict};
   const apart=state.day-(p.lastDay||state.day),conflictChance=.07+(apart>=3?.15:0)+(p.rapport<25?.1:0)+(state.stats.stress>70?.1:0);
+  // Relationship-specific consequences take precedence over a generic quarrel.
+  if(id==='viktoria'&&netWorth(state)<500000){
+    dropPartner(r,id);changeSocial(state,id,-35);p.last='Доходы упали. Виктория сказала, что у вас теперь разные планы.';
+    notice(state,'Разные планы',p.last,3,[{text:'Отпустить',effect:{stress:4},reply:'Она уехала без долгого разговора.'},{text:'Попытаться удержать',effect:{stress:9,mood:-4},reply:'Решение она уже приняла.'}]);
+    addLog(state,p.last,'bad');recordEncounter(state,'relationship-'+id);return;
+  }
+  if(id==='irina'&&p.days>=6&&rng()<.14){
+    dropPartner(r,id);changeSocial(state,id,-80);recordHarm(state,'violence','Тяжёлая ссора с Ириной закончилась травмами.');adjust(state,{health:-32,respect:-14,stress:16});p.last='После тяжёлой ссоры ты попал в больницу. Ирина разнесла по знакомым выдуманные истории.';
+    notice(state,'После ссоры',p.last,4,[{text:'Лечиться и собирать доказательства',effect:{health:8,stress:-3},reply:'Здоровье медленно возвращается.'},{text:'Сразу опровергать слухи',effect:{respect:4,energy:-8},reply:'Часть знакомых поверила тебе.'}]);addLog(state,p.last,'bad');recordEncounter(state,'relationship-'+id);return;
+  }
   if(id.startsWith('resident-')&&p.days%7===0){p.rapport=clamp(p.rapport+(apart<3?1:-2),0,100);adjust(state,{mood:apart<3?2:-1});}
   if(p.days>=2&&!r.conflict&&rng()<conflictChance){
     const cause=apart>=3?'Ты давно не находил времени на встречу.':state.stats.stress>70?'Напряжение после тяжёлого дня перешло в разговор на повышенных тонах.':'Неосторожная фраза испортила общий вечер.';
     r.conflict={kind:'quarrel',partnerId:id,title:`Ссора с ${livingRomancePeople(state).find(x=>x.id===id)?.name}`,text:cause,day:state.day};
     p.quarrels=(p.quarrels||0)+1;addLog(state,`${r.conflict.title}: ${cause}`,'bad');
+    recordEncounter(state,'relationship-'+id);return;
   }
   if(id==='marina'){
     if(rng()<.38){const cost=Math.min(Math.max(0,state.money),120+Math.floor(rng()*220));state.money-=cost;adjust(state,{mood:2,stress:3,energy:-2});p.last=`Марина предложила спонтанный вечер. Ушло ${cost} ₽.`;addLog(state,p.last,'neutral');}
@@ -60,7 +76,7 @@ function romancePartnerDay(state,rng,id){
     else if(rng()<.28){const cost=Math.min(Math.max(0,state.money),1500+Math.floor(rng()*4500));state.money-=cost;p.spent+=cost;adjust(state,{mood:1,stress:2});p.last=`Очередной дорогой вечер: ${cost} ₽.`;addLog(state,p.last,'neutral');}
   }
   if(id==='irina'){
-    if(p.days>=6&&rng()<.14){dropPartner(r,id);changeSocial(state,id,-80);recordHarm(state,'violence','Тяжёлая ссора с Ириной закончилась травмами.');adjust(state,{health:-32,respect:-14,stress:16});p.last='После тяжёлой ссоры ты попал в больницу. Ирина разнесла по знакомым выдуманные истории.';notice(state,'После ссоры',p.last,4,[{text:'Лечиться и собирать доказательства',effect:{health:8,stress:-3},reply:'Здоровье медленно возвращается.'},{text:'Сразу опровергать слухи',effect:{respect:4,energy:-8},reply:'Часть знакомых поверила тебе.'}]);addLog(state,p.last,'bad');}
-    else if(rng()<.35){adjust(state,{stress:5,contacts:-1});p.last='Ирина требовала отчёта о каждом звонке. Разговор затянулся до ночи.';addLog(state,p.last,'bad');}
+    if(rng()<.35){adjust(state,{stress:5,contacts:-1});p.last='Ирина требовала отчёта о каждом звонке. Разговор затянулся до ночи.';addLog(state,p.last,'bad');}
   }
+  if(before.notice!==state.recentIncident||before.conflict!==r.conflict||id!=='nina'&&(before.money!==state.money||before.health!==state.stats.health||before.stress!==state.stats.stress))recordEncounter(state,'relationship-'+id);
 }

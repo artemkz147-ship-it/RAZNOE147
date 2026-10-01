@@ -1,6 +1,7 @@
 import { careers } from '../data/lifestyle.js';
 import { businesses } from '../data/world.js';
 import { adjust,addLog,addLedger } from './state.js';
+import {encounterAllowed,recordEncounter} from './encounters.js';
 export const careerShift=id=>({janitor:{start:6,end:15,energy:25,days:6},shop:{start:9,end:18,energy:22,days:6},mechanic:{start:8,end:17,energy:28,days:5},clerk:{start:9,end:18,energy:15,days:5},manager:{start:9,end:19,energy:21,days:5},director:{start:10,end:19,energy:19,days:5}}[id]);
 export const salaryFor=(s,c)=>Math.round(c.salary*(.8+Math.min(.4,(s.skills[c.skill]-1)*.04))*(1+(s.careerRaises?.[c.id]||0)*.12));
 export const businessDuty=(config,firm)=>firm.staff?{hours:1,energy:3}:{hours:['stall','canteen','cafe','pickup','laundry'].includes(config.id)?8:config.district==='yard'||config.district==='market'?6:4,energy:config.district==='industrial'?18:14};
@@ -31,8 +32,9 @@ export function routineDay(s,rng,{skip=false}={}){
     if(s.day>=e.nextPay){const pay=Math.round(e.accrued);s.money+=pay;s.totalEarned+=pay;addLedger(s,'Зарплата',pay,c.name);addLog(s,`${c.name}: зарплата ${pay} ₽.`,'good');e.accrued=0;e.nextPay+=30;s.careerMonths++;}
     if(s.day>=e.reviewDay){
       e.reviewDay+=30;const quality=(s.stats.health+s.stats.mood+s.stats.appeal+s.stats.respect)/4-s.stats.stress*.3;
-      if((e.absences||0)>=5||rng()<.015+(quality<35?.08:0)){dismissCareer(s,'Из-за пропусков или качества работы договор расторгнут. Повторное собеседование возможно через три месяца.');}
-      else if(quality>60&&rng()<.05){s.careerRaises||={};s.careerRaises[c.id]=(s.careerRaises[c.id]||0)+1;s.recentIncident||={title:'Повышение',text:'Начальник повысил оклад на 12%.',art:10};addLog(s,'Оклад вырос на 12%.','good');}
+      const randomReview=encounterAllowed(s,'career-review-'+c.id,30);
+      if((e.absences||0)>=5||randomReview&&rng()<.015+(quality<35?.08:0)){if((e.absences||0)<5)recordEncounter(s,'career-review-'+c.id);dismissCareer(s,'Из-за пропусков или качества работы договор расторгнут. Повторное собеседование возможно через три месяца.');}
+      else if(randomReview&&quality>60&&rng()<.05){recordEncounter(s,'career-review-'+c.id);s.careerRaises||={};s.careerRaises[c.id]=(s.careerRaises[c.id]||0)+1;s.recentIncident||={title:'Повышение',text:'Начальник повысил оклад на 12%.',art:10};addLog(s,'Оклад вырос на 12%.','good');}
       e.absences=0;
     }
   }

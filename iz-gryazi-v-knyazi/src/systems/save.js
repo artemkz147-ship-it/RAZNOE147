@@ -28,6 +28,10 @@ function validateSchema(input,fresh){
   if(input.day!==undefined&&!day(input.day)||input.hour!==undefined&&!hour(input.hour))invalid();
   optionalId(input.district,sets.district);optionalId(input.home,sets.home);optionalId(input.vehicle,sets.vehicle);
   optionalId(input.diet,sets.diet);optionalId(input.skipDiet,sets.diet);
+  optionalObject(input,'eventDays');for(const value of Object.values(input.eventDays||{}))if(!day(value))invalid();
+  if(input.skipEncounters!==undefined&&input.skipEncounters!==null){const b=input.skipEncounters;if(!record(b)||!Number.isSafeInteger(b.month)||b.month<0||!Number.isInteger(b.count)||b.count<0||b.count>2||!day(b.lastDay))invalid();}
+  if(input.lifeHistory!==undefined)arrayField(input.lifeHistory,x=>record(x)&&typeof x.kind==='string'&&typeof x.text==='string'&&day(x.from)&&day(x.to)&&x.to>=x.from&&Number.isInteger(x.count)&&x.count>0&&finite(x.change));
+  if(input.outcome!==undefined&&input.outcome!==null){const o=input.outcome;if(!record(o)||typeof o.title!=='string'||typeof o.text!=='string'||!day(o.day)||o.scene!==undefined&&typeof o.scene!=='string')invalid();if(o.changes!==undefined){if(!record(o.changes))invalid();optionalNumbers(o.changes,['money','health','energy']);}}
   if(input.vehicleFaults!==undefined){if(!record(input.vehicleFaults))invalid();for(const [id,fault] of Object.entries(input.vehicleFaults))if(!sets.vehicle.has(id)||id==='feet'||typeof fault!=='string')invalid();}
   for(const key of ['stats','skills','xp','vitals','conditions'])if(input[key]!==undefined)numericFields(input[key],fresh[key]);
   optionalNumbers(input,['debt','heat','jailDays','lastRestDay','lastMealDay','crimesDone','arrestCount','careerMonths','jobsDone','totalEarned','market','ledgerSeq','lastSaved','story']);
@@ -41,7 +45,7 @@ function validateSchema(input,fresh){
     if(!record(input.businesses))invalid();
     for(const [id,firm] of Object.entries(input.businesses)){if(!sets.business.has(id)||!record(firm)||!Number.isInteger(firm.level)||firm.level<1||firm.level>5||!finite(firm.condition)||firm.condition<0||firm.condition>100)invalid();optionalNumbers(firm,['level','condition','expenseFactor','boostUntil','capacity','lastDuty','orderUntil']);if(firm.staff!==undefined&&typeof firm.staff!=='boolean')invalid();if(firm.strategy!==undefined&&!['safe','normal','growth'].includes(firm.strategy))invalid();}
   }
-  if(input.housing!==undefined&&input.housing!==null){if(!record(input.housing))invalid();optionalId(input.housing.id,sets.home);for(const key of ['since','nextDue'])if(input.housing[key]!==undefined&&!day(input.housing[key]))invalid();if(input.housing.multiplier!==undefined&&(!finite(input.housing.multiplier)||input.housing.multiplier<=0))invalid();}
+  if(input.housing!==undefined&&input.housing!==null){if(!record(input.housing))invalid();optionalId(input.housing.id,sets.home);for(const key of ['since','nextDue'])if(input.housing[key]!==undefined&&!day(input.housing[key]))invalid();if(input.housing.multiplier!==undefined&&(!finite(input.housing.multiplier)||input.housing.multiplier<=0))invalid();if(input.housing.prepaidCost!==undefined&&(!finite(input.housing.prepaidCost)||input.housing.prepaidCost<0))invalid();}
   if(input.employment!==undefined&&input.employment!==null){const e=input.employment;if(!record(e)||!sets.career.has(e.id)||!finite(e.accrued)||e.accrued<0||!Number.isSafeInteger(e.lastShift)||e.lastShift<0)invalid();optionalNumbers(e,['since','nextPay','worked','accrued','lastShift','reviewDay','leaveUntil','medicalUntil','lastLeave','lastWorkedDay','absences','promotions','performance']);for(const key of ['since','nextPay','reviewDay'])if(!day(e[key]))invalid();}
   if(input.investments!==undefined)arrayField(input.investments,item=>record(item)&&sets.investment.has(item.id)&&finite(item.amount)&&item.amount>=0&&day(item.maturity));
   if(input.criminalCases!==undefined)arrayField(input.criminalCases,item=>record(item)&&typeof item.name==='string'&&day(item.day)&&day(item.due)&&day(item.expires)&&finite(item.fine)&&finite(item.jail)&&finite(item.risk));
@@ -73,7 +77,7 @@ function validateSchema(input,fresh){
       if(t.id==='blackjack')arrayField(t.rival,card);else arrayField(t.selected,n=>Number.isInteger(n)&&n>=0&&n<5);
     }
   }
-  if(input.activeSkip!==undefined&&input.activeSkip!==null){const p=input.activeSkip;if(!record(p)||!['career','business'].includes(p.kind))invalid();if(p.kind==='career'&&!sets.career.has(p.id))invalid();if(!sets.diet.has(p.diet)||!day(p.from)||!Number.isSafeInteger(p.planned)||p.planned<30||p.planned>1800||!Number.isSafeInteger(p.worked)||p.worked<0||p.worked>p.planned||!finite(p.startMoney)||!Number.isSafeInteger(p.startSeq)||p.startSeq<0)invalid();}
+  if(input.activeSkip!==undefined&&input.activeSkip!==null){const p=input.activeSkip;if(!record(p)||!['career','business'].includes(p.kind))invalid();if(p.kind==='career'&&!sets.career.has(p.id)||p.kind==='business'&&p.id&&!sets.business.has(p.id))invalid();if(!sets.diet.has(p.diet)||!day(p.from)||!Number.isSafeInteger(p.planned)||p.planned<30||p.planned>1800||!Number.isSafeInteger(p.worked)||p.worked<0||p.worked>p.planned||!finite(p.startMoney)||!Number.isSafeInteger(p.startSeq)||p.startSeq<0)invalid();}
   if(input.death!==undefined&&input.death!==null&&(!record(input.death)||!day(input.death.day)||!finite(input.death.age)||typeof input.death.cause!=='string'))invalid();
   for(const key of ['pending','recentIncident'])if(input[key]!==undefined&&input[key]!==null&&!record(input[key]))invalid();
 }
