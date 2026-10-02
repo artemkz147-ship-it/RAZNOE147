@@ -1,0 +1,10 @@
+{
+  "name":"100 игр офлайн",
+  "short_name":"100 игр",
+  "start_url":"./index.html",
+  "display":"standalone",
+  "background_color":"#0f1320",
+  "theme_color":"#121829",
+  "lang":"ru",
+  "description":"Сборник мини-игр, работающий без интернета"
+}
