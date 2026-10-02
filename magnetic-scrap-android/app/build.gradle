@@ -1,0 +1,22 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.artem.magneticscrap'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.artem.magneticscrap.rebuild'
+        minSdk 26
+        targetSdk 35
+        versionCode 50
+        versionName '5.0.0-rebuild'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.debug
+        }
+    }
+}
