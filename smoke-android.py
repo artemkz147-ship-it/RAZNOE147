@@ -104,11 +104,28 @@ try:
     shot('07-inventory.png')
     touch('#close-panel');time.sleep(.3)
     evaluate("__game.saveRun()")
+    saved_run=evaluate("localStorage.getItem('deadlight-run-v2')")
+    evaluate("setTimeout(()=>location.reload(),0)")
+    time.sleep(2)
+    for _ in range(60):
+        try:
+            if evaluate("Boolean(window.__game&&__game.spritesReady)"):break
+        except RuntimeError:pass
+        time.sleep(.2)
+    assert game()['state']=='menu'
+    touch('#inventory');time.sleep(.3)
+    assert evaluate("localStorage.getItem('deadlight-run-v2')")==saved_run,'Menu panel overwrote raid snapshot'
+    assert evaluate("__game.profile.equipment.claw&&__game.profile.upgrades.vitality===1"),'Profile did not persist reload'
+    touch('#close-panel');time.sleep(.3)
+    touch('#play');time.sleep(.3)
+    assert game()['state']=='play'
+    assert evaluate("__game.kills>=1&&__game.corpses[0].eaten"),'Raid did not persist reload'
+    shot('08-restored-raid.png')
     errors=evaluate("Boolean(window.__game&&document.querySelector('canvas').width>0)");assert errors
     logs=adb('logcat','-d')
     assert 'FATAL EXCEPTION' not in logs,'Android crash; see logcat.txt'
     assert not re.search(r'Uncaught (SyntaxError|ReferenceError|TypeError)',logs),'JavaScript error; see logcat.txt'
-    (OUT/'result.json').write_text(json.dumps({'launch':'passed','touch_movement':'passed','double_jump':'passed','attack':'passed','dash':'passed','pause_resume':'passed','crash_check':'passed','sprites':'passed','specials_energy':'passed','corpse_feeding':'passed','potions':'passed','mutation_purchase':'passed','inventory_equip':'passed'},indent=2))
+    (OUT/'result.json').write_text(json.dumps({'launch':'passed','touch_movement':'passed','double_jump':'passed','attack':'passed','dash':'passed','pause_resume':'passed','crash_check':'passed','sprites':'passed','specials_energy':'passed','corpse_feeding':'passed','potions':'passed','mutation_purchase':'passed','inventory_equip':'passed','offline_reload':'passed','menu_save_preserved':'passed'},indent=2))
     print('PASS: APK installed, Android WebView rendered, physical touch movement/double jump/attack/dash, native back pause/resume, no crash')
 finally:
     if client:
