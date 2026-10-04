@@ -43,9 +43,14 @@ try:
             if evaluate("Boolean(window.__game&&document.querySelector('#play'))"):break
         except (OSError,StopIteration,RuntimeError):time.sleep(.5)
     else:raise RuntimeError('Android WebView game did not become ready')
+    time.sleep(5)
     assert game()['state']=='menu'
     shot('01-menu.png')
-    touch('#play');time.sleep(.15);assert game()['state']=='play'
+    touch('#play');
+    for _ in range(30):
+        if game()['state']=='play':break
+        time.sleep(.1)
+    assert game()['state']=='play'
     evaluate("window.__touchEvents=[];for(let name of ['pointerdown','pointerup','pointercancel','lostpointercapture','touchstart','touchend'])document.addEventListener(name,e=>window.__touchEvents.push({name:name,target:e.target.outerHTML,key:window.__game.keys.d}),true)")
     (OUT/'layout.json').write_text(evaluate("JSON.stringify({width:innerWidth,height:innerHeight,ratio:devicePixelRatio,hidden:document.hidden,buttons:[...document.querySelectorAll('[data-key]')].map(b=>({key:b.dataset.key,rect:b.getBoundingClientRect().toJSON(),display:getComputedStyle(b.parentElement.parentElement).display}))})"))
     shot('02-gameplay.png')
