@@ -29,7 +29,7 @@ def game():return json.loads(evaluate("JSON.stringify({state:window.__game.state
 try:
     # boot_completed precedes Android 15's initial package/resource updates.
     time.sleep(25)
-    adb('install','-r','DEADLIGHT-1.0.apk');adb('logcat','-c')
+    adb('install','-r','DEADLIGHT-2.0.apk');adb('logcat','-c')
     adb('shell','settings','put','secure','immersive_mode_confirmations','confirmed')
     result=adb('shell','am','start','-W','-n','com.deadlight.game/.MainActivity')
     (OUT/'launch.txt').write_text(result)
@@ -42,7 +42,7 @@ try:
             targets=json.loads(urllib.request.urlopen('http://127.0.0.1:9222/json',timeout=3).read())
             target=next(t for t in targets if '/assets/index.html' in t.get('url',''))
             client=websocket.create_connection(target['webSocketDebuggerUrl'],timeout=10,suppress_origin=True)
-            if evaluate("Boolean(window.__game&&document.querySelector('#play'))"):break
+            if evaluate("Boolean(window.__game&&window.__game.spritesReady&&document.querySelector('#play'))"):break
         except (OSError,StopIteration,RuntimeError):time.sleep(.5)
     else:raise RuntimeError('Android WebView game did not become ready')
     time.sleep(5)
@@ -72,11 +72,43 @@ try:
         if game()['state']=='play':break
         time.sleep(.1)
     assert game()['state']=='play'
+    # Physical controls with deterministic health/energy test fixtures.
+    evaluate("Object.assign(__game.p,{energy:100,attack:0,attackCd:0,special:0,specialCd:0,dash:0,inv:99});")
+    touch('[data-key="q"]');time.sleep(.1)
+    assert evaluate("__game.p.energy<80&&__game.p.special>0"),'Plague button or energy cost failed'
+    time.sleep(.8)
+    evaluate("Object.assign(__game.p,{y:565,vy:0,ground:true,x:200,specialCd:0,energy:100});")
+    touch('[data-key="r"]');time.sleep(.15)
+    assert evaluate("__game.p.energy<70&&__game.p.special>0"),'Slam button or energy cost failed'
+    time.sleep(1)
+    evaluate("(()=>{let e=__game.enemies[0];e.hp=12;Object.assign(__game.p,{x:e.x-60,y:e.y,vy:0,ground:true,face:1,attack:0,attackCd:0,special:0,hp:40,energy:10,inv:99});})()")
+    touch('[data-key="j"]');time.sleep(.6)
+    assert evaluate("__game.kills>=1&&__game.corpses.length>0"),'Claw hit did not create corpse'
+    evaluate("(()=>{let c=__game.corpses[0];Object.assign(__game.p,{x:c.x,y:c.y,vy:0,ground:true,attack:0,attackCd:0});})()")
+    touch('[data-key="e"]');time.sleep(2)
+    assert evaluate("__game.corpses[0].eaten&&__game.p.hp>=75&&__game.p.energy>=55"),'Feeding did not restore health and energy'
+    shot('05-feeding.png')
+    evaluate("__game.p.hp=10;__game.profile.inventory.life=2")
+    touch('#use-life');time.sleep(.2)
+    assert evaluate("__game.p.hp===60&&__game.profile.inventory.life===1"),'Potion consumption failed'
+    evaluate("__game.profile.points=1")
+    touch('#mutations');time.sleep(.3)
+    touch('[data-perk="vitality"]');time.sleep(.2)
+    assert evaluate("__game.profile.upgrades.vitality===1&&__game.profile.points===0"),'Mutation purchase failed'
+    shot('06-mutations.png')
+    touch('#close-panel');time.sleep(.3)
+    evaluate("__game.profile.inventory.claw=1")
+    touch('#inventory');time.sleep(.3)
+    touch('[data-item="claw"]');time.sleep(.2)
+    assert evaluate("__game.profile.equipment.claw===true"),'Relic equip failed'
+    shot('07-inventory.png')
+    touch('#close-panel');time.sleep(.3)
+    evaluate("__game.saveRun()")
     errors=evaluate("Boolean(window.__game&&document.querySelector('canvas').width>0)");assert errors
     logs=adb('logcat','-d')
     assert 'FATAL EXCEPTION' not in logs,'Android crash; see logcat.txt'
     assert not re.search(r'Uncaught (SyntaxError|ReferenceError|TypeError)',logs),'JavaScript error; see logcat.txt'
-    (OUT/'result.json').write_text(json.dumps({'launch':'passed','touch_movement':'passed','double_jump':'passed','attack':'passed','dash':'passed','pause_resume':'passed','crash_check':'passed'},indent=2))
+    (OUT/'result.json').write_text(json.dumps({'launch':'passed','touch_movement':'passed','double_jump':'passed','attack':'passed','dash':'passed','pause_resume':'passed','crash_check':'passed','sprites':'passed','specials_energy':'passed','corpse_feeding':'passed','potions':'passed','mutation_purchase':'passed','inventory_equip':'passed'},indent=2))
     print('PASS: APK installed, Android WebView rendered, physical touch movement/double jump/attack/dash, native back pause/resume, no crash')
 finally:
     (OUT/'logcat.txt').write_text(adb('logcat','-d'))

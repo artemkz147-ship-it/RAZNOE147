@@ -63,7 +63,7 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onResume() { super.onResume(); if (game != null) game.onResume(); }
     @Override @SuppressWarnings("deprecation") public void onBackPressed() {
-        game.evaluateJavascript("(function(){if(window.__game&&['play','paused'].includes(window.__game.state)){window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));return true;}return false;})()", result -> { if (!"true".equals(result)) finish(); });
+        game.evaluateJavascript("(function(){if(window.__game&&['play','paused','panel'].includes(window.__game.state)){window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));return true;}return false;})()", result -> { if (!"true".equals(result)) finish(); });
     }
     @Override protected void onDestroy() { if (game != null) { game.stopLoading(); game.destroy(); game = null; } super.onDestroy(); }
 }

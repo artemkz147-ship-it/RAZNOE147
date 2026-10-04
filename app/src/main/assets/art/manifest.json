@@ -1,0 +1,57 @@
+{
+  "shrine.webp": {
+    "width": 357,
+    "height": 411,
+    "sha256": "a76f5ad0f2bb85eef84612a373e5965dda0709eba1b042abf33925187b95d169"
+  },
+  "claw.webp": {
+    "width": 100,
+    "height": 160,
+    "sha256": "fa9a5718529f598aca3a8e8c62c5f4861ad6d38ce1804cbdb739bef66808383a"
+  },
+  "city.webp": {
+    "width": 1536,
+    "height": 1024,
+    "sha256": "ea46601c922665129df42a4c836a030fbeaecfb2e2cfca052790823d46696d3a"
+  },
+  "roof.webp": {
+    "width": 544,
+    "height": 221,
+    "sha256": "70e2ff7e9e81a11ab1c315a27843578ecd95394349d4008de643548cb4f2779e"
+  },
+  "soldiers.webp": {
+    "width": 1536,
+    "height": 1024,
+    "sha256": "d2d3b0f67b73e32191f9b2b4bb1a908c86593d226d2c11e1b274eb958ccd5ca7"
+  },
+  "energy.webp": {
+    "width": 62,
+    "height": 160,
+    "sha256": "00e842140e73ea716f82aae113970691903b5f0e9346b7664909a024721b149b"
+  },
+  "life.webp": {
+    "width": 131,
+    "height": 160,
+    "sha256": "1377c4ee29844bd98d006bfb0626d5af7b6d247378c9b8fa5a65d4e2342d74f5"
+  },
+  "crate.webp": {
+    "width": 319,
+    "height": 253,
+    "sha256": "c314428cfbd25f9293c1a9b64860e4f9fa6639436c58183d9a6da8b469770b1a"
+  },
+  "armour.webp": {
+    "width": 137,
+    "height": 160,
+    "sha256": "21dbcf13968a01a8f104513d4926c2a976d35e31367ba7472e8c43defcb73b75"
+  },
+  "hero.webp": {
+    "width": 1536,
+    "height": 1536,
+    "sha256": "b9afad6b6a5b8e1a636d785c0348a9fba4d099d4790f15bcd1d3891465375af3"
+  },
+  "catwalk.webp": {
+    "width": 447,
+    "height": 127,
+    "sha256": "e6327b02a88d5b7739d09db25715fe840637516bf7d1d63db171626bce80636a"
+  }
+}

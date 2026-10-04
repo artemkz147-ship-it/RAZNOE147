@@ -33,17 +33,19 @@ jobs:
         run: |
           node --check app/src/main/assets/game.js
           node qa.cjs
+          node progression-test.cjs
+          node asset-test.cjs
       - name: Build installable APK
         run: gradle --no-daemon :app:assembleDebug :app:lintDebug --stacktrace
       - name: Name APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk DEADLIGHT-1.0.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk DEADLIGHT-2.0.apk
       - name: Verify APK signature
-        run: '"$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose DEADLIGHT-1.0.apk'
+        run: '"$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose DEADLIGHT-2.0.apk'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: DEADLIGHT-Android-APK
-          path: DEADLIGHT-1.0.apk
+          path: DEADLIGHT-2.0.apk
           if-no-files-found: error
           retention-days: 30
       - name: Set up WebView test client
