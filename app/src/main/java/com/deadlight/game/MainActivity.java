@@ -20,6 +20,9 @@ public final class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         fullscreen();
+        if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            WebView.setWebContentsDebuggingEnabled(true);
+        }
         game = new WebView(this);
         game.setBackgroundColor(0xff10191b);
         WebSettings settings = game.getSettings();

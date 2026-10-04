@@ -46,6 +46,10 @@ jobs:
           path: DEADLIGHT-1.0.apk
           if-no-files-found: error
           retention-days: 30
+      - name: Set up WebView test client
+        run: |
+          python3 -m venv .smoke-venv
+          .smoke-venv/bin/pip install websocket-client==1.8.0
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -59,7 +63,7 @@ jobs:
           profile: pixel_2
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          script: python3 smoke-android.py
+          script: .smoke-venv/bin/python smoke-android.py
       - name: Upload launch evidence
         if: always()
         uses: actions/upload-artifact@v4
