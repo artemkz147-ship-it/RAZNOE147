@@ -27,6 +27,8 @@ def touch(selector,duration=0):
 def game():return json.loads(evaluate("JSON.stringify({state:window.__game.state,x:window.__game.p.x,y:window.__game.p.y,attack:window.__game.p.attack,dashCd:window.__game.p.dashCd,jumps:window.__game.p.jumps})"))
 
 try:
+    # boot_completed precedes Android 15's initial package/resource updates.
+    time.sleep(25)
     adb('install','-r','DEADLIGHT-1.0.apk');adb('logcat','-c')
     adb('shell','settings','put','secure','immersive_mode_confirmations','confirmed')
     result=adb('shell','am','start','-W','-n','com.deadlight.game/.MainActivity')
