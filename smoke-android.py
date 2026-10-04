@@ -21,8 +21,8 @@ def evaluate(expression):
 def touch(selector,duration=0):
     rect=evaluate("JSON.stringify((function(){let r=document.querySelector("+json.dumps(selector)+").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,ratio:devicePixelRatio};})())")
     r=json.loads(rect);x=str(round(r['x']*r['ratio']));y=str(round(r['y']*r['ratio']))
-    if duration:adb('shell','input','swipe',x,y,x,y,str(duration))
-    else:adb('shell','input','tap',x,y)
+    if duration:adb('shell','input','touchscreen','swipe',x,y,x,y,str(duration))
+    else:adb('shell','input','touchscreen','tap',x,y)
 
 def game():return json.loads(evaluate("JSON.stringify({state:window.__game.state,x:window.__game.p.x,y:window.__game.p.y,attack:window.__game.p.attack,dashCd:window.__game.p.dashCd,jumps:window.__game.p.jumps})"))
 
@@ -46,7 +46,11 @@ try:
     assert game()['state']=='menu'
     shot('01-menu.png')
     touch('#play');time.sleep(.15);assert game()['state']=='play'
-    before=game();touch('[data-key="d"]',350);time.sleep(.1);after=game()
+    evaluate("window.__touchEvents=[];for(let name of ['pointerdown','pointerup','pointercancel','lostpointercapture','touchstart','touchend'])document.addEventListener(name,e=>window.__touchEvents.push({name:name,target:e.target.outerHTML,key:window.__game.keys.d}),true)")
+    (OUT/'layout.json').write_text(evaluate("JSON.stringify({width:innerWidth,height:innerHeight,ratio:devicePixelRatio,hidden:document.hidden,buttons:[...document.querySelectorAll('[data-key]')].map(b=>({key:b.dataset.key,rect:b.getBoundingClientRect().toJSON(),display:getComputedStyle(b.parentElement.parentElement).display}))})"))
+    shot('02-gameplay.png')
+    before=game();touch('[data-key="d"]',1000);time.sleep(.1);after=game()
+    (OUT/'input.json').write_text(evaluate("JSON.stringify({events:window.__touchEvents,keys:window.__game.keys,step:window.__game.p.step})"))
     assert after['x']>before['x']+20,(before,after)
     shot('02-gameplay.png')
     touch('[data-key=" "]');time.sleep(.1);after=game();assert after['jumps']>=1,after
