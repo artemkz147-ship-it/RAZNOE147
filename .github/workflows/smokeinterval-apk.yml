@@ -1,4 +1,4 @@
-name: Build Shag bez sigaret APK
+name: Build Shag bez sigaret RELEASE
 
 on:
   push:
@@ -125,19 +125,59 @@ jobs:
         with:
           gradle-version: '9.6.0'
 
-      - name: Build installable debug APK
-        run: gradle --no-daemon -p SmokeInterval assembleDebug --stacktrace
+      - name: Build release APK
+        run: gradle --no-daemon -p SmokeInterval assembleRelease --stacktrace
 
-      - name: Prepare APK
+      - name: Generate release signing key
+        shell: bash
         run: |
-          APK=$(find SmokeInterval/app/build/outputs/apk/debug -name '*.apk' | head -1)
-          test -n "$APK"
-          cp "$APK" Shag-bez-sigaret-v1.9.apk
-          sha256sum Shag-bez-sigaret-v1.9.apk
+          set -euo pipefail
+          STORE_PASS=$(openssl rand -hex 24)
+          KEY_PASS=$(openssl rand -hex 24)
+          echo "STORE_PASS=$STORE_PASS" >> "$GITHUB_ENV"
+          echo "KEY_PASS=$KEY_PASS" >> "$GITHUB_ENV"
+          keytool -genkeypair -v             -keystore Shag-bez-sigaret-release.jks             -storetype JKS             -storepass "$STORE_PASS"             -keypass "$KEY_PASS"             -alias shag-bez-sigaret             -keyalg RSA             -keysize 4096             -validity 10000             -dname "CN=Shag bez sigaret, OU=Release, O=Shag bez sigaret, L=Berlin, ST=Berlin, C=DE"
 
-      - name: Upload APK
+      - name: Align and sign release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNSIGNED=$(find SmokeInterval/app/build/outputs/apk/release -name '*unsigned*.apk' | head -1)
+          test -n "$UNSIGNED"
+          ZIPALIGN="$ANDROID_HOME/build-tools/36.0.0/zipalign"
+          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          "$ZIPALIGN" -p -f 4 "$UNSIGNED" Shag-bez-sigaret-v1.9-release-aligned.apk
+          "$APKSIGNER" sign             --ks Shag-bez-sigaret-release.jks             --ks-key-alias shag-bez-sigaret             --ks-pass "pass:$STORE_PASS"             --key-pass "pass:$KEY_PASS"             --out Shag-bez-sigaret-v1.9-release.apk             Shag-bez-sigaret-v1.9-release-aligned.apk
+          "$APKSIGNER" verify --verbose --print-certs Shag-bez-sigaret-v1.9-release.apk | tee apksigner-verify.txt
+          sha256sum Shag-bez-sigaret-v1.9-release.apk | tee release-sha256.txt
+          {
+            echo "App: Шаг без сигарет — курить реже"
+            echo "Version: 1.9.0"
+            echo "Version code: 10"
+            echo "Package: com.example.smokeinterval"
+            echo "Key alias: shag-bez-sigaret"
+            echo "Keystore password: $STORE_PASS"
+            echo "Key password: $KEY_PASS"
+            echo
+            cat apksigner-verify.txt
+            echo
+            cat release-sha256.txt
+          } > RELEASE-SIGNING-INFO.txt
+
+      - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
-          name: Shag-bez-sigaret-v1.9-APK
-          path: Shag-bez-sigaret-v1.9.apk
+          name: Shag-bez-sigaret-v1.9-RELEASE
+          path: Shag-bez-sigaret-v1.9-release.apk
+          if-no-files-found: error
+
+      - name: Upload signing backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shag-bez-sigaret-v1.9-SIGNING-BACKUP
+          path: |
+            Shag-bez-sigaret-release.jks
+            RELEASE-SIGNING-INFO.txt
+            release-sha256.txt
+            apksigner-verify.txt
           if-no-files-found: error
