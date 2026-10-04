@@ -1,5 +1,6 @@
 const canvas=document.querySelector('#world');let ctx=canvas.getContext('2d');
 let W=1280;const $=s=>document.querySelector(s),H=720,WORLD=5600,keys={},pressed={};
+let paintedState='',hudCache={};
 let state='menu',t=0,last=0,camera=0,shake=0,kills=0,soundOn=false,audio,checkpoint=150,toastTime=0;
 const p={x:820,y:420,vx:0,vy:0,w:32,h:78,face:1,hp:100,ground:false,jumps:0,attack:0,attackCd:0,dash:0,dashCd:0,inv:0,step:0};
 let enemies=[],shots=[],particles=[],orbs=[],combo=0;
@@ -7,7 +8,7 @@ const platforms=[{x:0,y:565,w:900},{x:1000,y:545,w:560},{x:1670,y:565,w:630},{x:
 const enemySpawns=[660,1300,1940,2180,2710,3430,4140,4820];
 function rng(seed){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}}
 const rand=rng(471);const rain=Array.from({length:90},()=>({x:rand()*W,y:rand()*H,s:rand()*1.7+.5}));
-function resize(){const d=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*d;canvas.height=innerHeight*d;}addEventListener('resize',resize);resize();
+function resize(){const d=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*d;canvas.height=innerHeight*d;paintedState='';}addEventListener('resize',resize);resize();
 function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h)}
 function path(points,color,width=1){ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke()}
 function poly(points,color){ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fillStyle=color;ctx.fill()}
@@ -65,7 +66,7 @@ function render(){ctx.setTransform(canvas.width/W,0,0,canvas.height/H,0,0);ctx.s
 function burst(x,y,c,n=16){for(let i=0;i<n;i++){let ang=Math.random()*Math.PI*2,sp=40+Math.random()*200;particles.push({x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:.3+Math.random()*.5,c,size:2+Math.random()*3})}}
 function sfx(freq=130,dur=.1,type='sawtooth',vol=.03){if(!soundOn)return;if(!audio)audio=new(window.AudioContext||window.webkitAudioContext)();audio.resume();let osc=audio.createOscillator(),g=audio.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,audio.currentTime);osc.frequency.exponentialRampToValueAtTime(freq*.35,audio.currentTime+dur);g.gain.setValueAtTime(vol,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+dur);osc.connect(g);g.connect(audio.destination);osc.start();osc.stop(audio.currentTime+dur)}
 function toast(text){$('#toast').textContent=text;$('#toast').style.opacity=1;toastTime=2.8}
-function updateHUD(){$('#health').style.width=p.hp+'%';$('#hp').textContent=Math.ceil(p.hp);$('#kills').innerHTML=String(kills).padStart(2,'0')+'<span>/ 08</span>';$('#dash').textContent=p.dashCd>0?'ПЕРЕЗАРЯДКА':'ГОТОВ'}
+function updateHUD(){const hp=Math.ceil(p.hp),ready=p.dashCd<=0;if(hudCache.hp!==hp){$('#health').style.width=p.hp+'%';$('#hp').textContent=hp;hudCache.hp=hp}if(hudCache.kills!==kills){$('#kills').innerHTML=String(kills).padStart(2,'0')+'<span>/ 08</span>';hudCache.kills=kills}if(hudCache.ready!==ready){$('#dash').textContent=ready?'ГОТОВ':'ПЕРЕЗАРЯДКА';hudCache.ready=ready}}
 function reset(){Object.assign(p,{x:150,y:565,vx:0,vy:0,hp:100,ground:true,jumps:0,face:1,attack:0,attackCd:0,dash:0,dashCd:0,inv:0});checkpoint=150;kills=0;camera=0;particles=[];shots=[];enemies=enemySpawns.map((x,i)=>({x,y:platforms.find(a=>!a.upper&&x>=a.x&&x<a.x+a.w).y,vx:0,vy:0,hp:3,w:30,h:85,face:-1,ground:true,step:i,shootCd:1.2+i*.2,hit:0,home:x}));orbs=platforms.filter(a=>a.upper).map(a=>({x:a.x+a.w/2,y:a.y-35}));state='play';$('#menu').classList.add('hidden');$('#hud').classList.remove('hidden');$('#objective').classList.remove('hidden');$('#overlay').classList.add('hidden');document.body.classList.add('playing');updateHUD();toast('ДВОЙНОЙ ПРЫЖОК · SPACE / SPACE');}
 function overlay(title,text,action,mode){state=mode;$('#overlay-title').textContent=title;$('#overlay-text').textContent=text;$('#resume span').textContent=action;$('#overlay').classList.remove('hidden')}
 function hurt(amount){if(p.inv>0||p.dash>0||state!=='play')return;p.hp=Math.max(0,p.hp-amount);p.inv=1.2;shake=8;burst(p.x,p.y-44,'#b8d782',12);sfx(70,.18);if(p.hp<=0)overlay('ТЬМА ЗОВЁТ','Ты пал, но мёртвые умеют возвращаться. Попробуй ещё раз.','ВОССТАТЬ','dead');updateHUD()}
@@ -82,7 +83,7 @@ for(let e of enemies){if(e.hp<=0)continue;e.shootCd-=dt;const dx=p.x-e.x;e.face=
 for(let b of shots){b.x+=b.vx*dt;b.life-=dt;if(Math.abs(b.x-p.x)<22&&b.y>p.y-p.h&&b.y<p.y){hurt(9);b.life=0}}shots=shots.filter(b=>b.life>0);
 for(let i=orbs.length-1;i>=0;i--){let o=orbs[i];if(Math.abs(o.x-p.x)<27&&Math.abs(o.y-(p.y-40))<55){p.hp=Math.min(100,p.hp+22);burst(o.x,o.y,'#c7ff92',22);orbs.splice(i,1);sfx(600,.2,'sine');toast('ЭНЕРГИЯ +22 ЖИЗНИ')}}
 camera+=(Math.max(0,Math.min(WORLD-W,p.x-W*.36))-camera)*Math.min(1,dt*5);if(p.x>5300&&p.ground){overlay('ТЫ ВЫЖИЛ.',`Карантин позади. Поглощено патрульных: ${kills} из 8. Ночь принадлежит тебе.`,'ИГРАТЬ СНОВА','win');sfx(470,.5,'sine')}updateHUD();}
-function frame(now){let dt=Math.min((now-last)/1000||.016,.033);last=now;if(state==='play'||state==='menu'){t+=dt;update(dt)}render();for(let k in pressed)delete pressed[k];requestAnimationFrame(frame)}
+function frame(now){let dt=Math.min((now-last)/1000||.016,.033);last=now;if(state==='play'||state==='menu'){t+=dt;update(dt);render();paintedState=state}else if(paintedState!==state){render();paintedState=state}for(let k in pressed)delete pressed[k];requestAnimationFrame(frame)}
 addEventListener('keydown',e=>{let k=e.key.length===1?e.key.toLowerCase():e.key;const map={'ф':'a','в':'d','ц':'w','о':'j','л':'k'};k=map[k]||k;if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(k))e.preventDefault();if(!keys[k])pressed[k]=true;keys[k]=true;if(k==='Escape')togglePause();if(k==='Enter'&&state==='menu')reset()});
 addEventListener('keyup',e=>{let k=e.key.length===1?e.key.toLowerCase():e.key;const map={'ф':'a','в':'d','ц':'w','о':'j','л':'k'};keys[map[k]||k]=false});
 function togglePause(){if(state==='play')overlay('ПАУЗА','Город подождёт. Наберись сил.','ПРОДОЛЖИТЬ','paused');else if(state==='paused'){state='play';$('#overlay').classList.add('hidden')}}

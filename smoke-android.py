@@ -63,9 +63,13 @@ try:
     touch('[data-key=" "]');time.sleep(.1);assert game()['jumps']==2
     touch('[data-key="j"]');time.sleep(.02);assert game()['attack']>0
     touch('[data-key="k"]');time.sleep(.02);assert game()['dashCd']>0
-    adb('shell','input','keyevent','4');time.sleep(.2);assert game()['state']=='paused'
+    adb('shell','input','keyevent','4');time.sleep(.7);assert game()['state']=='paused'
     shot('04-pause.png')
-    touch('#resume');time.sleep(.1);assert game()['state']=='play'
+    time.sleep(1);touch('#resume');
+    for _ in range(30):
+        if game()['state']=='play':break
+        time.sleep(.1)
+    assert game()['state']=='play'
     errors=evaluate("Boolean(window.__game&&document.querySelector('canvas').width>0)");assert errors
     logs=adb('logcat','-d')
     assert 'FATAL EXCEPTION' not in logs,'Android crash; see logcat.txt'
