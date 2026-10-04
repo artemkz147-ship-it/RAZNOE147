@@ -19,6 +19,13 @@ result=adb('shell','am','start','-W','-n','com.deadlight.game/.MainActivity')
 (OUT/'launch.txt').write_text(result)
 assert 'Status: ok' in result,result
 time.sleep(5)
+# Android's first-run fullscreen hint blocks the app's accessibility tree.
+try:
+    x,y=find_button('GOT IT')
+    adb('shell','input','tap',str(x),str(y))
+    time.sleep(1)
+except RuntimeError:
+    pass
 assert 'com.deadlight.game' in adb('shell','dumpsys','activity','activities')
 shot('01-menu.png')
 x,y=find_button('ПРОБУДИТЬСЯ');adb('shell','input','tap',str(x),str(y));time.sleep(1)
