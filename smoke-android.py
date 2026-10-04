@@ -39,7 +39,7 @@ try:
         try:
             targets=json.loads(urllib.request.urlopen('http://127.0.0.1:9222/json',timeout=3).read())
             target=next(t for t in targets if '/assets/index.html' in t.get('url',''))
-            client=websocket.create_connection(target['webSocketDebuggerUrl'],timeout=10,skip_origin=True)
+            client=websocket.create_connection(target['webSocketDebuggerUrl'],timeout=10,suppress_origin=True)
             if evaluate("Boolean(window.__game&&document.querySelector('#play'))"):break
         except (OSError,StopIteration,RuntimeError):time.sleep(.5)
     else:raise RuntimeError('Android WebView game did not become ready')
