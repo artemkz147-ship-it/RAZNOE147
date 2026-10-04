@@ -81,12 +81,12 @@ try:
     touch('[data-key="r"]');time.sleep(.15)
     assert evaluate("__game.p.energy<70&&__game.p.special>0"),'Slam button or energy cost failed'
     time.sleep(1)
-    evaluate("(()=>{let e=__game.enemies[0];e.hp=12;Object.assign(__game.p,{x:e.x-60,y:e.y,vy:0,ground:true,face:1,attack:0,attackCd:0,special:0,hp:40,energy:10,inv:99});})()")
+    evaluate("(()=>{let e=__game.enemies.find(e=>e.hp>0);e.hp=12;Object.assign(__game.p,{x:e.x-60,y:e.y,vy:0,ground:true,face:1,attack:0,attackCd:0,special:0,hp:40,energy:10,inv:99});})()")
     touch('[data-key="j"]');time.sleep(.6)
     assert evaluate("__game.kills>=1&&__game.corpses.length>0"),'Claw hit did not create corpse'
-    evaluate("(()=>{let c=__game.corpses[0];Object.assign(__game.p,{x:c.x,y:c.y,vy:0,ground:true,attack:0,attackCd:0});})()")
+    evaluate("(()=>{let c=__game.corpses[__game.corpses.length-1];Object.assign(__game.p,{x:c.x,y:c.y,vy:0,ground:true,attack:0,attackCd:0});})()")
     touch('[data-key="e"]');time.sleep(2)
-    assert evaluate("__game.corpses[0].eaten&&__game.p.hp>=75&&__game.p.energy>=55"),'Feeding did not restore health and energy'
+    assert evaluate("__game.corpses[__game.corpses.length-1].eaten&&__game.p.hp>=75&&__game.p.energy>=55"),'Feeding did not restore health and energy'
     shot('05-feeding.png')
     evaluate("__game.p.hp=10;__game.profile.inventory.life=2")
     touch('#use-life');time.sleep(.2)
@@ -122,7 +122,7 @@ try:
     touch('#close-panel');time.sleep(.3)
     touch('#play');time.sleep(.3)
     assert game()['state']=='play'
-    assert evaluate("__game.kills>=1&&__game.corpses[0].eaten"),'Raid did not persist reload'
+    assert evaluate("__game.kills>=1&&__game.corpses.some(c=>c.eaten)"),'Raid did not persist reload'
     shot('08-restored-raid.png')
     errors=evaluate("Boolean(window.__game&&document.querySelector('canvas').width>0)");assert errors
     logs=adb('logcat','-d')
