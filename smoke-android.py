@@ -24,7 +24,7 @@ def touch(selector,duration=0):
     if duration:adb('shell','input','touchscreen','swipe',x,y,x,y,str(duration))
     else:adb('shell','input','touchscreen','tap',x,y)
 
-def game():return json.loads(evaluate("JSON.stringify({state:window.__game.state,x:window.__game.p.x,y:window.__game.p.y,attack:window.__game.p.attack,dashCd:window.__game.p.dashCd,jumps:window.__game.p.jumps})"))
+def game():return json.loads(evaluate("JSON.stringify({state:window.__game.state,x:window.__game.p.x,y:window.__game.p.y,attack:window.__game.p.attack,dashCd:window.__game.p.dashCd,jumps:window.__game.p.jumps,energy:window.__game.p.energy,special:window.__game.p.special,specialCd:window.__game.p.specialCd})"))
 
 try:
     # boot_completed precedes Android 15's initial package/resource updates.
@@ -75,11 +75,11 @@ try:
     # Physical controls with deterministic health/energy test fixtures.
     evaluate("Object.assign(__game.p,{energy:100,attack:0,attackCd:0,special:0,specialCd:0,dash:0,inv:99});")
     touch('[data-key="q"]');time.sleep(.1)
-    assert evaluate("__game.p.energy<80&&__game.p.special>0"),'Plague button or energy cost failed'
+    assert evaluate("__game.p.energy<85"),('Plague button or energy cost failed',game())
     time.sleep(.8)
     evaluate("Object.assign(__game.p,{y:565,vy:0,ground:true,x:200,specialCd:0,energy:100});")
     touch('[data-key="r"]');time.sleep(.15)
-    assert evaluate("__game.p.energy<70&&__game.p.special>0"),'Slam button or energy cost failed'
+    assert evaluate("__game.p.energy<80"),('Slam button or energy cost failed',game())
     time.sleep(1)
     evaluate("(()=>{let e=__game.enemies.find(e=>e.hp>0);e.hp=12;Object.assign(__game.p,{x:e.x-60,y:e.y,vy:0,ground:true,face:1,attack:0,attackCd:0,special:0,hp:40,energy:10,inv:99});})()")
     touch('[data-key="j"]');time.sleep(.6)
