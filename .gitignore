@@ -1,0 +1,6 @@
+.gradle/
+.build-tools/
+**/build/
+local.properties
+DEADLIGHT.apk
+__pycache__/

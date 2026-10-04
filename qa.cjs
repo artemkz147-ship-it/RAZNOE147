@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const nodes=new Map(),events={};const node=()=>({classList:{add(){},remove(){}},style:{},setAttribute(){},addEventListener(){},textContent:'',innerHTML:''});
+const ctx=new Proxy({createLinearGradient:()=>({addColorStop(){}}),createRadialGradient:()=>({addColorStop(){}})}, {get:(obj,key)=>obj[key]||(()=>{}),set:(obj,key,val)=>(obj[key]=val,true)});
+const canvas={...node(),getContext:()=>ctx};nodes.set('#world',canvas);
+const sandbox={console,Math,innerWidth:1280,innerHeight:720,devicePixelRatio:1,document:{querySelector:s=>{if(!nodes.has(s))nodes.set(s,node());return nodes.get(s)},querySelectorAll:()=>[],body:node(),addEventListener(){}},window:{},addEventListener:(name,fn)=>events[name]=fn,requestAnimationFrame:fn=>sandbox.frame=fn};vm.createContext(sandbox);vm.runInContext(fs.readFileSync('app/src/main/assets/game.js','utf8'),sandbox);const g=sandbox.window.__game;
+assert.equal(g.state,'menu');sandbox.frame(16);g.reset();assert.equal(g.state,'play');g.keys.d=true;for(let i=0;i<60;i++)g.update(1/60);assert(g.p.x>390);g.keys.d=false;
+g.p.x=300;g.p.y=565;g.p.ground=true;g.p.vy=0;g.p.jumps=0;g.pressed[' ']=true;g.update(1/60);delete g.pressed[' '];assert(g.p.vy<0);assert.equal(g.p.jumps,1);for(let i=0;i<10;i++)g.update(1/60);g.pressed[' ']=true;g.update(1/60);delete g.pressed[' '];assert.equal(g.p.jumps,2);g.pressed[' ']=true;g.update(1/60);delete g.pressed[' '];assert.equal(g.p.jumps,2);
+g.p.x=610;g.p.y=565;g.p.vy=0;g.p.face=1;g.p.attackCd=0;for(let i=0;i<3;i++){g.pressed.j=true;g.update(1/60);delete g.pressed.j;for(let n=0;n<24;n++)g.update(1/60)}assert.equal(g.enemies[0].hp,0);assert.equal(g.kills,1);
+g.pressed.k=true;g.update(1/60);delete g.pressed.k;assert(g.p.dash>0);assert(g.p.dashCd>0);
+g.p.x=940;g.p.y=900;g.p.inv=0;g.p.dash=0;g.update(1/60);assert.equal(g.p.x,150);assert(g.p.hp<100);
+events.keydown({key:'Escape',preventDefault(){}});assert.equal(g.state,'paused');events.keydown({key:'Escape',preventDefault(){}});assert.equal(g.state,'play');g.p.x=5340;g.p.y=565;g.p.vy=0;g.update(1/60);assert.equal(g.state,'win');g.reset();assert.equal(g.p.hp,100);assert.equal(g.kills,0);sandbox.frame(32);console.log('PASS: menu render, start, movement, double jump limit, melee kill, dash cooldown, fall recovery, pause/resume, victory, restart, gameplay render');

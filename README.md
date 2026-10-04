@@ -1,3 +1,32 @@
-# RAZNOE147
+# DEADLIGHT — Android
 
-Bootstrap repository. Active development is done in dedicated project branches.
+Зомби-платформер с ночным городом, дождём, многослойным фоном и процедурными анимациями. Пройди карантин и доберись до зелёного маяка. На пути — восемь вооружённых патрульных, энергия для лечения и две контрольные точки.
+
+Игра включена в APK и работает без сети. Поддерживается Android 8.0 и новее. Используется системный Android WebView: его рекомендуется обновить. Экран горизонтальный, управление сенсорными кнопками: движение, двойной прыжок, удар, рывок. Звук включается кнопкой ♫. «Назад» — пауза/продолжение; на меню или экране результата — выход.
+
+## APK через GitHub Actions
+
+Workflow `.github/workflows/android-apk.yml` запускается при push в ветку `deadlight-android`. Он проверяет игровые механики, собирает debug APK, запускает Android Lint, проверяет подпись и публикует artifact **DEADLIGHT-Android-APK**, содержащий **DEADLIGHT-1.0.apk**.
+
+После сборки workflow устанавливает APK на Android-эмулятор, проверяет меню, экранные кнопки и паузу. Скриншоты и логи доступны в artifact **DEADLIGHT-Android-Smoke**. Результаты проверки следует смотреть в конкретном запуске Actions; наличие исходников не означает успешную сборку.
+
+Это debug APK для личного тестирования, автоматически подписанный тестовым ключом. Релиз для магазина требует отдельной постоянной подписи. Ключи и секреты в репозиторий не включаются.
+
+## Локальная сборка
+
+Нужны JDK 17, Android SDK Platform 35, Build Tools 34.0.0 и Gradle 8.9. Версии Android Gradle Plugin (8.7.3) и AndroidX WebKit (1.12.1) фиксированы. Интернет нужен только для установки инструментов и зависимостей при сборке.
+
+С установленным Gradle: `gradle --no-daemon :app:assembleDebug :app:lintDebug`.
+
+Без установленного Gradle: задайте ANDROID_HOME и выполните `python3 build-apk.py`. Скрипт загрузит Gradle с официального сайта, сверит SHA-256 и положит DEADLIGHT.apk в корень.
+
+Проверка игровых механик: `node qa.cjs`.
+
+## Внешние компоненты
+
+AndroidX WebKit — библиотека загрузки локальных ресурсов в системный WebView. Лицензия Apache License 2.0, платных API и серверов для работы игры не требуется. Android WebView предоставляется системой. Google Fonts и другие сетевые ресурсы в Android-версии не используются.
+
+Документация:
+- https://developer.android.com/develop/ui/views/layout/webapps/load-local-content
+- https://developer.android.com/build/releases/agp-8-7-0-release-notes
+- https://www.apache.org/licenses/LICENSE-2.0

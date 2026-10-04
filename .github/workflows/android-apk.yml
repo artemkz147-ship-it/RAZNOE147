@@ -1,0 +1,68 @@
+name: DEADLIGHT Android APK
+on:
+  push:
+    branches: [deadlight-android]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deadlight-android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install build SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;34.0.0'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Verify game mechanics
+        run: |
+          node --check app/src/main/assets/game.js
+          node qa.cjs
+      - name: Build installable APK
+        run: gradle --no-daemon :app:assembleDebug :app:lintDebug --stacktrace
+      - name: Name APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk DEADLIGHT-1.0.apk
+      - name: Verify APK signature
+        run: '"$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose DEADLIGHT-1.0.apk'
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DEADLIGHT-Android-APK
+          path: DEADLIGHT-1.0.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Android launch and touch smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: python3 smoke-android.py
+      - name: Upload launch evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DEADLIGHT-Android-Smoke
+          path: smoke-output/
+          if-no-files-found: ignore
+          retention-days: 30
