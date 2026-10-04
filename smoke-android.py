@@ -61,8 +61,8 @@ try:
     assert after['x']>before['x']+20,(before,after)
     shot('02-gameplay.png')
     touch('[data-key=" "]');time.sleep(.1);after=game();assert after['jumps']>=1,after
+    touch('[data-key=" "]');time.sleep(.1);after=game();assert after['jumps']==2,after
     shot('03-jump.png')
-    touch('[data-key=" "]');time.sleep(.1);assert game()['jumps']==2
     touch('[data-key="j"]');time.sleep(.02);assert game()['attack']>0
     touch('[data-key="k"]');time.sleep(.02);assert game()['dashCd']>0
     adb('shell','input','keyevent','4');time.sleep(.7);assert game()['state']=='paused'
@@ -111,5 +111,8 @@ try:
     (OUT/'result.json').write_text(json.dumps({'launch':'passed','touch_movement':'passed','double_jump':'passed','attack':'passed','dash':'passed','pause_resume':'passed','crash_check':'passed','sprites':'passed','specials_energy':'passed','corpse_feeding':'passed','potions':'passed','mutation_purchase':'passed','inventory_equip':'passed'},indent=2))
     print('PASS: APK installed, Android WebView rendered, physical touch movement/double jump/attack/dash, native back pause/resume, no crash')
 finally:
+    if client:
+        try:(OUT/'last-game.json').write_text(json.dumps(game()))
+        except Exception:pass
     (OUT/'logcat.txt').write_text(adb('logcat','-d'))
     if client:client.close()
