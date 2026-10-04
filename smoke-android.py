@@ -104,7 +104,7 @@ try:
     shot('07-inventory.png')
     touch('#close-panel');time.sleep(.3)
     evaluate("__game.saveRun()")
-    saved_run=evaluate("localStorage.getItem('deadlight-run-v2')")
+    before_reload=evaluate("localStorage.getItem('deadlight-run-v2')")
     evaluate("setTimeout(()=>location.reload(),0)")
     time.sleep(2)
     for _ in range(60):
@@ -113,8 +113,11 @@ try:
         except RuntimeError:pass
         time.sleep(.2)
     assert game()['state']=='menu'
+    saved_run=evaluate("localStorage.getItem('deadlight-run-v2')")
     touch('#inventory');time.sleep(.3)
-    assert evaluate("localStorage.getItem('deadlight-run-v2')")==saved_run,'Menu panel overwrote raid snapshot'
+    after_panel=evaluate("localStorage.getItem('deadlight-run-v2')")
+    (OUT/'reload-saves.json').write_text(json.dumps({'before_reload':json.loads(before_reload),'after_reload':json.loads(saved_run),'after_menu_panel':json.loads(after_panel)},indent=2))
+    assert after_panel==saved_run,'Menu panel overwrote raid snapshot'
     assert evaluate("__game.profile.equipment.claw&&__game.profile.upgrades.vitality===1"),'Profile did not persist reload'
     touch('#close-panel');time.sleep(.3)
     touch('#play');time.sleep(.3)
