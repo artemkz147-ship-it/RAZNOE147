@@ -1,0 +1,72 @@
+name: Build Kinoimperiya Android APK
+on:
+  push:
+    branches:
+      - kinoimperiya-android-apk
+    paths:
+      - 'kinoimperiya/**'
+      - '.github/workflows/kinoimperiya-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout the game
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        run: sdkmanager 'platforms;android-35' 'platforms;android-34' 'build-tools;35.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Package game as a native Android APK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          npm install -g cordova@12
+          mkdir -p _kino-build
+          cd _kino-build
+          cordova create app com.kinoimperiya.game Kinoimperiya
+          cp -a ../kinoimperiya/www/. app/www/
+          cd app
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('config.xml')
+          s=p.read_text()
+          s=s.replace("</widget>",'  <preference name="Orientation" value="portrait" />\n  <preference name="Fullscreen" value="true" />\n  <preference name="android-targetSdkVersion" value="34" />\n</widget>')
+          p.write_text(s)
+          PY
+          cordova platform add android@13.0.0
+          cordova build android --debug -- --packageType=apk
+          cp platforms/android/app/build/outputs/apk/debug/app-debug.apk ../../Kinoimperiya-0.1.apk
+          test -s ../../Kinoimperiya-0.1.apk
+          ls -lh ../../Kinoimperiya-0.1.apk
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kinoimperiya-0.1-APK
+          path: Kinoimperiya-0.1.apk
+          if-no-files-found: error
