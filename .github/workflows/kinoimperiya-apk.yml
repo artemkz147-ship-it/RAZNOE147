@@ -30,6 +30,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Set up Android SDK without deprecated tools package
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+
       - name: Install Android build tools
         run: sdkmanager 'platforms;android-35' 'platforms;android-34' 'build-tools;35.0.0'
 
