@@ -1,0 +1,53 @@
+name: Build SparkForge Full Studio APK
+on:
+  push:
+    branches: [sparkforge-android]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Restore original Android project
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json,base64
+          base=Path("sparkforge")
+          pack=json.loads((base/"source-pack.json").read_text())
+          for name,value in pack["files"].items():
+              dest=base/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(base64.b64decode(value["b64"]) if isinstance(value,dict) else value.encode("utf-8"))
+          (base/"android/studio/src/main/assets/index.html").write_bytes((base/"web/index.html").read_bytes())
+          print("Prepared",len(pack["files"]),"Android project files")
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+      - name: Build REAL Studio APK with offline game exporter
+        working-directory: sparkforge/android
+        run: gradle --no-daemon --stacktrace :studio:assembleDebug
+      - name: Assert APK contains full native exporter assets
+        run: |
+          APK=sparkforge/android/studio/build/outputs/apk/debug/studio-debug.apk
+          test -s "$APK"
+          unzip -l "$APK" | grep -F runner-template.apk
+          unzip -l "$APK" | grep -F assets/index.html
+          ls -lh "$APK"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SparkForge-FULL-APK
+          path: sparkforge/android/studio/build/outputs/apk/debug/studio-debug.apk
+          if-no-files-found: error
